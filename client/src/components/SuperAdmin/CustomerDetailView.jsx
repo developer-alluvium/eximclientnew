@@ -233,6 +233,8 @@ const CustomerDetailView = ({
         sx: {
           borderRadius: 3,
           minHeight: '70vh',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid #F3F4F6',
         }
       }}
     >
@@ -240,42 +242,87 @@ const CustomerDetailView = ({
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        pb: 1
+        pb: 2,
+        borderBottom: '1px solid #F3F4F6',
+        backgroundColor: '#FFFFFF',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Avatar sx={{ 
-            bgcolor: 'primary.main', 
+            backgroundColor: '#3B82F6',
+            color: '#FFFFFF',
             width: 48, 
             height: 48,
-            fontSize: '1.2rem'
+            fontSize: '1.2rem',
+            fontWeight: 600,
           }}>
             {customer.name?.charAt(0) || 'C'}
           </Avatar>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 600,
+                fontSize: '1.125rem',
+                color: '#1F2937',
+                lineHeight: 1.2,
+              }}
+            >
               {customer.name || 'Customer Details'}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: '#6B7280',
+                fontSize: '0.875rem',
+                mt: 0.25,
+              }}
+            >
               {customer.ie_code_no} • {customer.pan_number}
             </Typography>
           </Box>
         </Box>
-        <IconButton onClick={handleClose}>
-          <Close />
+        <IconButton 
+          onClick={handleClose}
+          sx={{
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E5E7EB',
+            '&:hover': {
+              backgroundColor: '#F1F5F9',
+              borderColor: '#D1D5DB',
+            },
+          }}
+        >
+          <Close fontSize="small" sx={{ color: '#6B7280' }} />
         </IconButton>
       </DialogTitle>
 
       <DialogContent sx={{ p: 0 }}>
-        {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        {/* Modern Tabs */}
+        <Box sx={{ borderBottom: '1px solid #F3F4F6', backgroundColor: '#FFFFFF' }}>
           <Tabs 
             value={activeTab} 
             onChange={(e, newValue) => setActiveTab(newValue)}
-            sx={{ px: 3 }}
+            sx={{ 
+              px: 3,
+              '& .MuiTab-root': {
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                textTransform: 'none',
+                color: '#6B7280',
+                '&.Mui-selected': {
+                  color: '#3B82F6',
+                  fontWeight: 600,
+                },
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#3B82F6',
+                height: 2,
+              },
+            }}
           >
-            <Tab icon={<Person />} label="Profile" />
-            <Tab icon={<Security />} label="Security" />
-            <Tab icon={<Settings />} label="Module Access" />
+            <Tab icon={<Person fontSize="small" />} label="Profile" />
+            <Tab icon={<Security fontSize="small" />} label="Security" />
+            <Tab icon={<Settings fontSize="small" />} label="Module Access" />
           </Tabs>
         </Box>
 

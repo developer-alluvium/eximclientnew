@@ -20,6 +20,7 @@ import SuperAdminDashboard from "./components/SuperAdmin/SuperAdminDashboard.jsx
 import ModuleAccessManagement from "./pages/ModuleAccessManagement.jsx";
 import SessionManager from "./components/SessionManager.jsx";
 import { validateSuperAdminToken } from "./utils/tokenValidation";
+import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -115,6 +116,11 @@ function App() {
                 <Route path="/superadmin-dashboard" element={
                   <SuperAdminProtectedRoute>
                     <SuperAdminDashboard />
+                  </SuperAdminProtectedRoute>
+                } />
+                <Route path="/superadmin-dashboard/customer/:customerId" element={
+                  <SuperAdminProtectedRoute>
+                    <SuperAdminCustomerDetail />
                   </SuperAdminProtectedRoute>
                 } />
                 <Route path="/module-access-management" element={

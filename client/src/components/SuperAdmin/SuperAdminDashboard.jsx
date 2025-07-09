@@ -1,15 +1,17 @@
 import React, { useState, useContext, useEffect } from "react";
-import { Box, Container, useTheme, alpha, Alert } from "@mui/material";
+import { Box, Container, useTheme, alpha, Alert, ThemeProvider } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../context/UserContext";
 import { validateSuperAdminToken } from "../../utils/tokenValidation";
 import { useAutoLogout } from "../../hooks/useAutoLogout";
 
+// Import modern theme
+import { modernTheme } from "../../styles/modernTheme";
+
 // Import dashboard components
-import DashboardHeader from './DashboardHeader';
-import DashboardSidebar from './DashboardSidebar';
-import DashboardOverview from './DashboardOverview';
-import CustomerManagement from './CustomerManagement';
+import ModernSidebar from './ModernSidebar';
+import ModernDashboardOverview from './ModernDashboardOverview';
+import ModernCustomerManagement from './ModernCustomerManagement';
 import ModuleManagement from './ModuleManagement';
 import SystemAnalytics from './SystemAnalytics';
 import UserActivity from './UserActivity';
@@ -42,6 +44,8 @@ const SuperAdminDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [userActivity, setUserActivity] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
 
   // Tab configuration
@@ -134,9 +138,9 @@ const SuperAdminDashboard = () => {
   const renderActiveComponent = () => {
     switch (tabs[activeTab].component) {
       case 'overview':
-        return <DashboardOverview data={dashboardData} onRefresh={fetchDashboardData} />;
+        return <ModernDashboardOverview data={dashboardData} onRefresh={fetchDashboardData} loading={loading} />;
       case 'customers':
-        return <CustomerManagement onRefresh={fetchDashboardData} />;
+        return <ModernCustomerManagement onRefresh={fetchDashboardData} />;
       case 'modules':
         return <ModuleManagement onRefresh={fetchDashboardData} />;
       case 'analytics':
@@ -146,73 +150,82 @@ const SuperAdminDashboard = () => {
       case 'sessions':
         return <SessionManager userType="superadmin" />;
       default:
-        return <DashboardOverview data={dashboardData} onRefresh={fetchDashboardData} />;
+        return <ModernDashboardOverview data={dashboardData} onRefresh={fetchDashboardData} loading={loading} />;
     }
   };
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
-      minHeight: '100vh',
-      bgcolor: alpha(theme.palette.grey[50], 0.5),
-      position: 'relative'
-    }}>
-      {/* Session Manager for SuperAdmin */}
-      <SessionManager userType="superadmin" />
+    <ThemeProvider theme={modernTheme}>
       
-      {/* Sidebar */}
-      <DashboardSidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        tabs={tabs}
-        onLogout={handleLogout}
-      />
-
-      {/* Main Content */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          transition: theme.transitions.create('margin', {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.leavingScreen,
-          }),
-          marginLeft: sidebarOpen ? 0 : `-280px`,
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {/* Header */}
-        <DashboardHeader
-          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        {/* Session Manager for SuperAdmin */}
+        <SessionManager userType="superadmin" />
+        
+        {/* Modern Sidebar */}
+        <ModernSidebar
+          open={sidebarOpen}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          tabs={tabs}
           onLogout={handleLogout}
-          activeTab={tabs[activeTab].label}
-          user={user}
+          mobileOpen={mobileOpen}
+          onMobileToggle={() => setMobileOpen(!mobileOpen)}
         />
 
-        {/* Content Area */}
-        <Container
-          maxWidth={false}
+        {/* Main Content */}
+        <Box
+          component="main"
           sx={{
             flexGrow: 1,
-            pt: 3,
-            pb: 3,
-            px: { xs: 2, sm: 3 }
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: '100vh',
+            ml: { 
+              xs: 0, 
+              md: sidebarCollapsed ? '64px' : '240px' 
+            },
+            transition: 'margin-left 0.2s ease',
+            width: { 
+              xs: '100%',
+              md: `calc(100% - ${sidebarCollapsed ? '64px' : '240px'})`
+            },
+            overflow: 'hidden',
           }}
         >
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-              {error}
-            </Alert>
-          )}
-          
-          {renderActiveComponent()}
-        </Container>
-      </Box>
-    </Box>
+          {/* Content Area */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              p: { xs: 2, sm: 3, md: 3 },
+              backgroundColor: '#F8FAFC',
+              minHeight: '100vh',
+              width: '95%',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}
+          >
+            {error && (
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 2,
+                  border: '1px solid #FEE2E2',
+                  backgroundColor: '#FEF2F2',
+                  color: '#DC2626',
+                }} 
+                onClose={() => setError(null)}
+              >
+                {error}
+              </Alert>
+            )}
+            
+            {renderActiveComponent()}
+          </Box>
+        </Box>
+      
+    </ThemeProvider>
   );
 };
 

@@ -1,15 +1,14 @@
 import React from 'react';
-import { 
-  Card, 
-  CardContent, 
-  Typography, 
-  Box, 
-  Avatar,
-  alpha
+import {
+  Card,
+  CardContent,
+  Box,
+  Typography,
+  alpha,
 } from '@mui/material';
-import { 
-  TrendingUp as TrendingUpIcon, 
-  TrendingDown as TrendingDownIcon 
+import {
+  TrendingUp,
+  TrendingDown,
 } from '@mui/icons-material';
 
 const ModernStatsCard = ({ 
@@ -18,111 +17,170 @@ const ModernStatsCard = ({
   change, 
   trend, 
   icon: Icon, 
-  color, 
-  gradient,
-  colors 
+  color = '#3B82F6',
+  loading = false 
 }) => {
-  const TrendIcon = trend === 'up' ? TrendingUpIcon : TrendingDownIcon;
-  
+  if (loading) {
+    return (
+      <Card
+        sx={{
+          height: '100%',
+          border: '1px solid #F3F4F6',
+          borderRadius: 2,
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: '0 2px 4px 0 rgba(0, 0, 0, 0.05)',
+          },
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                backgroundColor: '#F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            />
+            <Box
+              sx={{
+                width: 60,
+                height: 16,
+                borderRadius: 1,
+                backgroundColor: '#F3F4F6',
+              }}
+            />
+          </Box>
+          
+          <Box
+            sx={{
+              width: 80,
+              height: 24,
+              borderRadius: 1,
+              backgroundColor: '#F3F4F6',
+              mb: 1,
+            }}
+          />
+          
+          <Box
+            sx={{
+              width: 120,
+              height: 14,
+              borderRadius: 1,
+              backgroundColor: '#F9FAFB',
+            }}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isPositiveTrend = trend === 'up';
+  const TrendIcon = isPositiveTrend ? TrendingUp : TrendingDown;
+  const trendColor = isPositiveTrend ? '#10B981' : '#EF4444';
+
   return (
-    <Card 
-      sx={{ 
+    <Card
+      sx={{
         height: '100%',
-        background: gradient,
-        color: colors.surface,
-        borderRadius: 3,
-        position: 'relative',
-        overflow: 'hidden',
-        cursor: 'pointer',
+        border: '1px solid #F3F4F6',
+        borderRadius: 2,
+        boxShadow: 'none',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          borderColor: '#E5E7EB',
         },
-        transition: 'all 0.3s ease'
+        transition: 'all 0.2s ease',
+        cursor: 'pointer',
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          height: '100%'
-        }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                opacity: 0.85,
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                mb: 1,
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-            >
-              {title}
-            </Typography>
-            <Typography 
-              variant="h4" 
-              sx={{ 
-                fontWeight: 700,
-                fontSize: '2rem',
-                lineHeight: 1.2,
-                mb: 1
-              }}
-            >
-              {typeof value === 'number' ? value.toLocaleString() : value}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <TrendIcon sx={{ fontSize: '1rem', opacity: 0.8 }} />
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  fontSize: '0.75rem',
-                  opacity: 0.8,
-                  fontWeight: 600
-                }}
-              >
-                {change}
-              </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  fontSize: '0.7rem',
-                  opacity: 0.7,
-                  ml: 0.5
-                }}
-              >
-                vs last month
-              </Typography>
-            </Box>
-          </Box>
-          
-          <Avatar 
-            sx={{ 
-              backgroundColor: alpha(colors.surface, 0.2),
-              width: 48,
-              height: 48,
-              backdropFilter: 'blur(10px)'
+        {/* Header with icon and trend */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1.5,
+              backgroundColor: alpha(color, 0.1),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <Icon sx={{ color: colors.surface, fontSize: '1.5rem' }} />
-          </Avatar>
+            {Icon && (
+              <Icon 
+                sx={{ 
+                  fontSize: 20, 
+                  color: color,
+                }} 
+              />
+            )}
+          </Box>
+          
+          {change && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+                backgroundColor: alpha(trendColor, 0.1),
+              }}
+            >
+              <TrendIcon 
+                sx={{ 
+                  fontSize: 12, 
+                  color: trendColor,
+                }} 
+              />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  color: trendColor,
+                }}
+              >
+                {Math.abs(change)}%
+              </Typography>
+            </Box>
+          )}
         </Box>
         
-        {/* Background decoration */}
-        <Box
+        {/* Value */}
+        <Typography
+          variant="h4"
           sx={{
-            position: 'absolute',
-            top: -20,
-            right: -20,
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            backgroundColor: alpha(colors.surface, 0.1),
-            zIndex: 0
+            fontSize: '1.5rem',
+            fontWeight: 700,
+            color: '#1F2937',
+            lineHeight: 1,
+            mb: 1,
           }}
-        />
+        >
+          {value}
+        </Typography>
+        
+        {/* Title */}
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            color: '#6B7280',
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </Typography>
       </CardContent>
     </Card>
   );
