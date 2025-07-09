@@ -11,6 +11,10 @@ import {
   updateCustomerPassword,
   validateSession,
   getInactiveCustomers,
+  getAvailableColumns,
+  getCustomerColumnPermissions,
+  updateCustomerColumnPermissions,
+  bulkUpdateColumnPermissions,
 } from "../controllers/customerController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
@@ -31,5 +35,11 @@ router.get("/api/customer-kyc-list", protectSuperAdmin, getCustomerKycList);
 router.get("/api/registered-customers", protectSuperAdmin, getRegisteredCustomers);
 router.get("/api/inactive-customers", protectSuperAdmin, getInactiveCustomers);
 router.put("/api/customer/:customerId/password", protectSuperAdmin, updateCustomerPassword);
+
+// Column permissions routes (SuperAdmin only)
+router.get("/api/available-columns", protectSuperAdmin, getAvailableColumns);
+router.get("/api/customer/:customerId/column-permissions", protectSuperAdmin, getCustomerColumnPermissions);
+router.put("/api/customer/:customerId/column-permissions", protectSuperAdmin, updateCustomerColumnPermissions);
+router.post("/api/bulk-column-permissions", protectSuperAdmin, bulkUpdateColumnPermissions);
 
 export default router;

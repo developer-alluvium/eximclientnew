@@ -21,6 +21,7 @@ import {
   Box,
   useTheme,
   useMediaQuery,
+  Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import axios from "axios";
@@ -33,6 +34,7 @@ import SelectImporterModal from "./CSelectImporterModal";
 import { useNavigate } from "react-router-dom";
 import { useImportersContext } from "../context/importersContext";
 import SaveIcon from "@mui/icons-material/Save";
+
 
 function CJobList(props) {
   const [years, setYears] = useState([]);
@@ -60,6 +62,8 @@ function CJobList(props) {
   const navigate = useNavigate();
 
   const [columnOrder, setColumnOrder] = useState([]);
+  const [allowedColumns, setAllowedColumns] = useState([]);
+  const [userRole, setUserRole] = useState('user');
   const [isColumnOrderLoaded, setIsColumnOrderLoaded] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -112,9 +116,11 @@ function CJobList(props) {
         // Handle both old and new user data structures
         const userId = parsedUser.id || parsedUser.data?.user?.id;
         const userName = parsedUser.name || parsedUser.data?.user?.name;
+        const role = parsedUser.role || parsedUser.data?.user?.role || 'user';
         
         // Set userId only once
         setCurrentUserId(userId);
+        setUserRole(role);
         
         if (userName) {
           setUsername(userName);
@@ -198,13 +204,30 @@ function CJobList(props) {
             params: { userId: currentUserId },
           }
         );
+
+        // Set allowed columns based on user role and backend response
+        if (userRole === 'superadmin') {
+          // Superadmin can see all columns
+          setAllowedColumns(columns.map(col => col.accessorKey));
+        } else {
+          // Regular user gets columns based on superadmin settings
+          // If allowedColumns is empty array, we treat it as "allow all columns" by default
+          const userAllowedColumns = res.data.allowedColumns && res.data.allowedColumns.length > 0 
+            ? res.data.allowedColumns 
+            : columns.map(col => col.accessorKey); // Default to all columns if none specified
+          setAllowedColumns(userAllowedColumns);
+        }
   
         if (res.data.columnOrder?.length) {
           setColumnOrder(res.data.columnOrder);
         } else {
-          // Create a stable reference to the default column order
-          const defaultOrder = columns.map((col) => col.accessorKey);
-          setColumnOrder(defaultOrder);
+          // Create default order with only allowed columns
+          const allowedCols = userRole === 'superadmin' 
+            ? columns.map(col => col.accessorKey)
+            : (res.data.allowedColumns && res.data.allowedColumns.length > 0 
+                ? res.data.allowedColumns 
+                : columns.map(col => col.accessorKey));
+          setColumnOrder(allowedCols);
         }
         
         // Check if user info was returned and update localStorage if there's a mismatch
@@ -258,10 +281,12 @@ function CJobList(props) {
     };
   
     fetchColumnOrder();
-  }, [currentUserId, hasAttemptedFetch]);
+  }, [currentUserId, hasAttemptedFetch, userRole, columns]);
   
   const saveColumnOrderToBackend = async () => {
-    if (!currentUserId) {
+    // Only allow superadmin to save column order
+    if (!currentUserId || userRole !== 'superadmin') {
+      console.warn("Only superadmin can save column layout");
       return;
     }
     
@@ -421,17 +446,27 @@ selectedExporter  ]);
     };
   }, [isScrolling, scrollPosition]);
   const table = useMaterialReactTable({
-    columns,
+    // Filter columns based on user role and permissions
+    // SuperAdmin can see all columns, regular users can only see their allowed columns
+    columns: columns.filter(col => 
+      userRole === 'superadmin' || allowedColumns.includes(col.accessorKey)
+    ),
     data: rows.map((row, index) => ({ ...row, id: row._id || `row-${index}` })),
     enableColumnResizing: true,
     state: {
-      columnOrder,
+      // Also filter column order to match allowed columns
+      columnOrder: columnOrder.filter(colKey => 
+        userRole === 'superadmin' || allowedColumns.includes(colKey)
+      ),
     },
     onColumnOrderChange: (newOrder) => {
-      setColumnOrder(newOrder);
-      setUnsavedChanges(true);
+      // Only allow column order changes for superadmin
+      if (userRole === 'superadmin') {
+        setColumnOrder(newOrder);
+        setUnsavedChanges(true);
+      }
     },
-    enableColumnOrdering: true,
+    enableColumnOrdering: userRole === 'superadmin', // Only enable for superadmin
     enablePagination: false,
     enableBottomToolbar: false,
     enableDensityToggle: false,
@@ -450,7 +485,7 @@ selectedExporter  ]);
     enableGrouping: false, // Disable grouping to prevent event interference
     enableColumnFilters: false,
     
-    enableColumnActions: false,
+    enableColumnActions: userRole === 'superadmin', // Only enable column actions for superadmin
     enableStickyHeader: true,
     enablePinning: true,
     enableRowActions: false,
@@ -667,7 +702,7 @@ selectedExporter  ]);
             }}
           />
 
-          {unsavedChanges && (
+          {userRole === 'superadmin' && unsavedChanges && (
             <Button
               startIcon={<SaveIcon fontSize="small" />}
               variant="contained"
@@ -702,6 +737,27 @@ selectedExporter  ]);
        
       }}
     >
+      {/* Show a notification to users if their column visibility is restricted */}
+      {userRole !== 'superadmin' && 
+       allowedColumns.length > 0 && 
+       allowedColumns.length < columns.length 
+       //</div>& (
+        // <Alert 
+        //   severity="info" 
+        //   sx={{ 
+        //     mb: 2, 
+        //     mt: 2,
+        //     mx: 2,
+        //     '& .MuiAlert-icon': {
+        //       alignItems: 'center'
+        //     }
+        //   }}
+        // >
+        //   Your view has been customized by the administrator. Some columns may not be visible.
+        // </Alert>
+      //)
+      }
+
       <div style={{ 
         flex: 1, 
         minHeight: 0,

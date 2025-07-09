@@ -38,6 +38,10 @@ const customerSchema = new mongoose.Schema(
       type: [String],
       default: [], // Empty array means no modules assigned
     },
+    allowedColumns: {
+      type: [String],
+      default: [], // Empty array means all columns allowed by default
+    },
   },
   { timestamps: true }
 );

@@ -18,6 +18,7 @@ import UserActivity from './UserActivity';
 import LoadingScreen from './LoadingScreen';
 import ModuleAccessManagement from '../../pages/ModuleAccessManagement';
 import SessionManager from '../SessionManager';
+import ColumnPermissionsManagement from './ColumnPermissionsManagement';
 
 // Import custom hook
 import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
@@ -53,6 +54,7 @@ const SuperAdminDashboard = () => {
     { label: 'Overview', icon: 'dashboard', component: 'overview' },
     { label: 'Customer Management', icon: 'people', component: 'customers' },
     { label: 'Module Management', icon: 'settings', component: 'modules' },
+    { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
     { label: 'System Analytics', icon: 'analytics', component: 'analytics' },
     { label: 'User Activity', icon: 'timeline', component: 'activity' },
     { label: 'Session Manager', icon: 'security', component: 'sessions' }
@@ -143,6 +145,8 @@ const SuperAdminDashboard = () => {
         return <ModernCustomerManagement onRefresh={fetchDashboardData} />;
       case 'modules':
         return <ModuleManagement onRefresh={fetchDashboardData} />;
+      case 'columns':
+        return <ColumnPermissionsManagement onRefresh={fetchDashboardData} />;
       case 'analytics':
         return <SystemAnalytics data={dashboardData} />;
       case 'activity':

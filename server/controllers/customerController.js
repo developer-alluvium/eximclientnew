@@ -612,6 +612,7 @@ export const getColumnOrder = async (req, res) => {
    
     res.json({ 
       columnOrder: user.columnOrder || [],
+      allowedColumns: user.allowedColumns || [], // Send allowed columns
       userInfo: {
         id: user._id,
         name: user.name,
@@ -873,6 +874,172 @@ export const getInactiveCustomers = async (req, res) => {
       success: false,
       message: "Failed to fetch inactive customers",
       error: error.message
+    });
+  }
+};
+
+/**
+ * Get all available columns for SuperAdmin to manage
+ */
+export const getAvailableColumns = async (req, res) => {
+  try {
+    // Define all available columns in the system
+    const availableColumns = [
+      { id: "supplier_exporter", name: "Exporter, Job Number & Free Time" },
+      { id: "be_no", name: "BE Number & Date" },
+      { id: "checklist", name: "Checklist" },
+      { id: "shipment_details", name: "Shipment & Commercial Details" },
+      { id: "container_details", name: "Container" },
+      { id: "weight_shortage", name: "Weight Shortage/Excess" },
+      { id: "movement_timeline", name: "Movement Timeline" },
+      { id: "esanchit_documents", name: "eSanchit Documents" },
+      { id: "doPlanning", name: "DO Planning" },
+      { id: "delivery_planning", name: "Delivery Planning" }
+    ];
+
+    res.status(200).json({
+      success: true,
+      data: availableColumns
+    });
+  } catch (error) {
+    console.error("Error fetching available columns:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available columns",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get column permissions for a specific customer
+ */
+export const getCustomerColumnPermissions = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const customer = await CustomerModel.findById(customerId).select('name ie_code_no allowedColumns');
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        customer: {
+          id: customer._id,
+          name: customer.name,
+          ie_code_no: customer.ie_code_no,
+          allowedColumns: customer.allowedColumns || []
+        }
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching customer column permissions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch customer column permissions",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Update column permissions for a specific customer
+ */
+export const updateCustomerColumnPermissions = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { allowedColumns } = req.body;
+
+    if (!Array.isArray(allowedColumns)) {
+      return res.status(400).json({
+        success: false,
+        message: "allowedColumns must be an array",
+      });
+    }
+
+    const customer = await CustomerModel.findByIdAndUpdate(
+      customerId,
+      { allowedColumns },
+      { new: true, runValidators: true }
+    ).select('name ie_code_no allowedColumns');
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    console.log(`Column permissions updated for customer ${customer.name} (${customer.ie_code_no})`);
+
+    res.status(200).json({
+      success: true,
+      message: "Customer column permissions updated successfully",
+      data: {
+        id: customer._id,
+        name: customer.name,
+        ie_code_no: customer.ie_code_no,
+        allowedColumns: customer.allowedColumns
+      },
+    });
+  } catch (error) {
+    console.error("Error updating customer column permissions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update customer column permissions",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Bulk update column permissions for multiple customers
+ */
+export const bulkUpdateColumnPermissions = async (req, res) => {
+  try {
+    const { customerIds, allowedColumns } = req.body;
+
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "customerIds must be a non-empty array",
+      });
+    }
+
+    if (!Array.isArray(allowedColumns)) {
+      return res.status(400).json({
+        success: false,
+        message: "allowedColumns must be an array",
+      });
+    }
+
+    const result = await CustomerModel.updateMany(
+      { _id: { $in: customerIds } },
+      { allowedColumns }
+    );
+
+    console.log(`Bulk column permissions updated for ${result.modifiedCount} customers`);
+
+    res.status(200).json({
+      success: true,
+      message: `Column permissions updated for ${result.modifiedCount} customers`,
+      data: {
+        modifiedCount: result.modifiedCount,
+        allowedColumns
+      },
+    });
+  } catch (error) {
+    console.error("Error in bulk column permissions update:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update column permissions",
+      error: error.message,
     });
   }
 };

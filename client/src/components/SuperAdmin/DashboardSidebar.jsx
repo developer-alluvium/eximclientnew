@@ -21,6 +21,8 @@ import {
   Logout,
   AdminPanelSettings,
   Security,
+  Settings,
+  Visibility,
 } from '@mui/icons-material';
 
 const DRAWER_WIDTH = 280;
@@ -32,8 +34,11 @@ const DashboardSidebar = ({ open, onClose, activeTab, onTabChange, tabs, onLogou
     const iconMap = {
       dashboard: Dashboard,
       people: People,
+      settings: Settings,
+      visibility: Visibility,
       analytics: Analytics,
       timeline: Timeline,
+      security: Security,
     };
     const IconComponent = iconMap[iconName] || Dashboard;
     return <IconComponent />;
