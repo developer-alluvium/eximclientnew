@@ -38,7 +38,7 @@ import SaveIcon from "@mui/icons-material/Save";
 
 function CJobList(props) {
   const [years, setYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedYear, setSelectedYear] = useState("");
   const [detailedStatus, setDetailedStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -352,11 +352,11 @@ selectedExporter  ]);
             ? `${currentTwoDigits}-${nextTwoDigits}`
             : `${prevTwoDigits}-${currentTwoDigits}`;
 
-        if (!selectedYear && filteredYears.length > 0) {
+        if (selectedYear === "" && filteredYears.length > 0) {
           const yearToSet = filteredYears.includes(defaultYearPair)
             ? defaultYearPair
             : filteredYears[0];
-          setSelectedYear(yearToSet);
+          setSelectedYear(yearToSet || "");
         }
       } catch (error) {
         console.error("Error fetching years:", error);
@@ -567,7 +567,7 @@ selectedExporter  ]);
             select
             defaultValue={years[0]}
             size="small"
-            value={selectedYear}
+            value={selectedYear || ""}
             onChange={(e) => {
               setSelectedYear(e.target.value);
             }}
@@ -741,21 +741,7 @@ selectedExporter  ]);
       {userRole !== 'superadmin' && 
        allowedColumns.length > 0 && 
        allowedColumns.length < columns.length 
-       //</div>& (
-        // <Alert 
-        //   severity="info" 
-        //   sx={{ 
-        //     mb: 2, 
-        //     mt: 2,
-        //     mx: 2,
-        //     '& .MuiAlert-icon': {
-        //       alignItems: 'center'
-        //     }
-        //   }}
-        // >
-        //   Your view has been customized by the administrator. Some columns may not be visible.
-        // </Alert>
-      //)
+      
       }
 
       <div style={{ 

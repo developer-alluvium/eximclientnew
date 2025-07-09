@@ -159,7 +159,7 @@ function useCustomerJobList() {
           }}
         >
           {/* <div>{job_no}</div> */}
-           <div key="job-no" style={{ 
+           <div key="job-number" style={{ 
           fontWeight: 'bold', 
           fontSize: '0.8rem', 
           border: '1px solid black', 
@@ -171,7 +171,7 @@ function useCustomerJobList() {
         }}>
           Job: {job_no}
         </div>
-         <div key="job-no" style={{ 
+         <div key="free-time" style={{ 
           fontWeight: 'bold', 
           fontSize: '0.8rem', 
           border: '1px solid black', 
