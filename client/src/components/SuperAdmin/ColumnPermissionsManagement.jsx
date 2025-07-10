@@ -224,7 +224,21 @@ function ColumnPermissionsManagement({ onRefresh }) {
     : [];
 
   const getColumnCount = (customer) => {
-    return customer.allowedColumns?.length || 0;
+    // Try all possible backend keys and log for debug
+    if (Array.isArray(customer.allowedColumns) && customer.allowedColumns.length > 0) {
+      return customer.allowedColumns.length;
+    }
+    if (Array.isArray(customer.allowed_columns) && customer.allowed_columns.length > 0) {
+      return customer.allowed_columns.length;
+    }
+    if (Array.isArray(customer.columns) && customer.columns.length > 0) {
+      return customer.columns.length;
+    }
+    // Log for debug if all are empty
+    if (customer) {
+      console.warn('Customer has no columns assigned:', customer);
+    }
+    return 0;
   };
 
   const getColumnStatus = (customer) => {
@@ -384,7 +398,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
                   <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Column Access</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -412,27 +425,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
                         <Typography variant="body2">
                           {getColumnCount(customer)} of {availableColumns.length} columns
                         </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={status.label}
-                          color={status.color}
-                          size="small"
-                          variant="outlined"
-                          sx={{
-                            fontWeight: 'medium',
-                            borderWidth: '2px',
-                            ...(status.color === 'success' && {
-                              bgcolor: alpha(theme.palette.success.main, 0.1)
-                            }),
-                            ...(status.color === 'warning' && {
-                              bgcolor: alpha(theme.palette.warning.main, 0.1)
-                            }),
-                            ...(status.color === 'error' && {
-                              bgcolor: alpha(theme.palette.error.main, 0.1)
-                            })
-                          }}
-                        />
                       </TableCell>
                       <TableCell>
                         <Tooltip title="Manage Column Permissions">

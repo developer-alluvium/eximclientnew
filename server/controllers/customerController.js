@@ -789,7 +789,7 @@ export const getAllCustomersUnified = async (req, res) => {
       console.log('Fetching registered customers from customer collection...');
       
       const registeredCustomers = await CustomerModel.find({})
-        .select('_id ie_code_no pan_number name isActive assignedModules createdAt lastLogin password_changed initialPassword email phone')
+        .select('_id ie_code_no pan_number name isActive assignedModules createdAt lastLogin password_changed initialPassword email phone allowedColumns')
         .lean();
 
       // If KYC data is needed, get it for registered customers
@@ -819,7 +819,8 @@ export const getAllCustomersUnified = async (req, res) => {
           lastLogin: customer.lastLogin,
           assignedModules: customer.assignedModules || [],
           password_changed: customer.password_changed,
-          initialPassword: customer.initialPassword
+          initialPassword: customer.initialPassword,
+          allowedColumns: customer.allowedColumns || [] // <-- Add this line
         };
 
         if (includeKyc === 'true' && kycMap.has(customer.ie_code_no)) {
