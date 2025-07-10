@@ -60,14 +60,13 @@ function ColumnPermissionsManagement({ onRefresh }) {
   const [bulkColumns, setBulkColumns] = useState([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
-  // Helper function to get SuperAdmin authorization headers
   const getSuperAdminHeaders = () => {
     const validation = validateSuperAdminToken();
-    
+
     if (!validation.isValid) {
       return null;
     }
-    
+
     return {
       headers: {
         Authorization: `Bearer ${validation.token}`,
@@ -92,7 +91,18 @@ function ColumnPermissionsManagement({ onRefresh }) {
         axios.get(`${process.env.REACT_APP_API_STRING}/available-columns`, headers)
       ]);
 
-      setCustomers(customersRes.data.data);
+      // Handle new API response structure
+      const data = customersRes.data.data;
+      let registeredCustomers = [];
+      if (Array.isArray(data)) {
+        registeredCustomers = data;
+      } else if (data && Array.isArray(data.registered)) {
+        registeredCustomers = data.registered;
+      } else {
+        console.error('Customers data is not an array or does not have a registered array:', data);
+      }
+      setCustomers(registeredCustomers);
+
       setAvailableColumns(columnsRes.data.data);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -103,26 +113,30 @@ function ColumnPermissionsManagement({ onRefresh }) {
   };
 
   const handleCustomerClick = async (customer) => {
+    if (!customer || !customer.id) {
+      setError('Selected customer does not have a valid ID.');
+      return;
+    }
     try {
       setSelectedCustomer(customer);
       const headers = getSuperAdminHeaders();
       if (!headers) return;
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/customer/${customer._id}/column-permissions`,
+        `${process.env.REACT_APP_API_STRING}/customer/${customer.id}/column-permissions`,
         headers
       );
 
       setCustomerColumns(response.data.data.customer.allowedColumns || []);
       setDialogOpen(true);
     } catch (error) {
-      console.error('Error fetching customer permissions:', error);
-      setError(error.response?.data?.message || 'Failed to fetch customer permissions');
+      console.error('Error fetching customer permissions:', error, error.response?.data);
+      setError(error.response?.data?.message || 'Failed to fetch customer permissions. Please check if the customer is registered and has valid data.');
     }
   };
 
   const handleColumnToggle = (columnId) => {
-    setCustomerColumns(prev => 
+    setCustomerColumns(prev =>
       prev.includes(columnId)
         ? prev.filter(id => id !== columnId)
         : [...prev, columnId]
@@ -147,14 +161,14 @@ function ColumnPermissionsManagement({ onRefresh }) {
       if (!headers) return;
 
       await axios.put(
-        `${process.env.REACT_APP_API_STRING}/customer/${selectedCustomer._id}/column-permissions`,
+        `${process.env.REACT_APP_API_STRING}/customer/${selectedCustomer.id}/column-permissions`,
         { allowedColumns: customerColumns },
         headers
       );
 
       setSuccess(`Column permissions updated for ${selectedCustomer.name}!`);
       setDialogOpen(false);
-      fetchData(); // Refresh the data
+      fetchData();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Error saving permissions:', error);
@@ -189,7 +203,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
       setBulkDialogOpen(false);
       setSelectedCustomers([]);
       setBulkColumns([]);
-      fetchData(); // Refresh the data
+      fetchData();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Error in bulk assignment:', error);
@@ -199,10 +213,15 @@ function ColumnPermissionsManagement({ onRefresh }) {
     }
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.ie_code_no?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Only include customers with a valid id (log for debug)
+  console.log('Fetched customers:', customers);
+  const filteredCustomers = Array.isArray(customers)
+    ? customers.filter(customer =>
+        customer && customer.id && typeof customer.id === 'string' && customer.id.trim() !== '' &&
+        (customer.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         customer.ie_code_no?.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : [];
 
   const getColumnCount = (customer) => {
     return customer.allowedColumns?.length || 0;
@@ -211,7 +230,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
   const getColumnStatus = (customer) => {
     const count = getColumnCount(customer);
     const total = availableColumns.length;
-    
+
     if (count === 0) return { label: 'None', color: 'error' };
     if (count === total) return { label: 'All', color: 'success' };
     return { label: `${count}/${total}`, color: 'warning' };
@@ -227,14 +246,13 @@ function ColumnPermissionsManagement({ onRefresh }) {
 
   return (
     <Box>
-      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             Column Permissions Management
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Control which table columns each customer can see in their job list view. 
+            Control which table columns each customer can see in their job list view.
             Empty permissions grant access to all columns by default.
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
@@ -252,7 +270,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         </Button>
       </Box>
 
-      {/* Alerts */}
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
@@ -264,7 +281,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 3 }}>
@@ -310,7 +326,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    {customers.filter(c => getColumnCount(c) === availableColumns.length).length}
+                    {filteredCustomers.filter(c => getColumnCount(c) === availableColumns.length).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Full Access
@@ -329,7 +345,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    {customers.filter(c => getColumnCount(c) > 0 && getColumnCount(c) < availableColumns.length).length}
+                    {filteredCustomers.filter(c => getColumnCount(c) > 0 && getColumnCount(c) < availableColumns.length).length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Restricted Access
@@ -344,7 +360,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         </Grid>
       </Grid>
 
-      {/* Search */}
       <TextField
         fullWidth
         placeholder="Search customers by name or IE code..."
@@ -360,7 +375,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         }}
       />
 
-      {/* Customers Table */}
       <Card sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: 0 }}>
           <TableContainer>
@@ -378,7 +392,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
                 {filteredCustomers.map((customer) => {
                   const status = getColumnStatus(customer);
                   return (
-                    <TableRow key={customer._id} hover>
+                    <TableRow key={customer.id} hover>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
@@ -405,10 +419,9 @@ function ColumnPermissionsManagement({ onRefresh }) {
                           color={status.color}
                           size="small"
                           variant="outlined"
-                          sx={{ 
+                          sx={{
                             fontWeight: 'medium',
                             borderWidth: '2px',
-                            // Make the chip more visually distinct based on status
                             ...(status.color === 'success' && {
                               bgcolor: alpha(theme.palette.success.main, 0.1)
                             }),
@@ -441,7 +454,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         </CardContent>
       </Card>
 
-      {/* Individual Customer Permissions Dialog */}
       <Dialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -451,18 +463,18 @@ function ColumnPermissionsManagement({ onRefresh }) {
           sx: { borderRadius: 3 }
         }}
       >
-        <DialogTitle sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <DialogTitle sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           bgcolor: alpha(theme.palette.primary.main, 0.05)
         }}>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} component="span">
               Column Permissions
             </Typography>
             {selectedCustomer && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" component="span">
                 {selectedCustomer.name} ({selectedCustomer.ie_code_no})
               </Typography>
             )}
@@ -483,7 +495,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
           <FormGroup>
             {availableColumns.map((column) => (
               <FormControlLabel
-                key={column.id}
+                key={column.id || column.name}
                 control={
                   <Checkbox
                     checked={customerColumns.includes(column.id)}
@@ -518,7 +530,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
         </DialogActions>
       </Dialog>
 
-      {/* Bulk Assignment Dialog */}
       <Dialog
         open={bulkDialogOpen}
         onClose={() => setBulkDialogOpen(false)}
@@ -528,7 +539,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
           sx: { borderRadius: 3 }
         }}
       >
-        <DialogTitle sx={{ 
+        <DialogTitle sx={{
           bgcolor: alpha(theme.palette.primary.main, 0.05)
         }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
@@ -539,22 +550,19 @@ function ColumnPermissionsManagement({ onRefresh }) {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Assign the same column permissions to multiple customers at once.
           </Typography>
-          
+
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
             Select Customers:
           </Typography>
-          
-          {/* Add bulk select for customers */}
+
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <Button 
+            <Button
               size="small"
               onClick={() => {
                 if (selectedCustomers.length === customers.length) {
-                  // If all are selected, deselect all
                   setSelectedCustomers([]);
                 } else {
-                  // Otherwise select all
-                  setSelectedCustomers(customers.map(c => c._id));
+                  setSelectedCustomers(customers.map(c => c.id));
                 }
               }}
               sx={{ textTransform: 'none' }}
@@ -562,19 +570,19 @@ function ColumnPermissionsManagement({ onRefresh }) {
               {selectedCustomers.length === customers.length ? 'Deselect All' : 'Select All'}
             </Button>
           </Box>
-          
+
           <FormGroup sx={{ mb: 3, maxHeight: '200px', overflow: 'auto' }}>
             {customers.map((customer) => (
               <FormControlLabel
-                key={customer._id}
+                key={customer.id}
                 control={
                   <Checkbox
-                    checked={selectedCustomers.includes(customer._id)}
+                    checked={selectedCustomers.includes(customer.id)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedCustomers(prev => [...prev, customer._id]);
+                        setSelectedCustomers(prev => [...prev, customer.id]);
                       } else {
-                        setSelectedCustomers(prev => prev.filter(id => id !== customer._id));
+                        setSelectedCustomers(prev => prev.filter(id => id !== customer.id));
                       }
                     }}
                     color="primary"
@@ -590,17 +598,14 @@ function ColumnPermissionsManagement({ onRefresh }) {
           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
             Select Columns:
           </Typography>
-          
-          {/* Add bulk select for columns */}
+
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-            <Button 
+            <Button
               size="small"
               onClick={() => {
                 if (bulkColumns.length === availableColumns.length) {
-                  // If all are selected, deselect all
                   setBulkColumns([]);
                 } else {
-                  // Otherwise select all
                   setBulkColumns(availableColumns.map(c => c.id));
                 }
               }}
@@ -609,7 +614,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
               {bulkColumns.length === availableColumns.length ? 'Deselect All' : 'Select All'}
             </Button>
           </Box>
-          
+
           <FormGroup>
             {availableColumns.map((column) => (
               <FormControlLabel
