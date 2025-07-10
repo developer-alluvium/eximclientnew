@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { Box, Alert } from "@mui/material";
+import React, { useState } from "react";
+import { Box, Alert, ThemeProvider } from "@mui/material";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { ThemeProvider } from '@mui/material/styles';
 
 // Import dashboard components
 import ModernDashboardOverview from './ModernDashboardOverview';
@@ -16,24 +15,21 @@ import ModernSidebar from './ModernSidebar';
 import LoadingScreen from './LoadingScreen';
 
 const SuperAdminDashboard = () => {
-  // Get context data from the layout
-  const { 
-    dashboardData, 
-    userActivity, 
-    fetchDashboardData, 
-    loading,
-    activeTab
-  } = useOutletContext();
-
-  // Local state
+  const navigate = useNavigate();
+  
+  // Get context data from the layout if available
+  const contextData = useOutletContext();
+  const dashboardData = contextData?.dashboardData || null;
+  const userActivity = contextData?.userActivity || [];
+  const fetchDashboardData = contextData?.fetchDashboardData || (() => {});
+  const loading = contextData?.loading || false;
+  
+  // State for sidebar
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [error, setError] = useState(null);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [activeTabState, setActiveTab] = useState(activeTab || 0);
-  
-  const navigate = useNavigate();
+  const [activeTabState, setActiveTab] = useState(0);
 
   // Tab configuration
   const tabs = [
@@ -48,11 +44,12 @@ const SuperAdminDashboard = () => {
 
   // Handle logout
   const handleLogout = () => {
-    // Add logout logic here
-    navigate('/login');
+    localStorage.removeItem("superadmin_token");
+    localStorage.removeItem("superadmin_user");
+    navigate("/superadmin-login");
   };
 
-  // Render active component based on current tab
+  // Function to render the active component based on tab
   const renderActiveComponent = () => {
     switch (tabs[activeTabState].component) {
       case 'overview':
@@ -76,73 +73,73 @@ const SuperAdminDashboard = () => {
 
   return (
     <ThemeProvider theme={modernTheme}>
-     
-        {/* Session Manager for SuperAdmin */}
-        <SessionManager userType="superadmin" />
-        
-        {/* Modern Sidebar */}
-        <ModernSidebar
-          open={sidebarOpen}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab={activeTabState}
-          onTabChange={setActiveTab}
-          tabs={tabs}
-          onLogout={handleLogout}
-          mobileOpen={mobileOpen}
-          onMobileToggle={() => setMobileOpen(!mobileOpen)}
-        />
+      {/* Session Manager for SuperAdmin */}
+      <SessionManager userType="superadmin" />
+      
+      {/* Modern Sidebar */}
+      <ModernSidebar
+        open={sidebarOpen}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        activeTab={activeTabState}
+        onTabChange={setActiveTab}
+        tabs={tabs}
+        onLogout={handleLogout}
+        mobileOpen={mobileOpen}
+        onMobileToggle={() => setMobileOpen(!mobileOpen)}
+      />
 
-        {/* Main Content */}
+      {/* Main Content */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+          ml: { 
+            xs: 0, 
+            md: sidebarCollapsed ? '64px' : '240px' 
+          },
+          transition: 'margin-left 0.2s ease',
+          width: { 
+            xs: '100%',
+            md: `calc(100% - ${sidebarCollapsed ? '64px' : '240px'})`
+          },
+          overflow: 'hidden',
+        }}
+      >
+        {/* Content Area */}
         <Box
-          component="main"
           sx={{
             flexGrow: 1,
-            display: 'flex',
-            flexDirection: 'column',
+            p: { xs: 2, sm: 3, md: 3 },
+            backgroundColor: '#F8FAFC',
             minHeight: '100vh',
-            position: 'absolute', // Position absolutely to remove gap
-            right: 0, // Align to the right side of the screen
-            left: { // Align to the edge of the sidebar
-              xs: 0,
-              md: sidebarCollapsed ? '64px' : '240px'
-            },
-            transition: 'left 0.2s ease',
-            overflow: 'auto', // Allow content to scroll if needed
+            width: '95%',
+            maxWidth: '100%',
+            overflow: 'hidden',
           }}
         >
-          {/* Content Area */}
-          <Box
-            sx={{
-              flexGrow: 1,
-              p: { xs: 2, sm: 3, md: 3 },
-              backgroundColor: '#F8FAFC',
-              minHeight: '100vh',
-              width: '95%',
-              maxWidth: '100%',
-              overflow: 'visible', // Changed from auto to visible to ensure buttons don't get hidden
-            }}
-          >
-            {error && (
-              <Alert 
-                severity="error" 
-                sx={{ 
-                  mb: 3,
-                  borderRadius: 2,
-                  border: '1px solid #FEE2E2',
-                  backgroundColor: '#FEF2F2',
-                  color: '#DC2626',
-                }} 
-                onClose={() => setError(null)}
-              >
-                {error}
-              </Alert>
-            )}
-            
-            {renderActiveComponent()}
-          </Box>
+          {error && (
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3,
+                borderRadius: 2,
+                border: '1px solid #FEE2E2',
+                backgroundColor: '#FEF2F2',
+                color: '#DC2626',
+              }} 
+              onClose={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
+          
+          {renderActiveComponent()}
         </Box>
-      
+      </Box>
     </ThemeProvider>
   );
 };

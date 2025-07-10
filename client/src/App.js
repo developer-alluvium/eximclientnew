@@ -17,6 +17,7 @@ import AppbarComponent from "./components/home/AppbarComponent";
 import NetPage from "./components/Net weight/NetPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import SuperAdminDashboard from "./components/SuperAdmin/SuperAdminDashboard.jsx";
+import SuperAdminLayout from "./components/SuperAdmin/SuperAdminLayout.jsx";
 import ModuleAccessManagement from "./pages/ModuleAccessManagement.jsx";
 import SessionManager from "./components/SessionManager.jsx";
 import { validateSuperAdminToken } from "./utils/tokenValidation";
@@ -113,16 +114,17 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/superadmin-login" element={<SuperAdminLoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                
+                {/* SuperAdmin routes with shared layout */}
                 <Route path="/superadmin-dashboard" element={
                   <SuperAdminProtectedRoute>
-                    <SuperAdminDashboard />
+                    <SuperAdminLayout />
                   </SuperAdminProtectedRoute>
-                } />
-                <Route path="/superadmin-dashboard/customer/:customerId" element={
-                  <SuperAdminProtectedRoute>
-                    <SuperAdminCustomerDetail />
-                  </SuperAdminProtectedRoute>
-                } />
+                }>
+                  <Route index element={<SuperAdminDashboard />} />
+                  <Route path="customer/:customerId" element={<SuperAdminCustomerDetail />} />
+                </Route>
+                
                 <Route path="/module-access-management" element={
                   <SuperAdminProtectedRoute>
                     <ModuleAccessManagement />
