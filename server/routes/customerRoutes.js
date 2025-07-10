@@ -8,6 +8,7 @@ import {
   getColumnOrder,
   getCustomerKycList,
   getRegisteredCustomers,
+  getAllCustomersUnified,
   updateCustomerPassword,
   validateSession,
   getInactiveCustomers,
@@ -29,11 +30,17 @@ router.get("/api/validate-session", authenticate, validateSession);
 router.post("/api/column-order", postColumnOrder);
 router.get("/api/column-order", getColumnOrder);
 
-// SuperAdmin protected registration routes
+// SuperAdmin protected customer management routes
 router.post("/api/register", protectSuperAdmin, registerCustomer);
+
+// OPTIMIZED: Unified customer API (replaces multiple endpoints)
+router.get("/api/customers", protectSuperAdmin, getAllCustomersUnified);
+
+// DEPRECATED: Legacy endpoints for backward compatibility
 router.get("/api/customer-kyc-list", protectSuperAdmin, getCustomerKycList);
 router.get("/api/registered-customers", protectSuperAdmin, getRegisteredCustomers);
 router.get("/api/inactive-customers", protectSuperAdmin, getInactiveCustomers);
+
 router.put("/api/customer/:customerId/password", protectSuperAdmin, updateCustomerPassword);
 
 // Column permissions routes (SuperAdmin only)

@@ -62,12 +62,11 @@ const CustomerManagement = ({ onRefresh }) => {
     setError,
     getCustomers,
     updateCustomerPassword,
-    getKycRecords,
     registerCustomer
   } = useSuperAdminApi();
 
   const [activeTab, setActiveTab] = useState(0);
-  const [customers, setCustomers] = useState([]);
+  const [allCustomerData, setAllCustomerData] = useState({ registered: [], inactive: [], pending: [], summary: {} });
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [hidePasswords, setHidePasswords] = useState(true);
@@ -80,7 +79,6 @@ const CustomerManagement = ({ onRefresh }) => {
   // Registration states
   const [viewMode, setViewMode] = useState('manage'); // 'register', 'manage', 'inactive'
   const [registrationMode, setRegistrationMode] = useState('dropdown'); // 'dropdown' or 'manual'
-  const [kycRecords, setKycRecords] = useState([]);
   const [selectedKyc, setSelectedKyc] = useState(null);
   const [registrationForm, setRegistrationForm] = useState({
     ie_code_no: '',
@@ -96,39 +94,41 @@ const CustomerManagement = ({ onRefresh }) => {
   const [selectedCustomerForDetail, setSelectedCustomerForDetail] = useState(null);
 
   useEffect(() => {
-    if (viewMode === 'manage') {
-      fetchCustomers();
-    } else if (viewMode === 'register' && registrationMode === 'dropdown') {
-      fetchKycRecords();
-    }
+    fetchAllCustomers();
   }, [viewMode, registrationMode]);
 
   useEffect(() => {
     filterCustomers();
-  }, [customers, searchTerm, activeTab]);
+  }, [allCustomerData, searchTerm, activeTab]);
 
-  const fetchCustomers = async () => {
+  const fetchAllCustomers = async () => {
     try {
-      const data = await getCustomers();
-      setCustomers(data.data);
+      // Fetch all customer data using the optimized unified API
+      const response = await getCustomers('all', { includeKyc: true });
+      setAllCustomerData(response.data || { registered: [], inactive: [], pending: [], summary: {} });
     } catch (error) {
       console.error('Error fetching customers:', error);
       showNotification('Failed to load customers', 'error');
     }
   };
 
-  const fetchKycRecords = async () => {
-    try {
-      const data = await getKycRecords();
-      setKycRecords(data.data);
-    } catch (error) {
-      console.error('Error fetching KYC records:', error);
-      showNotification('Failed to load KYC records', 'error');
-    }
-  };
-
   const filterCustomers = () => {
-    let filtered = customers;
+    let filtered = [];
+    
+    // Get the appropriate dataset based on view mode
+    switch (viewMode) {
+      case 'manage':
+        // Combine registered and inactive customers for comprehensive management view
+        const registeredCustomers = allCustomerData.registered || [];
+        const inactiveCustomers = allCustomerData.inactive || [];
+        filtered = [...registeredCustomers, ...inactiveCustomers];
+        break;
+      case 'register':
+        filtered = allCustomerData.inactive || []; // Show inactive customers for registration
+        break;
+      default:
+        filtered = allCustomerData.registered || [];
+    }
     
     // Filter by search term
     if (searchTerm) {
@@ -141,16 +141,19 @@ const CustomerManagement = ({ onRefresh }) => {
 
     // Filter by tab
     switch (activeTab) {
-      case 1: // Active customers
-        filtered = filtered.filter(customer => customer.isActive);
+      case 1: // Active/Registered customers
+        filtered = filtered.filter(customer => customer.status === 'registered' && customer.isActive);
         break;
-      case 2: // Inactive customers
-        filtered = filtered.filter(customer => !customer.isActive);
+      case 2: // Inactive/Awaiting Registration customers
+        filtered = filtered.filter(customer => 
+          (customer.status === 'registered' && !customer.isActive) || 
+          customer.status === 'inactive'
+        );
         break;
       case 3: // Custom passwords
         filtered = filtered.filter(customer => customer.password_changed);
         break;
-      default:
+      default: // All customers
         break;
     }
 
@@ -191,13 +194,25 @@ const CustomerManagement = ({ onRefresh }) => {
   };
 
   const getStatusColor = (customer) => {
-    if (customer.password_changed) return 'warning';
-    return customer.isActive ? 'success' : 'default';
+    if (customer.status === 'registered') {
+      return customer.isActive ? 'success' : 'warning';
+    } else if (customer.status === 'inactive') {
+      return 'info';
+    } else if (customer.status === 'pending') {
+      return 'warning';
+    }
+    return 'default';
   };
 
   const getStatusText = (customer) => {
-    if (customer.password_changed) return 'Custom Password';
-    return customer.isActive ? 'Active' : 'Inactive';
+    if (customer.status === 'registered') {
+      return customer.isActive ? 'Active' : 'Inactive';
+    } else if (customer.status === 'inactive') {
+      return 'Awaiting Registration';
+    } else if (customer.status === 'pending') {
+      return 'KYC Pending';
+    }
+    return 'Unknown';
   };
 
   // Handle customer detail view
@@ -512,20 +527,20 @@ const CustomerManagement = ({ onRefresh }) => {
                   <Autocomplete
                     fullWidth
                     loading={loading}
-                    options={kycRecords}
+                    options={allCustomerData.inactive || []}
                     value={selectedKyc}
                     onChange={handleKycSelection}
                     getOptionLabel={(option) => 
-                      `${option.name_of_individual} (IE: ${option.iec_no})`
+                      `${option.name} (IE: ${option.ie_code_no})`
                     }
                     renderOption={(props, option) => (
                       <Box component="li" {...props}>
                         <Box sx={{ flexGrow: 1 }}>
                           <Typography variant="body1" fontWeight={500}>
-                            {option.name_of_individual}
+                            {option.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            IE: {option.iec_no} | PAN: {option.pan_no}
+                            IE: {option.ie_code_no} | PAN: {option.pan_number}
                           </Typography>
                           {option.status && (
                             <Chip 

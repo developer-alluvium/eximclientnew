@@ -41,7 +41,7 @@ const InactiveCustomers = ({ onRegisterCustomer }) => {
     loading, 
     error, 
     setError,
-    getInactiveCustomers,
+    getCustomers, // Using new unified API
   } = useSuperAdminApi();
 
   const [inactiveCustomers, setInactiveCustomers] = useState([]);
@@ -59,8 +59,10 @@ const InactiveCustomers = ({ onRegisterCustomer }) => {
   const fetchInactiveCustomers = async () => {
     try {
       setError(null);
-      const response = await getInactiveCustomers();
+      // Use new unified API to get inactive customers
+      const response = await getCustomers('inactive');
       setInactiveCustomers(response.data || []);
+      console.log('Fetched inactive customers:', response.data);
     } catch (error) {
       console.error('Error fetching inactive customers:', error);
       setError('Failed to load inactive customers');

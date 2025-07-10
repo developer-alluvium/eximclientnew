@@ -628,97 +628,30 @@ export const getColumnOrder = async (req, res) => {
 /**
  * Get CustomerKYC data for registration dropdown
  */
+/**
+ * DEPRECATED: Get customer KYC list - Use getAllCustomersUnified instead
+ * Kept for backward compatibility during transition
+ */
 export const getCustomerKycList = async (req, res) => {
-  try {
-    console.log("Fetching CustomerKYC data for registration dropdown");
-
-    // Find all CustomerKYC records with required fields
-    const kycRecords = await CustomerKycModel.find(
-      {
-        name_of_individual: { $exists: true, $ne: null, $ne: "" },
-        iec_no: { $exists: true, $ne: null, $ne: "" },
-        pan_no: { $exists: true, $ne: null, $ne: "" },
-      },
-      {
-        _id: 1,
-        name_of_individual: 1,
-        iec_no: 1,
-        pan_no: 1,
-        status: 1,
-      }
-    ).lean();
-
-    if (!kycRecords || kycRecords.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No CustomerKYC records found",
-      });
-    }
-
-    // Filter out records where customers already exist
-    const existingCustomers = await CustomerModel.find(
-      {},
-      { ie_code_no: 1 }
-    ).lean();
-    
-    const existingIeCodes = new Set(existingCustomers.map(c => c.ie_code_no));
-
-    // Filter out already registered customers
-    const availableRecords = kycRecords.filter(
-      record => !existingIeCodes.has(record.iec_no)
-    );
-
-    console.log(`Found ${kycRecords.length} KYC records, ${availableRecords.length} available for registration`);
-
-    res.status(200).json({
-      success: true,
-      message: "CustomerKYC data fetched successfully",
-      data: availableRecords,
-    });
-  } catch (error) {
-    console.error("Error fetching CustomerKYC data:", error);
-    res.status(500).json({
-      success: false,
-      message: "An error occurred while fetching CustomerKYC data",
-      error: error.message,
-    });
-  }
+  console.warn("DEPRECATED: getCustomerKycList - Use getAllCustomersUnified with ?status=inactive instead");
+  
+  // Redirect to unified API with inactive status to get available KYC records
+  req.query.status = 'inactive';
+  req.query.includeKyc = 'true';
+  return await getAllCustomersUnified(req, res);
 };
 
-// Get all registered customers with their passwords (admin function)
+/**
+ * DEPRECATED: Get all registered customers - Use getAllCustomersUnified instead
+ * Kept for backward compatibility during transition
+ */
 export const getRegisteredCustomers = async (req, res) => {
-  try {
-    const customers = await CustomerModel.find(
-      {},
-      {
-        _id: 1,
-        ie_code_no: 1,
-        pan_number: 1,
-        name: 1,
-        initialPassword: 1,
-        password_changed: 1,
-        created_at: 1,
-        isActive: 1,
-        assignedModules: 1,
-      }
-    ).sort({ created_at: -1 }).lean();
-
-    console.log(`Found ${customers.length} registered customers`);
-
-    res.status(200).json({
-      success: true,
-      message: "Registered customers fetched successfully",
-      data: customers,
-    });
-  } catch (error) {
-    console.error("Error fetching registered customers:", error);
-    res.status(500).json({
-      success: false,
-      message: "An error occurred while fetching registered customers",
-      error: error.message,
-    });
-  }
-};
+  console.warn("DEPRECATED: getRegisteredCustomers - Use getAllCustomersUnified with ?status=registered instead");
+  
+  // Redirect to unified API
+  req.query.status = 'registered';
+  return await getAllCustomersUnified(req, res);
+};;
 
 // Update customer password (admin function)
 export const updateCustomerPassword = async (req, res) => {
@@ -828,54 +761,211 @@ export const validateSession = async (req, res) => {
 };
 
 /**
- * Get inactive customers - customers who are in customerKyc but not in customer collection
+ * OPTIMIZED: Unified API to get all customers with filtering capabilities
+ * Replaces: getInactiveCustomers, getCustomerKycList, getRegisteredCustomers
  */
-export const getInactiveCustomers = async (req, res) => {
+export const getAllCustomersUnified = async (req, res) => {
   try {
-    // Get all approved KYC records
-    const approvedKycRecords = await CustomerKycModel.find({ 
-      approval: 'Approved' 
-    }).select('ie_code_no pan_number name_of_individual approval createdAt updatedAt');
-
-    // Get all registered customers (customer collection)
-    const registeredCustomers = await CustomerModel.find({}).select('ie_code_no');
+    const { status = 'all', approval, includeKyc = 'false' } = req.query;
     
-    // Create a set of registered IE codes for efficient lookup
-    const registeredIeCodes = new Set(registeredCustomers.map(customer => customer.ie_code_no));
+    console.log(`Fetching customers with filters - status: ${status}, approval: ${approval}`);
 
-    // Filter KYC records to find those not in customer collection
-    const inactiveCustomers = approvedKycRecords.filter(kyc => 
-      !registeredIeCodes.has(kyc.ie_code_no)
-    );
+    // Initialize result structure
+    const result = {
+      registered: [],
+      inactive: [],
+      pending: [],
+      summary: {
+        total: 0,
+        registered: 0,
+        inactive: 0,
+        pending: 0
+      }
+    };
 
-    // Format the response
-    const formattedInactiveCustomers = inactiveCustomers.map(kyc => ({
-      id: kyc._id,
-      ie_code_no: kyc.ie_code_no,
-      pan_number: kyc.pan_number,
-      name: kyc.name_of_individual,
-      approval: kyc.approval,
-      kycApprovedAt: kyc.updatedAt,
-      kycCreatedAt: kyc.createdAt,
-      status: 'Inactive',
-      isRegistered: false
-    }));
+    // Handle different status requests efficiently
+    if (status === 'registered' || status === 'all') {
+      // For registered customers, fetch directly from customer collection (more efficient)
+      console.log('Fetching registered customers from customer collection...');
+      
+      const registeredCustomers = await CustomerModel.find({})
+        .select('_id ie_code_no pan_number name isActive assignedModules createdAt lastLogin password_changed initialPassword email phone')
+        .lean();
+
+      // If KYC data is needed, get it for registered customers
+      let kycMap = new Map();
+      if (includeKyc === 'true') {
+        const kycRecords = await CustomerKycModel.find({
+          $or: registeredCustomers.map(customer => ({ iec_no: customer.ie_code_no }))
+        }).lean();
+        
+        kycRecords.forEach(kyc => {
+          const ieCode = kyc.iec_no || kyc.ie_code_no;
+          if (ieCode) kycMap.set(ieCode, kyc);
+        });
+      }
+
+      registeredCustomers.forEach(customer => {
+        const registeredCustomer = {
+          id: customer._id,
+          ie_code_no: customer.ie_code_no,
+          pan_number: customer.pan_number,
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          status: 'registered',
+          isActive: customer.isActive,
+          registeredAt: customer.createdAt,
+          lastLogin: customer.lastLogin,
+          assignedModules: customer.assignedModules || [],
+          password_changed: customer.password_changed,
+          initialPassword: customer.initialPassword
+        };
+
+        if (includeKyc === 'true' && kycMap.has(customer.ie_code_no)) {
+          registeredCustomer.kycData = kycMap.get(customer.ie_code_no);
+          registeredCustomer.kycApproval = registeredCustomer.kycData.approval;
+        }
+
+        result.registered.push(registeredCustomer);
+      });
+
+      result.summary.registered = registeredCustomers.length;
+    }
+
+    if (status === 'inactive' || status === 'pending' || status === 'all') {
+      // For inactive/pending customers, work with KYC collection
+      console.log('Fetching inactive/pending customers from KYC collection...');
+      
+      let kycQuery = {};
+      if (approval) {
+        kycQuery.approval = approval;
+      }
+
+      const kycRecords = await CustomerKycModel.find(kycQuery)
+        .select('_id ie_code_no iec_no pan_no pan_number name_of_individual approval createdAt updatedAt email_id mobile_no')
+        .lean();
+
+      // Get all registered IE codes for filtering
+      const registeredIeCodes = new Set(
+        (await CustomerModel.find({}).select('ie_code_no').lean())
+        .map(customer => customer.ie_code_no)
+      );
+
+      kycRecords.forEach(kyc => {
+        // Standardize field names (handle both ie_code_no and iec_no)
+        const ieCode = kyc.ie_code_no || kyc.iec_no;
+        const panNumber = kyc.pan_number || kyc.pan_no;
+        
+        if (!ieCode) return; // Skip records without IE code
+
+        // Only process if customer is not already registered
+        if (!registeredIeCodes.has(ieCode)) {
+          if (kyc.approval === 'Approved') {
+            // Inactive customer (approved KYC but no account)
+            const inactiveCustomer = {
+              id: kyc._id,
+              ie_code_no: ieCode,
+              pan_number: panNumber,
+              name: kyc.name_of_individual,
+              email: kyc.email_id,
+              phone: kyc.mobile_no,
+              status: 'inactive',
+              kycApproval: kyc.approval,
+              kycApprovedAt: kyc.updatedAt,
+              kycCreatedAt: kyc.createdAt,
+              isRegistered: false
+            };
+
+            if (includeKyc === 'true') {
+              inactiveCustomer.kycData = kyc;
+            }
+
+            result.inactive.push(inactiveCustomer);
+            result.summary.inactive++;
+          } else {
+            // Pending KYC approval
+            const pendingCustomer = {
+              id: kyc._id,
+              ie_code_no: ieCode,
+              pan_number: panNumber,
+              name: kyc.name_of_individual,
+              email: kyc.email_id,
+              phone: kyc.mobile_no,
+              status: 'pending',
+              kycApproval: kyc.approval,
+              kycCreatedAt: kyc.createdAt,
+              isRegistered: false
+            };
+
+            if (includeKyc === 'true') {
+              pendingCustomer.kycData = kyc;
+            }
+
+            result.pending.push(pendingCustomer);
+            result.summary.pending++;
+          }
+        }
+      });
+    }
+
+    // Calculate total
+    result.summary.total = result.summary.registered + result.summary.inactive + result.summary.pending;
+
+    // Apply status filter for response
+    let responseData;
+    let count;
+
+    switch (status) {
+      case 'registered':
+        responseData = result.registered;
+        count = result.summary.registered;
+        break;
+      case 'inactive':
+        responseData = result.inactive;
+        count = result.summary.inactive;
+        break;
+      case 'pending':
+        responseData = result.pending;
+        count = result.summary.pending;
+        break;
+      case 'all':
+      default:
+        responseData = result;
+        count = result.summary.total;
+        break;
+    }
+
+    console.log(`Customers fetched - Total: ${result.summary.total}, Registered: ${result.summary.registered}, Inactive: ${result.summary.inactive}, Pending: ${result.summary.pending}`);
 
     res.status(200).json({
       success: true,
-      message: `Found ${formattedInactiveCustomers.length} inactive customers`,
-      data: formattedInactiveCustomers,
-      count: formattedInactiveCustomers.length
+      message: `Successfully fetched ${count} customers`,
+      data: responseData,
+      count: count,
+      filters: { status, approval, includeKyc }
     });
 
   } catch (error) {
-    console.error("Error fetching inactive customers:", error);
+    console.error("Error fetching customers:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch inactive customers",
+      message: "Failed to fetch customers",
       error: error.message
     });
   }
+};
+
+/**
+ * DEPRECATED: Get inactive customers - Use getAllCustomersUnified instead
+ * Kept for backward compatibility during transition
+ */
+export const getInactiveCustomers = async (req, res) => {
+  console.warn("DEPRECATED: getInactiveCustomers - Use getAllCustomersUnified with ?status=inactive instead");
+  
+  // Redirect to unified API
+  req.query.status = 'inactive';
+  return await getAllCustomersUnified(req, res);
 };
 
 /**

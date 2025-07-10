@@ -59,24 +59,37 @@ export const useSuperAdminApi = () => {
     apiCall(`/dashboard/user-activity?type=${type}&limit=${limit}`), [apiCall]
   );
 
-  const getCustomers = useCallback(() => 
-    apiCall('/registered-customers'), [apiCall]
-  );
+  // OPTIMIZED: Unified customer API
+  const getCustomers = useCallback((status = 'all', options = {}) => {
+    const params = new URLSearchParams({ status });
+    if (options.approval) params.append('approval', options.approval);
+    if (options.includeKyc) params.append('includeKyc', options.includeKyc);
+    
+    return apiCall(`/customers?${params.toString()}`);
+  }, [apiCall]);
+
+  // DEPRECATED: Legacy methods for backward compatibility
+  const getRegisteredCustomers = useCallback(() => {
+    console.warn('DEPRECATED: Use getCustomers("registered") instead');
+    return getCustomers('registered');
+  }, [getCustomers]);
+
+  const getInactiveCustomers = useCallback(() => {
+    console.warn('DEPRECATED: Use getCustomers("inactive") instead');
+    return getCustomers('inactive');
+  }, [getCustomers]);
+
+  const getKycRecords = useCallback(() => {
+    console.warn('DEPRECATED: Use getCustomers("inactive", { includeKyc: true }) instead');
+    return getCustomers('inactive', { includeKyc: true });
+  }, [getCustomers]);
 
   const updateCustomerPassword = useCallback((customerId, newPassword) => 
     apiCall(`/customer/${customerId}/password`, 'PUT', { newPassword }), [apiCall]
   );
 
-  const getKycRecords = useCallback(() => 
-    apiCall('/customer-kyc-list'), [apiCall]
-  );
-
   const registerCustomer = useCallback((customerData) => 
     apiCall('/register', 'POST', customerData), [apiCall]
-  );
-
-  const getInactiveCustomers = useCallback(() => 
-    apiCall('/inactive-customers'), [apiCall]
   );
 
   // Module management methods
@@ -104,14 +117,16 @@ export const useSuperAdminApi = () => {
     loading,
     error,
     setError,
-    // API methods
+    // OPTIMIZED API methods
     getDashboardAnalytics,
     getUserActivity,
-    getCustomers,
+    getCustomers, // New unified method
     updateCustomerPassword,
-    getKycRecords,
     registerCustomer,
+    // DEPRECATED: Legacy methods (use getCustomers instead)
+    getKycRecords,
     getInactiveCustomers,
+    getRegisteredCustomers,
     // Module management methods
     getAvailableModules,
     getCustomerModuleAssignments,

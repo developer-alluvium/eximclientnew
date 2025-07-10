@@ -35,9 +35,19 @@ const SuperAdminCustomerDetail = () => {
   const fetchCustomerData = async () => {
     try {
       setDataLoading(true);
-      const response = await getCustomers();
-      const customers = response.data || [];
-      const foundCustomer = customers.find(c => c._id === customerId);
+      const response = await getCustomers('all', { includeKyc: true });
+      
+      // The response now contains structured data with registered, inactive, and pending arrays
+      const data = response.data || { registered: [], inactive: [], pending: [] };
+      
+      // Combine all customer types into a single array for searching
+      const allCustomers = [
+        ...(data.registered || []),
+        ...(data.inactive || []),
+        ...(data.pending || [])
+      ];
+      
+      const foundCustomer = allCustomers.find(c => c.id === customerId || c._id === customerId);
       
       if (foundCustomer) {
         setCustomer(foundCustomer);

@@ -25,6 +25,11 @@ import {
   Tab,
   Paper,
   alpha,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -46,6 +51,10 @@ import {
   Extension,
   Info,
   Key,
+  Warning,
+  HowToReg,
+  AppRegistration,
+  VerifiedUser,
 } from '@mui/icons-material';
 
 // Import modern components
@@ -62,7 +71,26 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     getAvailableModules,
     getCustomerModuleAssignments,
     updateCustomerModuleAssignments,
+    registerCustomer,
   } = useSuperAdminApi();
+  
+  // Ensure we have a consistent customer ID (handle both id and _id from different API responses)
+  const customerId = customer?.id || customer?._id;
+
+  // Check if this is a registered customer (has both a valid customerId and is in the customer collection)
+  // Unregistered customers come from the KYC collection and aren't in the customers collection yet
+  // We can determine this by checking if there are certain customer-specific fields
+  const isRegistered = Boolean(customer?.assignedModules !== undefined || customer?.isActive !== undefined);
+
+  // Check if this is an unregistered customer with approved KYC
+  const isKycApproved = !isRegistered && customer?.kycApproval === 'Approved';
+  
+  // Registration-related state variables
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [registeredCustomer, setRegisteredCustomer] = useState(null);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [showRegistrationDialog, setShowRegistrationDialog] = useState(false);
 
   const [activeTab, setActiveTab] = useState(0);
   const [availableModules, setAvailableModules] = useState([]);
@@ -73,7 +101,8 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: 'success' });
-
+  // Registration form state removed - using simplified registration process
+  
   useEffect(() => {
     if (customer) {
       loadModuleData();
@@ -84,16 +113,21 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     try {
       setError(null);
       
-      // Load available modules
+      // Always load available modules, as they're needed for display
       const availableResponse = await getAvailableModules();
       setAvailableModules(availableResponse.data || []);
       
-      // Load customer's assigned modules
-      const assignedResponse = await getCustomerModuleAssignments(customer._id);
-      const customerAssignedModules = assignedResponse.data?.customer?.assignedModules || [];
-      setAssignedModules(customerAssignedModules);
-      setTempAssignedModules(customerAssignedModules);
-      
+      // Only load customer's assigned modules if this is a registered customer
+      if (isRegistered) {
+        const assignedResponse = await getCustomerModuleAssignments(customerId);
+        const customerAssignedModules = assignedResponse.data?.customer?.assignedModules || [];
+        setAssignedModules(customerAssignedModules);
+        setTempAssignedModules(customerAssignedModules);
+      } else {
+        // For unregistered customers, set empty assigned modules
+        setAssignedModules([]);
+        setTempAssignedModules([]);
+      }
     } catch (error) {
       console.error('Error loading module data:', error);
       setError('Failed to load module information');
@@ -123,7 +157,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     }
 
     try {
-      await updateCustomerPassword(customer._id, newPassword);
+      await updateCustomerPassword(customerId, newPassword);
       setNotification({ message: 'Password updated successfully!', type: 'success' });
       setIsEditingPassword(false);
       setNewPassword('');
@@ -146,7 +180,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
 
   const handleSaveModules = async () => {
     try {
-      await updateCustomerModuleAssignments(customer._id, tempAssignedModules);
+      await updateCustomerModuleAssignments(customerId, tempAssignedModules);
       setAssignedModules(tempAssignedModules);
       setIsEditingModules(false);
       setNotification({ message: 'Module assignments updated successfully!', type: 'success' });
@@ -160,6 +194,55 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const handleCancelModuleEdit = () => {
     setTempAssignedModules(assignedModules);
     setIsEditingModules(false);
+  };
+
+  // Handle customer registration - Unified handler for all registration buttons
+  const handleRegisterCustomer = async () => {
+    try {
+      setIsRegistering(true);
+      setError(null);
+
+      // Ensure we have the required fields
+      if (!customer?.ie_code_no || !customer?.pan_number || !customer?.name) {
+        setError('Missing required customer information for registration.');
+        setIsRegistering(false);
+        return;
+      }
+
+      // Register the customer using the same format as in RegisterPage.jsx
+      const response = await registerCustomer({
+        ie_code_no: customer.ie_code_no.toUpperCase(),
+        pan_number: customer.pan_number.toUpperCase(),
+        name: customer.name.trim() || undefined
+      });
+
+      // Handle successful registration
+      if (response.customer) {
+        setRegisteredCustomer(response.customer);
+        setGeneratedPassword(response.customer.initialPassword);
+        setRegistrationSuccess(true);
+        setShowRegistrationDialog(true);
+        
+        // Show success notification
+        setNotification({
+          message: `Registration successful! Customer ${response.customer.name} has been registered.`,
+          type: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('Error registering customer:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to register customer. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleCloseRegistrationDialog = () => {
+    setShowRegistrationDialog(false);
+    if (registrationSuccess && onRefresh) {
+      onRefresh(); // Refresh the parent component to show updated customer data
+    }
   };
 
   const getModuleIcon = (moduleId) => {
@@ -184,6 +267,8 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     };
     return colorMap[category] || colorMap.default;
   };
+  
+  // Custom registration form is now deprecated - we use the main registration handler
 
   if (!customer) {
     return (
@@ -214,6 +299,21 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
           >
             Back to Customers
           </ModernButton>
+          
+          {/* Registration button for KYC-approved unregistered customers */}
+          {isKycApproved && (
+            <ModernButton
+              variant="contained"
+              color="success"
+              startIcon={<AppRegistration />}
+              onClick={handleRegisterCustomer}
+              disabled={isRegistering || registrationSuccess}
+              sx={{ ml: 'auto' }}
+            >
+              {isRegistering ? 'Registering...' : 'Register Customer'}
+              {isRegistering && <CircularProgress size={16} sx={{ ml: 1, color: 'white' }} />}
+            </ModernButton>
+          )}
         </Box>
         
         <Box sx={{ 
@@ -246,16 +346,35 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
             >
               {customer.name || 'Unknown Customer'}
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Chip
-                label={customer.isActive !== false ? 'Active' : 'Inactive'}
-                color={customer.isActive !== false ? 'success' : 'error'}
-                size="small"
-                sx={{ fontSize: '0.75rem' }}
-              />
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              {isRegistered ? (
+                <Chip
+                  label={customer.isActive !== false ? 'Active' : 'Inactive'}
+                  color={customer.isActive !== false ? 'success' : 'error'}
+                  size="small"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              ) : (
+                <Chip
+                  label={isKycApproved ? "Ready for Registration" : "KYC Pending"}
+                  color={isKycApproved ? "info" : "warning"}
+                  size="small"
+                  sx={{ fontSize: '0.75rem' }}
+                  icon={isKycApproved ? <VerifiedUser sx={{ fontSize: '0.75rem !important' }} /> : undefined}
+                />
+              )}
               <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
-                ID: {customer._id?.slice(-8) || 'N/A'}
+                ID: {customerId?.slice(-8) || 'N/A'}
               </Typography>
+              {isKycApproved && (
+                <Chip
+                  label="KYC Approved"
+                  color="success"
+                  size="small" 
+                  variant="outlined"
+                  sx={{ fontSize: '0.75rem' }}
+                />
+              )}
             </Box>
           </Box>
         </Box>
@@ -412,321 +531,578 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
       )}
 
       {activeTab === 1 && (
-        <Grid container spacing={3}>
-          {/* Password Management */}
-          <Grid item xs={12} md={8}>
-            <ModernCard title="Password Management">
-              {!isEditingPassword ? (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Box>
-                      <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 1 }}>
-                        Current Password
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                        Password is encrypted and cannot be displayed
-                      </Typography>
-                    </Box>
-                    <ModernButton
-                      variant="outlined"
-                      startIcon={<Edit />}
-                      onClick={() => setIsEditingPassword(true)}
-                    >
-                      Change Password
-                    </ModernButton>
-                  </Box>
-
-                  <Divider sx={{ my: 3 }} />
-
-                  <Box>
-                    <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 2 }}>
-                      Generate Default Password
+        <>
+          {/* Show registration required alert for unregistered customers */}
+          {!isRegistered && (
+            <Alert 
+              severity={isKycApproved ? "info" : "warning"} 
+              sx={{ mb: 3, borderRadius: 2 }}
+              icon={isKycApproved ? <Info /> : <Warning />}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {isKycApproved ? "Ready to Complete Registration" : "Password Management Not Available"}
+                  </Typography>
+                  <Typography variant="body2">
+                    {isKycApproved 
+                      ? "This customer's KYC has been approved and is ready for registration. Register the customer to enable password management and security features."
+                      : "Password management will be available after customer registration is completed. The customer must be registered in the system before security features can be configured."
+                    }
+                  </Typography>
+                </Box>
+                {isKycApproved && (
+                  <ModernButton
+                    variant="contained"
+                    color="primary"
+                    startIcon={<AppRegistration />}
+                    size="small"
+                    onClick={handleRegisterCustomer}
+                    disabled={isRegistering || registrationSuccess}
+                  >
+                    {isRegistering ? 'Registering...' : 'Register Customer'}
+                    {isRegistering && <CircularProgress size={14} sx={{ ml: 1, color: 'white' }} />}
+                  </ModernButton>
+                )}
+              </Box>
+            </Alert>
+          )}
+        
+          <Grid container spacing={3}>
+            {/* Password Management */}
+            <Grid item xs={12} md={8}>
+              <ModernCard title="Password Management">
+                {!isRegistered ? (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <Lock sx={{ fontSize: 48, color: '#9CA3AF', mb: 2 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#4B5563', mb: 1 }}>
+                      Password Management Unavailable
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <TextField
-                        size="small"
-                        value={generatePassword(customer.ie_code_no, customer.pan_number)}
-                        InputProps={{
-                          readOnly: true,
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleCopy(
-                                  generatePassword(customer.ie_code_no, customer.pan_number),
-                                  'Generated Password'
-                                )}
-                              >
-                                <ContentCopy sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ flex: 1 }}
-                      />
+                    <Typography variant="body2" sx={{ color: '#6B7280', maxWidth: '80%', mx: 'auto' }}>
+                      This customer is not fully registered in the system. Password management is only available after registration is completed.
+                    </Typography>
+                  </Box>
+                ) : !isEditingPassword ? (
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                      <Box>
+                        <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 1 }}>
+                          Current Password
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                          Password is encrypted and cannot be displayed
+                        </Typography>
+                      </Box>
                       <ModernButton
                         variant="outlined"
-                        onClick={() => setNewPassword(generatePassword(customer.ie_code_no, customer.pan_number))}
+                        startIcon={<Edit />}
+                        onClick={() => setIsEditingPassword(true)}
                       >
-                        Use This
+                        Change Password
                       </ModernButton>
                     </Box>
-                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.6875rem', mt: 1, display: 'block' }}>
-                      Format: Last 4 digits of IE Code + @ + First 4 characters of PAN
+
+                    <Divider sx={{ my: 3 }} />
+
+                    <Box>
+                      <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 2 }}>
+                        Generate Default Password
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TextField
+                          size="small"
+                          value={generatePassword(customer.ie_code_no, customer.pan_number)}
+                          InputProps={{
+                            readOnly: true,
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCopy(
+                                    generatePassword(customer.ie_code_no, customer.pan_number),
+                                    'Generated Password'
+                                  )}
+                                >
+                                  <ContentCopy sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{ flex: 1 }}
+                        />
+                        <ModernButton
+                          variant="outlined"
+                          onClick={() => setNewPassword(generatePassword(customer.ie_code_no, customer.pan_number))}
+                        >
+                          Use This
+                        </ModernButton>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.6875rem', mt: 1, display: 'block' }}>
+                        Format: Last 4 digits of IE Code + @ + First 4 characters of PAN
+                      </Typography>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box>
+                    <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 3 }}>
+                      Set New Password
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      label="New Password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password (minimum 6 characters)"
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowPassword(!showPassword)}
+                              edge="end"
+                              size="small"
+                            >
+                              {showPassword ? <VisibilityOff /> : <Visibility />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{ mb: 3 }}
+                    />
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <ModernButton
+                        variant="outlined"
+                        startIcon={<Cancel />}
+                        onClick={() => {
+                          setIsEditingPassword(false);
+                          setNewPassword('');
+                        }}
+                      >
+                        Cancel
+                      </ModernButton>
+                      <ModernButton
+                        variant="contained"
+                        startIcon={<Save />}
+                        onClick={handlePasswordUpdate}
+                        disabled={!newPassword || newPassword.length < 6}
+                        loading={loading}
+                      >
+                        Update Password
+                      </ModernButton>
+                    </Box>
+                  </Box>
+                )}
+              </ModernCard>
+            </Grid>
+
+            {/* Security Info */}
+            <Grid item xs={12} md={4}>
+              <ModernCard title="Security Information">
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                      Account ID
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#1F2937' }}>
+                      {customerId || 'N/A'}
                     </Typography>
                   </Box>
-                </Box>
-              ) : (
-                <Box>
-                  <Typography variant="body1" sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#1F2937', mb: 3 }}>
-                    Set New Password
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    label="New Password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password (minimum 6 characters)"
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            onClick={() => setShowPassword(!showPassword)}
-                            edge="end"
-                            size="small"
-                          >
-                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ mb: 3 }}
-                  />
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <ModernButton
-                      variant="outlined"
-                      startIcon={<Cancel />}
-                      onClick={() => {
-                        setIsEditingPassword(false);
-                        setNewPassword('');
-                      }}
-                    >
-                      Cancel
-                    </ModernButton>
-                    <ModernButton
-                      variant="contained"
-                      startIcon={<Save />}
-                      onClick={handlePasswordUpdate}
-                      disabled={!newPassword || newPassword.length < 6}
-                      loading={loading}
-                    >
-                      Update Password
-                    </ModernButton>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                      Security Level
+                    </Typography>
+                    <Chip
+                      label={isRegistered ? "Standard" : "Not Registered"}
+                      color={isRegistered ? "info" : "default"}
+                      size="small"
+                      sx={{ fontSize: '0.6875rem', mt: 0.5 }}
+                    />
                   </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                      Access Level
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#1F2937', fontWeight: 600 }}>
+                      {isRegistered ? "Customer" : "Pending Registration"}
+                    </Typography>
+                  </Box>
+                  {!isRegistered && (
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                        Registration Status
+                      </Typography>
+                      <Chip
+                        label="Not Registered"
+                        color="warning"
+                        size="small"
+                        sx={{ fontSize: '0.6875rem', mt: 0.5 }}
+                      />
+                    </Box>
+                  )}
                 </Box>
-              )}
-            </ModernCard>
+              </ModernCard>
+            </Grid>
           </Grid>
-
-          {/* Security Info */}
-          <Grid item xs={12} md={4}>
-            <ModernCard title="Security Information">
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Account ID
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#1F2937' }}>
-                    {customer._id || 'N/A'}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Security Level
-                  </Typography>
-                  <Chip
-                    label="Standard"
-                    color="info"
-                    size="small"
-                    sx={{ fontSize: '0.6875rem', mt: 0.5 }}
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Access Level
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem', color: '#1F2937', fontWeight: 600 }}>
-                    Customer
-                  </Typography>
-                </Box>
-              </Box>
-            </ModernCard>
-          </Grid>
-        </Grid>
+        </>
       )}
 
       {activeTab === 2 && (
-        <Grid container spacing={3}>
-          {/* Module Assignment */}
-          <Grid item xs={12} md={8}>
-            <ModernCard
-              title="Module Access Management"
-              action={
-                !isEditingModules ? (
+        <>
+          {/* Show registration required alert for unregistered customers */}
+          {!isRegistered && (
+            <Alert 
+              severity={isKycApproved ? "info" : "warning"} 
+              sx={{ mb: 3, borderRadius: 2 }}
+              icon={isKycApproved ? <Info /> : <Warning />}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {isKycApproved ? "Customer Ready for Registration" : "Customer Registration Required"}
+                  </Typography>
+                  <Typography variant="body2">
+                    {isKycApproved 
+                      ? "This customer's KYC has been approved and is ready for registration. Use the Register button at the top of the page to complete registration and enable module management."
+                      : "This customer needs to be registered before module assignment is available. KYC approval is required before registration can be completed."
+                    }
+                  </Typography>
+                </Box>
+                {isKycApproved ? (
                   <ModernButton
-                    variant="outlined"
-                    startIcon={<Edit />}
-                    onClick={() => setIsEditingModules(true)}
+                    variant="contained"
+                    color="success"
+                    startIcon={<AppRegistration />}
+                    size="small"
+                    onClick={handleRegisterCustomer}
+                    disabled={isRegistering || registrationSuccess}
                   >
-                    Edit Modules
+                    {isRegistering ? 'Registering...' : 'Register Now'}
+                    {isRegistering && <CircularProgress size={14} sx={{ ml: 1, color: 'white' }} />}
                   </ModernButton>
                 ) : (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <ModernButton
+                    variant="outlined"
+                    startIcon={<HowToReg />}
+                    size="small"
+                    onClick={onBack}
+                  >
+                    Back to Customer List
+                  </ModernButton>
+                )}
+              </Box>
+            </Alert>
+          )}
+
+          <Grid container spacing={3}>
+            {/* Module Assignment */}
+            <Grid item xs={12} md={8}>
+              <ModernCard
+                title="Module Access Management"
+                action={
+                  !isEditingModules && isRegistered ? (
                     <ModernButton
                       variant="outlined"
-                      startIcon={<Cancel />}
-                      onClick={handleCancelModuleEdit}
+                      startIcon={<Edit />}
+                      onClick={() => setIsEditingModules(true)}
                     >
-                      Cancel
+                      Edit Modules
                     </ModernButton>
-                    <ModernButton
-                      variant="contained"
-                      startIcon={<Save />}
-                      onClick={handleSaveModules}
-                      loading={loading}
-                    >
-                      Save Changes
-                    </ModernButton>
+                  ) : isEditingModules && isRegistered ? (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <ModernButton
+                        variant="outlined"
+                        startIcon={<Cancel />}
+                        onClick={handleCancelModuleEdit}
+                      >
+                        Cancel
+                      </ModernButton>
+                      <ModernButton
+                        variant="contained"
+                        startIcon={<Save />}
+                        onClick={handleSaveModules}
+                        loading={loading}
+                      >
+                        Save Changes
+                      </ModernButton>
+                    </Box>
+                  ) : null
+                }
+              >
+                {!isRegistered ? (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Info sx={{ fontSize: 48, color: '#9CA3AF', mb: 2 }} />
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#4B5563', mb: 1 }}>
+                      Module Management Not Available
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6B7280', maxWidth: '80%', mx: 'auto' }}>
+                      This customer is not fully registered in the system. Module assignment is only available after the registration process is completed.
+                    </Typography>
                   </Box>
-                )
-              }
-            >
-              <List sx={{ p: 0 }}>
-                {availableModules.map((module, index) => {
-                  const IconComponent = getModuleIcon(module.id);
-                  const isAssigned = isEditingModules 
-                    ? tempAssignedModules.includes(module.id)
-                    : assignedModules.includes(module.id);
+                ) : (
+                  <List sx={{ p: 0 }}>
+                    {availableModules.map((module, index) => {
+                      const IconComponent = getModuleIcon(module.id);
+                      const isAssigned = isEditingModules 
+                        ? tempAssignedModules.includes(module.id)
+                        : assignedModules.includes(module.id);
 
-                  return (
-                    <ListItem
-                      key={module.id}
-                      sx={{
-                        px: 0,
-                        py: 1.5,
-                        borderBottom: index < availableModules.length - 1 ? '1px solid #F3F4F6' : 'none',
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Avatar
+                      return (
+                        <ListItem
+                          key={module.id}
                           sx={{
-                            width: 32,
-                            height: 32,
-                            backgroundColor: alpha(getModuleCategoryColor(module.category), 0.1),
+                            px: 0,
+                            py: 1.5,
+                            borderBottom: index < availableModules.length - 1 ? '1px solid #F3F4F6' : 'none',
                           }}
                         >
-                          <IconComponent 
-                            sx={{ 
-                              fontSize: 16, 
-                              color: getModuleCategoryColor(module.category) 
-                            }} 
+                          <ListItemIcon sx={{ minWidth: 40 }}>
+                            <Avatar
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                backgroundColor: alpha(getModuleCategoryColor(module.category), 0.1),
+                              }}
+                            >
+                              <IconComponent 
+                                sx={{ 
+                                  fontSize: 16, 
+                                  color: getModuleCategoryColor(module.category) 
+                                }} 
+                              />
+                            </Avatar>
+                          </ListItemIcon>
+                          
+                          <ListItemText
+                            primary={
+                              <Typography
+                                variant="body1"
+                                sx={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: 600,
+                                  color: '#1F2937',
+                                }}
+                              >
+                                {module.name || module.id}
+                              </Typography>
+                            }
+                            secondary={
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  color: '#6B7280',
+                                }}
+                              >
+                                {module.description || 'Module access and functionality'}
+                              </Typography>
+                            }
                           />
-                        </Avatar>
-                      </ListItemIcon>
-                      
-                      <ListItemText
-                        primary={
-                          <Typography
-                            variant="body1"
-                            sx={{
-                              fontSize: '0.875rem',
-                              fontWeight: 600,
-                              color: '#1F2937',
-                            }}
-                          >
-                            {module.name || module.id}
-                          </Typography>
-                        }
-                        secondary={
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontSize: '0.75rem',
-                              color: '#6B7280',
-                            }}
-                          >
-                            {module.description || 'Module access and functionality'}
-                          </Typography>
-                        }
-                      />
-                      
-                      {isEditingModules ? (
-                        <Checkbox
-                          checked={isAssigned}
-                          onChange={() => handleModuleToggle(module.id)}
-                          icon={<RadioButtonUnchecked />}
-                          checkedIcon={<CheckCircle />}
-                          sx={{
-                            color: '#D1D5DB',
-                            '&.Mui-checked': {
-                              color: '#10B981',
-                            },
-                          }}
-                        />
-                      ) : (
-                        <Chip
-                          label={isAssigned ? "Assigned" : "Not Assigned"}
-                          color={isAssigned ? "success" : "default"}
-                          size="small"
-                          sx={{
-                            fontSize: '0.6875rem',
-                            fontWeight: 500,
-                          }}
-                        />
-                      )}
-                    </ListItem>
-                  );
-                })}
-              </List>
-            </ModernCard>
-          </Grid>
+                          
+                          {isEditingModules ? (
+                            <Checkbox
+                              checked={isAssigned}
+                              onChange={() => handleModuleToggle(module.id)}
+                              icon={<RadioButtonUnchecked />}
+                              checkedIcon={<CheckCircle />}
+                              sx={{
+                                color: '#D1D5DB',
+                                '&.Mui-checked': {
+                                  color: '#10B981',
+                                },
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label={isAssigned ? "Assigned" : "Not Assigned"}
+                              color={isAssigned ? "success" : "default"}
+                              size="small"
+                              sx={{
+                                fontSize: '0.6875rem',
+                                fontWeight: 500,
+                              }}
+                            />
+                          )}
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                )}
+              </ModernCard>
+            </Grid>
 
-          {/* Module Summary */}
-          <Grid item xs={12} md={4}>
-            <ModernCard title="Module Summary">
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Total Available Modules
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937' }}>
-                    {availableModules.length}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Assigned Modules
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10B981' }}>
-                    {assignedModules.length}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-                    Access Percentage
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#3B82F6' }}>
-                    {availableModules.length > 0 
-                      ? Math.round((assignedModules.length / availableModules.length) * 100)
-                      : 0}%
-                  </Typography>
-                </Box>
-              </Box>
-            </ModernCard>
+            {/* Module Summary */}
+            <Grid item xs={12} md={4}>
+              <ModernCard title="Module Summary">
+                {!isRegistered ? (
+                  <Box sx={{ py: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280', mb: 1 }}>
+                      No modules are available until customer registration is completed.
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      {isKycApproved ? (
+                        <>
+                          <VerifiedUser sx={{ fontSize: 16, color: '#10B981' }} />
+                          <Typography variant="body2" sx={{ color: '#10B981', fontWeight: 500 }}>
+                            KYC Approved - Ready for Registration
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          <Lock sx={{ fontSize: 16, color: '#9CA3AF' }} />
+                          <Typography variant="body2" sx={{ color: '#4B5563', fontWeight: 500 }}>
+                            Modules Locked - Pending KYC Approval
+                          </Typography>
+                        </>
+                      )}
+                    </Box>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                      Steps to Enable Modules:
+                    </Typography>
+                    {isKycApproved ? (
+                      <Box component="ol" sx={{ pl: 2, mt: 1, mb: 0, fontSize: '0.75rem', color: '#6B7280' }}>
+                        <li>Click the "Register Customer" button</li>
+                        <li>Save the generated password</li>
+                        <li>Assign modules to the customer</li>
+                      </Box>
+                    ) : (
+                      <Box component="ol" sx={{ pl: 2, mt: 1, mb: 0, fontSize: '0.75rem', color: '#6B7280' }}>
+                        <li>Wait for KYC approval</li>
+                        <li>Complete customer registration</li>
+                        <li>Return to assign modules</li>
+                      </Box>
+                    )}
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                        Total Available Modules
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937' }}>
+                        {availableModules.length}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                        Assigned Modules
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10B981' }}>
+                        {assignedModules.length}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                        Access Percentage
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#3B82F6' }}>
+                        {availableModules.length > 0 
+                          ? Math.round((assignedModules.length / availableModules.length) * 100)
+                          : 0}%
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </ModernCard>
+            </Grid>
           </Grid>
-        </Grid>
+        </>
       )}
+
+      {/* Legacy Registration Dialog - Removed in favor of the streamlined registration process */}
+      
+      {/* Registration Success Dialog */}
+      <Dialog
+        open={showRegistrationDialog}
+        onClose={handleCloseRegistrationDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            border: '1px solid #F3F4F6',
+          }
+        }}
+      >
+        <DialogTitle sx={{ borderBottom: '1px solid #F3F4F6' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <VerifiedUser sx={{ color: '#10B981' }} />
+            <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>
+              Customer Registration Successful
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, mt: 2 }}>
+          <Alert severity="success" sx={{ mb: 3 }}>
+            Customer has been successfully registered and added to the system.
+          </Alert>
+          
+          <Typography variant="h6" sx={{ mb: 1, fontSize: '1rem', fontWeight: 600 }}>
+            Customer Details:
+          </Typography>
+          
+          <Box sx={{ mb: 3, pl: 2, borderLeft: '3px solid #10B981' }}>
+            <Typography variant="body1" sx={{ mb: 0.5 }}>
+              <strong>Name:</strong> {registeredCustomer?.name || customer?.name}
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 0.5 }}>
+              <strong>IE Code:</strong> {registeredCustomer?.ie_code_no || customer?.ie_code_no}
+            </Typography>
+            <Typography variant="body1">
+              <strong>PAN:</strong> {registeredCustomer?.pan_number || customer?.pan_number}
+            </Typography>
+          </Box>
+          
+          <Typography variant="h6" sx={{ mb: 2, fontSize: '1rem', fontWeight: 600 }}>
+            Generated Password
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <TextField
+              fullWidth
+              size="small"
+              value={generatedPassword}
+              InputProps={{
+                readOnly: true,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => handleCopy(generatedPassword, 'Password')}
+                    >
+                      <ContentCopy sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ fontFamily: 'monospace' }}
+            />
+          </Box>
+          
+          <Alert severity="info" variant="outlined" sx={{ mt: 1 }}>
+            Please keep this password safe. You can now assign modules to this customer.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid #F3F4F6' }}>
+          <ModernButton
+            variant="outlined"
+            onClick={handleCloseRegistrationDialog}
+          >
+            Close
+          </ModernButton>
+          <ModernButton
+            variant="contained"
+            startIcon={<Assignment />}
+            onClick={() => {
+              handleCloseRegistrationDialog();
+              onRefresh?.();
+              setActiveTab(2); // Switch to module management tab
+            }}
+          >
+            Manage Modules
+          </ModernButton>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
