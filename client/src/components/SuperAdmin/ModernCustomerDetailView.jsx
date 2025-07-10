@@ -30,6 +30,13 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -55,12 +62,28 @@ import {
   HowToReg,
   AppRegistration,
   VerifiedUser,
+  Save as SaveIcon,
+  SelectAll as SelectAllIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 
 // Import modern components
 import ModernCard from '../common/ModernCard';
 import ModernButton from '../common/ModernButton';
 import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
+import axios from 'axios';
+
+function getSuperAdminHeaders() {
+  const validation = require('../../utils/tokenValidation').validateSuperAdminToken();
+  if (!validation.isValid) throw new Error('SuperAdmin authentication failed');
+  return {
+    headers: {
+      Authorization: `Bearer ${validation.token}`,
+      'Content-Type': 'application/json',
+    },
+    withCredentials: true,
+  };
+}
 
 const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const {
@@ -102,12 +125,25 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: 'success' });
   // Registration form state removed - using simplified registration process
+
+  // Column permissions state
+  const [columnPermissions, setColumnPermissions] = useState([]);
+  const [availableColumns, setAvailableColumns] = useState([]);
+  const [columnLoading, setColumnLoading] = useState(false);
+  const [columnError, setColumnError] = useState(null);
+  const [columnSaving, setColumnSaving] = useState(false);
   
   useEffect(() => {
     if (customer) {
       loadModuleData();
     }
   }, [customer]);
+
+  useEffect(() => {
+    if (activeTab === 3 && customerId) {
+      fetchColumnPermissions();
+    }
+  }, [activeTab, customerId]);
 
   const loadModuleData = async () => {
     try {
@@ -134,12 +170,20 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     }
   };
 
-  const handleCopy = async (text, type) => {
+  const fetchColumnPermissions = async () => {
     try {
-      await navigator.clipboard.writeText(text);
-      setNotification({ message: `${type} copied to clipboard!`, type: 'success' });
-    } catch (error) {
-      setNotification({ message: `Failed to copy ${type.toLowerCase()}`, type: 'error' });
+      setColumnLoading(true);
+      setColumnError(null);
+      // Fetch available columns
+      const columnsRes = await axios.get(`${process.env.REACT_APP_API_STRING}/available-columns`, getSuperAdminHeaders());
+      setAvailableColumns(columnsRes.data.data || []);
+      // Fetch customer column permissions
+      const permRes = await axios.get(`${process.env.REACT_APP_API_STRING}/customer/${customerId}/column-permissions`, getSuperAdminHeaders());
+      setColumnPermissions(permRes.data.data.customer.allowedColumns || []);
+    } catch (err) {
+      setColumnError(err.response?.data?.message || 'Failed to fetch column permissions');
+    } finally {
+      setColumnLoading(false);
     }
   };
 
@@ -280,6 +324,51 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
     );
   }
 
+  // Define handleSelectAllColumns and handleColumnToggle before use
+  const handleSelectAllColumns = () => {
+    if (columnPermissions.length === availableColumns.length) {
+      setColumnPermissions([]);
+    } else {
+      setColumnPermissions(availableColumns.map(col => col.id));
+    }
+  };
+
+  const handleColumnToggle = (columnId) => {
+    setColumnPermissions(prev =>
+      prev.includes(columnId)
+        ? prev.filter(id => id !== columnId)
+        : [...prev, columnId]
+    );
+  };
+
+  const handleSaveColumnPermissions = async () => {
+    try {
+      setColumnSaving(true);
+      setColumnError(null);
+      await axios.put(
+        `${process.env.REACT_APP_API_STRING}/customer/${customerId}/column-permissions`,
+        { allowedColumns: columnPermissions },
+        getSuperAdminHeaders()
+      );
+      setNotification({ message: 'Column permissions updated!', type: 'success' });
+      onRefresh?.();
+    } catch (err) {
+      setColumnError(err.response?.data?.message || 'Failed to save column permissions');
+    } finally {
+      setColumnSaving(false);
+    }
+  };
+
+  // Add handleCopy definition
+  const handleCopy = async (text, type) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotification({ message: `${type} copied to clipboard!`, type: 'success' });
+    } catch (error) {
+      setNotification({ message: `Failed to copy ${type.toLowerCase()}`, type: 'error' });
+    }
+  };
+
   return (
     <Box sx={{ 
       width: '100%', 
@@ -419,6 +508,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
           <Tab icon={<Person />} label="Profile Information" />
           <Tab icon={<Security />} label="Security & Access" />
           <Tab icon={<Assignment />} label="Module Management" />
+          <Tab icon={<SecurityIcon />} label="Column Permissions" />
         </Tabs>
       </Box>
 
@@ -1009,8 +1099,97 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
         </>
       )}
 
-      {/* Legacy Registration Dialog - Removed in favor of the streamlined registration process */}
-      
+      {activeTab === 3 && (
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <ModernCard title="Column Permissions">
+              {columnLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+                  <CircularProgress size={32} />
+                </Box>
+              ) : columnError ? (
+                <Alert severity="error" sx={{ mb: 2 }}>{columnError}</Alert>
+              ) : (
+                <>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Select which columns this customer can see in their job list view.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<SelectAllIcon />}
+                      onClick={handleSelectAllColumns}
+                    >
+                      {columnPermissions.length === availableColumns.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </Box>
+                  <FormGroup>
+                    {availableColumns.map((column) => (
+                      <FormControlLabel
+                        key={column.id}
+                        control={
+                          <Checkbox
+                            checked={columnPermissions.includes(column.id)}
+                            onChange={() => handleColumnToggle(column.id)}
+                            color="primary"
+                          />
+                        }
+                        label={column.name}
+                      />
+                    ))}
+                  </FormGroup>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <ModernButton
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveColumnPermissions}
+                      loading={columnSaving}
+                      disabled={columnSaving}
+                    >
+                      Save Permissions
+                    </ModernButton>
+                  </Box>
+                </>
+              )}
+            </ModernCard>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <ModernCard title="Column Access Summary">
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                    Total Available Columns
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937' }}>
+                    {availableColumns.length}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                    Assigned Columns
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10B981' }}>
+                    {columnPermissions.length}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                    Access Percentage
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#3B82F6' }}>
+                    {availableColumns.length > 0 
+                      ? Math.round((columnPermissions.length / availableColumns.length) * 100)
+                      : 0}%
+                  </Typography>
+                </Box>
+              </Box>
+            </ModernCard>
+          </Grid>
+        </Grid>
+      )}
+
       {/* Registration Success Dialog */}
       <Dialog
         open={showRegistrationDialog}

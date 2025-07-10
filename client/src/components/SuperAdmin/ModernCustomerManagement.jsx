@@ -393,13 +393,6 @@ const ModernCustomerManagement = ({ onRefresh }) => {
             >
               Refresh
             </ModernButton>
-            <ModernButton
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setViewMode('register')}
-            >
-              Add Customer
-            </ModernButton>
           </Box>
         </Box>
 
