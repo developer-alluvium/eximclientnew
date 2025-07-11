@@ -42,7 +42,8 @@ const activityLogSchema = new mongoose.Schema(
         'export_data',
         'failed_login',
         'session_expired',
-        'unauthorized_access'
+        'unauthorized_access',
+        'sso_token_generated'
       ],
     },
     description: {

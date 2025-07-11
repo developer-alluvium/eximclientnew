@@ -1130,6 +1130,81 @@ export const bulkUpdateColumnPermissions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update column permissions",
+    });
+  }
+};
+//  * Generate SSO token for E-Lock redirection
+//  * Generates a short-lived JWT token containing only ie_code_no
+//  */
+export const generateSSOToken = async (req, res) => {
+  try {
+    // Check if user is authenticated
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Get ie_code_no from authenticated user
+    const ie_code_no = req.user.ie_code_no;
+
+    if (!ie_code_no) {
+      return res.status(400).json({
+        success: false,
+        message: "IE code not found in user profile",
+      });
+    }
+
+    // Generate short-lived SSO token with standard JWT format
+    const ssoToken = jwt.sign(
+      {
+        sub: req.user.id, // Standard JWT subject field
+        ie_code_no: ie_code_no,
+        name: req.user.name
+        // exp and iat are automatically added by jwt.sign()
+      },
+      JWT_SECRET,
+      { expiresIn: "1d" } // 1 day expiry for security
+    );
+
+    // Log SSO token generation
+    try {
+      await ActivityLogModel.create({
+        user_id: req.user.id,
+        user_email: req.user.email || `${ie_code_no}@example.com`,
+        user_name: req.user.name,
+        ie_code_no: ie_code_no,
+        activity_type: 'sso_token_generated',
+        description: 'SSO token generated for E-Lock redirection',
+        ip_address: req.ip || req.connection.remoteAddress || 'Unknown',
+        user_agent: req.headers['user-agent'] || 'Unknown',
+        severity: 'low',
+        details: {
+          token_expiry: '10m',
+          target_system: 'E-Lock'
+        }
+      });
+    } catch (activityError) {
+      console.error('Error logging SSO token generation:', activityError);
+      // Continue even if activity logging fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "SSO token generated successfully",
+      data: {
+        token: ssoToken,
+        ie_code_no: ie_code_no,
+        expires_in: "1d"
+      }
+    });
+
+  } catch (error) {
+    console.error("Error generating SSO token:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate SSO token",
       error: error.message,
     });
   }

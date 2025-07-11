@@ -16,6 +16,7 @@ import {
   getCustomerColumnPermissions,
   updateCustomerColumnPermissions,
   bulkUpdateColumnPermissions,
+  generateSSOToken,
 } from "../controllers/customerController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
@@ -31,6 +32,10 @@ router.post("/api/column-order", postColumnOrder);
 router.get("/api/column-order", getColumnOrder);
 
 // SuperAdmin protected customer management routes
+// SSO token generation for E-Lock redirection
+router.post("/api/generate-sso-token", authenticate, generateSSOToken);
+
+// SuperAdmin protected registration routes
 router.post("/api/register", protectSuperAdmin, registerCustomer);
 
 // OPTIMIZED: Unified customer API (replaces multiple endpoints)

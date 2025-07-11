@@ -36,7 +36,7 @@ const AVAILABLE_MODULES = [
     isExternal: true
   },
   {
-    id: "#",
+    id: "http://localhost:3005/",
     name: "E-Lock",
     description: "Secure electronic document locking and verification",
     category: "core"

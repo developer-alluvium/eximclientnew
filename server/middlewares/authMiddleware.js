@@ -54,6 +54,27 @@ export const generateRefreshToken = (user) => {
 };
 
 /**
+ * Generate short-lived SSO token for E-Lock redirection
+ * @param {Object} user - User object with ie_code_no
+ * @returns {String} JWT token for SSO
+ */
+export const generateSSOToken = (user) => {
+  return jwt.sign(
+    {
+      sub: user._id || user.id, // Standard JWT subject field
+      ie_code_no: user.ie_code_no,
+      name: user.name
+      // exp and iat are automatically added by jwt.sign()
+    },
+    ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: "1d", // 1 day expiry for security
+      algorithm: "HS256",
+    }
+  );
+};
+
+/**
  * Send tokens via cookies and optionally in response body
  * @param {Object} user - User object
  * @param {Number} statusCode - HTTP status code
@@ -70,12 +91,11 @@ export const createSendTokens = (
   const accessToken = generateToken(user);
   const refreshToken = generateRefreshToken(user);
 
-  // Cookie options
+  // Cookie options for HTTP environments
   const cookieOptions = {
     httpOnly: true,
-    // secure: process.env.NODE_ENV === "production",
-    secure:false,
-    sameSite: "strict",
+    secure: false, // Set to false for HTTP environments (both dev and production)
+    sameSite: "lax", // Changed from "strict" to "lax" for better HTTP compatibility
   };
 
   // Set access token cookie
@@ -223,8 +243,8 @@ export const refreshAccessToken = async (req, res) => {
     // Set new access token in cookie
     res.cookie("access_token", accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: false, // HTTP compatibility
+      sameSite: "lax", // HTTP compatibility
       expires: new Date(
         Date.now() +
           (process.env.JWT_COOKIE_EXPIRES_IN

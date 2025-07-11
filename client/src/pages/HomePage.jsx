@@ -321,18 +321,47 @@ function HomePage() {
     return filteredModules;
   }, [moduleRefreshKey, user?.role]);
 
-  const handleCardClick = (path, isExternal = false, isLocked = false) => {
+  const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
     if (isLocked) {
       // Show a message or modal for locked modules
       return;
     }
     
     if (path === "#") {
-      // Do nothing for coming soon modules
-      return;
-    }
-    
-    if (isExternal) {
+      // Handle E-Lock SSO redirection
+      if (moduleName === "E-Lock") {
+        try {
+          const response = await fetch(`${process.env.REACT_APP_API_STRING}/generate-sso-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include', // Include cookies for authentication
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const ssoToken = data.data.token;
+            
+            // Store the SSO token in localStorage (short-lived)
+            localStorage.setItem("exim_sso_token", ssoToken);
+            
+            // Redirect to E-Lock system with token
+            window.location.href = `http://localhost:3005/?token=${ssoToken}`;
+          } else {
+            console.error('Failed to generate SSO token');
+            // Show error message to user
+            alert('Failed to generate SSO token. Please try again.');
+          }
+        } catch (error) {
+          console.error('Error generating SSO token:', error);
+          alert('Error connecting to authentication service. Please try again.');
+        }
+      } else {
+        // Do nothing for other coming soon modules
+        return;
+      }
+    } else if (isExternal) {
       window.open(path, '_blank', 'noopener,noreferrer');
     } else {
       navigate(path);
@@ -481,7 +510,7 @@ function HomePage() {
               {modules.filter(module => ["Import DSR", "CostIQ", "SnapCheck"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={index}
-                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked)}
+                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
                   sx={{
                     ...(module.category === "beta" ? { 
                       "&:before": {
@@ -600,7 +629,7 @@ function HomePage() {
               {modules.filter(module => ["QR Locker", "Task Flow AI", "E-Lock"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={`second-row-${index}`}
-                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked)}
+                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
                   sx={{
                     ...(module.category === "beta" ? { 
                       "&:before": {
@@ -740,7 +769,7 @@ function HomePage() {
               {modules.filter(module => ["Intendor Management System", "DocSure"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={`third-row-${index}`}
-                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked)}
+                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
                   sx={{
                     ...(module.category === "coming-soon" ? {
                       opacity: 0.7,
@@ -874,7 +903,7 @@ function HomePage() {
                 {modules.filter(module => module.category === "admin").map((module, index) => (
                   <StyledCard 
                     key={index}
-                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked)}
+                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
                     sx={{ 
                       ...(module.isLocked ? {
                         opacity: 0.6,
