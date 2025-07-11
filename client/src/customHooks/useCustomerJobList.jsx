@@ -556,7 +556,7 @@ function useCustomerJobList() {
               </div>
 
                 <div>
-                <strong>Empty Container <br />Offload: </strong>
+                <strong>Empty Offload: </strong>
                <span>
                   {container_nos.length > 0
                     ? container_nos.map((container, id) => (

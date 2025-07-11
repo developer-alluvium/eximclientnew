@@ -267,7 +267,15 @@ function LoginPage() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Logging In..." : "Login"}
-                </Button>{forgotPassword ? (
+                </Button>
+                <Box sx={{ width: '100%', textAlign: 'center', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    <span>Administrator access? </span>
+                    <Link to="/superadmin-login" style={{ color: '#1976d2', textDecoration: 'underline', fontWeight: 500 }}>
+                      Login as SuperAdmin
+                    </Link>
+                  </Typography>
+                </Box>{forgotPassword ? (
                   <Box sx={{ mt: 2 }}>
                     {resetPasswordSuccess ? (
                       <Box sx={{ textAlign: "center" }}>

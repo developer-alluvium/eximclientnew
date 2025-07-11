@@ -405,7 +405,7 @@ const ModernCustomerManagement = ({ onRefresh }) => {
                   Total Customers
                 </Typography>
                 <Typography variant="h5" sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#1F2937' }}>
-                  {(allCustomerData.summary?.registered || 0) + (allCustomerData.summary?.inactive || 0) + (allCustomerData.summary?.pending || 0)}
+                  {(allCustomerData.summary?.inactive || 0) + (allCustomerData.summary?.pending || 0)}
                 </Typography>
               </CardContent>
             </Card>
