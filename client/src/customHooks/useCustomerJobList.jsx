@@ -345,8 +345,8 @@ function useCustomerJobList() {
               <strong>Net weight:</strong> {job_net_weight || ""} kg<br />
            
               <strong>Invoice:</strong> {invoice_number} {invoice_date} <br />
-              <strong>Value:</strong> {inv_currency}{" "}
-              {total_inv_value ? total_inv_value.split(" ")[0] : ""} <br />
+              <strong>Value:</strong> 
+              {total_inv_value || ""} <br />
               <strong>POL:</strong>{" "}
               {loading_port ? loading_port.replace(/\(.*?\)\s*/, "") : ""}{" "}
               <br />

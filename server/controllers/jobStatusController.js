@@ -21,7 +21,7 @@ const parseDate = (dateStr) => {
 
 // Field selection logic
 const defaultFields = `
-  job_no year importer custom_house awb_bl_no container_nos vessel_berthing transporter job_net_weight net_weight origin_country weight_shortage checklist is_checklist_aprroved_date is_checklist_clicked
+  job_no year importer custom_house awb_bl_no container_nos vessel_berthing transporter job_net_weight net_weight origin_country weight_shortage checklist is_checklist_aprroved_date is_checklist_clicked invoice_number invoice_date inv_currency total_inv_value
   gateway_igm_date discharge_date detailed_status be_no be_date loading_port goods_delivery free_time net_weight delivery_address per_kg_cost   net_weight_calculator description ie_code_no weighment_slip_images is_checklist_aprroved remark_client emptyContainerOffLoadDate
   port_of_reporting type_of_b_e consignment_type shipping_line_airline bill_date out_of_charge pcv_date delivery_date emptyContainerOffLoadDate do_completed do_validity  do_copies rail_out_date cth_documents payment_method supplier_exporter gross_weight job_net_weight processed_be_attachment ooc_copies gate_pass_copies do_planning_history doPlanning do_planning_date
 `;
