@@ -328,40 +328,11 @@ function HomePage() {
     }
     
     if (path === "#") {
-      // Handle E-Lock SSO redirection
-      if (moduleName === "E-Lock") {
-        try {
-          const response = await fetch(`${process.env.REACT_APP_API_STRING}/generate-sso-token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include', // Include cookies for authentication
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const ssoToken = data.data.token;
-            
-            // Store the SSO token in localStorage (short-lived)
-            localStorage.setItem("exim_sso_token", ssoToken);
-            
-            // Redirect to E-Lock system with token
-            window.location.href = `http://localhost:3005/?token=${ssoToken}`;
-          } else {
-            console.error('Failed to generate SSO token');
-            // Show error message to user
-            alert('Failed to generate SSO token. Please try again.');
-          }
-        } catch (error) {
-          console.error('Error generating SSO token:', error);
-          alert('Error connecting to authentication service. Please try again.');
-        }
-      } else {
-        // Do nothing for other coming soon modules
-        return;
-      }
-    } else if (isExternal) {
+      // Do nothing for coming soon modules
+      return;
+    }
+    
+    if (isExternal) {
       window.open(path, '_blank', 'noopener,noreferrer');
     } else {
       navigate(path);

@@ -1181,7 +1181,7 @@ export const generateSSOToken = async (req, res) => {
         user_agent: req.headers['user-agent'] || 'Unknown',
         severity: 'low',
         details: {
-          token_expiry: '10m',
+          token_expiry: '1d',
           target_system: 'E-Lock'
         }
       });

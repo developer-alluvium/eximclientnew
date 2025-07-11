@@ -46,7 +46,7 @@ try {
 
   // Test 4: Generate E-Lock redirection URL
   const elockUrl = `http://localhost:3005/?token=${ssoToken}`;
-  console.log(`🔗 E-Lock redirection URL: ${elockUrl.substring(0, 80)}...`);
+  console.log(`🔗 E-Lock redirection URL: ${elockUrl}`);
 
   console.log('\n✅ All tests passed! SSO token generation is working correctly.');
 
