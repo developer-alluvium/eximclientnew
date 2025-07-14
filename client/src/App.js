@@ -7,8 +7,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import SuperAdminLoginPage from "./pages/SuperAdminLoginPage";
+
 import { TabValueProvider } from "./context/TabValueContext";
 import { UserContext } from "./context/UserContext";
 import { SelectedYearContext } from "./context/SelectedYearContext";
@@ -52,47 +51,9 @@ const ProtectedRoute = ({ children }) => {
 };
 
 // SuperAdmin protected route component
-const SuperAdminProtectedRoute = ({ children }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
 
-  // Check if SuperAdmin is authenticated
-  const validation = validateSuperAdminToken();
-
-  useEffect(() => {
-    if (!validation.isValid) {
-      // Redirect to SuperAdmin login page if not authenticated
-      navigate("/superadmin-login", { replace: true });
-    }
-  }, [validation.isValid, navigate, validation.reason]);
-
-  return validation.isValid ? children : null;
-};
 
 // Route-aware session manager
-const RouteAwareSessionManager = () => {
-  const location = useLocation();
-  
-  // Check if we're on SuperAdmin routes
-  const isSuperAdminRoute = location.pathname.startsWith('/superadmin-dashboard') || 
-                           location.pathname.startsWith('/module-access-management');
-  
-  // Check if we're on SuperAdmin login
-  const isSuperAdminLogin = location.pathname === '/superadmin-login';
-  
-  // Don't run any session manager on login pages
-  if (location.pathname === '/login' || isSuperAdminLogin) {
-    return null;
-  }
-  
-  // Run SuperAdmin session manager only on SuperAdmin routes
-  if (isSuperAdminRoute) {
-    return <SessionManager userType="superadmin" />;
-  }
-  
-  // Run regular user session manager on all other routes
-  return <SessionManager userType="user" />;
-};
 
 function App() {
   const [user, setUser] = React.useState(() => {
@@ -108,7 +69,7 @@ function App() {
         <TabValueProvider>
           <ImportersProvider>
             <BrowserRouter>
-              <RouteAwareSessionManager />
+            
               
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
