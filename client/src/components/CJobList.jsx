@@ -108,16 +108,17 @@ function CJobList(props) {
   // Get username and importer name from localStorage
   useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
-  
+  console.log(userDataFromStorage);
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
         
         // Handle both old and new user data structures
-        const userId = parsedUser.id || parsedUser.data?.user?.id;
-        const userName = parsedUser.name || parsedUser.data?.user?.name;
-        const role = parsedUser.role || parsedUser.data?.user?.role || 'user';
+        const userId = parsedUser?.id 
+        const userName = parsedUser?.name 
+        const role = parsedUser?.role || 'customer'
         
+        console.log("details", userId, userName, role);
         // Set userId only once
         setCurrentUserId(userId);
         setUserRole(role);

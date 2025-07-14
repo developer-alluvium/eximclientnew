@@ -101,7 +101,7 @@ const JobExcelTable = ({ userId }) => {
       if (userDataFromStorage) {
         const parsedUser = JSON.parse(userDataFromStorage);
     
-        return parsedUser?.data?.user?.ie_code_no || null;
+        return parsedUser?.ie_code_no || null;
       }
       
     } catch (error) {
@@ -116,7 +116,7 @@ const JobExcelTable = ({ userId }) => {
       const userDataFromStorage = localStorage.getItem("exim_user");
       if (userDataFromStorage) {
         const parsedUser = JSON.parse(userDataFromStorage);
-        return parsedUser?.data?.user?.name || null;
+        return parsedUser?.name || null;
       }
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -180,7 +180,8 @@ const JobExcelTable = ({ userId }) => {
   const fetchJobData = useCallback(async () => {
     const ieCode = getUserIECode();
     const userImporter = getUserImporterName();
-    
+    console.log('ieCode:', ieCode, 'selectedYear:', selectedYear, 'userImporter:', userImporter);
+
     if (!ieCode || !selectedYear || !userImporter) {
       // console.log('Missing IE code, selected year, or importer name');
       return;
@@ -669,7 +670,7 @@ const JobExcelTable = ({ userId }) => {
         </Box>
       </Box>
 
-      {totalCount === 0 ? (
+      {totalCount == 0 ? (
         <Alert severity="info" sx={{ mb: 2 }}>
           No job data found for the selected criteria.
         </Alert>

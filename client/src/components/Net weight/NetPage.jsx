@@ -278,9 +278,10 @@ const NetPage = () => {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
         console.log(parsedUser);
-        const ieCode = parsedUser.data?.user?.ie_code_no;
+        const ieCode = parsedUser?.ie_code_no;
+        console.log("ieCode", ieCode);
         // Set user name and initial for header
-        const name = parsedUser.data?.user?.name || "User";
+        const name = parsedUser?.name 
         setUserName(name);
         setUserInitial(name.charAt(0).toUpperCase());
         setUserId(ieCode);
