@@ -2,7 +2,7 @@ import SuperAdminModel from "../models/superAdminModel.js";
 import jwt from "jsonwebtoken";
 
 // Environment variables
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "your-secret-key";
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 
 /**

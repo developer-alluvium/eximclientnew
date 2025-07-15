@@ -11,11 +11,14 @@ export const useSuperAdminApi = () => {
       setLoading(true);
       setError(null);
       
+      // Get superadmin token from localStorage
+      const token = localStorage.getItem('superadmin_token');
       const config = {
         method,
         url: `${process.env.REACT_APP_API_STRING}${endpoint}`,
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         withCredentials: true,
       };
