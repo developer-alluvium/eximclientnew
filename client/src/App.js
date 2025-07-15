@@ -17,11 +17,11 @@ import NetPage from "./components/Net weight/NetPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import SuperAdminDashboard from "./components/SuperAdmin/SuperAdminDashboard.jsx";
 import SuperAdminLayout from "./components/SuperAdmin/SuperAdminLayout.jsx";
-import ModuleAccessManagement from "./pages/ModuleAccessManagement.jsx";
+import ModuleAccessManagement from "./components/SuperAdmin/ModuleAccessManagement.jsx";
 import SessionManager from "./components/SessionManager.jsx";
 import { validateSuperAdminToken } from "./utils/tokenValidation";
 import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
-
+import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
 // Protected route component
 const ProtectedRoute = ({ children }) => {
   const navigate = useNavigate();
@@ -51,7 +51,22 @@ const ProtectedRoute = ({ children }) => {
 };
 
 // SuperAdmin protected route component
+const SuperAdminProtectedRoute = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
+  // Check if SuperAdmin is authenticated
+  const validation = validateSuperAdminToken();
+
+  useEffect(() => {
+    if (!validation.isValid) {
+      // Redirect to SuperAdmin login page if not authenticated
+      navigate("/superadmin-login", { replace: true });
+    }
+  }, [validation.isValid, navigate, validation.reason]);
+
+  return validation.isValid ? children : null;
+};
 
 // Route-aware session manager
 
@@ -74,8 +89,8 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/superadmin-login" element={<SuperAdminLoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                
+                {/* <Route path="/register" element={<RegisterPage />} />
+                 */}
                 {/* SuperAdmin routes with shared layout */}
                 <Route path="/superadmin-dashboard" element={
                   <SuperAdminProtectedRoute>

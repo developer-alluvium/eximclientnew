@@ -5,7 +5,7 @@ import { useSuperAdminApi } from '../hooks/useSuperAdminApi';
 
 // Import components
 import ModernCustomerDetailView from '../components/SuperAdmin/ModernCustomerDetailView';
-import LoadingScreen from '../components/SuperAdmin/LoadingScreen';
+import LoadingScreen from   '../components/LoadingScreen.jsx';
 
 const SuperAdminCustomerDetail = () => {
   const { customerId } = useParams();
