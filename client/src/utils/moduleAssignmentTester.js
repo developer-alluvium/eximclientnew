@@ -71,7 +71,7 @@ class ModuleAssignmentFrontendTester {
         this.log(`✅ getUserAssignedModules returned: ${JSON.stringify(assignedModules)}`);
         
         // Test access to specific modules
-        const testModules = ['/importdsr', '/netpage', '#'];
+        const testModules = ['/importdsr', '/netpage', 'http://elock-tracking.s3-website.ap-south-1.amazonaws.com/'];
         testModules.forEach(module => {
           const hasAccess = hasModuleAccess(module);
           this.log(`Module ${module}: ${hasAccess ? '✅ Access granted' : '❌ Access denied'}`);
@@ -141,7 +141,7 @@ class ModuleAssignmentFrontendTester {
       'http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/': 'SnapCheck',
       'http://qrlocker.s3-website.ap-south-1.amazonaws.com/': 'QR Locker',
       'http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/': 'Task Flow AI',
-      '#': 'E-Lock'
+      'http://elock-tracking.s3-website.ap-south-1.amazonaws.com/': 'E-Lock'
     };
 
     let accessibleModules = 0;

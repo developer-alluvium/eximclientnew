@@ -64,7 +64,7 @@ async function testSSOEndpoint() {
           console.log('  ✓ iat (issued at):', new Date(decoded.iat * 1000).toISOString());
           
           // Test E-Lock redirection URL
-          const elockUrl = `http://localhost:3005/?token=${token}`;
+          const elockUrl = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${token}`;
           console.log(`🔗 E-Lock redirection URL: ${elockUrl.substring(0, 80)}...`);
           
           console.log('\n✅ SSO endpoint test completed successfully!');

@@ -67,7 +67,7 @@ The SSO token follows standardized JWT practices and includes:
 ### Local Development
 - Server: http://localhost:9001
 - Client: http://localhost:3001
-- E-Lock: http://localhost:3005
+- E-Lock: http://elock-tracking.s3-website.ap-south-1.amazonaws.com
 
 ### Production URLs (HTTP)
 - Configure in .env file with your production HTTP URLs
@@ -109,7 +109,7 @@ DEV_CLIENT_URI=http://your-production-domain
 2. Frontend calls `/api/generate-sso-token` with authentication
 3. Backend validates user and generates standardized JWT token
 4. Token includes required fields: `sub`, `ie_code_no`, `name`, `exp`, `iat`
-5. Frontend redirects to: `http://localhost:3005/?token={JWT_TOKEN}`
+5. Frontend redirects to: `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token={JWT_TOKEN}`
 6. E-Lock system validates token and logs user in
 
 ### 2. Security Considerations

@@ -67,7 +67,7 @@ async function testSSOFlow() {
           console.log('📋 Decoded SSO token:', decoded);
           
           // Step 4: Test E-Lock URL generation
-          const elockUrl = `http://localhost:3005/?token=${ssoToken}`;
+          const elockUrl = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
           console.log('🔗 E-Lock URL:', elockUrl);
           
           console.log('\n✅ Complete SSO flow test passed!');

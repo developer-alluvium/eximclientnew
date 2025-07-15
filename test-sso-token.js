@@ -45,7 +45,7 @@ try {
   console.log(`⏰ Token expires in: ${timeUntilExpiry} seconds (${Math.floor(timeUntilExpiry / 60)} minutes)`);
 
   // Test 4: Generate E-Lock redirection URL
-  const elockUrl = `http://localhost:3005/?token=${ssoToken}`;
+  const elockUrl = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
   console.log(`🔗 E-Lock redirection URL: ${elockUrl}`);
 
   console.log('\n✅ All tests passed! SSO token generation is working correctly.');
