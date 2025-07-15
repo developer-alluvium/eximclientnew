@@ -39,7 +39,8 @@ const AVAILABLE_MODULES = [
     id: "http://localhost:3005/",
     name: "E-Lock",
     description: "Secure electronic document locking and verification",
-    category: "core"
+    category: "core",
+    isExternal: true
   }
 ];
 

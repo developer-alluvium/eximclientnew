@@ -280,9 +280,10 @@ function HomePage() {
     {
       name: "E-Lock",
       description: "Secure electronic document locking and verification",
-      path: "#",
+      path: "http://localhost:3005/",
       icon: <LockOutlinedIcon />,
-      category: "core"
+      category: "core",
+      isExternal: true
     },
     {
       name: "Intendor Management System",
@@ -329,6 +330,13 @@ function HomePage() {
     
     if (path === "#") {
       // Do nothing for coming soon modules
+      return;
+    }
+    
+    // Special handling for E-Lock: always use navigate for SPA routing
+    if (moduleName === "E-Lock" && isExternal && path === "http://localhost:3005/") {
+      // navigate(path, { replace: true });
+         window.location.href = path;
       return;
     }
     
@@ -871,12 +879,9 @@ function HomePage() {
                   maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
                 }
               }}>
-                {modules.filter(module => module.category === "admin").map((module, index) => (
-                  <StyledCard 
-                    key={index}
-                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
-                    sx={{ 
-                      ...(module.isLocked ? {
+                {modules.filter(module => module.category === "admin").map((module, index) => {
+                  const adminCardSx = module.isLocked
+                    ? {
                         opacity: 0.6,
                         filter: "grayscale(50%)",
                         cursor: "not-allowed",
@@ -887,86 +892,92 @@ function HomePage() {
                         "&:before": {
                           backgroundColor: "#f44336" // Red color for locked modules
                         }
-                      } : {
+                      }
+                    : {
                         "&:before": {
                           backgroundColor: "#d32f2f" // Different color for admin modules
                         }
-                      })
-                    }}
-                  >
-                    <CardContent sx={{ 
-                      height: "100%", 
-                      display: "flex", 
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: { xs: "16px", sm: "20px", md: "24px" },
-                      gap: 1,
-                      position: "relative"
-                    }}>
-                      {module.isLocked && (
-                        <Box sx={{ 
-                          position: "absolute", 
-                          top: 8, 
-                          right: 8, 
-                          backgroundColor: "error.main", 
-                          borderRadius: "50%", 
-                          p: 0.5,
-                          minWidth: 24,
-                          minHeight: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <LockOutlinedIcon sx={{ fontSize: 16, color: "white" }} />
-                        </Box>
-                      )}
-                      
-                      <IconContainer sx={{ 
-                        backgroundColor: module.isLocked ? "rgba(244, 67, 54, 0.1)" : "rgba(211, 47, 47, 0.1)" 
+                      };
+                  return (
+                    <StyledCard
+                      key={index}
+                      onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
+                      sx={adminCardSx}
+                    >
+                      <CardContent sx={{ 
+                        height: "100%", 
+                        display: "flex", 
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        textAlign: "center",
+                        padding: { xs: "16px", sm: "20px", md: "24px" },
+                        gap: 1,
+                        position: "relative"
                       }}>
-                        <AdminPanelSettingsOutlinedIcon sx={{ 
-                          color: module.isLocked ? "#f44336" : "#d32f2f" 
-                        }} />
-                      </IconContainer>
-                      
-                      <Typography 
-                        variant="h6" 
-                        component="div" 
-                        fontWeight="500" 
-                        gutterBottom
-                        sx={{ 
-                          color: module.isLocked ? "#666" : undefined 
-                        }}
-                      >
-                        {module.name}
-                      </Typography>
-                      
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          maxWidth: "90%", 
-                          mx: "auto", 
-                          lineHeight: 1.4,
-                          fontSize: "13px"
-                        }}
-                      >
-                        {module.isLocked ? "Contact Admin for Access" : module.description}
-                      </Typography>
-                      
-                      {module.isLocked && (
-                        <Chip
-                          size="small"
-                          label="Access Restricted"
-                          color="error"
-                          sx={{ mt: 1, fontSize: "0.7rem" }}
-                        />
-                      )}
-                    </CardContent>
-                  </StyledCard>
-                ))}
+                        {module.isLocked && (
+                          <Box sx={{ 
+                            position: "absolute", 
+                            top: 8, 
+                            right: 8, 
+                            backgroundColor: "error.main", 
+                            borderRadius: "50%", 
+                            p: 0.5,
+                            minWidth: 24,
+                            minHeight: 24,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                          }}>
+                            <LockOutlinedIcon sx={{ fontSize: 16, color: "white" }} />
+                          </Box>
+                        )}
+                        
+                        <IconContainer sx={{ 
+                          backgroundColor: module.isLocked ? "rgba(244, 67, 54, 0.1)" : "rgba(211, 47, 47, 0.1)" 
+                        }}>
+                          <AdminPanelSettingsOutlinedIcon sx={{ 
+                            color: module.isLocked ? "#f44336" : "#d32f2f" 
+                          }} />
+                        </IconContainer>
+                        
+                        <Typography 
+                          variant="h6" 
+                          component="div" 
+                          fontWeight="500" 
+                          gutterBottom
+                          sx={{ 
+                            color: module.isLocked ? "#666" : undefined 
+                          }}
+                        >
+                          {module.name}
+                        </Typography>
+                        
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          sx={{ 
+                            maxWidth: "90%", 
+                            mx: "auto", 
+                            lineHeight: 1.4,
+                            fontSize: "13px"
+                          }}
+                        >
+                          {module.isLocked ? "Contact Admin for Access" : module.description}
+                        </Typography>
+                        
+                        {module.isLocked && (
+                          <Chip
+                            size="small"
+                            label="Access Restricted"
+                            color="error"
+                            sx={{ mt: 1, fontSize: "0.7rem" }}
+                          />
+                        )}
+                      </CardContent>
+                    </StyledCard>
+                  );
+                })}
               </Box>
               
               {/* Debug Component - Remove in production */}
