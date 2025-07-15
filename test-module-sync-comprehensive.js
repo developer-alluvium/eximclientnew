@@ -100,19 +100,6 @@ function printManualTestInstructions() {
      isActive: true
    }
 
-4. **Test Session Validation**
-   In browser console, run:
-   
-   fetch('/api/validate-session', {
-     method: 'GET',
-     credentials: 'include'
-   })
-   .then(r => r.json())
-   .then(data => {
-     console.log('Session validation response:', data);
-     console.log('Assigned modules:', data.user?.assignedModules);
-   });
-
 5. **Check localStorage**
    In browser console, run:
    

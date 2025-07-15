@@ -10,7 +10,6 @@ import ModuleManagement from "./ModuleManagement.jsx";
 import SystemAnalytics from './SystemAnalytics.jsx';
 import UserActivity from './UserActivity';
 import ColumnPermissionsManagement from './ColumnPermissionsManagement';
-import SessionManager from "../SessionManager.jsx";
 import { modernTheme } from '../../styles/modernTheme';
 import ModernSidebar from './ModernSidebar';
 import LoadingScreen from "../LoadingScreen.jsx";
@@ -67,8 +66,6 @@ const SuperAdminDashboard = () => {
         return <SystemAnalytics data={dashboardData} />;
       case 'activity':
         return <UserActivity data={userActivity} onRefresh={fetchDashboardData} />;
-      case 'sessions':
-        return <SessionManager userType="superadmin" />;
       default:
         return <ModernDashboardOverview data={dashboardData} onRefresh={fetchDashboardData} loading={loading} />;
     }
@@ -77,9 +74,6 @@ const SuperAdminDashboard = () => {
   return (
     <ThemeProvider theme={modernTheme}>
      
-        {/* Session Manager for SuperAdmin */}
-        <SessionManager userType="superadmin" />
-        
         {/* Modern Sidebar */}
         <ModernSidebar
           open={sidebarOpen}

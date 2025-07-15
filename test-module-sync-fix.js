@@ -3,45 +3,6 @@
 
 const axios = require('axios');
 
-const testModuleSync = async () => {
-  console.log('🔍 Testing Module Assignment Sync...\n');
-  
-  try {
-    // Test the validate-session endpoint
-    const response = await axios.get('http://localhost:5000/api/validate-session', {
-      headers: {
-        'Cookie': 'access_token=YOUR_ACCESS_TOKEN_HERE', // Replace with actual token
-      },
-      withCredentials: true
-    });
-    
-    console.log('✅ Session validation response:');
-    console.log('📊 User data:', response.data.user);
-    console.log('📋 Assigned modules:', response.data.user.assignedModules);
-    
-    // Check specific modules
-    const expectedModules = ['/importdsr', '/netpage'];
-    const actualModules = response.data.user.assignedModules || [];
-    
-    console.log('\n🔍 Module Access Check:');
-    expectedModules.forEach(module => {
-      const hasAccess = actualModules.includes(module);
-      console.log(`   ${module}: ${hasAccess ? '✅ ACCESSIBLE' : '❌ NOT ACCESSIBLE'}`);
-    });
-    
-    if (JSON.stringify(actualModules.sort()) === JSON.stringify(expectedModules.sort())) {
-      console.log('\n✅ SUCCESS: Module assignments are correctly synchronized!');
-    } else {
-      console.log('\n❌ ISSUE: Module assignments do not match expected values');
-      console.log('   Expected:', expectedModules);
-      console.log('   Actual:', actualModules);
-    }
-    
-  } catch (error) {
-    console.error('❌ Error testing module sync:', error.response?.data || error.message);
-  }
-};
-
 // Alternative test using direct MongoDB query
 const testDatabaseSync = async () => {
   console.log('\n🔍 Testing Database Sync...\n');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, Button, List, ListItem, ListItemText, Alert } from '@mui/material';
-import { getUserAssignedModules, forceRefreshUserModules, onUserDataRefresh } from '../utils/moduleAccess';
+import { getUserAssignedModules } from '../utils/moduleAccess';
 
 /**
  * Debug component to test module assignment synchronization
@@ -8,7 +8,6 @@ import { getUserAssignedModules, forceRefreshUserModules, onUserDataRefresh } fr
  */
 const ModuleDebugger = () => {
   const [modules, setModules] = useState([]);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [userData, setUserData] = useState(null);
 
   const loadModules = () => {
@@ -24,25 +23,7 @@ const ModuleDebugger = () => {
 
   useEffect(() => {
     loadModules();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    const cleanup = onUserDataRefresh(() => {
-      console.log('🔄 Debug - User data refreshed event received');
-      setRefreshKey(prev => prev + 1);
-    });
-
-    return cleanup;
   }, []);
-
-  const handleManualRefresh = async () => {
-    console.log('🔄 Debug - Manual refresh triggered');
-    const success = await forceRefreshUserModules();
-    console.log('🔄 Debug - Refresh result:', success);
-    if (success) {
-      loadModules();
-    }
-  };
 
   return (
     <Paper sx={{ p: 2, m: 2 }}>
@@ -87,15 +68,6 @@ const ModuleDebugger = () => {
         <Button variant="outlined" onClick={loadModules}>
           Reload from localStorage
         </Button>
-        <Button variant="contained" onClick={handleManualRefresh}>
-          Force Refresh from Server
-        </Button>
-      </Box>
-
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          Refresh Key: {refreshKey} (increments when data changes)
-        </Typography>
       </Box>
     </Paper>
   );

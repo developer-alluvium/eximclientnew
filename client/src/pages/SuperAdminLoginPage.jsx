@@ -22,8 +22,7 @@ import {
   Person,
   Lock,
 } from "@mui/icons-material";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { validateSuperAdminToken, getSessionErrorMessage } from "../utils/tokenValidation";
+import { useNavigate, Link } from "react-router-dom";
 
 function SuperAdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -34,17 +33,14 @@ function SuperAdminLoginPage() {
   const [sessionMessage, setSessionMessage] = useState(null);
   const navigate = useNavigate();
 
-  // Check if already logged in as superadmin or handle expired sessions
+  // Check if already logged in as superadmin
   useEffect(() => {
-    const validation = validateSuperAdminToken();
-    
-    if (validation.isValid) {
-      // Valid token exists, redirect to SuperAdmin dashboard
+    const token = localStorage.getItem("superadmin_token");
+    const user = localStorage.getItem("superadmin_user");
+
+    if (token && user) {
+      // Valid token and user exist, redirect to SuperAdmin dashboard
       navigate("/superadmin-dashboard");
-    } else if (validation.reason) {
-      // Token was invalid/expired, show appropriate message
-      const message = getSessionErrorMessage(validation.reason);
-      setSessionMessage(message);
     }
   }, [navigate]);
 

@@ -2,15 +2,12 @@ import React, { useState, useContext, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, ThemeProvider, Alert } from '@mui/material';
 import { UserContext } from '../../context/UserContext';
-import { validateSuperAdminToken } from '../../utils/tokenValidation';
-import { useAutoLogout } from '../../hooks/useAutoLogout';
 import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
 
 // Import modern theme and components
 import { modernTheme } from '../../styles/modernTheme';
 import ModernSidebar from './ModernSidebar';
 import LoadingScreen from "../LoadingScreen.jsx";
-import SessionManager from '../SessionManager';
 
 const SuperAdminLayout = () => {
   const navigate = useNavigate();
@@ -25,9 +22,6 @@ const SuperAdminLayout = () => {
     getDashboardAnalytics, 
     getUserActivity 
   } = useSuperAdminApi();
-
-  // Use auto-logout hook
-  const { handleLogout: autoLogout } = useAutoLogout('superadmin');
 
   // Sidebar state management
   const [activeTab, setActiveTab] = useState(0);
@@ -51,16 +45,17 @@ const SuperAdminLayout = () => {
 
   // Authentication check
   useEffect(() => {
-    const checkSuperAdminAuth = async () => {
-      const validation = validateSuperAdminToken();
+    const checkSuperAdminAuth = () => {
+      const token = localStorage.getItem("superadmin_token");
+      const user = localStorage.getItem("superadmin_user");
       
-      if (!validation.isValid) {
+      if (!token || !user) {
         navigate("/superadmin-login");
         return;
       }
       
       setIsAuthenticating(false);
-      await fetchDashboardData();
+      fetchDashboardData();
     };
     
     checkSuperAdminAuth();
@@ -197,9 +192,6 @@ const SuperAdminLayout = () => {
 
   return (
     <ThemeProvider theme={modernTheme}>
-      {/* Session Manager for SuperAdmin */}
-      <SessionManager userType="superadmin" />
-      
       {/* Modern Sidebar - Single instance */}
       <ModernSidebar
         open={sidebarOpen}

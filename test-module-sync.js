@@ -22,17 +22,4 @@ testModules.forEach(moduleId => {
   console.log(`📋 Module ${moduleId}: ${hasAccess ? '✅ ACCESSIBLE' : '❌ LOCKED'}`);
 });
 
-// 3. Test API call to validate session
-fetch('/api/validate-session', {
-  method: 'GET',
-  credentials: 'include',
-  headers: { 'Content-Type': 'application/json' }
-})
-.then(response => response.json())
-.then(data => {
-  console.log("🌐 Server response modules:", data.user?.assignedModules);
-  console.log("🔄 Sync status:", 
-    JSON.stringify(assignedModules.sort()) === JSON.stringify(data.user?.assignedModules?.sort()) 
-    ? "✅ SYNCHRONIZED" : "❌ OUT OF SYNC"
-  );
-});
+// Removed /api/validate-session test call and related logic

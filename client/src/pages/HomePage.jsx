@@ -24,10 +24,9 @@ import Tooltip from "@mui/material/Tooltip";
 import Alert from "@mui/material/Alert";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
-import { filterModulesByAccess, getUserAssignedModules, onUserDataRefresh } from "../utils/moduleAccess";
+import ModuleDebugger from '../components/ModuleDebugger';
+import { filterModulesByAccess, getUserAssignedModules } from "../utils/moduleAccess";
 import { logActivity } from "../utils/activityLogger";
-import { useAutoLogout } from "../hooks/useAutoLogout";
-import ModuleDebugger from "../components/ModuleDebugger";
 
 // Import icons
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
@@ -158,11 +157,7 @@ function HomePage() {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedImporter, setSelectedImporter] = useState(null);
-  const [moduleRefreshKey, setModuleRefreshKey] = useState(0); // Force re-render for module updates
   const open = Boolean(anchorEl);
-
-  // Use auto-logout hook for enhanced session management
-  const { handleLogout: autoLogout } = useAutoLogout('user');
 
   // Format date and time
   const formattedDate = currentDateTime.toLocaleDateString('en-US', {
@@ -199,25 +194,6 @@ function HomePage() {
       }
     }, [user, setUser]);
   
-  // Listen for user data refresh events to update module access
-  useEffect(() => {
-    const cleanup = onUserDataRefresh(() => {
-      console.log('🔄 User data refreshed, updating module access...');
-      setModuleRefreshKey(prev => prev + 1);
-    });
-    
-    return cleanup;
-  }, []);
-  
-  // Update time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 60000);
-    
-    return () => clearInterval(timer);
-  }, []);
-
   // This function will be called from the Sidebar component to update the job counts in HomePage
   const updateJobCounts = useCallback((counts) => {
     setJobCounts(counts);
@@ -319,7 +295,7 @@ function HomePage() {
     }
     
     return filteredModules;
-  }, [moduleRefreshKey, user?.role]);
+  }, [user?.role]);
 
   const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
     if (isLocked) {

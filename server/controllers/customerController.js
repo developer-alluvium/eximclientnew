@@ -729,43 +729,43 @@ export const updateCustomerPassword = async (req, res) => {
 };
 
 //* SESSION VALIDATION
-export const validateSession = async (req, res) => {
-  try {
-    if (req.user && req.user.id) {
-      // Fetch full customer details
-      const customer = await CustomerModel.findById(req.user.id).lean();
-      if (!customer) {
-        return res.status(401).json({
-          success: false,
-          message: "Session invalid"
-        });
-      }
-      console.log('customer', customer);
-      return res.status(200).json({
-        success: true,
-        message: "Session valid",
-        user: {
-          id: customer._id,
-          name: customer.name,
-          ie_code_no: customer.ie_code_no,
-          isActive: customer.isActive,
-          assignedModules: customer.assignedModules || []
-        }
-      });
-    } else {
-      return res.status(401).json({
-        success: false,
-        message: "Session invalid"
-      });
-    }
-  } catch (error) {
-    console.error("Session validation error:", error);  
-    return res.status(500).json({
-      success: false,
-      message: "Server error during session validation"
-    });
-  }
-};
+// export const validateSession = async (req, res) => {
+//   try {
+//     if (req.user && req.user.id) {
+//       // Fetch full customer details
+//       const customer = await CustomerModel.findById(req.user.id).lean();
+//       if (!customer) {
+//         return res.status(401).json({
+//           success: false,
+//           message: "Session invalid"
+//         });
+//       }
+//       console.log('customer----------------------------------------', customer);
+//       return res.status(200).json({
+//         success: true,
+//         message: "Session valid",
+//         user: {
+//           id: customer._id,
+//           name: customer.name,
+//           ie_code_no: customer.ie_code_no,
+//           isActive: customer.isActive,
+//           assignedModules: customer.assignedModules || []
+//         }
+//       });
+//     } else {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Session invalid"
+//       });
+//     }
+//   } catch (error) {
+//     console.error("Session validation error:", error);  
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error during session validation"
+//     });
+//   }
+// };
 
 /**
  * OPTIMIZED: Unified API to get all customers with filtering capabilities
@@ -1152,7 +1152,7 @@ export const generateSSOToken = async (req, res) => {
         message: "Authentication required",
       });
     }
-
+    console.log(`Generating SSO token for user: ${req.user.id} (${req.user.name})`);
     // Get ie_code_no from authenticated user
     const ie_code_no = req.user.ie_code_no;
 

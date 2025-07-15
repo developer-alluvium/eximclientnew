@@ -52,7 +52,7 @@ import {
   Refresh,
 } from '@mui/icons-material';
 import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
-import { forceRefreshUserModules } from '../../utils/moduleAccess';
+// import { forceRefreshUserModules } from '../../utils/moduleAccess';
 
 const ModuleManagement = () => {
   const theme = useTheme();
@@ -144,9 +144,9 @@ const ModuleManagement = () => {
       if (currentUser) {
         const userData = JSON.parse(currentUser);
         const currentUserId = userData.id || userData.data?.user?.id;
-        if (currentUserId === editingCustomer._id) {
-          await forceRefreshUserModules();
-        }
+        // if (currentUserId === editingCustomer._id) {
+        //   await forceRefreshUserModules();
+        // }
       }
       
       setEditingCustomer(null);
@@ -188,9 +188,9 @@ const ModuleManagement = () => {
       if (currentUser) {
         const userData = JSON.parse(currentUser);
         const currentUserId = userData.id || userData.data?.user?.id;
-        if (bulkSelectedCustomers.includes(currentUserId)) {
-          await forceRefreshUserModules();
-        }
+        // if (bulkSelectedCustomers.includes(currentUserId)) {
+        //   await forceRefreshUserModules();
+        // }
       }
       
       // Refresh data

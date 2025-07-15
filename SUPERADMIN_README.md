@@ -65,7 +65,6 @@ The SuperAdmin Dashboard is a comprehensive management interface for system admi
 - `POST /api/login` - Customer login
 - `POST /api/logout` - Customer logout
 - `POST /api/forgot-password` - Reset customer password
-- `GET /api/validate-session` - Validate customer session
 
 ### Data Status: **LIVE DATA** ✅
 ### Module Management Status: **FULLY IMPLEMENTED** ✅

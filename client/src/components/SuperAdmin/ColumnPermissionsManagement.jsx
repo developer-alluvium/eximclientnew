@@ -40,7 +40,6 @@ import {
   Save as SaveIcon,
   Group as GroupIcon
 } from '@mui/icons-material';
-import { validateSuperAdminToken } from '../../utils/tokenValidation';
 import axios from 'axios';
 
 function ColumnPermissionsManagement({ onRefresh }) {
@@ -60,22 +59,6 @@ function ColumnPermissionsManagement({ onRefresh }) {
   const [bulkColumns, setBulkColumns] = useState([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
-  const getSuperAdminHeaders = () => {
-    const validation = validateSuperAdminToken();
-
-    if (!validation.isValid) {
-      return null;
-    }
-
-    return {
-      headers: {
-        Authorization: `Bearer ${validation.token}`,
-        'Content-Type': 'application/json',
-      },
-      withCredentials: true,
-    };
-  };
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -83,8 +66,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const headers = getSuperAdminHeaders();
-      if (!headers) return;
+      const headers = { headers: { Authorization: `Bearer ${localStorage.getItem("superadmin_token")}` } };
 
       const [customersRes, columnsRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_API_STRING}/registered-customers`, headers),
@@ -119,8 +101,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
     }
     try {
       setSelectedCustomer(customer);
-      const headers = getSuperAdminHeaders();
-      if (!headers) return;
+      const headers = { headers: { Authorization: `Bearer ${localStorage.getItem("superadmin_token")}` } };
 
       const response = await axios.get(
         `${process.env.REACT_APP_API_STRING}/customer/${customer.id}/column-permissions`,
@@ -157,8 +138,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
     try {
       setSaving(true);
       setError(null);
-      const headers = getSuperAdminHeaders();
-      if (!headers) return;
+      const headers = { headers: { Authorization: `Bearer ${localStorage.getItem("superadmin_token")}` } };
 
       await axios.put(
         `${process.env.REACT_APP_API_STRING}/customer/${selectedCustomer.id}/column-permissions`,
@@ -187,8 +167,7 @@ function ColumnPermissionsManagement({ onRefresh }) {
     try {
       setSaving(true);
       setError(null);
-      const headers = getSuperAdminHeaders();
-      if (!headers) return;
+      const headers = { headers: { Authorization: `Bearer ${localStorage.getItem("superadmin_token")}` } };
 
       await axios.post(
         `${process.env.REACT_APP_API_STRING}/bulk-column-permissions`,

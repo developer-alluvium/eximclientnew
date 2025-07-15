@@ -1,27 +1,9 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
-import { validateSuperAdminToken } from '../utils/tokenValidation';
 
 export const useSuperAdminApi = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Get SuperAdmin headers
-  const getSuperAdminHeaders = useCallback(() => {
-    const validation = validateSuperAdminToken();
-    
-    if (!validation.isValid) {
-      throw new Error('SuperAdmin authentication failed');
-    }
-    
-    return {
-      headers: {
-        Authorization: `Bearer ${validation.token}`,
-        'Content-Type': 'application/json',
-      },
-      withCredentials: true,
-    };
-  }, []);
 
   // Generic API call function
   const apiCall = useCallback(async (endpoint, method = 'GET', data = null) => {
@@ -32,7 +14,10 @@ export const useSuperAdminApi = () => {
       const config = {
         method,
         url: `${process.env.REACT_APP_API_STRING}${endpoint}`,
-        ...getSuperAdminHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
       };
 
       if (data && method !== 'GET') {
@@ -48,7 +33,7 @@ export const useSuperAdminApi = () => {
     } finally {
       setLoading(false);
     }
-  }, [getSuperAdminHeaders]);
+  }, []);
 
   // Specific API methods
   const getDashboardAnalytics = useCallback(() => 

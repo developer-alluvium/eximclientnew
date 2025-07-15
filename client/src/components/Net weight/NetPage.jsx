@@ -13,7 +13,6 @@ import CssBaseline from "@mui/material/CssBaseline"; // Import CssBaseline for c
 import JobExcelTable from "./JobExcelTable";
 import { UserContext } from "../../context/UserContext";
 import { logActivity } from "../../utils/activityLogger";
-import { useAutoLogout } from "../../hooks/useAutoLogout";
 import { useNavigate } from "react-router-dom";
 
 const NetPage = () => {
@@ -30,9 +29,6 @@ const NetPage = () => {
   const [userName, setUserName] = useState("User");
   const [userInitial, setUserInitial] = useState("U");
   const open = Boolean(anchorEl);
-  
-  // Use auto-logout hook for enhanced session management
-  const { handleLogout: autoLogout } = useAutoLogout('user');
   
   // Create refs for the input fields
   const inputRefs = {

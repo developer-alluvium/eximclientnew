@@ -17,21 +17,7 @@ This document describes the comprehensive auto-logout functionality implemented 
 - `d:\eximclient\server\middlewares\authMiddleware.js`
 - `d:\eximclient\server\controllers\superAdminController.js`
 
-### 2. Session Validation Endpoint
-
-#### New API Endpoint
-```
-GET /api/validate-session
-```
-- **Purpose**: Validates the user's session using cookies
-- **Protection**: Requires authentication middleware
-- **Response**: Returns user session validity status
-
-#### Files Modified:
-- `d:\eximclient\server\controllers\customerController.js` (added validateSession function)
-- `d:\eximclient\server\routes\customerRoutes.js` (added route)
-
-### 3. Enhanced Token Validation Utilities
+### 2. Enhanced Token Validation Utilities
 
 #### File: `d:\eximclient\client\src\utils\tokenValidation.js`
 
@@ -41,7 +27,7 @@ GET /api/validate-session
 - `isTokenExpired()`: Checks if JWT token is expired
 - `getTokenExpirationStatus()`: Returns expiration status with warnings
 
-### 4. Auto-Logout Hook
+### 3. Auto-Logout Hook
 
 #### File: `d:\eximclient\client\src\hooks\useAutoLogout.js`
 
@@ -60,7 +46,7 @@ GET /api/validate-session
   - Displays human-readable time remaining
   - Dismissible warning alerts
 
-### 5. Session Manager Component
+### 4. Session Manager Component
 
 #### File: `d:\eximclient\client\src\components\SessionManager.jsx`
 
@@ -70,7 +56,7 @@ GET /api/validate-session
 - Shows logout notifications
 - Handles both regular users and SuperAdmin
 
-### 6. Application Integration
+### 5. Application Integration
 
 #### Main App Component
 - **File**: `d:\eximclient\client\src\App.js`

@@ -19,7 +19,6 @@ import { useNavigate } from "react-router-dom";
 import AppbarComponent from "./home/AppbarComponent";
 import BackButton from "./BackButton";
 import { logActivity } from "../utils/activityLogger";
-import { useAutoLogout } from "../hooks/useAutoLogout";
 
 function CImportDSR() {
   const { a11yProps, CustomTabPanel } = useTabs();
@@ -39,8 +38,6 @@ function CImportDSR() {
   const inputRef = React.useRef();
   const navigate = useNavigate();
   
-  // Use auto-logout hook for enhanced session management
-  const { handleLogout: autoLogout } = useAutoLogout('user');
 
   const handleChange = (event, newValue) => {
     setTabValue(newValue);

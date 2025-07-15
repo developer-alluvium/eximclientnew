@@ -1,6 +1,3 @@
-import axios from 'axios';
-import { validateUserToken, validateSuperAdminToken } from './tokenValidation';
-
 /**
  * Centralized token validation service to avoid duplicate API calls
  */
@@ -67,30 +64,11 @@ class TokenService {
       let isValid = false;
       
       if (userType === 'superadmin') {
-        const validation = validateSuperAdminToken();
-        isValid = validation.isValid;
-        
-        if (!isValid) {
-          console.log(`SuperAdmin token invalid: ${validation.reason}`);
-        }
+        // SuperAdmin validation logic can be added here if needed
+        isValid = true; // Placeholder, assuming superadmin token is valid
       } else {
-        // For regular users, make API call to validate session
-        try {
-          const response = await axios.get(
-            `${process.env.REACT_APP_API_STRING}/validate-session`,
-            { withCredentials: true }
-          );
-          
-          isValid = response.status === 200;
-        } catch (error) {
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            isValid = false;
-          } else {
-            // For network errors, don't immediately invalidate
-            console.error('Network error during token validation:', error);
-            isValid = this.cachedValidationResult !== null ? this.cachedValidationResult : false;
-          }
-        }
+        // For regular users, directly return cached result as API call is removed
+        isValid = this.cachedValidationResult !== null ? this.cachedValidationResult : false;
       }
 
       this.cachedValidationResult = isValid;

@@ -18,8 +18,6 @@ import HomePage from "./pages/HomePage.jsx";
 import SuperAdminDashboard from "./components/SuperAdmin/SuperAdminDashboard.jsx";
 import SuperAdminLayout from "./components/SuperAdmin/SuperAdminLayout.jsx";
 import ModuleAccessManagement from "./components/SuperAdmin/ModuleAccessManagement.jsx";
-import SessionManager from "./components/SessionManager.jsx";
-import { validateSuperAdminToken } from "./utils/tokenValidation";
 import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
 // Protected route component
@@ -50,24 +48,6 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : null;
 };
 
-// SuperAdmin protected route component
-const SuperAdminProtectedRoute = ({ children }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Check if SuperAdmin is authenticated
-  const validation = validateSuperAdminToken();
-
-  useEffect(() => {
-    if (!validation.isValid) {
-      // Redirect to SuperAdmin login page if not authenticated
-      navigate("/superadmin-login", { replace: true });
-    }
-  }, [validation.isValid, navigate, validation.reason]);
-
-  return validation.isValid ? children : null;
-};
-
 // Route-aware session manager
 
 function App() {
@@ -87,32 +67,30 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/superadmin-login" element={<SuperAdminLoginPage />} />
-                {/* <Route path="/register" element={<RegisterPage />} />
-                 */}
-                {/* SuperAdmin routes with shared layout */}
+
+                {/* SuperAdmin routes with localStorage check */}
                 <Route path="/superadmin-dashboard" element={
-                  <SuperAdminProtectedRoute>
-                    <SuperAdminLayout />
-                  </SuperAdminProtectedRoute>
+                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <SuperAdminLoginPage />
                 }>
                   <Route index element={<SuperAdminDashboard />} />
                   <Route path="customer/:customerId" element={<SuperAdminCustomerDetail />} />
                 </Route>
-                
+
                 <Route path="/module-access-management" element={
-                  <SuperAdminProtectedRoute>
-                    <ModuleAccessManagement />
-                  </SuperAdminProtectedRoute>
+                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <SuperAdminLoginPage />
                 } />
-               
-                <Route path="/" element={<HomePage />} />
-                <Route path="/netpage" element={<NetPage />} />
+
+                {/* User routes with localStorage check */}
+                <Route path="/" element={
+                  localStorage.getItem("exim_user") ? <HomePage /> : <LoginPage />
+                } />
+                <Route path="/netpage" element={
+                  localStorage.getItem("exim_user") ? <NetPage /> : <LoginPage />
+                } />
                 <Route
                   path="/importdsr"
                   element={
-                    <ProtectedRoute>
-                      <AppbarComponent />
-                    </ProtectedRoute>
+                    localStorage.getItem("exim_user") ? <AppbarComponent /> : <LoginPage />
                   }
                 />
               </Routes>
