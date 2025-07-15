@@ -207,7 +207,7 @@ Frontend Environment: REACT_APP_API_STRING=http://localhost:9001/api
 ```
 REACT_APP_API_STRING=http://localhost:9001/api
 JWT_SECRET=your-secret-key
-JWT_EXPIRES_IN=1d
+JWT_EXPIRATION=1d
 ```
 
 ### Authentication Token Storage:

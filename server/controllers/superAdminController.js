@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 // Environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "12h";
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 
 /**
  * SuperAdmin Login
@@ -77,7 +77,7 @@ export const superAdminLogin = async (req, res) => {
         role: "superadmin"
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRATION }
     );
 
     console.log(`SuperAdmin ${username} logged in successfully`);

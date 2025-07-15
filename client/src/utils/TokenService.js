@@ -40,7 +40,7 @@ class TokenService {
    * @param {string} userType - 'user' or 'superadmin'
    * @returns {Promise<boolean>} - True if token is valid
    */
-  async validateToken(userType = 'user') {
+  async validateToken(userType = 'user' ||  'customer') {
     const now = Date.now();
     
     // Return cached result if validation was recent

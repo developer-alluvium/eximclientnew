@@ -11,7 +11,7 @@ import { createSendTokens } from "../middlewares/authMiddleware.js";
 
 // Environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "12h";
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 
 //* LOGIN
 
@@ -223,7 +223,7 @@ export const login = async (req, res) => {
     const token = jwt.sign(
       { id: customer._id, ie_code_no: customer.ie_code_no },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRATION }
     );
 
     createSendTokens(customer, 200, res, true);
@@ -731,18 +731,25 @@ export const updateCustomerPassword = async (req, res) => {
 //* SESSION VALIDATION
 export const validateSession = async (req, res) => {
   try {
-    // At this point, if the middleware passed, the user is valid
-    // req.user is set by the authenticate middleware
-    if (req.user) {
+    if (req.user && req.user.id) {
+      // Fetch full customer details
+      const customer = await CustomerModel.findById(req.user.id).lean();
+      if (!customer) {
+        return res.status(401).json({
+          success: false,
+          message: "Session invalid"
+        });
+      }
+      console.log('customer', customer);
       return res.status(200).json({
         success: true,
         message: "Session valid",
         user: {
-          id: req.user.id,
-          name: req.user.name,
-          ie_code_no: req.user.ie_code_no,
-          isActive: req.user.isActive,
-          assignedModules: req.user.assignedModules || []
+          id: customer._id,
+          name: customer.name,
+          ie_code_no: customer.ie_code_no,
+          isActive: customer.isActive,
+          assignedModules: customer.assignedModules || []
         }
       });
     } else {
@@ -752,7 +759,7 @@ export const validateSession = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Session validation error:", error);
+    console.error("Session validation error:", error);  
     return res.status(500).json({
       success: false,
       message: "Server error during session validation"

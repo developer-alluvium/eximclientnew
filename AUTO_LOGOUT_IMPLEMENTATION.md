@@ -8,7 +8,7 @@ This document describes the comprehensive auto-logout functionality implemented 
 ### 1. Token Expiration Configuration
 
 #### Backend Changes
-- **Customer Controller**: Token expiration set to 12 hours (`JWT_EXPIRES_IN = "12h"`)
+- **Customer Controller**: Token expiration set to 12 hours (`JWT_EXPIRATION = "12h"`)
 - **Auth Middleware**: Access token expiration set to 12 hours (`ACCESS_TOKEN_EXPIRES = "12h"`)
 - **SuperAdmin Controller**: Token expiration already set to 12 hours
 
