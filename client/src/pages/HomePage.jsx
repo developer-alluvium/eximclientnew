@@ -297,7 +297,7 @@ function HomePage() {
     return filteredModules;
   }, [user?.role]);
 
- const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = 'E-Lock') => {
+ const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
   if (isLocked) {
     return;
   }
@@ -359,7 +359,19 @@ function HomePage() {
     return;
   }
   
-  // Rest of your code...
+  // Handle external links
+  if (isExternal && path && path.startsWith('http')) {
+    window.open(path, '_blank');
+    return;
+  }
+
+  // Handle internal navigation
+  if (path && path.startsWith('/')) {
+    navigate(path);
+    return;
+  }
+
+  // If path is '#' or invalid, do nothing
 };
 
   const handleUserMenuOpen = (event) => {
