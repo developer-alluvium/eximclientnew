@@ -165,7 +165,7 @@ const ModernSidebar = ({
       <Box sx={{ mt: 'auto', p: 1 }}>
         <Divider sx={{ borderColor: '#1F1F1F', mb: 1 }} />
         <ListItem
-          onClick={onLogout}
+          onClick={handleLogout}
           sx={{
             borderRadius: 2,
             cursor: 'pointer',
@@ -234,6 +234,14 @@ const ModernSidebar = ({
       </Box>
     </>
   );
+
+  const handleLogout = () => {
+    localStorage.removeItem('superadmin_token');
+    localStorage.removeItem('superadmin_user');
+    if (typeof onLogout === 'function') {
+      onLogout();
+    }
+  };
 
   return (
     <>

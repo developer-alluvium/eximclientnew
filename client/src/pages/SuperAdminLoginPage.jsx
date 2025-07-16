@@ -30,18 +30,47 @@ function SuperAdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [sessionMessage, setSessionMessage] = useState(null);
   const navigate = useNavigate();
 
   // Check if already logged in as superadmin
   useEffect(() => {
-    const token = localStorage.getItem("superadmin_token");
-    const user = localStorage.getItem("superadmin_user");
+    const checkAuth = () => {
+      const token = localStorage.getItem("superadmin_token");
+      const user = localStorage.getItem("superadmin_user");
 
-    if (token && user) {
-      // Valid token and user exist, redirect to SuperAdmin dashboard
-      navigate("/superadmin-dashboard");
-    }
+      if (token && user) {
+        try {
+          JSON.parse(user); // Validate user data
+          console.log("Valid auth found, redirecting...");
+          // Valid token and user exist, redirect to SuperAdmin dashboard
+          navigate("/superadmin-dashboard", { replace: true });
+        } catch (error) {
+          console.error("Invalid user data in localStorage:", error);
+          // Invalid user data, clear storage
+          localStorage.removeItem("superadmin_token");
+          localStorage.removeItem("superadmin_user");
+        }
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
+
+  // Listen for storage changes (helps with login state sync)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const token = localStorage.getItem("superadmin_token");
+      const user = localStorage.getItem("superadmin_user");
+      
+      if (token && user) {
+        navigate("/superadmin-dashboard", { replace: true });
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [navigate]);
 
   const handleSubmit = async (event) => {
@@ -57,22 +86,51 @@ function SuperAdminLoginPage() {
     }
 
     try {
+      console.log("Attempting login...");
       const response = await axios.post(
         `${process.env.REACT_APP_API_STRING}/superadmin/login`,
         { username, password },
         { withCredentials: true }
       );
 
+      console.log("Login response:", response.data);
+
       if (response.data.success) {
+        console.log("Login successful, storing data...");
+        setIsRedirecting(true);
+        
         // Store the superadmin token
         localStorage.setItem("superadmin_token", response.data.token);
         localStorage.setItem("superadmin_user", JSON.stringify(response.data.superAdmin));
         
-        // Redirect to SuperAdmin dashboard
-        navigate("/superadmin-dashboard");
+        // Clear form state
+        setUsername("");
+        setPassword("");
+        setError(null);
+        setSessionMessage(null);
+        
+        // Verify storage was successful
+        const storedToken = localStorage.getItem("superadmin_token");
+        const storedUser = localStorage.getItem("superadmin_user");
+        console.log("Storage verification - Token:", !!storedToken, "User:", !!storedUser);
+        
+        // Force page reload approach (most reliable)
+        setTimeout(() => {
+          console.log("Redirecting to dashboard...");
+          window.location.href = "/superadmin-dashboard";
+        }, 100);
+        
+        // Fallback navigation attempt
+        setTimeout(() => {
+          if (window.location.pathname === "/superadmin-login") {
+            console.log("Fallback navigation...");
+            navigate("/superadmin-dashboard", { replace: true });
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error("SuperAdmin login error:", error);
+      setIsRedirecting(false);
       
       if (error.response) {
         switch (error.response.status) {
@@ -195,6 +253,20 @@ function SuperAdminLoginPage() {
               </Alert>
             )}
 
+            {/* Redirecting Alert */}
+            {isRedirecting && (
+              <Alert
+                severity="success"
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
+                }}
+              >
+                Login successful! Redirecting to dashboard...
+              </Alert>
+            )}
+
             {/* Login Form */}
             <form onSubmit={handleSubmit}>
               <Box sx={{ mb: 3 }}>
@@ -205,7 +277,7 @@ function SuperAdminLoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   variant="outlined"
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || isRedirecting}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -230,7 +302,7 @@ function SuperAdminLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   variant="outlined"
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || isRedirecting}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -242,7 +314,7 @@ function SuperAdminLoginPage() {
                         <IconButton
                           onClick={() => setShowPassword(!showPassword)}
                           edge="end"
-                          disabled={isLoading}
+                          disabled={isLoading || isRedirecting}
                         >
                           {showPassword ? <VisibilityOff /> : <Visibility />}
                         </IconButton>
@@ -261,22 +333,26 @@ function SuperAdminLoginPage() {
                 type="submit"
                 fullWidth
                 variant="contained"
-                disabled={isLoading}
+                disabled={isLoading || isRedirecting}
                 sx={{
                   py: 1.5,
                   borderRadius: 2,
                   fontWeight: 600,
                   fontSize: "1.1rem",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background: isRedirecting 
+                    ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
+                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   "&:hover": {
-                    background: "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)",
+                    background: isRedirecting 
+                      ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
+                      : "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)",
                   },
                   "&:disabled": {
                     background: "#ccc",
                   },
                 }}
               >
-                {isLoading ? "Authenticating..." : "Access SuperAdmin Portal"}
+                {isLoading ? "Authenticating..." : isRedirecting ? "Redirecting..." : "Access SuperAdmin Portal"}
               </Button>
             </form>
 

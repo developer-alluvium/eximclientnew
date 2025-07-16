@@ -35,7 +35,7 @@ export const useSuperAdminApi = () => {
     // Superadmin verification before API call
     if (!verifySuperAdmin()) {
       // Navigate to login page instead of dashboard
-      navigate('/superadmin/login');
+      navigate('/superadmin-login');
       throw new Error('Authentication required');
     }
 
