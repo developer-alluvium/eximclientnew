@@ -41,97 +41,109 @@ function LoginPage() {
     }
   }, [navigate, setUser]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setLoginError(null);
-    setIsSubmitting(true);
+ const handleSubmit = async (event) => {
+  event.preventDefault();
+  setLoginError(null);
+  setIsSubmitting(true);
 
-    try {
-      const res = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/login`,
-        { ie_code_no, password },
-        { withCredentials: true } // Important for cookie handling
-      );
+  try {
+    const res = await axios.post(
+      `${process.env.REACT_APP_API_STRING}/login`,
+      { ie_code_no, password },
+      { withCredentials: true } // Important for cookie handling
+    );
 
-      if (res.status === 200) {
-        const userData = res.data.data.user; // Extract user data from correct path
+    if (res.status === 200) {
+      const userData = res.data.data.user;
+      const accessToken = res.data.accessToken;
+      const refreshToken = res.data.refreshToken;
 
-        // Log successful login activity
-        try {
-          await logActivity({
-            userId: userData.id, // Use id instead of customerId
-            activityType: 'login',
-            description: `Successful login for IE Code: ${ie_code_no}`,
-            severity: 'low',
-            metadata: {
-              ieCode: ie_code_no,
-              loginTime: new Date().toISOString(),
-              userAgent: navigator.userAgent
-            }
-          });
-        } catch (logError) {
-          console.error('Failed to log login activity:', logError);
-        }
-
-        // Store user data in localStorage for persistence across page refreshes
-        localStorage.setItem("exim_user", JSON.stringify(userData));
-
-        // Update user context
-        setUser(userData);
-
-        // Navigate to home page
-        navigate("/");
-
-        // Reset form fields
-        setIeCodeNo("");
-        setPassword("");
-      }
-    } catch (error) {
-      let errorMessage = "An unexpected error occurred";
-      
-      if (error.response) {
-        switch (error.response.status) {
-          case 400:
-            errorMessage = error.response.data.message;
-            setLoginError(errorMessage);
-            break;
-          case 401:
-            errorMessage = "Invalid credentials";
-            setLoginError(errorMessage);
-            break;
-          case 500:
-            errorMessage = "Server error. Please try again later.";
-            setLoginError(errorMessage);
-            break;
-          default:
-            setLoginError(errorMessage);
-        }
-      } else {
-        errorMessage = "Network error. Please check your connection.";
-        setLoginError(errorMessage);
-      }
-
-      // Log failed login attempt
+      // Log successful login activity
       try {
         await logActivity({
-          userId: null, // No user ID for failed login
-          activityType: 'failed_login',
-          description: `Failed login attempt for IE Code: ${ie_code_no}`,
-          severity: 'medium',
+          userId: userData.id,
+          activityType: 'login',
+          description: `Successful login for IE Code: ${ie_code_no}`,
+          severity: 'low',
           metadata: {
             ieCode: ie_code_no,
-            errorMessage: errorMessage,
-            attemptTime: new Date().toISOString(),
+            loginTime: new Date().toISOString(),
             userAgent: navigator.userAgent
           }
         });
       } catch (logError) {
-        console.error('Failed to log failed login activity:', logError);
-      }    } finally {
-      setIsSubmitting(false);
-    }
-  };
+        console.error('Failed to log login activity:', logError);
+      }
 
+      // Store user data with tokens in localStorage
+      const userDataWithTokens = {
+        ...userData,
+        accessToken: accessToken,
+        refreshToken: refreshToken
+      };
+      
+      localStorage.setItem("exim_user", JSON.stringify(userDataWithTokens));
+      
+      // Also store tokens separately for easier access
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("refresh_token", refreshToken);
+
+      // Update user context
+      setUser(userDataWithTokens);
+
+      // Navigate to home page
+      navigate("/");
+
+      // Reset form fields
+      setIeCodeNo("");
+      setPassword("");
+    }
+  } catch (error) {
+    let errorMessage = "An unexpected error occurred";
+    
+    if (error.response) {
+      switch (error.response.status) {
+        case 400:
+          errorMessage = error.response.data.message;
+          setLoginError(errorMessage);
+          break;
+        case 401:
+          errorMessage = "Invalid credentials";
+          setLoginError(errorMessage);
+          break;
+        case 500:
+          errorMessage = "Server error. Please try again later.";
+          setLoginError(errorMessage);
+          break;
+        default:
+          setLoginError(errorMessage);
+      }
+    } else {
+      errorMessage = "Network error. Please check your connection.";
+      setLoginError(errorMessage);
+    }
+
+    // Log failed login attempt
+    try {
+      await logActivity({
+        userId: null,
+        activityType: 'failed_login',
+        description: `Failed login attempt for IE Code: ${ie_code_no}`,
+        severity: 'medium',
+        metadata: {
+          ieCode: ie_code_no,
+          errorMessage: errorMessage,
+          attemptTime: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        }
+      });
+    } catch (logError) {
+      console.error('Failed to log failed login activity:', logError);
+    }
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const handleForgotPassword = async (event) => {
     event.preventDefault();
     setResetPasswordError(null);

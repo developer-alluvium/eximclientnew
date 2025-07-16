@@ -138,15 +138,18 @@ export const createSendTokens = (
 //* Authentication middleware that verifies JWT in cookie or Authorization header
 export const authenticate = async (req, res, next) => {
   try {
-    // Get token from cookie or Authorization header
+    // Get token from cookie, Authorization header, or access_token cookie
     const token =
       (req.cookies && req.cookies.access_token) ||
-      (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+      (req.headers.authorization && req.headers.authorization.split(" ")[1]) ||
+      (req.headers.authorization && req.headers.authorization.replace("Bearer ", ""));
 
     if (!token) {
       // Log only specific routes or in debug mode to reduce log noise
       if (process.env.NODE_ENV === 'development' && process.env.DEBUG_AUTH) {
         console.log("No token provided for protected route:", req.path);
+        console.log("Cookies:", req.cookies);
+        console.log("Authorization header:", req.headers.authorization);
       }
       return res.status(401).json({
         success: false,
@@ -185,6 +188,7 @@ export const authenticate = async (req, res, next) => {
       role: decoded.role || "customer",
       isActive: customer.isActive,
       assignedModules: customer.assignedModules || [],
+      email: customer.email, // Add email if available
     };
 
     next();
@@ -209,7 +213,6 @@ export const authenticate = async (req, res, next) => {
     });
   }
 };
-
 //* Middleware to refresh access token using refresh token
 
 export const refreshAccessToken = async (req, res) => {

@@ -32,7 +32,7 @@ router.get("/api/column-order", getColumnOrder);
 
 // SuperAdmin protected customer management routes
 // SSO token generation for E-Lock redirection
-router.post("/api/generate-sso-token", authenticate, generateSSOToken);
+router.post("/api/generate-sso-token", authenticate,  generateSSOToken);
 
 // SuperAdmin protected registration routes
 router.post("/api/register", protectSuperAdmin, registerCustomer);

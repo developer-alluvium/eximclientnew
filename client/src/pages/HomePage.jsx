@@ -297,44 +297,70 @@ function HomePage() {
     return filteredModules;
   }, [user?.role]);
 
-  const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
-    if (isLocked) {
-      // Show a message or modal for locked modules
-      return;
-    }
-    
-    if (path === "#") {
-      // Do nothing for coming soon modules
-      return;
-    }
+ const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = 'E-Lock') => {
+  if (isLocked) {
+    return;
+  }
 
-    // Special handling for E-Lock SSO
-    if (moduleName == "E-Lock") {
-      try {
-        const res = await axios.post(
-          `${process.env.REACT_APP_API_STRING}/generate-sso-token`,
-          {},
-          { withCredentials: true }
-        );
-        const token = res.data?.data?.token;
-        if (token) {
-          localStorage.setItem('sso_token', token); // Store SSO token in localStorage
-          window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${token}`;
-        } else {
-          alert("Failed to generate SSO token for E-Lock.");
+  if (moduleName == "E-Lock") {
+    try {
+      // Get user data from localStorage
+      const eximUser = localStorage.getItem('exim_user');
+      let token;
+      
+      if (eximUser) {
+        try {
+          const parsed = JSON.parse(eximUser);
+          // Make sure you're getting the correct token field
+          token = parsed.token || parsed.accessToken || parsed.jwt;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+          // Redirect to login if user data is corrupted
+          navigate('/login');
+          return;
         }
-      } catch (err) {
+      }
+
+      if (!token) {
+        // No token found, redirect to login
+        navigate('/login');
+        return;
+      }
+
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/generate-sso-token`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            'Authorization': `Bearer ${token}`, // Ensure this format matches your backend
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const ssoToken = res.data?.data?.token;
+      if (ssoToken) {
+        localStorage.setItem('sso_token', ssoToken);
+        window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
+      } else {
+        alert("Failed to generate SSO token for E-Lock.");
+      }
+    } catch (err) {
+      console.error('SSO token generation error:', err);
+      
+      // If it's an authentication error, redirect to login
+      if (err.response?.status === 401) {
+        navigate('/login');
+      } else {
         alert("Error generating SSO token for E-Lock.");
       }
-      return;
     }
-    
-    if (isExternal) {
-      window.open(path, '_blank', 'noopener,noreferrer');
-    } else {
-      navigate(path);
-    }
-  };
+    return;
+  }
+  
+  // Rest of your code...
+};
 
   const handleUserMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
