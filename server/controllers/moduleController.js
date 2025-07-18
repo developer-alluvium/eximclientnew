@@ -36,7 +36,9 @@ const AVAILABLE_MODULES = [
     isExternal: true
   },
   {
-    id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    id: process.env.ELOCK_URL || (process.env.NODE_ENV === "development"
+      ? "http://localhost:3005/"
+      : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/"),
     name: "E-Lock",
     description: "Secure electronic document locking and verification",
     category: "core",

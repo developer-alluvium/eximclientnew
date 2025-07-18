@@ -256,8 +256,10 @@ function HomePage() {
     {
       name: "E-Lock",
       description: "Secure electronic document locking and verification",
-      path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
-      icon: <LockOutlinedIcon />,
+      path: process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
+        ? "http://localhost:3005"
+        : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/"),
+      icon: <LockOutlinedIcon />, 
       category: "core"
     },
     {
@@ -342,7 +344,10 @@ function HomePage() {
       const ssoToken = res.data?.data?.token;
       if (ssoToken) {
         localStorage.setItem('sso_token', ssoToken);
-        window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
+        const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
+          ? "http://localhost:3005"
+          : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
+        window.location.href = `${elockUrl}?token=${ssoToken}`;
       } else {
         alert("Failed to generate SSO token for E-Lock.");
       }

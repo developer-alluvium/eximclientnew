@@ -118,6 +118,25 @@ DEV_CLIENT_URI=http://your-production-domain
 - HTTP-compatible while maintaining security best practices
 - Cross-origin requests handled properly
 
+## E-Lock URL Environment Variables
+
+To make the E-Lock URL dynamic for both development and production, use environment variables in both frontend and backend:
+
+### Frontend (.env)
+```
+REACT_APP_ELOCK_URL=http://localhost:3005
+# For production, set to: http://elock-tracking.s3-website.ap-south-1.amazonaws.com/
+```
+
+### Backend (.env)
+```
+ELOCK_URL=http://localhost:3005/
+# For production, set to: http://elock-tracking.s3-website.ap-south-1.amazonaws.com/
+```
+
+- The application will use the environment variable if set, otherwise fallback to localhost:3005 in development and the S3 URL in production.
+- Update your deployment environment variables as needed to switch between environments.
+
 ## Implementation Status
 
 ✅ HTTP cookie configuration complete
