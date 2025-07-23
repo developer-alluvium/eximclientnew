@@ -574,7 +574,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                       {customer.ie_code_no && (
                         <IconButton
                           size="small"
-                          onClick={(event) => handleCopy(event, customer.ie_code_no)}
+                          onClick={(event) => handleCopy(event, customer.ie_code_no, 'IE Code')}
                         >
                           <ContentCopyIcon sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -594,7 +594,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                       {customer.pan_number && (
                         <IconButton
                           size="small"
-                          onClick={(event) => handleCopy(event, customer.pan_number)}
+                          onClick={(event) => handleCopy(event, customer.pan_number, 'PAN Number')}
                         >
                           <ContentCopyIcon sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -741,7 +741,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                               <InputAdornment position="end">
                                 <IconButton
                                   size="small"
-                                  onClick={(event) => handleCopy(event, generatePassword(customer.ie_code_no, customer.pan_number))}
+                                  onClick={(event) => handleCopy(event, generatePassword(customer.ie_code_no, customer.pan_number), 'Generated Password')}
                                 >
                                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
@@ -1277,7 +1277,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                   <InputAdornment position="end">
                     <IconButton
                       size="small"
-                      onClick={() => handleCopy(generatedPassword, 'Password')}
+                      onClick={(event) => handleCopy(event, generatedPassword, 'Generated Password')}
                     >
                       <ContentCopy sx={{ fontSize: 16 }} />
                     </IconButton>
