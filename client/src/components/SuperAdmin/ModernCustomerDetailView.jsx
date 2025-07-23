@@ -74,15 +74,13 @@ import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
 import axios from 'axios';
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
-function getSuperAdminHeaders() {
-  const validation = require('../../utils/tokenValidation').validateSuperAdminToken();
-  if (!validation.isValid) throw new Error('SuperAdmin authentication failed');
+export function getSuperAdminHeaders() {
+  const token = localStorage.getItem('superadmin_token');
   return {
     headers: {
-      Authorization: `Bearer ${validation.token}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-    },
-    withCredentials: true,
+    }
   };
 }
 
@@ -222,6 +220,7 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
       setColumnPermissions(permRes.data.data.customer.allowedColumns || []);
     } catch (err) {
       setColumnError(err.response?.data?.message || 'Failed to fetch column permissions');
+      console.log('Error fetching column permissions:', err);
     } finally {
       setColumnLoading(false);
     }
