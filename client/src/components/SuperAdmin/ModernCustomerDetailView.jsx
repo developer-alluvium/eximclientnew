@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -72,6 +72,7 @@ import ModernCard from '../common/ModernCard';
 import ModernButton from '../common/ModernButton';
 import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
 import axios from 'axios';
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 function getSuperAdminHeaders() {
   const validation = require('../../utils/tokenValidation').validateSuperAdminToken();
@@ -84,6 +85,8 @@ function getSuperAdminHeaders() {
     withCredentials: true,
   };
 }
+
+  
 
 const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const {
@@ -144,6 +147,43 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
       fetchColumnPermissions();
     }
   }, [activeTab, customerId]);
+
+
+    const handleCopy = useCallback((event, text, type= 'Text') => {
+    event.stopPropagation();
+
+    if (
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+    ) {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          console.log("Text copied to clipboard:", text);
+          setNotification({ message: `${type} copied to clipboard!`, type: 'success' });
+        })
+        .catch((err) => {
+          alert("Failed to copy text to clipboard.");
+          console.error("Failed to copy:", err);
+            setNotification({ message: `Failed to copy ${type.toLowerCase()}`, type: 'error' });
+        });
+    } else {
+      // Fallback approach for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        console.log("Text copied to clipboard using fallback method:", text);
+      } catch (err) {
+        alert("Failed to copy text to clipboard.");
+        console.error("Fallback copy failed:", err);
+      }
+      document.body.removeChild(textArea);
+    }
+  }, []);
 
   const loadModuleData = async () => {
     try {
@@ -360,14 +400,8 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   };
 
   // Add handleCopy definition
-  const handleCopy = async (text, type) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setNotification({ message: `${type} copied to clipboard!`, type: 'success' });
-    } catch (error) {
-      setNotification({ message: `Failed to copy ${type.toLowerCase()}`, type: 'error' });
-    }
-  };
+ 
+
 
   return (
     <Box sx={{ 
@@ -541,9 +575,9 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                       {customer.ie_code_no && (
                         <IconButton
                           size="small"
-                          onClick={() => handleCopy(customer.ie_code_no, 'IE Code')}
+                          onClick={(event) => handleCopy(event, customer.ie_code_no)}
                         >
-                          <ContentCopy sx={{ fontSize: 16 }} />
+                          <ContentCopyIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       )}
                     </Box>
@@ -561,9 +595,9 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                       {customer.pan_number && (
                         <IconButton
                           size="small"
-                          onClick={() => handleCopy(customer.pan_number, 'PAN Number')}
+                          onClick={(event) => handleCopy(event, customer.pan_number)}
                         >
-                          <ContentCopy sx={{ fontSize: 16 }} />
+                          <ContentCopyIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       )}
                     </Box>
@@ -708,12 +742,9 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                               <InputAdornment position="end">
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleCopy(
-                                    generatePassword(customer.ie_code_no, customer.pan_number),
-                                    'Generated Password'
-                                  )}
+                                  onClick={(event) => handleCopy(event, generatePassword(customer.ie_code_no, customer.pan_number))}
                                 >
-                                  <ContentCopy sx={{ fontSize: 16 }} />
+                                  <ContentCopyIcon sx={{ fontSize: 16 }} />
                                 </IconButton>
                               </InputAdornment>
                             ),

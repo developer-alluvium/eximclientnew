@@ -36,6 +36,7 @@ export const useSuperAdminApi = () => {
     if (!verifySuperAdmin()) {
       // Navigate to login page instead of dashboard
       navigate('/superadmin-login');
+      
       throw new Error('Authentication required');
     }
 
@@ -44,7 +45,8 @@ export const useSuperAdminApi = () => {
       setError(null);
       
       const token = localStorage.getItem('superadmin_token');
-      
+      console.log('Superadmin token:', token); // Debugging line
+
       const config = {
         method,
         url: `${process.env.REACT_APP_API_STRING}${endpoint}`,
@@ -52,7 +54,7 @@ export const useSuperAdminApi = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`, // Add auth header
         },
-        withCredentials: true,
+      //  withCredentials: true,
       };
 
       // Only add data for non-GET requests
@@ -63,19 +65,26 @@ export const useSuperAdminApi = () => {
       const response = await axios(config);
       return response.data;
     } catch (err) {
-      // Handle different error types
-      if (err.response?.status === 401) {
-        // Token expired or invalid
-        localStorage.removeItem('superadmin_token');
-        localStorage.removeItem('superadmin_user');
-        navigate('/superadmin/login');
-        throw new Error('Session expired. Please login again.');
-      }
-      
-      const errorMessage = err.response?.data?.message || err.message || 'An error occurred';
-      setError(errorMessage);
-      throw err;
-    } finally {
+  console.error('API Call Error:', err.response?.status, err.response?.data);
+  
+  // Handle different error types
+  if (err.response?.status === 401) {
+    // Token expired or invalid
+    localStorage.clear();
+    localStorage.removeItem('superadmin_token');
+    localStorage.removeItem('superadmin_user');
+    navigate('/superadmin-login');
+    throw new Error('Session expired. Please login again.');
+  } else if (err.response?.status === 403) {
+    // Forbidden - likely a backend authorization issue
+    console.error('Access forbidden. Check backend route permissions.');
+    throw new Error('Access forbidden. Please check your permissions.');
+  }
+  
+  const errorMessage = err.response?.data?.message || err.message || 'An error occurred';
+  setError(errorMessage);
+  throw err;
+} finally {
       setLoading(false);
     }
   }, [navigate, verifySuperAdmin]);
