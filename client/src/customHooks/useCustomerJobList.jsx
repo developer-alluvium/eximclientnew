@@ -495,7 +495,8 @@ function useCustomerJobList() {
             container_nos = [],
             out_of_charge,
             delivery_date,
-            emptyContainerOffLoadDate
+            emptyContainerOffLoadDate,
+            consignment_type
           } = cell.row.original;
 
           // Format dates
@@ -521,7 +522,21 @@ function useCustomerJobList() {
                 <strong>Discharge: </strong>
                 <span> {formatDischargedate}</span>
               </div>
-
+            <div> 
+  <strong>{consignment_type === "LCL" ? "By Road: " : "Rail Out: "}</strong>
+  <span>
+    {container_nos.length > 0
+      ? container_nos.map((container, id) => (
+          <React.Fragment key={id}>
+            {consignment_type === "LCL"
+              ? (container.by_road_movement_date?.split("T")[0] ?? "N/A")
+              : (container.container_rail_out_date?.split("T")[0] ?? "N/A")}
+            <br />
+          </React.Fragment>
+        ))
+      : "N/A"}
+  </span>
+</div>
               <div>
                 <strong>Arrival: </strong>
                 <span>
