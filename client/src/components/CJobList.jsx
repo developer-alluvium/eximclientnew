@@ -285,19 +285,16 @@ function CJobList(props) {
   }, [currentUserId, hasAttemptedFetch, userRole, columns]);
   
   const saveColumnOrderToBackend = async () => {
-    // Only allow superadmin to save column order
-    if (!currentUserId || userRole !== 'superadmin') {
-      console.warn("Only superadmin can save column layout");
+    // Allow all users to save column order
+    if (!currentUserId) {
+      console.warn("No user ID found. Cannot save column layout.");
       return;
     }
-    
     try {
       await axios.post(`${process.env.REACT_APP_API_STRING}/column-order`, {
         userId: currentUserId,
         columnOrder: columnOrder,
       });
-      
-      // Reset unsaved changes flag after successful save
       setUnsavedChanges(false);
     } catch (err) {
       console.error("Failed to save column order", err);
@@ -461,16 +458,15 @@ selectedExporter  ]);
       ),
     },
     onColumnOrderChange: (newOrder) => {
-      // Only allow column order changes for superadmin
-      if (userRole === 'superadmin') {
-        setColumnOrder(newOrder);
-        setUnsavedChanges(true);
-      }
+      // Allow all users to change column order
+      setColumnOrder(newOrder);
+      setUnsavedChanges(true);
     },
-    enableColumnOrdering: userRole === 'superadmin', // Only enable for superadmin
+    enableColumnOrdering: true, // Enable for all users
     enablePagination: false,
     enableBottomToolbar: false,
     enableDensityToggle: false,
+
     // Ensure proper event handling
     enableClickToPause: true,
     muiTableOptions: {
@@ -485,8 +481,9 @@ selectedExporter  ]);
     enableGlobalFilter: false,
     enableGrouping: false, // Disable grouping to prevent event interference
     enableColumnFilters: false,
-    
-    enableColumnActions: userRole === 'superadmin', // Only enable column actions for superadmin
+     enableColumnResizing: true,
+    enableColumnOrdering: true,
+    enableColumnActions: false, // Enable for all users
     enableStickyHeader: true,
     enablePinning: true,
     enableRowActions: false,
@@ -703,7 +700,7 @@ selectedExporter  ]);
             }}
           />
 
-          {userRole === 'superadmin' && unsavedChanges && (
+          {unsavedChanges && (
             <Button
               startIcon={<SaveIcon fontSize="small" />}
               variant="contained"
