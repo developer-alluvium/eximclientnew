@@ -255,7 +255,7 @@ function HomePage() {
     },
     {
       name: "E-Lock",
-      description: "Secure electronic document locking and verification",
+      description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
       path: process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
         ? "http://localhost:3005"
         : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/"),
