@@ -1,6 +1,3 @@
-/**
- * Helper functions for module access control
- */
 
 /**
  * Get user's assigned modules from localStorage
@@ -47,12 +44,16 @@ export const hasModuleAccess = (moduleId) => {
  */
 export const filterModulesByAccess = (allModules) => {
   const assignedModules = getUserAssignedModules();
-  
-  return allModules.map(module => ({
-    ...module,
-    hasAccess: assignedModules.includes(module.path),
-    isLocked: !assignedModules.includes(module.path)
-  }));
+  return allModules.map(module => {
+    // Check both path and id for access
+    const moduleIds = [module.path, module.id].filter(Boolean);
+    const hasAccess = moduleIds.some(id => assignedModules.includes(id));
+    return {
+      ...module,
+      hasAccess,
+      isLocked: !hasAccess
+    };
+  });
 };
 
 /**

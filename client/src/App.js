@@ -20,6 +20,8 @@ import SuperAdminLayout from "./components/SuperAdmin/SuperAdminLayout.jsx";
 import ModuleAccessManagement from "./components/SuperAdmin/ModuleAccessManagement.jsx";
 import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
+import ImportVideo from "./components/ImportVideo.jsx"; // Import the new component
+import ImportVideoPage from "./pages/ImportVideoPage"; // Import the new ImportVideoPage component
 // Protected route component
 const ProtectedRoute = ({ children }) => {
   const navigate = useNavigate();
@@ -93,6 +95,10 @@ function App() {
                     localStorage.getItem("exim_user") ? <AppbarComponent /> : <LoginPage />
                   }
                 />
+                <Route path="/trademasterguide" element={
+                  localStorage.getItem("exim_user") ? <ImportVideoPage /> : <LoginPage />
+                } />
+                
               </Routes>
             </BrowserRouter>
           </ImportersProvider>

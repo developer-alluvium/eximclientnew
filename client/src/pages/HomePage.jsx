@@ -43,6 +43,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ContactSupportOutlinedIcon from "@mui/icons-material/ContactSupportOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import "../styles/home.scss";
 import {  alpha } from "@mui/material/styles";
 
@@ -276,6 +277,13 @@ function HomePage() {
       icon: <DescriptionOutlinedIcon />,
       category: "coming-soon"
     },
+    {
+      name: "Trademaster Guide", 
+      description: "Tutorials to master import and export procedures",
+      path: "/trademasterguide", 
+      icon : <VideocamOutlinedIcon />,
+      category: "core"
+    }
   ];
 
   // Filter modules based on user access (reactive to module changes)
@@ -521,7 +529,7 @@ function HomePage() {
                 maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
               }
             }}>
-              {modules.filter(module => ["Import DSR", "CostIQ", "SnapCheck"].includes(module.name)).map((module, index) => (
+              {modules.filter(module => ["Import DSR", "CostIQ", "E-Lock"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={index}
                   onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
@@ -640,7 +648,7 @@ function HomePage() {
                 maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
               }
             }}>
-              {modules.filter(module => ["QR Locker", "Task Flow AI", "E-Lock"].includes(module.name)).map((module, index) => (
+              {modules.filter(module => ["QR Locker", "Task Flow AI", "SnapCheck"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={`second-row-${index}`}
                   onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
@@ -770,7 +778,7 @@ function HomePage() {
               ))}
             </Box>
             
-            {/* Third row: Intendor Management System, DocSure */}
+            {/* Third row: Intendor Management System, DocSure Import video */}
             <Box sx={{ 
               display: 'flex', 
               gap: { xs: 2, sm: 2.5, md: 3 }, 
@@ -780,7 +788,7 @@ function HomePage() {
                 maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
               }
             }}>
-              {modules.filter(module => ["Intendor Management System", "DocSure"].includes(module.name)).map((module, index) => (
+              {modules.filter(module => ["Trademaster Guide"].includes(module.name)).map((module, index) => (
                 <StyledCard 
                   key={`third-row-${index}`}
                   onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}

@@ -43,7 +43,14 @@ const AVAILABLE_MODULES = [
     description: "Secure electronic document locking and verification",
     category: "core",
     isExternal: true
-  }
+  }, 
+  {
+    id: "/import-video",
+    name: "Import Video",
+    description: "View and manage import daily status reports and track shipments",
+    category: "core",
+  },
+
 ];
 
 /**
