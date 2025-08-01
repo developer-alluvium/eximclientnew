@@ -257,8 +257,8 @@ function HomePage() {
     {
       name: "E-Lock",
       description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      path:"http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
-      icon: <LockOutlinedIcon />, 
+      path: process.env.REACT_APP_ELOCK_URL,
+      icon: <LockOutlinedIcon />,
       category: "core",
       isExternal: true
     },
