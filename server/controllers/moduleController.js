@@ -45,11 +45,12 @@ const AVAILABLE_MODULES = [
     isExternal: true
   }, 
   {
-    id: "/import-video",
-    name: "Import Video",
+    id: "/trademasterguide",
+    name: "Trade Master Guide",
     description: "View and manage import daily status reports and track shipments",
     category: "core",
   },
+ 
 
 ];
 
