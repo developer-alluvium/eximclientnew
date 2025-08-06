@@ -14,17 +14,8 @@ client/build
 server/build
 
 # Environment files
-client/.env
-client/.env.local
-client/.env.development.local
-client/.env.test.local
-client/.env.production.local
-
-server/.env
-server/.env.local
-server/.env.development.local
-server/.env.test.local
-server/.env.production.local
+client/.env*
+server/.env*
 
 # Build artifacts
 *.zip
