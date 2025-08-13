@@ -1,47 +1,12 @@
-version: '3.8'
-
 services:
-  exim-backend:
-    build: .
-    container_name: exim-backend
-    restart: unless-stopped
+  server:
+    container_name: customer
+    build: . # Build using the Dockerfile in the current directory
     ports:
-      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - .:/server # Mount the current directory (where docker-compose.yml is) to /server
+      - /server/node_modules # Prevent overwriting node_modules
     environment:
-      - NODE_ENV=production
-      - PORT=9000
-    env_file:
-      - .env
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - exim-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  nginx:
-    image: nginx:alpine
-    container_name: exim-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx.conf:/etc/nginx/conf.d/default.conf
-      - /etc/ssl/alvision:/etc/ssl/alvision:ro
-      - nginx-logs:/var/log/nginx
-    depends_on:
-      - exim-backend
-    networks:
-      - exim-network
-
-networks:
-  exim-network:
-    driver: bridge
-
-volumes:
-  nginx-logs:
+      - NODE_ENV=development
+    command: ["npm", "run", "start"]

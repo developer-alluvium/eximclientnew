@@ -31,10 +31,6 @@ app.use(
   cors({
     origin: [
       "http://localhost:3001",
-      "https://localhost:3001",
-      "https://exim.alvision.in",
-      "http://exim-client-prod.s3-website.ap-south-1.amazonaws.com",
-      "https://exim-client-prod.s3-website.ap-south-1.amazonaws.com",
       "http://43.205.59.159",
       "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
       "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
@@ -114,8 +110,6 @@ app.use((req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${config.nodeEnv}`);
-  console.log(`API Health Check: http://localhost:${PORT}/api/health`);
 });
 
 export default app;
