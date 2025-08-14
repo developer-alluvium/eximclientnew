@@ -42,6 +42,20 @@ const customerSchema = new mongoose.Schema(
       type: [String],
       default: [], // Empty array means all columns allowed by default
     },
+    // Admin designation fields
+    isAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    adminRoleGrantedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+      default: null,
+    },
+    adminRoleGrantedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

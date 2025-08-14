@@ -1,4 +1,3 @@
-// app.mjs
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -13,6 +12,9 @@ import superAdminRoutes from "./routes/superAdminRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import customerAdminRoutes from "./routes/customerAdminRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +74,9 @@ app.use(superAdminRoutes);
 app.use(dashboardRoutes);
 app.use(moduleRoutes);
 app.use(activityRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/customer-admin", customerAdminRoutes);
 
 // Root route
 app.get("/", (req, res) => {

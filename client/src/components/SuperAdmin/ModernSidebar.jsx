@@ -41,6 +41,7 @@ const ModernSidebar = ({
     const iconMap = {
       dashboard: <Dashboard />,
       people: <People />,
+      admin_panel_settings: <AdminPanelSettings />,
       settings: <Extension />,
       analytics: <Analytics />,
       timeline: <Timeline />,

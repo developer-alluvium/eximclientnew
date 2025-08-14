@@ -230,3 +230,42 @@ export const logSearchActivity = async (options) => {
     }
   });
 };
+
+/**
+ * Simple logActivity function for the new user system
+ * @param {String} userId - User ID
+ * @param {String} activityType - Type of activity
+ * @param {String} description - Activity description
+ * @param {Object} details - Additional details
+ * @param {String} ipAddress - IP address
+ */
+export const logActivity = async (userId, activityType, description, details = {}, ipAddress = null) => {
+  try {
+    // Get user information to fill required fields
+    const user = await CustomerModel.findById(userId);
+    if (!user) {
+      console.error('User not found for activity logging:', userId);
+      return null;
+    }
+
+    const activityLog = new ActivityLogModel({
+      user_id: userId,
+      user_name: user.name,
+      user_email: user.email || 'unknown@email.com',
+      ie_code_no: user.ie_code_no,
+      activity_type: activityType,
+      description,
+      ip_address: ipAddress,
+      user_agent: details.userAgent || null,
+      severity: 'medium',
+      details,
+      timestamp: new Date()
+    });
+
+    await activityLog.save();
+    return activityLog;
+  } catch (error) {
+    console.error('Error logging activity:', error);
+    return null;
+  }
+};

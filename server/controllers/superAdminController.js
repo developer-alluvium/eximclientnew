@@ -1,4 +1,11 @@
 import SuperAdminModel from "../models/superAdminModel.js";
+import AdminModel from "../models/adminModel.js";
+import EximclientUser from "../models/eximclientUserModel.js";
+import CustomerModel from "../models/customerModel.js";
+import JobModel from "../models/jobModel.js";
+import Notification from "../models/notificationModel.js";
+import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
+import { logActivity } from "../utils/activityLogger.js";
 import jwt from "jsonwebtoken";
 
 // Environment variables
@@ -195,11 +202,11 @@ export const protectSuperAdmin = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log(`Token verified for SuperAdmin ID: ${decoded.id}`);
+
 
     // Check if user has superadmin role
     if (decoded.role !== "superadmin") {
-      console.log(`Insufficient privileges. Role: ${decoded.role}`);
+    
       return res.status(403).json({
         success: false,
         message: "Access denied. SuperAdmin privileges required.",
@@ -210,7 +217,7 @@ export const protectSuperAdmin = async (req, res, next) => {
     const superAdmin = await SuperAdminModel.findById(decoded.id);
 
     if (!superAdmin) {
-      console.log(`SuperAdmin with ID ${decoded.id} not found`);
+
       return res.status(401).json({
         success: false,
         message: "SuperAdmin not found",
@@ -219,7 +226,7 @@ export const protectSuperAdmin = async (req, res, next) => {
 
     // Check if superadmin is active
     if (!superAdmin.isActive) {
-      console.log(`SuperAdmin account is inactive: ${decoded.id}`);
+      
       return res.status(401).json({
         success: false,
         message: "SuperAdmin account is inactive",
@@ -235,7 +242,7 @@ export const protectSuperAdmin = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("SuperAdmin auth middleware error:", error);
+
     return res.status(401).json({
       success: false,
       message: "Access denied. Invalid or expired token.",
@@ -304,6 +311,853 @@ export const createInitialSuperAdmin = async (req, res) => {
       success: false,
       message: "An error occurred while creating SuperAdmin",
       error: error.message,
+    });
+  }
+};
+
+/**
+ * Register Admin
+ */
+export const registerAdmin = async (req, res) => {
+  try {
+    const { name, email, password, ie_code_no } = req.body;
+    const superAdmin = req.user;
+
+    // Validate required fields
+    if (!name || !email || !password || !ie_code_no) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required (name, email, password, ie_code_no)."
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address."
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long."
+      });
+    }
+
+    // Check if email already exists
+    const existingAdmin = await AdminModel.findOne({ email: email.toLowerCase() });
+    if (existingAdmin) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered. Please use a different email."
+      });
+    }
+
+    // Verify IE code exists
+    const ieCodeUpper = ie_code_no.toUpperCase();
+    const customer = await CustomerModel.findOne({ ie_code_no: ieCodeUpper });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid IE Code. Please verify the IE code exists in the system."
+      });
+    }
+
+    // Check if admin already exists for this IE code
+    const existingAdminForIE = await AdminModel.findOne({ ie_code_no: ieCodeUpper });
+    if (existingAdminForIE) {
+      return res.status(409).json({
+        success: false,
+        message: "An admin already exists for this IE code."
+      });
+    }
+
+    // Create admin
+    const admin = new AdminModel({
+      name: name.trim(),
+      email: email.toLowerCase(),
+      password,
+      ie_code_no: ieCodeUpper,
+      createdBy: superAdmin._id,
+      isActive: true
+    });
+
+    await admin.save();
+
+    // Log activity
+    await logActivity(
+      superAdmin._id,
+      'ADMIN_REGISTRATION',
+      `SuperAdmin registered new admin: ${name} for IE Code: ${ieCodeUpper}`,
+      { 
+        adminId: admin._id,
+        adminEmail: email,
+        adminName: name,
+        ie_code_no: ieCodeUpper 
+      },
+      req.ip
+    );
+
+    // Create notification for the new admin (welcome message)
+    await Notification.createNotification({
+      type: 'admin_created',
+      recipient: admin._id,
+      recipientModel: 'Admin',
+      sender: superAdmin._id,
+      senderModel: 'SuperAdmin',
+      title: 'Welcome to Admin Panel',
+      message: `Your admin account has been created successfully for IE Code ${ieCodeUpper}. You can now manage users under this IE code.`,
+      data: {
+        ie_code_no: ieCodeUpper,
+        createdBy: superAdmin.username
+      },
+      priority: 'medium'
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Admin registered successfully",
+      data: {
+        adminId: admin._id,
+        name: admin.name,
+        email: admin.email,
+        ie_code_no: admin.ie_code_no,
+        isActive: admin.isActive,
+        createdAt: admin.createdAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Admin registration error:", error);
+    
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Admin with this email already exists."
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to register admin. Please try again later."
+    });
+  }
+};
+
+/**
+ * Get All Admins
+ */
+export const getAdmins = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, status } = req.query;
+
+    // Build query
+    const query = {};
+    
+    if (status) {
+      query.isActive = status === 'active';
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { ie_code_no: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get admins with pagination
+    const admins = await AdminModel.find(query)
+      .select('-password')
+      .populate('createdBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await AdminModel.countDocuments(query);
+
+    // Get user counts for each admin
+    const adminsWithStats = await Promise.all(
+      admins.map(async (admin) => {
+        const userCount = await EximclientUser.countDocuments({ ie_code_no: admin.ie_code_no });
+        const activeUserCount = await EximclientUser.countDocuments({ 
+          ie_code_no: admin.ie_code_no,
+          status: 'active' 
+        });
+        
+        return {
+          ...admin.toObject(),
+          userStats: {
+            total: userCount,
+            active: activeUserCount,
+            pending: userCount - activeUserCount
+          }
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        admins: adminsWithStats,
+        pagination: {
+          current: parseInt(page),
+          pages: Math.ceil(total / limit),
+          total
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Get admins error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch admins."
+    });
+  }
+};
+
+/**
+ * Update Admin Status
+ */
+export const updateAdminStatus = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const { isActive, reason } = req.body;
+    const superAdmin = req.user;
+
+    // Find admin
+    const admin = await AdminModel.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found."
+      });
+    }
+
+    // Update admin status
+    const oldStatus = admin.isActive;
+    admin.isActive = isActive;
+    await admin.save();
+
+    // If deactivating admin, also deactivate all their users
+    if (!isActive && oldStatus) {
+      await EximclientUser.updateMany(
+        { ie_code_no: admin.ie_code_no },
+        { status: 'inactive', isActive: false }
+      );
+    }
+
+    // Create notification for admin
+    await Notification.createNotification({
+      type: isActive ? 'admin_activated' : 'admin_deactivated',
+      recipient: admin._id,
+      recipientModel: 'Admin',
+      sender: superAdmin._id,
+      senderModel: 'SuperAdmin',
+      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
+      message: `Your admin account has been ${isActive ? 'activated' : 'deactivated'} by SuperAdmin. ${reason ? 'Reason: ' + reason : ''}`,
+      data: {
+        oldStatus,
+        newStatus: isActive,
+        reason: reason || null
+      },
+      priority: isActive ? 'medium' : 'high'
+    });
+
+    // Log activity
+    await logActivity(
+      superAdmin._id,
+      'ADMIN_STATUS_UPDATE',
+      `${isActive ? 'Activated' : 'Deactivated'} admin ${admin.name} (${admin.email})`,
+      {
+        adminId: admin._id,
+        adminEmail: admin.email,
+        adminName: admin.name,
+        ie_code_no: admin.ie_code_no,
+        oldStatus,
+        newStatus: isActive,
+        reason
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `Admin ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      data: {
+        adminId: admin._id,
+        oldStatus,
+        newStatus: isActive,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Update admin status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update admin status."
+    });
+  }
+};
+
+/**
+ * Designate Customer as Admin
+ * This function allows SuperAdmin to designate an existing customer as an admin
+ */
+export const designateCustomerAsAdmin = async (req, res) => {
+  try {
+    const { ie_code_no } = req.body;
+    const superAdmin = req.user;
+
+    // Validate required fields
+    if (!ie_code_no) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code is required."
+      });
+    }
+
+    // Find customer by IE code
+    const ieCodeUpper = ie_code_no.toUpperCase();
+    const customer = await CustomerModel.findOne({ ie_code_no: ieCodeUpper });
+    
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer with this IE Code not found."
+      });
+    }
+
+    // Check if customer is already active
+    if (!customer.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer account is not active."
+      });
+    }
+
+    // Add admin role to customer (we'll use a new field)
+    customer.isAdmin = true;
+    customer.adminRoleGrantedBy = superAdmin._id;
+    customer.adminRoleGrantedAt = new Date();
+    
+    await customer.save();
+
+    // Log activity
+    await logActivity(
+      superAdmin._id,
+      'CUSTOMER_ADMIN_DESIGNATION',
+      `SuperAdmin designated customer ${customer.name} (IE: ${ieCodeUpper}) as admin`,
+      { 
+        customerId: customer._id,
+        customerName: customer.name,
+        ie_code_no: ieCodeUpper 
+      },
+      req.ip
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Customer ${customer.name} has been designated as admin for IE Code ${ieCodeUpper}`,
+      data: {
+        customerId: customer._id,
+        name: customer.name,
+        ie_code_no: customer.ie_code_no,
+        isAdmin: customer.isAdmin,
+        designatedAt: customer.adminRoleGrantedAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Designate customer as admin error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to designate customer as admin."
+    });
+  }
+};
+
+/**
+ * Get System Statistics
+ */
+export const getSystemStats = async (req, res) => {
+  try {
+    // Get counts
+    const totalAdmins = await AdminModel.countDocuments({});
+    const activeAdmins = await AdminModel.countDocuments({ isActive: true });
+    const totalUsers = await EximclientUser.countDocuments({});
+    const activeUsers = await EximclientUser.countDocuments({ status: 'active' });
+    const pendingUsers = await EximclientUser.countDocuments({ status: 'pending' });
+    const totalCustomers = await CustomerModel.countDocuments({});
+
+    // Get recent activity
+    const recentAdmins = await AdminModel.find({})
+      .select('-password')
+      .populate('createdBy', 'username')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const recentUsers = await EximclientUser.find({})
+      .select('-password')
+      .populate('adminId', 'name email ie_code_no')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get IE code distribution
+    const ieCodeStats = await EximclientUser.aggregate([
+      {
+        $group: {
+          _id: '$ie_code_no',
+          userCount: { $sum: 1 },
+          activeCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+          },
+          pendingCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          }
+        }
+      },
+      { $sort: { userCount: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        statistics: {
+          admins: {
+            total: totalAdmins,
+            active: activeAdmins,
+            inactive: totalAdmins - activeAdmins
+          },
+          users: {
+            total: totalUsers,
+            active: activeUsers,
+            pending: pendingUsers,
+            inactive: totalUsers - activeUsers - pendingUsers
+          },
+          customers: {
+            total: totalCustomers
+          }
+        },
+        recentActivity: {
+          admins: recentAdmins,
+          users: recentUsers
+        },
+        ieCodeDistribution: ieCodeStats
+      }
+    });
+
+  } catch (error) {
+    console.error("Get system stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch system statistics."
+    });
+  }
+};
+
+/**
+ * Get All Customers
+ */
+export const getAllCustomers = async (req, res) => {
+  try {
+    const customers = await CustomerModel.find({})
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: {
+        customers: customers || []
+      }
+    });
+
+  } catch (error) {
+    console.error("Get all customers error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch customers."
+    });
+  }
+};
+
+/**
+ * Get Available IE Codes for Assignment from Job Model
+ */
+export const getAvailableIeCodes = async (req, res) => {
+  try {
+    // Use aggregation pipeline to get distinct IE codes from jobs for year "25-26"
+    // and exclude IE codes that are already assigned to admins
+    const pipeline = [
+      // Match jobs for year "25-26" with non-empty ie_code_no
+      {
+        $match: {
+          year: "25-26",
+          ie_code_no: { $exists: true, $ne: "", $ne: null }
+        }
+      },
+      // Group by ie_code_no to get distinct values with additional info
+      {
+        $group: {
+          _id: "$ie_code_no",
+          importer: { $first: "$importer" },
+          jobCount: { $sum: 1 },
+          lastJobDate: { $max: "$job_date" }
+        }
+      },
+      // Lookup customer data to check admin status
+      {
+        $lookup: {
+          from: "customers",
+          localField: "_id",
+          foreignField: "ie_code_no",
+          as: "customerInfo"
+        }
+      },
+      // Filter out IE codes where customer is already admin
+      {
+        $match: {
+          $or: [
+            { customerInfo: { $size: 0 } }, // No customer record exists
+            { "customerInfo.isAdmin": { $ne: true } } // Customer exists but not admin
+          ]
+        }
+      },
+      // Project final structure
+      {
+        $project: {
+          ie_code_no: "$_id",
+          name: "$importer",
+          jobCount: 1,
+          lastJobDate: 1,
+          customerId: { $arrayElemAt: ["$customerInfo._id", 0] },
+          pan_number: { $arrayElemAt: ["$customerInfo.pan_number", 0] },
+          _id: 0
+        }
+      },
+      // Sort by importer name
+      {
+        $sort: { name: 1 }
+      }
+    ];
+
+    const availableIeCodes = await JobModel.aggregate(pipeline);
+
+    res.json({
+      success: true,
+      data: {
+        availableIeCodes: availableIeCodes.map(item => ({
+          ie_code_no: item.ie_code_no,
+          name: item.name || `IE Code: ${item.ie_code_no}`,
+          pan_number: item.pan_number || "Not Available",
+          customerId: item.customerId || null,
+          jobCount: item.jobCount,
+          lastJobDate: item.lastJobDate
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error("Get available IE codes error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available IE codes."
+    });
+  }
+};
+
+/**
+ * Get All Users
+ */
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await EximclientUser.find({})
+      .select('-password')
+      .populate('adminId', 'name ie_code_no')
+      .sort({ createdAt: -1 }); 
+
+    // Check which users are admins (have Customer records with isAdmin: true and matching IE codes)
+    const usersWithAdminStatus = await Promise.all(
+      users.map(async (user) => {
+        const customerRecord = await CustomerModel.findOne({ 
+          ie_code_no: user.ie_code_no,
+          isAdmin: true 
+        });
+        return {
+          ...user.toObject(),
+          isAdmin: !!customerRecord,
+          adminCustomer: customerRecord ? {
+            id: customerRecord._id,
+            name: customerRecord.name,
+            ie_code_no: customerRecord.ie_code_no,
+            adminRoleGrantedAt: customerRecord.adminRoleGrantedAt
+          } : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        users: usersWithAdminStatus || []
+      }
+    });
+
+  } catch (error) {
+    console.error("Get all users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch users."
+    });
+  }
+};
+
+/**
+ * Update Customer Admin Status
+ */
+export const updateCustomerAdminStatus = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { isAdmin } = req.body;
+
+    const customer = await CustomerModel.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found."
+      });
+    }
+
+    customer.isAdmin = isAdmin;
+    await customer.save();
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'CUSTOMER_ADMIN_STATUS_UPDATE',
+      `${isAdmin ? 'Granted' : 'Revoked'} admin access for customer ${customer.name}`,
+      {
+        customerId: customer._id,
+        customerName: customer.name,
+        ie_code_no: customer.ie_code_no,
+        newAdminStatus: isAdmin
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `Customer admin status ${isAdmin ? 'granted' : 'revoked'} successfully.`,
+      data: {
+        customer: {
+          id: customer._id,
+          name: customer.name,
+          ie_code_no: customer.ie_code_no,
+          isAdmin: customer.isAdmin
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Update customer admin status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update customer admin status."
+    });
+  }
+};
+
+/**
+ * Promote User to Admin
+ */
+export const promoteUserToAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { ie_code_no } = req.body; // SuperAdmin will provide the IE code to assign
+
+    if (!ie_code_no) {
+      return res.status(400).json({
+        success: false,
+        message: "IE code is required to promote user to admin."
+      });
+    }
+
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Find Customer record with the IE code that SuperAdmin wants to assign
+    const customer = await CustomerModel.findOne({ ie_code_no: ie_code_no });
+    if (!customer) {
+      return res.status(400).json({
+        success: false,
+        message: `No customer found with IE code ${ie_code_no}. Cannot promote user to admin.`
+      });
+    }
+
+    if (customer.isAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer with this IE code is already an admin."
+      });
+    }
+
+    // Assign IE code to the user (update both possible field names for compatibility)
+    user.ie_code_no = ie_code_no;
+    user.assignedIeCode = ie_code_no;
+    user.assignedImporterName = customer.name;
+    await user.save();
+
+    // Promote the customer to admin
+    customer.isAdmin = true;
+    customer.adminRoleGrantedBy = req.superAdmin.id; // SuperAdmin who granted the role
+    customer.adminRoleGrantedAt = new Date();
+    await customer.save();
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'USER_PROMOTED_TO_ADMIN',
+      `Promoted user ${user.name} to admin and assigned IE code ${ie_code_no}`,
+      {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        assignedIeCode: ie_code_no,
+        customerId: customer._id,
+        customerName: customer.name
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: "User promoted to admin and IE code assigned successfully.",
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          ie_code_no: user.ie_code_no,
+          assignedIeCode: user.assignedIeCode,
+          assignedImporterName: user.assignedImporterName
+        },
+        customer: {
+          id: customer._id,
+          name: customer.name,
+          ie_code_no: customer.ie_code_no,
+          isAdmin: customer.isAdmin,
+          adminRoleGrantedAt: customer.adminRoleGrantedAt
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Promote user to admin error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to promote user to admin."
+    });
+  }
+};
+
+/**
+ * Demote User from Admin
+ */
+export const demoteUserFromAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Get IE code from user (handle both ie_code_no and assignedIeCode fields)
+    const userIeCode = user.ie_code_no || user.assignedIeCode;
+    if (!userIeCode) {
+      return res.status(400).json({
+        success: false,
+        message: "User does not have an IE code assigned."
+      });
+    }
+
+    // Find Customer record with the same IE code as the user
+    const customer = await CustomerModel.findOne({ ie_code_no: userIeCode });
+    if (!customer) {
+      return res.status(400).json({
+        success: false,
+        message: "User is not currently an admin."
+      });
+    }
+
+    if (!customer.isAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer with this IE code is not currently an admin."
+      });
+    }
+
+    // Demote the customer from admin
+    customer.isAdmin = false;
+    customer.adminRoleGrantedBy = null;
+    customer.adminRoleGrantedAt = null;
+    await customer.save();
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'USER_DEMOTED_FROM_ADMIN',
+      `Demoted user ${user.name} from admin via customer ${customer.name}`,
+      {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        ie_code_no: userIeCode,
+        customerId: customer._id,
+        customerName: customer.name
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: "User demoted from admin successfully.",
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          ie_code_no: userIeCode
+        },
+        customer: {
+          id: customer._id,
+          name: customer.name,
+          ie_code_no: customer.ie_code_no,
+          isAdmin: customer.isAdmin
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Demote user from admin error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to demote user from admin."
     });
   }
 };

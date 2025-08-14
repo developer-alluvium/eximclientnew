@@ -43,7 +43,15 @@ const activityLogSchema = new mongoose.Schema(
         'failed_login',
         'session_expired',
         'unauthorized_access',
-        'sso_token_generated'
+        'sso_token_generated',
+        'CUSTOMER_ADMIN_LOGIN',
+        'USER_REGISTRATION',
+        'USER_LOGIN',
+        'USER_STATUS_UPDATE',
+        'MODULE_ACCESS_UPDATE',
+        'CUSTOMER_ADMIN_STATUS_UPDATE',
+        'USER_PROMOTED_TO_ADMIN',
+        'USER_DEMOTED_FROM_ADMIN'
       ],
     },
     description: {

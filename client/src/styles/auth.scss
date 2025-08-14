@@ -1,0 +1,229 @@
+// Auth pages styling
+.auth-container {
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.auth-row {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  min-height: 100vh;
+  max-height: 100vh;
+}
+
+.auth-left-col {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  padding: 0;
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("../assets/images/login-bg.webp") center/cover;
+    opacity: 0.1;
+  }
+}
+
+.auth-left-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: white;
+  padding: 2rem;
+  max-width: 500px;
+}
+
+.auth-left-title {
+  font-weight: 600 !important;
+  margin-bottom: 1rem !important;
+  color: white !important;
+}
+
+.auth-left-subtitle {
+  font-size: 1.2rem !important;
+  margin-bottom: 2rem !important;
+  opacity: 0.9;
+}
+
+.auth-left-features {
+  text-align: left;
+  
+  .MuiTypography-root {
+    margin-bottom: 0.5rem;
+    opacity: 0.9;
+  }
+}
+
+.auth-right-col {
+  background-color: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  flex: 1;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.auth-right-content {
+  width: 100%;
+  max-width: 450px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 16px !important;
+  border: 1px solid #F3F4F6;
+  
+  .MuiCardContent-root {
+    padding: 2.5rem !important;
+  }
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-title {
+  font-weight: 600 !important;
+  color: #1F2937 !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.auth-form {
+  .auth-input {
+    margin-bottom: 1.5rem !important;
+    
+    .MuiInputBase-root {
+      background-color: #fff !important;
+      border-radius: 8px !important;
+    }
+    
+    .MuiOutlinedInput-notchedOutline {
+      border-color: #E5E7EB !important;
+    }
+    
+    &:hover .MuiOutlinedInput-notchedOutline {
+      border-color: #3B82F6 !important;
+    }
+    
+    .Mui-focused .MuiOutlinedInput-notchedOutline {
+      border-color: #3B82F6 !important;
+    }
+  }
+}
+
+.auth-submit-btn {
+  border-radius: 8px !important;
+  padding: 12px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+  
+  &:hover {
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.25) !important;
+  }
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 2rem;
+  
+  .MuiLink-root {
+    font-weight: 500;
+    text-decoration: none !important;
+    
+    &:hover {
+      text-decoration: underline !important;
+    }
+  }
+}
+
+// Media Queries for Responsiveness
+@media screen and (max-width: 1200px) {
+  .auth-card .MuiCardContent-root {
+    padding: 2rem !important;
+  }
+}
+
+@media screen and (max-width: 992px) {
+  .auth-left-col {
+    display: none;
+  }
+
+  .auth-right-col {
+    width: 100%;
+    padding: 1.5rem;
+  }
+  
+  .auth-right-content {
+    max-width: 500px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .auth-right-col {
+    padding: 1rem;
+  }
+  
+  .auth-card .MuiCardContent-root {
+    padding: 1.5rem !important;
+  }
+  
+  .auth-left-content {
+    padding: 1.5rem;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .auth-card .MuiCardContent-root {
+    padding: 1rem !important;
+  }
+  
+  .auth-header {
+    margin-bottom: 1.5rem;
+  }
+}
+
+// Alert customizations
+.MuiAlert-root {
+  border-radius: 8px !important;
+  
+  &.MuiAlert-standardError {
+    background-color: #FEF2F2 !important;
+    color: #DC2626 !important;
+    border: 1px solid #FECACA;
+  }
+  
+  &.MuiAlert-standardSuccess {
+    background-color: #F0FDF4 !important;
+    color: #16A34A !important;
+    border: 1px solid #BBF7D0;
+  }
+  
+  &.MuiAlert-standardWarning {
+    background-color: #FFFBEB !important;
+    color: #D97706 !important;
+    border: 1px solid #FED7AA;
+  }
+}

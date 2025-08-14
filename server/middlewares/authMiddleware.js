@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import CustomerModel from "../models/customerModel.js";
+import EximclientUser from "../models/eximclientUserModel.js";
+import AdminModel from "../models/adminModel.js";
+import SuperAdminModel from "../models/superAdminModel.js";
 import ActivityLogModel from "../models/ActivityLogModel.js";
 
 // Initialize environment variables
@@ -138,9 +141,11 @@ export const createSendTokens = (
 //* Authentication middleware that verifies JWT in cookie or Authorization header
 export const authenticate = async (req, res, next) => {
   try {
-    // Get token from cookie, Authorization header, or access_token cookie
+    // Get token from various sources - check different user type cookies
     const token =
       (req.cookies && req.cookies.access_token) ||
+      (req.cookies && req.cookies.customer_admin_access_token) ||
+      (req.cookies && req.cookies.user_access_token) ||
       (req.headers.authorization && req.headers.authorization.split(" ")[1]) ||
       (req.headers.authorization && req.headers.authorization.replace("Bearer ", ""));
 
@@ -359,4 +364,240 @@ export const sanitizeUserData = (user) => {
   });
 
   return sanitized;
+};
+
+/**
+ * Generate access token for new user system
+ * @param {Object} user - User object with required properties
+ * @param {String} userType - Type of user (user, admin, superadmin)
+ * @returns {String} JWT token
+ */
+export const generateUserToken = (user, userType = 'user') => {
+  const payload = {
+    id: user._id,
+    email: user.email,
+    name: user.name,
+    userType: userType,
+    role: userType,
+  };
+
+  // Add specific fields based on user type
+  if (userType === 'user' || userType === 'admin') {
+    payload.ie_code_no = user.ie_code_no;
+  }
+  
+  if (userType === 'user') {
+    payload.status = user.status;
+    payload.adminId = user.adminId;
+  }
+
+  return jwt.sign(payload, ACCESS_TOKEN_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES,
+    algorithm: "HS256",
+  });
+};
+
+/**
+ * Authentication middleware for new user system
+ */
+export const authenticateUser = async (req, res, next) => {
+  try {
+    // Get token from cookie or Authorization header
+    const token =
+      (req.cookies && req.cookies.user_access_token) ||
+      (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Access denied. No token provided.",
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
+    
+    // Get user based on type
+    let user;
+    switch (decoded.userType) {
+      case 'user':
+        user = await EximclientUser.findById(decoded.id).populate('adminId', 'name email ie_code_no');
+        break;
+      case 'admin':
+        user = await AdminModel.findById(decoded.id);
+        break;
+      case 'superadmin':
+        user = await SuperAdminModel.findById(decoded.id);
+        break;
+      default:
+        return res.status(401).json({
+          success: false,
+          message: "Invalid user type.",
+        });
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token. User not found.",
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Account is inactive. Please contact support.",
+      });
+    }
+
+    // For users, check if they're verified
+    if (decoded.userType === 'user' && user.status === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: "Account pending verification. Please wait for admin approval.",
+      });
+    }
+
+    // Attach user to request
+    req.user = user;
+    req.userType = decoded.userType;
+    
+    next();
+  } catch (error) {
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token.",
+      });
+    }
+    
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired. Please login again.",
+      });
+    }
+
+    console.error("Authentication error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authentication.",
+    });
+  }
+};
+
+/**
+ * Authorization middleware to check user roles
+ */
+export const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.userType) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    if (!roles.includes(req.userType)) {
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient permissions.",
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware to check IE code access
+ */
+export const checkIECodeAccess = async (req, res, next) => {
+  try {
+    if (!req.user || !req.userType) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    // SuperAdmin has access to all IE codes
+    if (req.userType === 'superadmin') {
+      return next();
+    }
+
+    // Get IE code from request (params, body, or query)
+    const targetIECode = req.params.ie_code_no || req.body.ie_code_no || req.query.ie_code_no;
+    
+    if (!targetIECode) {
+      return res.status(400).json({
+        success: false,
+        message: "IE code is required.",
+      });
+    }
+
+    // Check if user has access to this IE code
+    if (req.user.ie_code_no !== targetIECode.toUpperCase()) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You don't have permission for this IE code.",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("IE code access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authorization.",
+    });
+  }
+};
+
+/**
+ * Send authentication response for new user system
+ */
+export const sendUserAuthResponse = (user, userType, statusCode, res, includeTokens = false) => {
+  const accessToken = generateUserToken(user, userType);
+  const refreshToken = generateRefreshToken(user);
+
+  // Cookie options
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  };
+
+  // Set access token cookie with user-specific name
+  res.cookie(`${userType}_access_token`, accessToken, {
+    ...cookieOptions,
+    expires: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours
+  });
+
+  // Set refresh token cookie
+  res.cookie(`${userType}_refresh_token`, refreshToken, {
+    ...cookieOptions,
+    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+  });
+
+  // Sanitize user data for response
+  const userData = sanitizeUserData(user);
+
+  // Create response object
+  const responseData = {
+    success: true,
+    message: "Authentication successful",
+    userType: userType,
+    data: { user: userData },
+  };
+
+  // Include tokens in response body if requested
+  if (includeTokens) {
+    responseData.accessToken = accessToken;
+    responseData.refreshToken = refreshToken;
+  }
+
+  // Send response
+  res.status(statusCode).json(responseData);
 };
