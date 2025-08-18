@@ -351,9 +351,11 @@ function HomePage() {
       const ssoToken = res.data?.data?.token;
       if (ssoToken) {
         localStorage.setItem('sso_token', ssoToken);
-        const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
-          ? "http://localhost:3005"
-          : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
+        // const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
+        //   ? "http://localhost:3005"
+        //   : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
+        // const elockUrl = "http://localhost:3005";
+        const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/"
         window.location.href = `${elockUrl}?token=${ssoToken}`;
       } else {
         alert("Failed to generate SSO token for E-Lock.");

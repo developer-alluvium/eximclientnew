@@ -37,6 +37,7 @@ app.use(
       "http://43.205.59.159",
       "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
       "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
+      "http://localhost:3005"
     ], // Your React app's URL
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],

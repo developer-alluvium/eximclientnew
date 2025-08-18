@@ -45,6 +45,7 @@ const AVAILABLE_MODULES = [
   // },
   {
     id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    // id:"http://localhost:3005",
     name: "E-Lock",
     description: "Secure electronic document locking and verification (Tracking)",
     category: "core",
