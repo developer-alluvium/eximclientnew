@@ -41,9 +41,69 @@ import {
   Refresh,
   People,
   SupervisorAccount,
-  Business
+  Business,
+  Block,
+  CheckCircle,
+  ToggleOn,
+  ToggleOff,
+  Assignment,
+  GroupWork,
+  Apps,
+  Close,
+  SelectAll,
+  ExpandMore
 } from '@mui/icons-material';
 import axios from 'axios';
+
+// Available modules for assignment
+const AVAILABLE_MODULES = [
+  {
+    id: "/importdsr",
+    name: "Import DSR",
+    description: "View and manage import daily status reports and track shipments",
+    category: "core"
+  },
+  {
+    id: "/netpage", 
+    name: "CostIQ",
+    description: "Calculate shipping costs per kilogram for better pricing decisions",
+    category: "core"
+  },
+  {
+    id: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/",
+    name: "SnapCheck",
+    description: "Beta Version - Quality control and inspection management system",
+    category: "beta",
+    isExternal: true
+  },
+  {
+    id: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/",
+    name: "QR Locker", 
+    description: "Beta Version - Digital locker management with QR code integration",
+    category: "beta",
+    isExternal: true
+  },
+  {
+    id: "http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/",
+    name: "Task Flow AI",
+    description: "Task management system with organizational hierarchy",
+    category: "core",
+    isExternal: true
+  },
+  {
+    id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    name: "E-Lock",
+    description: "Secure electronic document locking and verification (Tracking)",
+    category: "core",
+    isExternal: true
+  },
+  {
+    id: "/trademasterguide",
+    name: "Trade Master Guide",
+    description: "View and manage import daily status reports and track shipments",
+    category: "core",
+  }
+];
 
 const AdminManagement = ({ onRefresh }) => {
   const [customers, setCustomers] = useState([]);
@@ -55,8 +115,17 @@ const AdminManagement = ({ onRefresh }) => {
   
   // Dialog states
   const [adminDialog, setAdminDialog] = useState(false);
+  const [statusDialog, setStatusDialog] = useState(false);
+  const [moduleDialog, setModuleDialog] = useState(false);
+  const [bulkModuleDialog, setBulkModuleDialog] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [adminAction, setAdminAction] = useState(''); // 'promote', 'demote'
+  const [statusAction, setStatusAction] = useState(''); // 'activate', 'deactivate'
+  
+  // Module assignment states
+  const [selectedUserModules, setSelectedUserModules] = useState([]);
+  const [bulkSelectedUsers, setBulkSelectedUsers] = useState([]);
+  const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
   
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
@@ -231,10 +300,180 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
+  const handleChangeUserStatus = async (user, newStatus) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check for SuperAdmin authentication
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${user._id}/status`;
+      const data = { isActive: newStatus };
+
+      const response = await axios.put(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Successfully ${newStatus ? 'activated' : 'deactivated'} user ${user.name}`);
+        fetchData();
+        setStatusDialog(false);
+      }
+    } catch (error) {
+      console.error('Error changing user status:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+        localStorage.removeItem('superadmin_token');
+        localStorage.removeItem('superadmin_user');
+      } else {
+        setError(error.response?.data?.message || 'Failed to change user status');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignModules = async (userId, moduleIds) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${userId}/modules`;
+      const data = { moduleIds };
+
+      const response = await axios.put(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Successfully updated module assignments`);
+        fetchData();
+        setModuleDialog(false);
+        setSelectedUserModules([]);
+      }
+    } catch (error) {
+      console.error('Error assigning modules:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to assign modules');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkAssignModules = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/bulk-assign-modules`;
+      const data = { 
+        userIds: bulkSelectedUsers,
+        moduleIds: bulkSelectedModules 
+      };
+
+      const response = await axios.post(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Successfully assigned modules to ${bulkSelectedUsers.length} users`);
+        fetchData();
+        setBulkModuleDialog(false);
+        setBulkSelectedUsers([]);
+        setBulkSelectedModules([]);
+      }
+    } catch (error) {
+      console.error('Error bulk assigning modules:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to bulk assign modules');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openAdminDialog = (entity, action, type) => {
     setSelectedEntity({ ...entity, type });
     setAdminAction(action);
     setAdminDialog(true);
+  };
+
+  const openStatusDialog = (user, action) => {
+    setSelectedEntity(user);
+    setStatusAction(action);
+    setStatusDialog(true);
+  };
+
+  const openModuleDialog = (user) => {
+    setSelectedEntity(user);
+    // Get user's current modules - assuming they're stored in assignedModules field
+    setSelectedUserModules(user.assignedModules || []);
+    setModuleDialog(true);
+  };
+
+  const openBulkModuleDialog = () => {
+    setBulkModuleDialog(true);
+  };
+
+  const getModuleIcon = (moduleId) => {
+    // Simple icon mapping based on module ID or category
+    if (moduleId.includes('dsr')) return '📊';
+    if (moduleId.includes('net') || moduleId.includes('cost')) return '⚖️';
+    if (moduleId.includes('snap')) return '📷';
+    if (moduleId.includes('qr')) return '🔒';
+    if (moduleId.includes('task') || moduleId.includes('ai')) return '🤖';
+    if (moduleId.includes('elock') || moduleId.includes('lock')) return '🔐';
+    if (moduleId.includes('trade')) return '📚';
+    return '📱';
+  };
+
+  const getModuleCategoryColor = (category) => {
+    switch (category) {
+      case 'core': return 'primary';
+      case 'beta': return 'warning';
+      case 'external': return 'secondary';
+      default: return 'default';
+    }
   };
 
   const filteredCustomers = customers.filter(customer =>
@@ -269,10 +508,24 @@ const AdminManagement = ({ onRefresh }) => {
           sx={{ 
             borderRadius: 2,
             textTransform: 'none',
-            px: 3
+            px: 3,
+            mr: 2
           }}
         >
           Refresh
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<GroupWork />}
+          onClick={openBulkModuleDialog}
+          disabled={loading}
+          sx={{ 
+            borderRadius: 2,
+            textTransform: 'none',
+            px: 3
+          }}
+        >
+          Bulk Module Assignment
         </Button>
       </Box>
 
@@ -506,6 +759,7 @@ const AdminManagement = ({ onRefresh }) => {
                     <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Assigned Modules</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -540,7 +794,62 @@ const AdminManagement = ({ onRefresh }) => {
                         />
                       </TableCell>
                       <TableCell>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxWidth: 300 }}>
+                          {user.assignedModules && user.assignedModules.length > 0 ? (
+                            user.assignedModules.slice(0, 3).map((moduleId) => {
+                              const module = AVAILABLE_MODULES.find(m => m.id === moduleId);
+                              return (
+                                <Chip
+                                  key={moduleId}
+                                  label={module?.name || moduleId.split('/').pop() || moduleId}
+                                  color={getModuleCategoryColor(module?.category)}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              );
+                            })
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No modules assigned
+                            </Typography>
+                          )}
+                          {user.assignedModules && user.assignedModules.length > 3 && (
+                            <Chip
+                              label={`+${user.assignedModules.length - 3} more`}
+                              size="small"
+                              variant="outlined"
+                              color="default"
+                              sx={{ fontSize: '0.7rem' }}
+                            />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
+                          {/* Status Toggle Button */}
+                          <Tooltip title={user.isActive ? 'Deactivate User' : 'Activate User'}>
+                            <IconButton
+                              size="small"
+                              color={user.isActive ? 'warning' : 'success'}
+                              onClick={() => openStatusDialog(user, user.isActive ? 'deactivate' : 'activate')}
+                            >
+                              {user.isActive ? <ToggleOff /> : <ToggleOn />}
+                            </IconButton>
+                          </Tooltip>
+
+                          {/* Module Assignment Button */}
+                          <Tooltip title="Assign Modules">
+                            <IconButton
+                              size="small"
+                              color="info"
+                              onClick={() => openModuleDialog(user)}
+                            >
+                              <Assignment />
+                            </IconButton>
+                          </Tooltip>
+                          
+                          {/* Admin Role Toggle Button */}
                           {user.isAdmin ? (
                             <Tooltip title="Remove Admin Role">
                               <IconButton
@@ -568,7 +877,7 @@ const AdminManagement = ({ onRefresh }) => {
                   ))}
                   {filteredUsers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                         <Typography color="text.secondary">
                           No users found
                         </Typography>
@@ -673,6 +982,304 @@ const AdminManagement = ({ onRefresh }) => {
             disabled={loading || (adminAction === 'promote' && selectedEntity?.type === 'user' && !selectedIeCode)}
           >
             {adminAction === 'promote' ? 'Promote' : 'Revoke'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* User Status Change Dialog */}
+      <Dialog 
+        open={statusDialog} 
+        onClose={() => setStatusDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          {statusAction === 'activate' ? 'Activate User' : 'Deactivate User'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            {statusAction === 'activate' 
+              ? `Are you sure you want to activate "${selectedEntity?.name}"?`
+              : `Are you sure you want to deactivate "${selectedEntity?.name}"?`
+            }
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {statusAction === 'activate' 
+              ? 'This will allow the user to log in and access their assigned modules.'
+              : 'This will prevent the user from logging in and accessing the system.'
+            }
+          </Typography>
+          
+          {statusAction === 'deactivate' && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                <strong>Warning:</strong> Deactivating this user will immediately log them out and prevent them from accessing the system.
+              </Typography>
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStatusDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color={statusAction === 'activate' ? 'success' : 'warning'}
+            onClick={() => {
+              const newStatus = statusAction === 'activate';
+              handleChangeUserStatus(selectedEntity, newStatus);
+            }}
+            disabled={loading}
+          >
+            {statusAction === 'activate' ? 'Activate' : 'Deactivate'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Module Assignment Dialog */}
+      <Dialog 
+        open={moduleDialog} 
+        onClose={() => setModuleDialog(false)} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Assignment color="primary" />
+            Assign Modules to {selectedEntity?.name}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Select modules to assign to this user. Users can only access modules that are assigned to them.
+          </Typography>
+          
+          <Grid container spacing={2}>
+            {AVAILABLE_MODULES.map((module) => {
+              const isAssigned = selectedUserModules.includes(module.id);
+              return (
+                <Grid item xs={12} md={6} key={module.id}>
+                  <Card 
+                    variant="outlined" 
+                    sx={{ 
+                      cursor: 'pointer',
+                      border: isAssigned ? '2px solid' : '1px solid',
+                      borderColor: isAssigned ? 'primary.main' : 'divider',
+                      bgcolor: isAssigned ? 'primary.50' : 'background.paper',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'primary.50'
+                      }
+                    }}
+                    onClick={() => {
+                      if (isAssigned) {
+                        setSelectedUserModules(prev => prev.filter(id => id !== module.id));
+                      } else {
+                        setSelectedUserModules(prev => [...prev, module.id]);
+                      }
+                    }}
+                  >
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Box sx={{ fontSize: '1.2rem' }}>{getModuleIcon(module.id)}</Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {module.name}
+                        </Typography>
+                        {isAssigned && <CheckCircle color="primary" fontSize="small" />}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {module.description}
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Chip 
+                          label={module.category || 'general'} 
+                          size="small" 
+                          color={getModuleCategoryColor(module.category)}
+                          variant="outlined"
+                        />
+                        {module.isExternal && (
+                          <Chip 
+                            label="External" 
+                            size="small" 
+                            color="secondary"
+                            variant="outlined"
+                            sx={{ ml: 0.5 }}
+                          />
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+          
+          <Typography variant="body2" color="primary" sx={{ mt: 2, fontWeight: 500 }}>
+            Selected: {selectedUserModules.length} modules
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModuleDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => handleAssignModules(selectedEntity._id, selectedUserModules)}
+            disabled={loading}
+            startIcon={<Assignment />}
+          >
+            Assign Modules
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Module Assignment Dialog */}
+      <Dialog 
+        open={bulkModuleDialog} 
+        onClose={() => setBulkModuleDialog(false)} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <GroupWork color="primary" />
+            Bulk Module Assignment
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Select users and modules to assign in bulk. This will add the selected modules to all selected users.
+          </Typography>
+          
+          <Grid container spacing={3}>
+            {/* User Selection */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <People />
+                Select Users ({bulkSelectedUsers.length} selected)
+              </Typography>
+              
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  size="small"
+                  startIcon={<SelectAll />}
+                  onClick={() => {
+                    if (bulkSelectedUsers.length === filteredUsers.length) {
+                      setBulkSelectedUsers([]);
+                    } else {
+                      setBulkSelectedUsers(filteredUsers.map(u => u._id));
+                    }
+                  }}
+                >
+                  {bulkSelectedUsers.length === filteredUsers.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </Box>
+              
+              <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                {filteredUsers.map((user) => (
+                  <FormControlLabel
+                    key={user._id}
+                    control={
+                      <Switch
+                        checked={bulkSelectedUsers.includes(user._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setBulkSelectedUsers(prev => [...prev, user._id]);
+                          } else {
+                            setBulkSelectedUsers(prev => prev.filter(id => id !== user._id));
+                          }
+                        }}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {user.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {user.email} • {user.ie_code_no}
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ display: 'block', mb: 1 }}
+                  />
+                ))}
+              </Box>
+            </Grid>
+            
+            {/* Module Selection */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Apps />
+                Select Modules ({bulkSelectedModules.length} selected)
+              </Typography>
+              
+              <Box sx={{ mb: 2 }}>
+                <Button
+                  size="small"
+                  startIcon={<SelectAll />}
+                  onClick={() => {
+                    if (bulkSelectedModules.length === AVAILABLE_MODULES.length) {
+                      setBulkSelectedModules([]);
+                    } else {
+                      setBulkSelectedModules(AVAILABLE_MODULES.map(m => m.id));
+                    }
+                  }}
+                >
+                  {bulkSelectedModules.length === AVAILABLE_MODULES.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </Box>
+              
+              <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                {AVAILABLE_MODULES.map((module) => (
+                  <FormControlLabel
+                    key={module.id}
+                    control={
+                      <Switch
+                        checked={bulkSelectedModules.includes(module.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setBulkSelectedModules(prev => [...prev, module.id]);
+                          } else {
+                            setBulkSelectedModules(prev => prev.filter(id => id !== module.id));
+                          }
+                        }}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ fontSize: '1rem' }}>{getModuleIcon(module.id)}</Box>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {module.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {module.category} {module.isExternal && '• External'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    }
+                    sx={{ display: 'block', mb: 1 }}
+                  />
+                ))}
+              </Box>
+            </Grid>
+          </Grid>
+          
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              <strong>Note:</strong> This will add the selected modules to the selected users. 
+              Existing module assignments will be preserved.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkModuleDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleBulkAssignModules}
+            disabled={loading || bulkSelectedUsers.length === 0 || bulkSelectedModules.length === 0}
+            startIcon={<GroupWork />}
+          >
+            Assign to {bulkSelectedUsers.length} Users
           </Button>
         </DialogActions>
       </Dialog>

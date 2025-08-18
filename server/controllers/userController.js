@@ -149,6 +149,7 @@ export const registerUser = async (req, res) => {
  */
 export const loginUser = async (req, res) => {
   try {
+    console.log("Login request started");
     const { email, password } = req.body;
 
     // Validate required fields
@@ -159,29 +160,37 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    console.log("Finding user:", email);
     // Find user by email
     const user = await EximclientUser.findOne({ 
       email: email.toLowerCase() 
     }).populate('adminId', 'name ie_code_no'); // Populating customer as admin
 
     if (!user) {
+      console.log("User not found for email:", email);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password."
       });
     }
 
-    // Check if account is locked
-    if (user.isLocked) {
-      return res.status(423).json({
-        success: false,
-        message: "Account is temporarily locked due to multiple failed login attempts. Please try again later."
-      });
-    }
+    console.log("User found:", { id: user._id, email: user.email, status: user.status });
 
+    // // Check if account is locked
+    // if (user.isLocked) {
+    //   return res.status(423).json({
+    //     success: false,
+    //     message: "Account is temporarily locked due to multiple failed login attempts. Please try again later."
+    //   });
+    // }
+
+    console.log("Starting password verification");
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
+    console.log("Password verification result:", isPasswordValid);
+    
     if (!isPasswordValid) {
+      console.log("Password invalid, incrementing login attempts");
       // Increment login attempts
       await user.incLoginAttempts();
       
@@ -191,26 +200,36 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // Reset login attempts on successful login
-    if (user.loginAttempts > 0) {
-      await user.resetLoginAttempts();
-    }
+    console.log("Password valid, proceeding with login");
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
+    // // Reset login attempts on successful login
+    // if (user.loginAttempts > 0) {
+    //   await user.resetLoginAttempts();
+    // }
 
-    // Log activity
-    await logActivity(
-      user._id,
-      'USER_LOGIN',
-      'User logged in successfully',
-      { email: user.email },
-      req.ip
+    console.log("Updating last login timestamp");
+    // Update last login using updateOne to avoid full document validation
+    await EximclientUser.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } }
     );
+    console.log("Last login updated successfully");
 
+    console.log("Starting activity logging");
+   // Log activity - temporarily commented out for debugging
+    // await logActivity(
+    //   user._id,
+    //   'USER_LOGIN',
+    //   'User logged in successfully',
+    //   { email: user.email },
+    //   req.ip
+    // );
+    // console.log("Activity logging completed");
+
+    console.log("Sending auth response");
     // Send auth response
     sendUserAuthResponse(user, 'user', 200, res);
+    console.log("Auth response sent successfully");
 
   } catch (error) {
     console.error("Login error:", error);

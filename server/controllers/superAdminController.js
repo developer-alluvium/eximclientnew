@@ -1161,3 +1161,231 @@ export const demoteUserFromAdmin = async (req, res) => {
     });
   }
 };
+
+/**
+ * Update User Status (SuperAdmin)
+ */
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive, reason } = req.body;
+
+    // Find user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Update user status
+    const oldStatus = user.isActive;
+    user.isActive = isActive;
+    user.status = isActive ? 'active' : 'inactive';
+    await user.save();
+
+    // Create notification for user
+    const notificationMessage = isActive 
+      ? 'Your account has been activated by SuperAdmin. You can now access the system.'
+      : `Your account has been deactivated by SuperAdmin. ${reason ? 'Reason: ' + reason : ''}`;
+
+    await Notification.createNotification({
+      type: isActive ? 'user_activated' : 'user_deactivated',
+      recipient: user._id,
+      recipientModel: 'EximclientUser',
+      sender: req.superAdmin.id,
+      senderModel: 'SuperAdmin',
+      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
+      message: notificationMessage,
+      data: {
+        oldStatus,
+        newStatus: isActive,
+        reason: reason || null,
+        updatedBy: 'SuperAdmin'
+      },
+      priority: isActive ? 'medium' : 'high'
+    });
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'USER_STATUS_UPDATE',
+      `${isActive ? 'Activated' : 'Deactivated'} user ${user.name} (${user.email})`,
+      {
+        userId: user._id,
+        userEmail: user.email,
+        userName: user.name,
+        ie_code_no: user.ie_code_no,
+        oldStatus,
+        newStatus: isActive,
+        reason
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      data: {
+        userId: user._id,
+        oldStatus,
+        newStatus: isActive,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Update user status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user status."
+    });
+  }
+};
+
+/**
+ * Assign Modules to User (SuperAdmin)
+ */
+export const assignModulesToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { moduleIds } = req.body;
+
+    if (!Array.isArray(moduleIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "Module IDs must be an array."
+      });
+    }
+
+    // Find user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Update user's assigned modules
+    user.assignedModules = moduleIds;
+    await user.save();
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'MODULE_ASSIGNMENT_UPDATE',
+      `Updated module assignments for user ${user.name} (${user.email})`,
+      {
+        userId: user._id,
+        userEmail: user.email,
+        userName: user.name,
+        ie_code_no: user.ie_code_no,
+        assignedModules: moduleIds,
+        moduleCount: moduleIds.length
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully assigned ${moduleIds.length} modules to user.`,
+      data: {
+        userId: user._id,
+        assignedModules: moduleIds,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Assign modules to user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign modules to user."
+    });
+  }
+};
+
+/**
+ * Bulk Assign Modules to Users (SuperAdmin)
+ */
+export const bulkAssignModulesToUsers = async (req, res) => {
+  try {
+    const { userIds, moduleIds } = req.body;
+
+    if (!Array.isArray(userIds) || !Array.isArray(moduleIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "User IDs and Module IDs must be arrays."
+      });
+    }
+
+    if (userIds.length === 0 || moduleIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one user and one module must be selected."
+      });
+    }
+
+    // Find users
+    const users = await EximclientUser.find({ _id: { $in: userIds } });
+    if (users.length !== userIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Some users not found."
+      });
+    }
+
+    // Update all users' assigned modules (add new modules to existing ones)
+    const bulkOperations = users.map(user => {
+      const existingModules = user.assignedModules || [];
+      const newModules = [...new Set([...existingModules, ...moduleIds])]; // Remove duplicates
+      
+      return {
+        updateOne: {
+          filter: { _id: user._id },
+          update: { $set: { assignedModules: newModules } }
+        }
+      };
+    });
+
+    await EximclientUser.bulkWrite(bulkOperations);
+
+    // Log activity for each user
+    for (const user of users) {
+      await logActivity(
+        req.superAdmin.id,
+        'BULK_MODULE_ASSIGNMENT',
+        `Bulk assigned ${moduleIds.length} modules to user ${user.name} (${user.email})`,
+        {
+          userId: user._id,
+          userEmail: user.email,
+          userName: user.name,
+          ie_code_no: user.ie_code_no,
+          newModules: moduleIds,
+          moduleCount: moduleIds.length,
+          bulkOperation: true
+        },
+        req.ip
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully assigned ${moduleIds.length} modules to ${users.length} users.`,
+      data: {
+        affectedUsers: users.length,
+        assignedModules: moduleIds.length,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Bulk assign modules error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to bulk assign modules."
+    });
+  }
+};

@@ -131,9 +131,10 @@ export const getExporters = async (req, res) => {
       });
     }
 
-    // Build match query
+    // Build match query similar to getContainerDetails approach
     const matchQuery = {
-      importer: { $regex: `^${importer}$`, $options: "i" }
+      importer: { $regex: `^${importer}$`, $options: "i" },
+      supplier_exporter: { $exists: true, $ne: null, $ne: "" }
     };
 
     // Add year filter if provided
@@ -178,20 +179,290 @@ export const getExporters = async (req, res) => {
       }
     }
 
-    // Get distinct exporters using aggregation
-    const exporters = await JobModel.distinct('supplier_exporter', matchQuery);
-    
-    // Filter out null/empty values and remove duplicates
-    const filteredExporters = exporters.filter(exporter => 
-      exporter && exporter.trim() !== ''
-    );
+    console.log('Match Query:', JSON.stringify(matchQuery, null, 2));
 
-    res.status(200).json(filteredExporters);
+    // Pipeline to get exporters that work exclusively with the specified importer
+    const pipeline = [
+      {
+        $match: {
+          supplier_exporter: { $exists: true, $ne: null, $ne: "" }
+        }
+      },
+      {
+        $group: {
+          _id: { $trim: { input: "$supplier_exporter" } },
+          uniqueImporters: {
+            $addToSet: "$importer"
+          },
+          jobCount: { $sum: 1 },
+          latestJobDate: { $max: "$job_date" }
+        }
+      },
+      {
+        $match: {
+          _id: { 
+            $exists: true, 
+            $ne: null, 
+            $ne: "", 
+            $not: { $regex: "^\\s*$" } 
+          },
+          uniqueImporters: {
+            $in: [{ $regex: `^${importer}$`, $options: "i" }]
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          exporter: "$_id",
+          jobCount: 1,
+          latestJobDate: 1,
+          uniqueImporters: 1,
+          isExclusive: {
+            $eq: [{ $size: "$uniqueImporters" }, 1]
+          }
+        }
+      },
+      {
+        $sort: {
+          exporter: 1
+        }
+      }
+    ];
+
+    // Apply additional filters to the pipeline if needed
+    if (year && year !== 'all') {
+      pipeline.unshift({
+        $match: { year: year }
+      });
+    }
+
+    if (status && status !== 'all') {
+      const statusFilter = {};
+      const statusLower = status.toLowerCase();
+      
+      if (statusLower === "pending") {
+        statusFilter.$and = [
+          { status: { $regex: "^pending$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $in: [null, ""] } },
+              { status: { $regex: "^pending$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "completed") {
+        statusFilter.$and = [
+          { status: { $regex: "^completed$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $nin: [null, ""] } },
+              { status: { $regex: "^completed$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "cancelled") {
+        statusFilter.$and = [
+          {
+            $or: [
+              { status: { $regex: "^cancelled$", $options: "i" } },
+              { be_no: { $regex: "^cancelled$", $options: "i" } },
+            ],
+          },
+        ];
+      }
+      
+      if (Object.keys(statusFilter).length > 0) {
+        pipeline.unshift({
+          $match: statusFilter
+        });
+      }
+    }
+
+    const result = await JobModel.aggregate(pipeline);
+    
+    console.log(`Found ${result.length} exporters for importer: ${importer}`);
+    console.log('Sample result:', result.slice(0, 3)); // Log first 3 results for debugging
+    
+    // Extract just the exporter names for the dropdown
+    const exporters = result.map(item => item.exporter);
+
+    res.status(200).json(exporters);
   } catch (error) {
     console.error('Error fetching exporters:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch exporters',
+      error: error.message 
+    });
+  }
+};
+
+//* Get exporters that work exclusively with only one importer (for DSR filtering)
+export const getExclusiveExporters = async (req, res) => {
+  try {
+    const { importer, year, status, exclusive = 'true' } = req.query;
+    
+    if (!importer) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Importer parameter is required" 
+      });
+    }
+
+    // Base pipeline to find exporters
+    const pipeline = [
+      {
+        $match: {
+          supplier_exporter: { $exists: true, $ne: null, $ne: "" }
+        }
+      }
+    ];
+
+    // Add year filter if provided
+    if (year && year !== 'all') {
+      pipeline[0].$match.year = year;
+    }
+
+    // Add status filter if provided
+    if (status && status !== 'all') {
+      const statusLower = status.toLowerCase();
+      if (statusLower === "pending") {
+        pipeline[0].$match.$and = [
+          { status: { $regex: "^pending$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $in: [null, ""] } },
+              { status: { $regex: "^pending$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "completed") {
+        pipeline[0].$match.$and = [
+          { status: { $regex: "^completed$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $nin: [null, ""] } },
+              { status: { $regex: "^completed$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "cancelled") {
+        pipeline[0].$match.$and = [
+          {
+            $or: [
+              { status: { $regex: "^cancelled$", $options: "i" } },
+              { be_no: { $regex: "^cancelled$", $options: "i" } },
+            ],
+          },
+        ];
+      }
+    }
+
+    // Add the core pipeline stages
+    pipeline.push(
+      {
+        $group: {
+          _id: { $trim: { input: "$supplier_exporter" } },
+          uniqueImporters: {
+            $addToSet: "$importer"
+          },
+          jobCount: { $sum: 1 },
+          latestJobDate: { $max: "$job_date" }
+        }
+      }
+    );
+
+    // Different filtering based on exclusive parameter
+    if (exclusive === 'true') {
+      // Truly exclusive exporters (work with only one importer)
+      pipeline.push({
+        $match: {
+          _id: { 
+            $exists: true, 
+            $ne: null, 
+            $ne: "", 
+            $not: { $regex: "^\\s*$" } 
+          },
+          uniqueImporters: { $size: 1 }, // Exactly one importer
+          $expr: {
+            $anyElementTrue: {
+              $map: {
+                input: "$uniqueImporters",
+                as: "imp",
+                in: { $regexMatch: { input: "$$imp", regex: `^${importer}$`, options: "i" } }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // All exporters that work with the specified importer (may also work with others)
+      pipeline.push({
+        $match: {
+          _id: { 
+            $exists: true, 
+            $ne: null, 
+            $ne: "", 
+            $not: { $regex: "^\\s*$" } 
+          },
+          $expr: {
+            $anyElementTrue: {
+              $map: {
+                input: "$uniqueImporters",
+                as: "imp",
+                in: { $regexMatch: { input: "$$imp", regex: `^${importer}$`, options: "i" } }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    pipeline.push(
+      {
+        $project: {
+          _id: 0,
+          supplier_exporter: "$_id",
+          jobCount: 1,
+          latestJobDate: 1,
+          uniqueImporters: 1,
+          importerCount: { $size: "$uniqueImporters" },
+          isExclusive: { $eq: [{ $size: "$uniqueImporters" }, 1] }
+        }
+      },
+      {
+        $sort: {
+          supplier_exporter: 1
+        }
+      }
+    );
+
+    const result = await JobModel.aggregate(pipeline);
+    
+    console.log(`Found ${result.length} ${exclusive === 'true' ? 'exclusive' : 'all'} exporters for importer: ${importer}`);
+    console.log('Sample results:', result.slice(0, 3));
+    
+    // Extract just the exporter names for the dropdown
+    const exporters = result.map(item => item.supplier_exporter);
+
+    res.status(200).json({
+      success: true,
+      data: exporters,
+      total_count: exporters.length,
+      filter_type: exclusive === 'true' ? 'exclusive' : 'all',
+      message: `Found ${exporters.length} ${exclusive === 'true' ? 'exclusive' : ''} exporter(s) for ${importer}`,
+      debug_info: result.slice(0, 5) // Include detailed info for first 5 results
+    });
+  } catch (error) {
+    console.error('Error fetching exclusive exporters:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch exclusive exporters',
       error: error.message 
     });
   }

@@ -15,6 +15,9 @@ import {
   updateCustomerAdminStatus,
   promoteUserToAdmin,
   demoteUserFromAdmin,
+  updateUserStatus,
+  assignModulesToUser,
+  bulkAssignModulesToUsers,
   getAvailableIeCodes
 } from "../controllers/superAdminController.js";
 import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
@@ -43,5 +46,8 @@ router.get("/api/superadmin/available-ie-codes", protectSuperAdmin, getAvailable
 router.put("/api/superadmin/customers/:customerId/admin-status", protectSuperAdmin, updateCustomerAdminStatus);
 router.put("/api/superadmin/users/:userId/promote-admin", protectSuperAdmin, promoteUserToAdmin);
 router.put("/api/superadmin/users/:userId/demote-admin", protectSuperAdmin, demoteUserFromAdmin);
+router.put("/api/superadmin/users/:userId/status", protectSuperAdmin, updateUserStatus);
+router.put("/api/superadmin/users/:userId/modules", protectSuperAdmin, assignModulesToUser);
+router.post("/api/superadmin/users/bulk-assign-modules", protectSuperAdmin, bulkAssignModulesToUsers);
 
 export default router;
