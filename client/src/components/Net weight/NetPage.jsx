@@ -23,6 +23,25 @@ const NetPage = () => {
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
+
+  // Always check localStorage for tab visibility
+  const getTabVisibility = () => {
+    const userDataFromStorage = localStorage.getItem("exim_user");
+    if (userDataFromStorage) {
+      try {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        return {
+          showJobsTab: !!parsedUser?.jobsTabVisible,
+          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
+        };
+      } catch {
+        return { showJobsTab: true, showGandhidhamTab: true };
+      }
+    }
+    return { showJobsTab: true, showGandhidhamTab: true };
+  };
+
+  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
   const years = ["25-26", "24-25"];
@@ -279,19 +298,16 @@ const NetPage = () => {
 
   useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
-
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
-        console.log(parsedUser);
-        const ieCode = parsedUser?.ie_code_no;
-        console.log("ieCode", ieCode);
+        // Set tab visibility according to localStorage values
+      
         // Set user name and initial for header
-        const name = parsedUser?.name 
+        const name = parsedUser?.name;
         setUserName(name);
         setUserInitial(name.charAt(0).toUpperCase());
-        setUserId(ieCode);
-        console.log(ieCode);
+        setUserId(parsedUser?.ie_code_no);
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }
@@ -682,21 +698,25 @@ const NetPage = () => {
           <BackButton />
           
 
-          {/* Tabs for Jobs/Gandhidham */}
-          <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-            <Tabs value={tabValue} onChange={handleTabChange} aria-label="job tabs">
-              <Tab label="Jobs" />
-              <Tab label="Gandhidham" />
-            </Tabs>
-          </Box>
+          {/* Tabs for Jobs/Gandhidham - show according to localStorage values */}
+          {(showJobsTab || showGandhidhamTab) && (
+            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange} aria-label="job tabs">
+                {showJobsTab && <Tab label="Jobs" />}
+                {showGandhidhamTab && <Tab label="Gandhidham" />}
+              </Tabs>
+            </Box>
+          )}
 
           {/* Job Excel Table - positioned between BackButton and existing content */}
-          <JobExcelTable 
-  userId={userId} 
-  selectedYear={selectedYear} 
-  gandhidham={tabValue === 1}
-  key={`${tabValue}-${selectedYear}`} // Add this key to force re-render
-/>
+          {(showJobsTab || showGandhidhamTab) && (
+            <JobExcelTable 
+              userId={userId} 
+              selectedYear={selectedYear} 
+              gandhidham={showGandhidhamTab && !showJobsTab ? true : tabValue === (showJobsTab ? 1 : 0)}
+              key={`${tabValue}-${selectedYear}`} // Add this key to force re-render
+            />
+          )}
 
           <div
             style={{
