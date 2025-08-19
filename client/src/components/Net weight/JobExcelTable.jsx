@@ -20,13 +20,14 @@ import {
   Chip,
   Autocomplete,
   IconButton
+   
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
 import TablePagination from '@mui/material/TablePagination';
 import { detailedStatusOptions } from '../../assets/data/detailedStatusOptions';
 
-const JobExcelTable = ({ userId }) => {
+const JobExcelTable = ({ userId, gandhidham }) => {
   const [jobData, setJobData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -199,7 +200,23 @@ const JobExcelTable = ({ userId }) => {
   const formattedExporter = selectedExporter && selectedExporter !== "all" ? encodeURIComponent(selectedExporter) : "";
   
   // Use the same API URL construction as CJobList for consistency
-  const apiUrl = `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+
+ let apiUrl;
+
+// Utility function to capitalize first letter
+
+
+if (gandhidham) {
+  console.log("gandhidham is true");
+
+
+  apiUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+} else {
+  apiUrl = `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+  console.log("gandhidham is false");
+}
+
+  //const apiUrl = `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
 
   console.log("Fetching jobs data from:", apiUrl);
 
@@ -313,7 +330,7 @@ const JobExcelTable = ({ userId }) => {
     } catch (error) {
       setError('Failed to fetch job data');
     }
-  }, [selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, debouncedSearchQuery, getUserIECode]);
+  }, [selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, gandhidham, debouncedSearchQuery, getUserIECode]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -323,7 +340,7 @@ const JobExcelTable = ({ userId }) => {
   // Fetch data when dependencies change
   useEffect(() => {
     fetchJobData();
-  }, [fetchJobData]);
+  }, [fetchJobData, gandhidham]);
 
   // Memoized format functions for better performance
   const formatDate = useCallback((dateStr) => {

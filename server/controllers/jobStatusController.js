@@ -78,6 +78,7 @@ const buildSearchQuery = (search) => ({
   ],
 });
 
+
 // Status mapping for detailed status filtering
 const statusMapping = {
   billing_pending: "Billing Pending",
@@ -291,6 +292,7 @@ export async function getJobsByStatusAndImporter(req, res) {
     // console.log('========================================');
 
     res.json({
+      message: "Jobs fetched successfully",
       data: paginatedJobs,
       total: allJobs.length,
       currentPage: parseInt(page),

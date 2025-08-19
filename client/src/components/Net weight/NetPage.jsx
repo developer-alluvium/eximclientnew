@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useContext } from "react";
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import { TextField, Box, Typography, Button, Paper } from "@mui/material";
 import axios from "axios";
 import ImportAnalytics from "./ImportAnalytics";
@@ -16,6 +18,11 @@ import { logActivity } from "../../utils/activityLogger";
 import { useNavigate } from "react-router-dom";
 
 const NetPage = () => {
+  // Tabs for Jobs/Gandhidham
+  const [tabValue, setTabValue] = useState(0);
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
   const years = ["25-26", "24-25"];
@@ -674,8 +681,22 @@ const NetPage = () => {
           </div>
           <BackButton />
           
+
+          {/* Tabs for Jobs/Gandhidham */}
+          <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="job tabs">
+              <Tab label="Jobs" />
+              <Tab label="Gandhidham" />
+            </Tabs>
+          </Box>
+
           {/* Job Excel Table - positioned between BackButton and existing content */}
-          <JobExcelTable userId={userId} selectedYear={selectedYear}  />
+          <JobExcelTable 
+  userId={userId} 
+  selectedYear={selectedYear} 
+  gandhidham={tabValue === 1}
+  key={`${tabValue}-${selectedYear}`} // Add this key to force re-render
+/>
 
           <div
             style={{
