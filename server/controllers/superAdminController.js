@@ -1,3 +1,39 @@
+import CustomerModel from "../models/customerModel.js";
+// Get tab visibility for a customer
+export async function getCustomerTabVisibility(req, res) {
+  try {
+    const { customerId } = req.params;
+    const customer = await CustomerModel.findById(customerId).select("jobsTabVisible gandhidhamTabVisible");
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    res.json({ jobsTabVisible: customer.jobsTabVisible, gandhidhamTabVisible: customer.gandhidhamTabVisible });
+  } catch (error) {
+    console.error("Error fetching customer tab visibility:", error);
+    res.status(500).json({ error: "Error fetching customer tab visibility" });
+  }
+}
+
+// Update tab visibility for a customer
+export async function updateCustomerTabVisibility(req, res) {
+  try {
+    const { customerId } = req.params;
+    const { jobsTabVisible, gandhidhamTabVisible } = req.body;
+    const customer = await CustomerModel.findById(customerId);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    if (typeof jobsTabVisible === "boolean") customer.jobsTabVisible = jobsTabVisible;
+    if (typeof gandhidhamTabVisible === "boolean") customer.gandhidhamTabVisible = gandhidhamTabVisible;
+    await customer.save();
+    res.json({ success: true, jobsTabVisible: customer.jobsTabVisible, gandhidhamTabVisible: customer.gandhidhamTabVisible });
+  } catch (error) {
+    console.error("Error updating customer tab visibility:", error);
+    res.status(500).json({ error: "Error updating customer tab visibility" });
+  }
+}
+// Endpoint to get allowed customers for Gandhidham tab
+
 import SuperAdminModel from "../models/superAdminModel.js";
 import AdminModel from "../models/adminModel.js";
 import EximclientUser from "../models/eximclientUserModel.js";
@@ -1437,3 +1473,17 @@ export const bulkAssignModulesToUsers = async (req, res) => {
   }
 };
 
+/* Endpoint to get allowed customers for Gandhidham tab */
+export async function getAllowedGandhidhamCustomers(req, res) {
+  try {
+    const { superadminId } = req.params;
+    const superadmin = await SuperAdminModel.findById(superadminId);
+    if (!superadmin) {
+      return res.status(404).json({ error: "Superadmin not found" });
+    }
+    res.json({ allowedCustomers: superadmin.allowedCustomers || [] });
+  } catch (error) {
+    console.error("Error fetching allowed Gandhidham customers:", error);
+    res.status(500).json({ error: "Error fetching allowed Gandhidham customers" });
+  }
+}

@@ -39,7 +39,7 @@ function a11yProps(index) {
   };
 }
 
-function CJobTabs() {
+function CJobTabs({ gandhidham = false }) {
   const [value, setValue] = React.useState(0);
   const [containerSummaryOpen, setContainerSummaryOpen] = React.useState(false);
   const { importers } = React.useContext(useImportersContext) || {};
@@ -141,13 +141,13 @@ function CJobTabs() {
       </Box>
 
       <CustomTabPanel value={value} index={0}>
-        <JobList status="Pending" />
+        <JobList status="Pending" gandhidham={gandhidham} />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        <JobList status="Completed" />
+        <JobList status="Completed" gandhidham={gandhidham} />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={2}>
-        <JobList status="Cancelled" />
+        <JobList status="Cancelled" gandhidham={gandhidham} />
       </CustomTabPanel>
 
       {/* Container Summary Modal */}

@@ -112,6 +112,29 @@ function CImportDSR() {
     });
   };
 
+  // Get tab visibility from localStorage
+  const [tabVisibility, setTabVisibility] = React.useState({ jobsTabVisible: true, gandhidhamTabVisible: false });
+
+  React.useEffect(() => {
+    const userDataFromStorage = localStorage.getItem("exim_user");
+    if (userDataFromStorage) {
+      try {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        setTabVisibility({
+          jobsTabVisible: parsedUser.jobsTabVisible !== undefined ? parsedUser.jobsTabVisible : true,
+          gandhidhamTabVisible: parsedUser.gandhidhamTabVisible !== undefined ? parsedUser.gandhidhamTabVisible : false,
+        });
+      } catch (e) {
+        setTabVisibility({ jobsTabVisible: true, gandhidhamTabVisible: false });
+      }
+    }
+  }, []);
+
+  // Tabs config
+  const visibleTabs = [];
+  if (tabVisibility.jobsTabVisible) visibleTabs.push({ label: "Jobs", key: "jobs" });
+  if (tabVisibility.gandhidhamTabVisible) visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
+
   return (
     <Box sx={{ 
       display: "flex", 
@@ -120,7 +143,6 @@ function CImportDSR() {
       width: "100%",
       overflow: "hidden"
     }}>
-
       <SelectedYearContext.Provider value={{ selectedYear, setSelectedYear }}>
         <Box sx={{ 
           width: "100%",
@@ -128,7 +150,6 @@ function CImportDSR() {
           flexDirection: "column",
           minHeight: "100%",
           overflow: "hidden",
-      
         }}>
           <Box
             sx={{
@@ -145,9 +166,7 @@ function CImportDSR() {
             <Box sx={{ 
               display: "flex", 
               alignItems: "center", 
-              // gap: { xs: 1, sm: 2 },
               minWidth: 0,
-              // flex: { xs: "1 1 auto", sm: "0 1 auto" }
             }}>
               <BackButton />
               <Tabs
@@ -163,7 +182,9 @@ function CImportDSR() {
                   }
                 }}
               >
-                <Tab label="Jobs" {...a11yProps(2)} key={1} />
+                {visibleTabs.map((tab, idx) => (
+                  <Tab label={tab.label} {...a11yProps(idx)} key={tab.key} />
+                ))}
               </Tabs>
             </Box>
             <Button
@@ -190,9 +211,11 @@ function CImportDSR() {
             </Button>
           </Box>
 
-          <CustomTabPanel value={tabValue} index={0}>
-            <CJobTabs />
-          </CustomTabPanel>
+          {visibleTabs.map((tab, idx) => (
+            <CustomTabPanel value={tabValue} index={idx} key={tab.key}>
+              <CJobTabs gandhidham={tab.key === "gandhidham"} />
+            </CustomTabPanel>
+          ))}
         </Box>
         <Snackbar
           open={snackbar.open}

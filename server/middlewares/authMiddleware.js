@@ -366,6 +366,10 @@ export const sanitizeUserData = (user) => {
     }
   });
 
+  // Add tab visibility fields
+  if (user.jobsTabVisible !== undefined) sanitized.jobsTabVisible = user.jobsTabVisible;
+  if (user.gandhidhamTabVisible !== undefined) sanitized.gandhidhamTabVisible = user.gandhidhamTabVisible;
+
   return sanitized;
 };
 

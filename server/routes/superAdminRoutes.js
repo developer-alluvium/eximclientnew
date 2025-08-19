@@ -15,7 +15,10 @@ import {
   updateCustomerAdminStatus,
   assignModulesToUser,
   bulkAssignModulesToUsers,
-  getAvailableIeCodes
+  getAvailableIeCodes,
+    getAllowedGandhidhamCustomers,
+  getCustomerTabVisibility,
+  updateCustomerTabVisibility,
 } from "../controllers/superAdminController.js";
 
 import { 
@@ -32,12 +35,18 @@ import {
   bulkUpdateCustomerColumnPermissions
 } from "../controllers/sharedUserActionController.js";
 
+
+
+
 const router = express.Router();
 
 // SuperAdmin authentication routes
 router.post("/api/superadmin/login", superAdminLogin);
 router.post("/api/superadmin/logout", superAdminLogout);
 router.get("/api/superadmin/profile", protectSuperAdmin, getSuperAdminProfile);
+
+router.get("/api/superadmin/:superadminId/gandhidham-allowed-customers", getAllowedGandhidhamCustomers);
+
 
 // Initial setup route (only works if no superadmin exists)
 router.post("/api/superadmin/setup", createInitialSuperAdmin);
@@ -72,5 +81,11 @@ router.post("/api/superadmin/users/bulk-column-permissions", protectSuperAdmin, 
 router.get("/api/superadmin/customers/:customerId/column-permissions", protectSuperAdmin, getCustomerColumnPermissions);
 router.put("/api/superadmin/customers/:customerId/column-permissions", protectSuperAdmin, updateCustomerColumnPermissions);
 router.post("/api/superadmin/customers/bulk-column-permissions", protectSuperAdmin, bulkUpdateCustomerColumnPermissions);
+// Get tab visibility for a customer
+router.get("/api/superadmin/customer/:customerId/tab-visibility", getCustomerTabVisibility);
+// Update tab visibility for a customer
+router.patch("/api/superadmin/customer/:customerId/tab-visibility", updateCustomerTabVisibility);
+// Endpoint to get allowed customers for Gandhidham tab
+
 
 export default router;

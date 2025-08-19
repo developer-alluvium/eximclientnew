@@ -26,6 +26,8 @@ import {
   getJobsMultiStatus
 } from "../controllers/optimizedJobController.js";
 
+import { getJobsByStatusAndImporterGandhidham } from "../controllers/gandhidhamController.js";
+
 const router = express.Router();
 
 router.get("/api/get-importer-jobs/:importerURL/:year", getImporterJobCounts);
@@ -40,8 +42,11 @@ router.get(
   "/api/:year/jobs/:status/:detailedStatus/:importer",
   getJobsByStatusAndImporter
 );
-
-
+// Gandhidham jobs route
+router.get(
+  "/api/gandhidham/:year/jobs/:status/:detailedStatus/:importer",
+  getJobsByStatusAndImporterGandhidham
+);
 router.patch("/api/jobs/:id", updateJob);
 
 router.patch('/api/jobs/container/:id', updateContainerTransporter);

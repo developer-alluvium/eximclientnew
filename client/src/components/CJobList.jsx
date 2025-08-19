@@ -108,7 +108,7 @@ function CJobList(props) {
   // Get username and importer name from localStorage
   useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
-  console.log(userDataFromStorage);
+
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
@@ -118,7 +118,7 @@ function CJobList(props) {
         const userName = parsedUser?.assignedImporterName
         const role = parsedUser?.role || 'customer'
         
-        console.log("details", userId, userName, role);
+     
         // Set userId only once
         setCurrentUserId(userId);
         setUserRole(role);
@@ -137,10 +137,10 @@ function CJobList(props) {
   useEffect(() => {
     const fetchExporters = async () => {
       if (!selectedImporter || selectedImporter === "all") {
-        console.log("Skipping exporter fetch - no valid importer selected:", selectedImporter);
+
         return;
       }
-
+   
       
       try {
         const res = await axios.get(
@@ -154,11 +154,11 @@ function CJobList(props) {
           }
         );
         
-        console.log("Exporters API response:", res.data);
+
         
         // Filter out null/undefined exporters and remove duplicates
         const uniqueExporters = [...new Set(res.data.filter(exporter => exporter && exporter.trim() !== ''))];
-        console.log("Filtered exporters:", uniqueExporters);
+   
         setExporters(uniqueExporters);
       } catch (error) {
         console.error("Error fetching exporters:", error);
@@ -182,6 +182,7 @@ function CJobList(props) {
 
   // Track if column order has been fetched
   
+// Fixed useEffect hook - replace the problematic section around lines 170-295
 useEffect(() => {
   if (hasAttemptedFetch || !currentUserId) {
     return;
@@ -193,28 +194,26 @@ useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
       console.error("Authentication token not found.");
-      setIsColumnOrderLoaded(true); // Stop loading
+      setIsColumnOrderLoaded(true);
       return;
     }
     
     try {
-      // 1. URL updated: '/api/' is removed as requested.
       const res = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`,
+        `${process.env.REACT_APP_API_STRING}/column-order`,
         {
-          // 2. Authentication is now handled by the Authorization header.
+          params: { userId: currentUserId },
           headers: {
             Authorization: `Bearer ${token}`
           }
-          // 3. Redundant 'userId' and 'withCredentials' have been removed.
         }
       );
-      
-      // The rest of your logic for handling the response data remains the same.
+
+      // Set allowed columns based on user role and backend response
       if (userRole === 'superadmin') {
         setAllowedColumns(columns.map(col => col.accessorKey));
       } else {
-        const userAllowedColumns = res.data.allowedColumns?.length > 0 
+        const userAllowedColumns = res.data.allowedColumns && res.data.allowedColumns.length > 0 
           ? res.data.allowedColumns 
           : columns.map(col => col.accessorKey);
         setAllowedColumns(userAllowedColumns);
@@ -225,14 +224,47 @@ useEffect(() => {
       } else {
         const allowedCols = userRole === 'superadmin' 
           ? columns.map(col => col.accessorKey)
-          : (res.data.allowedColumns?.length > 0 
+          : (res.data.allowedColumns && res.data.allowedColumns.length > 0 
               ? res.data.allowedColumns 
               : columns.map(col => col.accessorKey));
         setColumnOrder(allowedCols);
       }
-
+      
+      // Check if user info was returned and update localStorage if there's a mismatch
+      if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
+        const userDataFromStorage = localStorage.getItem("exim_user");
+        if (userDataFromStorage) {
+          try {
+            const parsedUser = JSON.parse(userDataFromStorage);
+            
+            if (parsedUser.data && parsedUser.data.user) {
+              parsedUser.data.user.id = res.data.userInfo.id;
+              parsedUser.data.user.name = res.data.userInfo.name;
+              parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
+            } else {
+              parsedUser.id = res.data.userInfo.id;
+              parsedUser.name = res.data.userInfo.name;
+              parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
+            }
+            
+            localStorage.setItem("exim_user", JSON.stringify(parsedUser));
+            setCurrentUserId(res.data.userInfo.id);
+            setUsername(res.data.userInfo.name);
+            setUserImporterName(res.data.userInfo.name);
+            setSelectedImporter(res.data.userInfo.name);
+            
+          } catch (e) {
+            console.error("Error updating user data in storage:", e);
+          }
+        }
+      }
     } catch (err) {
       console.error("Failed to fetch column order", err);
+      
+      if (err.response?.status === 404 && err.response?.data?.suggestion) {
+        console.warn("User session appears to be stale. Consider logging out and back in.");
+      }
+      
       const defaultOrder = columns.map((col) => col.accessorKey);
       setColumnOrder(defaultOrder);
     } finally {
@@ -242,20 +274,24 @@ useEffect(() => {
 
   fetchColumnOrder();
 }, [currentUserId, hasAttemptedFetch, userRole, columns]);
-  
- const saveColumnOrderToBackend = async () => {
+
+// Fixed saveColumnOrderToBackend function
+const saveColumnOrderToBackend = async () => {
   const token = localStorage.getItem("access_token");
   if (!token) {
     console.warn("No token found. Cannot save column layout.");
     return;
   }
   
+  if (!currentUserId) {
+    console.warn("No user ID found. Cannot save column layout.");
+    return;
+  }
+  
   try {
-    // 1. URL updated: '/api/' is removed as requested.
     await axios.post(
       `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`, 
       {
-        // 2. Request body now only sends the necessary 'columnOrder' data.
         columnOrder: columnOrder
       }, 
       {
@@ -265,6 +301,7 @@ useEffect(() => {
       }
     );
     setUnsavedChanges(false);
+    console.log("Column order saved successfully");
   } catch (err) {
     console.error("Failed to save column order", err);
   }
@@ -296,7 +333,8 @@ selectedExporter  ]);
     props.status,
     debouncedSearchQuery,
     selectedImporter,
-    selectedExporter
+    selectedExporter,
+    props.gandhidham || false
   );
 
   useEffect(() => {

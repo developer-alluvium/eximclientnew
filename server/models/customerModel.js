@@ -55,6 +55,14 @@ const customerSchema = new mongoose.Schema(
     roleGrantedAt: {
       type: Date,
       default: null,
+    }, // ← Fixed: Added missing closing brace and comma
+    jobsTabVisible: {
+      type: Boolean,
+      default: true,
+    },
+    gandhidhamTabVisible: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }
@@ -81,6 +89,7 @@ customerSchema.methods.comparePassword = async function(candidatePassword) {
     throw new Error(error);
   }
 };
+
 // Generate password
 customerSchema.methods.generatePassword = function () {
   const iecPart = this.ie_code_no?.slice(-4);

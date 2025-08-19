@@ -133,6 +133,45 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const [columnLoading, setColumnLoading] = useState(false);
   const [columnError, setColumnError] = useState(null);
   const [columnSaving, setColumnSaving] = useState(false);
+
+      // Tab visibility state
+  const [tabVisibility, setTabVisibility] = useState({ jobsTabVisible: true, gandhidhamTabVisible: false });
+  const [tabVisibilityLoading, setTabVisibilityLoading] = useState(false);
+  const [tabVisibilitySaving, setTabVisibilitySaving] = useState(false);
+
+  useEffect(() => {
+    if (customerId) {
+      setTabVisibilityLoading(true);
+      axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/customer/${customerId}/tab-visibility`, getSuperAdminHeaders())
+        .then(res => {
+          setTabVisibility({
+            jobsTabVisible: res.data.jobsTabVisible,
+            gandhidhamTabVisible: res.data.gandhidhamTabVisible
+          });
+        })
+        .catch(() => {
+          setTabVisibility({ jobsTabVisible: true, gandhidhamTabVisible: false });
+        })
+        .finally(() => setTabVisibilityLoading(false));
+    }
+  }, [customerId]);
+
+  // Save tab visibility
+  const handleSaveTabVisibility = async () => {
+    setTabVisibilitySaving(true);
+    try {
+      await axios.patch(
+        `${process.env.REACT_APP_API_STRING}/superadmin/customer/${customerId}/tab-visibility`,
+        tabVisibility,
+        getSuperAdminHeaders()
+      );
+      setNotification({ message: 'Tab visibility updated!', type: 'success' });
+    } catch (error) {
+      setNotification({ message: 'Failed to update tab visibility', type: 'error' });
+    } finally {
+      setTabVisibilitySaving(false);
+    }
+  };
   
   useEffect(() => {
     if (customer) {
@@ -916,138 +955,158 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
           <Grid container spacing={3}>
             {/* Module Assignment */}
             <Grid item xs={12} md={8}>
-              <ModernCard
-                title="Module Access Management"
-                action={
-                  !isEditingModules && isRegistered ? (
-                    <ModernButton
-                      variant="outlined"
-                      startIcon={<Edit />}
-                      onClick={() => setIsEditingModules(true)}
-                    >
-                      Edit Modules
-                    </ModernButton>
-                  ) : isEditingModules && isRegistered ? (
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <ModernButton
-                        variant="outlined"
-                        startIcon={<Cancel />}
-                        onClick={handleCancelModuleEdit}
-                      >
-                        Cancel
-                      </ModernButton>
-                      <ModernButton
-                        variant="contained"
-                        startIcon={<Save />}
-                        onClick={handleSaveModules}
-                        loading={loading}
-                      >
-                        Save Changes
-                      </ModernButton>
-                    </Box>
-                  ) : null
-                }
+                <ModernCard
+        title="Module Access Management"
+        action={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {!isEditingModules && isRegistered && (
+              <ModernButton
+                variant="outlined"
+                startIcon={<Edit />}
+                onClick={() => setIsEditingModules(true)}
               >
-                {!isRegistered ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Info sx={{ fontSize: 48, color: '#9CA3AF', mb: 2 }} />
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#4B5563', mb: 1 }}>
-                      Module Management Not Available
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#6B7280', maxWidth: '80%', mx: 'auto' }}>
-                      This customer is not fully registered in the system. Module assignment is only available after the registration process is completed.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <List sx={{ p: 0 }}>
-                    {availableModules.map((module, index) => {
-                      const IconComponent = getModuleIcon(module.id);
-                      const isAssigned = isEditingModules 
-                        ? tempAssignedModules.includes(module.id)
-                        : assignedModules.includes(module.id);
+                Edit Modules
+              </ModernButton>
+            )}
+            {isEditingModules && isRegistered && (
+              <>
+                <ModernButton
+                  variant="outlined"
+                  startIcon={<Cancel />}
+                  onClick={handleCancelModuleEdit}
+                >
+                  Cancel
+                </ModernButton>
+                <ModernButton
+                  variant="contained"
+                  startIcon={<Save />}
+                  onClick={handleSaveModules}
+                  loading={loading}
+                >
+                  Save Changes
+                </ModernButton>
+              </>
+            )}
+          </Box>
+        }
+      >
+        {/* Tab Visibility Management Section */}
+        {isRegistered && (
+          <Box sx={{ mb: 3, p: 2, border: '1px solid #F3F4F6', borderRadius: 2, background: '#F9FAFB' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              Import DSR Tab Visibility
+            </Typography>
+            <FormGroup row>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={tabVisibility.jobsTabVisible}
+                    onChange={e => setTabVisibility(v => ({ ...v, jobsTabVisible: e.target.checked }))}
+                    disabled={tabVisibilityLoading || tabVisibilitySaving}
+                  />
+                }
+                label="Jobs Tab"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={tabVisibility.gandhidhamTabVisible}
+                    onChange={e => setTabVisibility(v => ({ ...v, gandhidhamTabVisible: e.target.checked }))}
+                    disabled={tabVisibilityLoading || tabVisibilitySaving}
+                  />
+                }
+                label="Gandhidham Tab"
+              />
+            </FormGroup>
+            <ModernButton
+              variant="contained"
+              startIcon={<Save />}
+              onClick={handleSaveTabVisibility}
+              loading={tabVisibilitySaving}
+              sx={{ mt: 1 }}
+            >
+              Save Tab Visibility
+            </ModernButton>
+          </Box>
+        )}
+        {/* ...existing module management code... */}
+        {!isRegistered ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Info sx={{ fontSize: 48, color: '#9CA3AF', mb: 2 }} />
+            <Typography variant="body1" sx={{ fontWeight: 600, color: '#4B5563', mb: 1 }}>
+              Module Management Not Available
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6B7280', maxWidth: '80%', mx: 'auto' }}>
+              This customer is not fully registered in the system. Module assignment is only available after the registration process is completed.
+            </Typography>
+          </Box>
+        ) : (
+          <List sx={{ p: 0 }}>
+            {availableModules.map((module, index) => {
+              const IconComponent = getModuleIcon(module.id);
+              const isAssigned = isEditingModules 
+                ? tempAssignedModules.includes(module.id)
+                : assignedModules.includes(module.id);
 
-                      return (
-                        <ListItem
-                          key={module.id}
-                          sx={{
-                            px: 0,
-                            py: 1.5,
-                            borderBottom: index < availableModules.length - 1 ? '1px solid #F3F4F6' : 'none',
-                          }}
-                        >
-                          <ListItemIcon sx={{ minWidth: 40 }}>
-                            <Avatar
-                              sx={{
-                                width: 32,
-                                height: 32,
-                                backgroundColor: alpha(getModuleCategoryColor(module.category), 0.1),
-                              }}
-                            >
-                              <IconComponent 
-                                sx={{ 
-                                  fontSize: 16, 
-                                  color: getModuleCategoryColor(module.category) 
-                                }} 
-                              />
-                            </Avatar>
-                          </ListItemIcon>
-                          
-                          <ListItemText
-                            primary={
-                              <Typography
-                                variant="body1"
-                                sx={{
-                                  fontSize: '0.875rem',
-                                  fontWeight: 600,
-                                  color: '#1F2937',
-                                }}
-                              >
-                                {module.name || module.id}
-                              </Typography>
-                            }
-                            secondary={
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  color: '#6B7280',
-                                }}
-                              >
-                                {module.description || 'Module access and functionality'}
-                              </Typography>
-                            }
-                          />
-                          
-                          {isEditingModules ? (
-                            <Checkbox
-                              checked={isAssigned}
-                              onChange={() => handleModuleToggle(module.id)}
-                              icon={<RadioButtonUnchecked />}
-                              checkedIcon={<CheckCircle />}
-                              sx={{
-                                color: '#D1D5DB',
-                                '&.Mui-checked': {
-                                  color: '#10B981',
-                                },
-                              }}
-                            />
-                          ) : (
-                            <Chip
-                              label={isAssigned ? "Assigned" : "Not Assigned"}
-                              color={isAssigned ? "success" : "default"}
-                              size="small"
-                              sx={{
-                                fontSize: '0.6875rem',
-                                fontWeight: 500,
-                              }}
-                            />
-                          )}
-                        </ListItem>
-                      );
-                    })}
-                  </List>
-                )}
-              </ModernCard>
+              return (
+                <ListItem
+                  key={module.id}
+                  sx={{
+                    px: 0,
+                    py: 1.5,
+                    borderBottom: index < availableModules.length - 1 ? '1px solid #F3F4F6' : 'none',
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Avatar
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        backgroundColor: alpha(getModuleCategoryColor(module.category), 0.1),
+                      }}
+                    >
+                      <IconComponent 
+                        sx={{ 
+                          fontSize: 16, 
+                          color: getModuleCategoryColor(module.category) 
+                        }} 
+                      />
+                    </Avatar>
+                  </ListItemIcon>
+                  
+                  <ListItemText
+                    primary={
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {module.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                        {module.category}
+                      </Typography>
+                    }
+                  />
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Checkbox
+                      edge="end"
+                      checked={isAssigned}
+                      onChange={() => isEditingModules ? handleModuleToggle(module.id) : null}
+                      disabled={!isEditingModules}
+                      sx={{ color: getModuleCategoryColor(module.category) }}
+                    />
+                  </ListItemIcon>
+                </ListItem>
+              );
+            })}
+          </List>
+        )}
+      </ModernCard>
+
             </Grid>
 
             {/* Module Summary */}

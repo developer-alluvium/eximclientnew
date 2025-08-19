@@ -7,7 +7,8 @@ function useFetchJobsData(
   status,
   searchQuery,
   selectedImporter,
-  selectedExporter = "all"
+  selectedExporter = "all",
+  gandhidham = false
 ) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -57,7 +58,12 @@ function useFetchJobsData(
         return;
       }
 
-      const apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+      let apiUrl;
+      if (gandhidham) {
+        apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+      } else {
+        apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+      }
 
       console.log("Fetching jobs data from:", apiUrl);
 

@@ -43,6 +43,7 @@ const superAdminSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    allowedCustomers: [{ type: String }], // List of allowed customers for Gandhidham tab
   },
   { 
     timestamps: true,
