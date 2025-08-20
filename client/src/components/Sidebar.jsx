@@ -12,6 +12,25 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 const drawerWidth = 280;
 
 const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
+  // Tab visibility logic from localStorage
+  const getTabVisibility = () => {
+    const userDataFromStorage = localStorage.getItem("exim_user");
+    if (userDataFromStorage) {
+      try {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        return {
+          showJobsTab: !!parsedUser?.jobsTabVisible,
+          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
+        };
+      } catch {
+        return { showJobsTab: true, showGandhidhamTab: true };
+      }
+    }
+    return { showJobsTab: true, showGandhidhamTab: true };
+  };
+
+  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
+  const [selectedView, setSelectedView] = useState("jobs"); // "jobs" or "gandhidham"
   // If initial job counts are provided, use them, otherwise default to zeros
   const [jobCounts, setJobCounts] = useState(initialJobCounts || [0, 0, 0, 0]); 
   const [totalJobs, pendingJobs, completedJobs, cancelledJobs] = jobCounts;
@@ -90,29 +109,35 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       if (selectedImporter && selectedYear) {
         try {
           const sanitizedImporter = selectedImporter
-            .toLowerCase()
-            .replace(/ /g, "_")
-            .replace(/\./g, "")
-            .replace(/\//g, "_")
-            .replace(/-/g, "")
-            .replace(/_+/g, "_")
-            .replace(/\(/g, "")
-            .replace(/\)/g, "")
-            .replace(/\[/g, "")
-            .replace(/\]/g, "")
-            .replace(/,/g, "");
-            
-          const res = await axios.get(
-            `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
-          );
-          // console.log("Importer data:", res.data);
-          
+            // .toLowerCase()
+            // .replace(/ /g, "_")
+            // .replace(/\./g, "")
+            // .replace(/\//g, "_")
+            // .replace(/-/g, "")
+            // .replace(/_+/g, "_")
+            // .replace(/\(/g, "")
+            // .replace(/\)/g, "")
+            // .replace(/\[/g, "")
+            // .replace(/\]/g, "")
+            // .replace(/,/g, "");
+
+          let apiUrl = "";
+          if (showJobsTab && !showGandhidhamTab) {
+            apiUrl = `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
+          } else if (!showJobsTab && showGandhidhamTab) {
+            apiUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
+          } else if (showJobsTab && showGandhidhamTab) {
+            apiUrl = selectedView === "jobs"
+              ? `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
+              : `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
+          }
+
+          if (!apiUrl) return;
+
+          const res = await axios.get(apiUrl);
           if (res.data && Array.isArray(res.data) && res.data.length === 4) {
-            // The API returns an array directly [total, pending, completed, cancelled]
             const newJobCounts = res.data;
             setJobCounts(newJobCounts);
-            
-            // Send job counts to parent component (HomePage)
             if (setParentJobCounts) {
               setParentJobCounts(newJobCounts);
             }
@@ -123,7 +148,7 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       }
     }
     getImporterData();
-  }, [selectedImporter, selectedYear, setParentJobCounts]);
+  }, [selectedImporter, selectedYear, setParentJobCounts, showJobsTab, showGandhidhamTab, selectedView]);
 
   // Handle year change
   const handleYearChange = (event) => {
@@ -158,6 +183,21 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       <Box sx={{ overflow: 'auto', p: 2, pb: 6 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>Job Analytics</Typography>
         
+        {/* Dropdown/toggle for jobs/gandhidham if both are visible */}
+        {showJobsTab && showGandhidhamTab && (
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>Select View</Typography>
+            <Select
+              value={selectedView}
+              onChange={e => setSelectedView(e.target.value)}
+              size="small"
+            >
+              <MenuItem value="jobs">Jobs</MenuItem>
+              <MenuItem value="gandhidham">Gandhidham Jobs</MenuItem>
+            </Select>
+          </FormControl>
+        )}
+        
         {/* Year Selection */}
         {years.length > 0 && (
           <FormControl fullWidth sx={{ mb: 3 }}>
@@ -178,44 +218,43 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
         )}
         
         {/* Pie Chart */}
-      {/* Pie Chart */}
-{totalJobs > 0 && (
-  <Box sx={{ width: '100%', height: 250, mb: 2, position: 'relative' }}>
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={pieChartData}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={80}
-          paddingAngle={2}
-          dataKey="value"
-        >
-          {pieChartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value, entry) => [`${value}`, `${entry}`,'  Count']} />
-      </PieChart>
-    </ResponsiveContainer>
-    {/* Center text overlay */}
-    <div style={{
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      textAlign: 'center'
-    }}>
-      <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1F2937' }}>
-        {totalJobs}
-      </Typography>
-      <Typography variant="body2" sx={{ color: '#6B7280' }}>
-        Total Jobs
-      </Typography>
-    </div>
-  </Box>
-)}
+        {totalJobs > 0 && (
+          <Box sx={{ width: '100%', height: 250, mb: 2, position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {pieChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value, entry) => [`${value}`, `${entry}`, '  Count']} />
+              </PieChart>
+            </ResponsiveContainer>
+            {/* Center text overlay */}
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center'
+            }}>
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1F2937' }}>
+                {totalJobs}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                Total Jobs
+              </Typography>
+            </div>
+          </Box>
+        )}
         
         {/* Job Statistics */}
         <List>
