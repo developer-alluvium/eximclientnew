@@ -161,10 +161,12 @@ export const loginUser = async (req, res) => {
     }
 
     console.log("Finding user:", email);
-    // Find user by email
+    // Find user by email and select necessary fields
     const user = await EximclientUser.findOne({ 
       email: email.toLowerCase() 
-    }).populate('adminId', 'name ie_code_no'); // Populating customer as admin
+    })
+    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules')
+    .populate('adminId', 'name ie_code_no'); // Populating customer as admin
 
     if (!user) {
       console.log("User not found for email:", email);

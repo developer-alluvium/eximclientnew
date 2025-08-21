@@ -6,7 +6,7 @@
 
 class ModuleAssignmentFrontendTester {
   constructor() {
-    this.API_BASE_URL = process.env.REACT_APP_API_STRING || 'http://localhost:5000';
+    this.API_BASE_URL = process.env.REACT_APP_API_STRING;
     this.results = [];
     this.currentUser = null;
   }

@@ -48,6 +48,7 @@ export const generateRefreshToken = (user) => {
     {
       id: user._id,
       ie_code_no: user.ie_code_no,
+      role: user.role || 'customer',
     },
     REFRESH_TOKEN_SECRET,
     {
@@ -355,6 +356,7 @@ export const sanitizeUserData = (user) => {
     "assigned_importer_name",
     "modules",
     "assignedModules",
+    "isAdmin",  // Added isAdmin field
   ];
 
   additionalFields.forEach((field) => {
@@ -379,6 +381,7 @@ export const generateUserToken = (user, userType = 'user') => {
     name: user.name,
     userType: userType,
     role: userType,
+    isAdmin: user.isAdmin,
   };
 
   // Add specific fields based on user type

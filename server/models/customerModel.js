@@ -42,17 +42,17 @@ const customerSchema = new mongoose.Schema(
       type: [String],
       default: [], // Empty array means all columns allowed by default
     },
-    // Admin designation fields
-    isAdmin: {
-      type: Boolean,
-      default: false,
+    role: {
+      type: String,
+      enum: ['superadmin', 'admin', 'customer'],
+      default: 'customer'
     },
-    adminRoleGrantedBy: {
+    roleGrantedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
       default: null,
     },
-    adminRoleGrantedAt: {
+    roleGrantedAt: {
       type: Date,
       default: null,
     },

@@ -46,6 +46,11 @@ const eximclientUserSchema = new mongoose.Schema(
       enum: ['pending', 'active', 'inactive'],
       default: 'pending',
     },
+    role: {
+      type: String,
+      enum: ['super_admin', 'admin' , 'customer'],
+      default: 'customer'
+    },
     isActive: {
       type: Boolean,
       default: false,

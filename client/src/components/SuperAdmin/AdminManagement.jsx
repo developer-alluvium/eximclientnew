@@ -193,112 +193,139 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-  const handlePromoteToAdmin = async (entity, type) => {
-    try {
-      setLoading(true);
-      setError(null);
+const handlePromoteToAdmin = async (entity, type) => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Check for SuperAdmin authentication
-      const superadminToken = localStorage.getItem('superadmin_token');
-      if (!superadminToken) {
-        setError('SuperAdmin authentication required. Please login again.');
-        return;
-      }
+    // Check for SuperAdmin authentication
+    const superadminToken = localStorage.getItem('superadmin_token');
+    if (!superadminToken) {
+      setError('SuperAdmin authentication required. Please login again.');
+      return;
+    }
 
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${superadminToken}`,
-          'Content-Type': 'application/json'
-        },
-        withCredentials: true
-      };
+    const config = {
+      headers: {
+        'Authorization': `Bearer ${superadminToken}`,
+        'Content-Type': 'application/json'
+      },
+      withCredentials: true
+    };
 
-      let endpoint, data;
-      if (type === 'customer') {
-        // For customers, we just update their admin status
-        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
-        data = { isAdmin: true };
+    let endpoint, data;
+    if (type === 'customer') {
+      // For customers, we just update their admin status
+      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
+      data = { role: 'admin' };
+    } else {
+      // For users, we promote them to admin with optional IE code assignment
+      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/promote-admin`;
+      
+      // Check if user already has an IE code
+      const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
+      
+      if (hasExistingIeCode) {
+        // User has IE code - selectedIeCode is optional
+        data = selectedIeCode ? { ie_code_no: selectedIeCode } : {};
       } else {
-        // For users, we promote them to admin with IE code assignment
+        // User doesn't have IE code - selectedIeCode is required
         if (!selectedIeCode) {
-          setError('Please select an IE code to assign to the user.');
+          setError('This user does not have an IE code. Please select an IE code to assign.');
+          setLoading(false);
           return;
         }
-        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/promote-admin`;
         data = { ie_code_no: selectedIeCode };
       }
-
-      const response = await axios.put(endpoint, data, config);
-
-      if (response.data.success) {
-        setSuccess(`Successfully promoted ${entity.name} to admin${type === 'user' ? ` with IE code ${selectedIeCode}` : ''}`);
-        fetchData();
-        setAdminDialog(false);
-        setSelectedIeCode(''); // Reset selection
-      }
-    } catch (error) {
-      console.error('Error promoting to admin:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError('SuperAdmin authentication expired. Please login again.');
-        localStorage.removeItem('superadmin_token');
-        localStorage.removeItem('superadmin_user');
-      } else {
-        setError(error.response?.data?.message || 'Failed to promote to admin');
-      }
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const handleRevokeAdmin = async (entity, type) => {
-    try {
-      setLoading(true);
-      setError(null);
+    const response = await axios.put(endpoint, data, config);
 
-      // Check for SuperAdmin authentication
-      const superadminToken = localStorage.getItem('superadmin_token');
-      if (!superadminToken) {
-        setError('SuperAdmin authentication required. Please login again.');
-        return;
-      }
-
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${superadminToken}`,
-          'Content-Type': 'application/json'
-        },
-        withCredentials: true
-      };
-
-      let endpoint, data;
+    if (response.data.success) {
+      // Enhanced success message based on IE code assignment
+      let successMessage;
       if (type === 'customer') {
-        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
-        data = { isAdmin: false };
+        successMessage = `Successfully promoted ${entity.name} to admin`;
       } else {
-        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/demote-admin`;
-        data = {};
+        const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
+        if (hasExistingIeCode && !selectedIeCode) {
+          successMessage = `Successfully promoted ${entity.name} to admin using existing IE code`;
+        } else if (selectedIeCode) {
+          successMessage = `Successfully promoted ${entity.name} to admin with IE code ${selectedIeCode}`;
+        } else {
+          successMessage = `Successfully promoted ${entity.name} to admin`;
+        }
       }
-
-      const response = await axios.put(endpoint, data, config);
-
-      if (response.data.success) {
-        setSuccess(`Successfully revoked admin access for ${entity.name}`);
-        fetchData();
-        setAdminDialog(false);
-      }
-    } catch (error) {
-      console.error('Error revoking admin:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError('SuperAdmin authentication expired. Please login again.');
-        localStorage.removeItem('superadmin_token');
-        localStorage.removeItem('superadmin_user');
-      } else {
-        setError(error.response?.data?.message || 'Failed to revoke admin access');
-      }
-    } finally {
-      setLoading(false);
+      
+      setSuccess(successMessage);
+      fetchData();
+      setAdminDialog(false);
+      setSelectedIeCode(''); // Reset selection
     }
-  };
+  } catch (error) {
+    console.error('Error promoting to admin:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      setError('SuperAdmin authentication expired. Please login again.');
+      localStorage.removeItem('superadmin_token');
+      localStorage.removeItem('superadmin_user');
+    } else {
+      setError(error.response?.data?.message || 'Failed to promote to admin');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleRevokeAdmin = async (entity, type) => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    // Check for SuperAdmin authentication
+    const superadminToken = localStorage.getItem('superadmin_token');
+    if (!superadminToken) {
+      setError('SuperAdmin authentication required. Please login again.');
+      return;
+    }
+
+    const config = {
+      headers: {
+        'Authorization': `Bearer ${superadminToken}`,
+        'Content-Type': 'application/json'
+      },
+      withCredentials: true
+    };
+
+    let endpoint, data;
+    if (type === 'customer') {
+      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
+      data = { role: 'customer' };
+    } else {
+      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/demote-admin`;
+      data = {};
+    }
+
+    const response = await axios.put(endpoint, data, config);
+
+    if (response.data.success) {
+      setSuccess(`Successfully revoked admin access for ${entity.name}`);
+      fetchData();
+      setAdminDialog(false);
+    }
+  } catch (error) {
+    console.error('Error revoking admin:', error);
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      setError('SuperAdmin authentication expired. Please login again.');
+      localStorage.removeItem('superadmin_token');
+      localStorage.removeItem('superadmin_user');
+    } else {
+      setError(error.response?.data?.message || 'Failed to revoke admin access');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleChangeUserStatus = async (user, newStatus) => {
     try {
@@ -780,10 +807,10 @@ const AdminManagement = ({ onRefresh }) => {
                       <TableCell>{user.ie_code_no}</TableCell>
                       <TableCell>
                         <Chip
-                          label={user.isAdmin ? 'Admin' : 'User'}
-                          color={user.isAdmin ? 'secondary' : 'default'}
+                          label={user.role === 'admin' ? 'Admin' : 'User'}
+                          color={user.role === 'admin' ? 'secondary' : 'default'}
                           size="small"
-                          icon={user.isAdmin ? <AdminPanelSettings /> : <People />}
+                          icon={user.role === 'admin' ? <AdminPanelSettings /> : <People />}
                         />
                       </TableCell>
                       <TableCell>
@@ -850,7 +877,7 @@ const AdminManagement = ({ onRefresh }) => {
                           </Tooltip>
                           
                           {/* Admin Role Toggle Button */}
-                          {user.isAdmin ? (
+                          {user.role == 'admin' ? (
                             <Tooltip title="Remove Admin Role">
                               <IconButton
                                 size="small"

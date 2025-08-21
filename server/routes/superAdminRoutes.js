@@ -18,7 +18,7 @@ import {
   updateUserStatus,
   assignModulesToUser,
   bulkAssignModulesToUsers,
-  getAvailableIeCodes
+   getAvailableIeCodes
 } from "../controllers/superAdminController.js";
 import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
 

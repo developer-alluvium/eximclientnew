@@ -8,7 +8,7 @@ const axios = require('axios');
 
 // Configuration
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/eximclient';
-const API_BASE = process.env.API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.API_BASE ;
 const TEST_IE_CODE = 'ABDFM8378H';
 const EXPECTED_MODULES = ['/importdsr', '/netpage'];
 

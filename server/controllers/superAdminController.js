@@ -642,35 +642,36 @@ export const designateCustomerAsAdmin = async (req, res) => {
       });
     }
 
-    // Add admin role to customer (we'll use a new field)
-    customer.isAdmin = true;
-    customer.adminRoleGrantedBy = superAdmin._id;
-    customer.adminRoleGrantedAt = new Date();
+    // Update customer's role to admin
+    customer.role = 'admin';
+    customer.roleGrantedBy = superAdmin._id;
+    customer.roleGrantedAt = new Date();
     
     await customer.save();
 
     // Log activity
     await logActivity(
       superAdmin._id,
-      'CUSTOMER_ADMIN_DESIGNATION',
-      `SuperAdmin designated customer ${customer.name} (IE: ${ieCodeUpper}) as admin`,
+      'CUSTOMER_ROLE_CHANGED',
+      `SuperAdmin promoted customer ${customer.name} (IE: ${ieCodeUpper}) to admin role`,
       { 
         customerId: customer._id,
         customerName: customer.name,
-        ie_code_no: ieCodeUpper 
+        ie_code_no: ieCodeUpper,
+        newRole: 'admin' 
       },
       req.ip
     );
 
     res.status(200).json({
       success: true,
-      message: `Customer ${customer.name} has been designated as admin for IE Code ${ieCodeUpper}`,
+      message: `Customer ${customer.name} has been promoted to admin role for IE Code ${ieCodeUpper}`,
       data: {
         customerId: customer._id,
         name: customer.name,
         ie_code_no: customer.ie_code_no,
-        isAdmin: customer.isAdmin,
-        designatedAt: customer.adminRoleGrantedAt
+        role: customer.role,
+        promotedAt: customer.roleGrantedAt
       }
     });
 
@@ -822,14 +823,14 @@ export const getAvailableIeCodes = async (req, res) => {
         }
       },
       // Filter out IE codes where customer is already admin
-      {
-        $match: {
-          $or: [
-            { customerInfo: { $size: 0 } }, // No customer record exists
-            { "customerInfo.isAdmin": { $ne: true } } // Customer exists but not admin
-          ]
-        }
-      },
+      // {
+      //   $match: {
+      //     $or: [
+      //       { customerInfo: { $size: 0 } }, // No customer record exists
+      //       { "customerInfo.isAdmin": { $ne: true } } // Customer exists but not admin
+      //     ]
+      //   }
+      // },
       // Project final structure
       {
         $project: {
@@ -883,17 +884,15 @@ export const getAllUsers = async (req, res) => {
       .populate('adminId', 'name ie_code_no')
       .sort({ createdAt: -1 }); 
 
-    // Check which users are admins (have Customer records with isAdmin: true and matching IE codes)
+    // Get users with their admin status and corresponding customer info
     const usersWithAdminStatus = await Promise.all(
       users.map(async (user) => {
         const customerRecord = await CustomerModel.findOne({ 
-          ie_code_no: user.ie_code_no,
-          isAdmin: true 
+          ie_code_no: user.ie_code_no
         });
         return {
           ...user.toObject(),
-          isAdmin: !!customerRecord,
-          adminCustomer: customerRecord ? {
+          adminCustomer: user.isAdmin && customerRecord ? {
             id: customerRecord._id,
             name: customerRecord.name,
             ie_code_no: customerRecord.ie_code_no,
@@ -980,14 +979,7 @@ export const updateCustomerAdminStatus = async (req, res) => {
 export const promoteUserToAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { ie_code_no } = req.body; // SuperAdmin will provide the IE code to assign
-
-    if (!ie_code_no) {
-      return res.status(400).json({
-        success: false,
-        message: "IE code is required to promote user to admin."
-      });
-    }
+    const { ie_code_no } = req.body; // Optional if user already has IE code
 
     const user = await EximclientUser.findById(userId);
     if (!user) {
@@ -997,53 +989,80 @@ export const promoteUserToAdmin = async (req, res) => {
       });
     }
 
-    // Find Customer record with the IE code that SuperAdmin wants to assign
-    const customer = await CustomerModel.findOne({ ie_code_no: ie_code_no });
+    // Get existing IE code from user or use the provided one
+    const existingIeCode = user.ie_code_no || user.assignedIeCode;
+    const ieCodeToUse = ie_code_no || existingIeCode;
+
+    // If no IE code is available (neither existing nor provided), require it
+    if (!ieCodeToUse) {
+      return res.status(400).json({
+        success: false,
+        message: "IE code is required to promote user to admin. Either provide an IE code or ensure the user already has one assigned."
+      });
+    }
+
+    // Find Customer record with the IE code
+    const customer = await CustomerModel.findOne({ ie_code_no: ieCodeToUse });
     if (!customer) {
       return res.status(400).json({
         success: false,
-        message: `No customer found with IE code ${ie_code_no}. Cannot promote user to admin.`
+        message: `No customer found with IE code ${ieCodeToUse}. Cannot promote user to admin.`
       });
     }
 
-    if (customer.isAdmin) {
+    // Check if customer is already an admin
+    if (customer.role === 'admin') {
       return res.status(400).json({
         success: false,
-        message: "Customer with this IE code is already an admin."
+        message: "This customer is already an admin."
       });
     }
 
-    // Assign IE code to the user (update both possible field names for compatibility)
-    user.ie_code_no = ie_code_no;
-    user.assignedIeCode = ie_code_no;
-    user.assignedImporterName = customer.name;
+    // Update user record (only update IE code if a new one was provided)
+    if (ie_code_no && ie_code_no !== existingIeCode) {
+      user.ie_code_no = ie_code_no;
+      user.assignedIeCode = ie_code_no;
+      user.assignedImporterName = customer.name;
+    }
+    user.role = 'admin';
     await user.save();
 
-    // Promote the customer to admin
-    customer.isAdmin = true;
-    customer.adminRoleGrantedBy = req.superAdmin.id; // SuperAdmin who granted the role
-    customer.adminRoleGrantedAt = new Date();
+    // Update customer record to admin role
+    customer.role = 'admin';
+    customer.roleGrantedBy = req.superAdmin.id;
+    customer.roleGrantedAt = new Date();
     await customer.save();
+
+    // Prepare log message
+    const logMessage = ie_code_no && ie_code_no !== existingIeCode 
+      ? `Promoted user ${user.name} to admin and assigned new IE code ${ie_code_no}`
+      : `Promoted user ${user.name} to admin using existing IE code ${ieCodeToUse}`;
 
     // Log activity
     await logActivity(
       req.superAdmin.id,
       'USER_PROMOTED_TO_ADMIN',
-      `Promoted user ${user.name} to admin and assigned IE code ${ie_code_no}`,
+      logMessage,
       {
         userId: user._id,
         userName: user.name,
         userEmail: user.email,
-        assignedIeCode: ie_code_no,
+        assignedIeCode: ieCodeToUse,
+        newIeCodeProvided: ie_code_no ? true : false,
+        previousIeCode: existingIeCode,
         customerId: customer._id,
-        customerName: customer.name
+        customerName: customer.name,
+        previousRole: 'customer',
+        newRole: 'admin'
       },
       req.ip
     );
 
     res.json({
       success: true,
-      message: "User promoted to admin and IE code assigned successfully.",
+      message: ie_code_no && ie_code_no !== existingIeCode 
+        ? "User promoted to admin and new IE code assigned successfully."
+        : "User promoted to admin using existing IE code successfully.",
       data: {
         user: {
           id: user._id,
@@ -1051,14 +1070,22 @@ export const promoteUserToAdmin = async (req, res) => {
           email: user.email,
           ie_code_no: user.ie_code_no,
           assignedIeCode: user.assignedIeCode,
-          assignedImporterName: user.assignedImporterName
+          assignedImporterName: user.assignedImporterName,
+          role: user.role
         },
         customer: {
           id: customer._id,
           name: customer.name,
           ie_code_no: customer.ie_code_no,
-          isAdmin: customer.isAdmin,
-          adminRoleGrantedAt: customer.adminRoleGrantedAt
+          role: customer.role,
+          roleGrantedBy: customer.roleGrantedBy,
+          roleGrantedAt: customer.roleGrantedAt
+        },
+        ieCodeStatus: {
+          used: ieCodeToUse,
+          wasExisting: existingIeCode ? true : false,
+          wasProvided: ie_code_no ? true : false,
+          changed: ie_code_no && ie_code_no !== existingIeCode
         }
       }
     });
@@ -1072,6 +1099,7 @@ export const promoteUserToAdmin = async (req, res) => {
   }
 };
 
+
 /**
  * Demote User from Admin
  */
@@ -1084,6 +1112,14 @@ export const demoteUserFromAdmin = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found."
+      });
+    }
+
+    // Check if user is currently an admin
+    if (user.role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: "User is not currently an admin."
       });
     }
 
@@ -1101,54 +1137,67 @@ export const demoteUserFromAdmin = async (req, res) => {
     if (!customer) {
       return res.status(400).json({
         success: false,
-        message: "User is not currently an admin."
+        message: "No customer found with this IE code."
       });
     }
 
-    if (!customer.isAdmin) {
+    if (customer.role !== 'admin') {
       return res.status(400).json({
         success: false,
-        message: "Customer with this IE code is not currently an admin."
+        message: "Customer with this IE code does not have admin role."
       });
     }
 
-    // Demote the customer from admin
-    customer.isAdmin = false;
-    customer.adminRoleGrantedBy = null;
-    customer.adminRoleGrantedAt = null;
+    // Change user role back to customer
+    user.role = 'customer';
+    // Optionally clear IE code assignment if you want to unassign completely
+    // user.ie_code_no = null;
+    // user.assignedIeCode = null;
+    // user.assignedImporterName = null;
+    await user.save();
+
+    // Update customer record back to customer role
+    customer.role = 'customer';
+    customer.roleGrantedBy = null;
+    customer.roleGrantedAt = null; // Clear the granted date or set to demotion date
     await customer.save();
 
     // Log activity
     await logActivity(
       req.superAdmin.id,
       'USER_DEMOTED_FROM_ADMIN',
-      `Demoted user ${user.name} from admin via customer ${customer.name}`,
+      `Demoted user ${user.name} from admin to customer`,
       {
         userId: user._id,
         userName: user.name,
         userEmail: user.email,
         ie_code_no: userIeCode,
         customerId: customer._id,
-        customerName: customer.name
+        customerName: customer.name,
+        previousRole: 'admin',
+        newRole: 'customer'
       },
       req.ip
     );
 
     res.json({
       success: true,
-      message: "User demoted from admin successfully.",
+      message: "User demoted from admin to customer successfully.",
       data: {
         user: {
           id: user._id,
           name: user.name,
           email: user.email,
-          ie_code_no: userIeCode
+          ie_code_no: user.ie_code_no,
+          role: user.role
         },
         customer: {
           id: customer._id,
           name: customer.name,
           ie_code_no: customer.ie_code_no,
-          isAdmin: customer.isAdmin
+          role: customer.role,
+          roleGrantedBy: customer.roleGrantedBy,
+          roleGrantedAt: customer.roleGrantedAt
         }
       }
     });
@@ -1161,3 +1210,229 @@ export const demoteUserFromAdmin = async (req, res) => {
     });
   }
 };
+
+export const updateUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive, reason } = req.body;
+
+    // Find user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Update user status
+    const oldStatus = user.isActive;
+    user.isActive = isActive;
+    user.status = isActive ? 'active' : 'inactive';
+    await user.save();
+
+    // Create notification for user
+    const notificationMessage = isActive 
+      ? 'Your account has been activated by SuperAdmin. You can now access the system.'
+      : `Your account has been deactivated by SuperAdmin. ${reason ? 'Reason: ' + reason : ''}`;
+
+    await Notification.createNotification({
+      type: isActive ? 'user_activated' : 'user_deactivated',
+      recipient: user._id,
+      recipientModel: 'EximclientUser',
+      sender: req.superAdmin.id,
+      senderModel: 'SuperAdmin',
+      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
+      message: notificationMessage,
+      data: {
+        oldStatus,
+        newStatus: isActive,
+        reason: reason || null,
+        updatedBy: 'SuperAdmin'
+      },
+      priority: isActive ? 'medium' : 'high'
+    });
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'USER_STATUS_UPDATE',
+      `${isActive ? 'Activated' : 'Deactivated'} user ${user.name} (${user.email})`,
+      {
+        userId: user._id,
+        userEmail: user.email,
+        userName: user.name,
+        ie_code_no: user.ie_code_no,
+        oldStatus,
+        newStatus: isActive,
+        reason
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      data: {
+        userId: user._id,
+        oldStatus,
+        newStatus: isActive,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Update user status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user status."
+    });
+  }
+};
+
+/**
+ * Assign Modules to User (SuperAdmin)
+ */
+export const assignModulesToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { moduleIds } = req.body;
+
+    if (!Array.isArray(moduleIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "Module IDs must be an array."
+      });
+    }
+
+    // Find user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Update user's assigned modules
+    user.assignedModules = moduleIds;
+    await user.save();
+
+    // Log activity
+    await logActivity(
+      req.superAdmin.id,
+      'MODULE_ASSIGNMENT_UPDATE',
+      `Updated module assignments for user ${user.name} (${user.email})`,
+      {
+        userId: user._id,
+        userEmail: user.email,
+        userName: user.name,
+        ie_code_no: user.ie_code_no,
+        assignedModules: moduleIds,
+        moduleCount: moduleIds.length
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully assigned ${moduleIds.length} modules to user.`,
+      data: {
+        userId: user._id,
+        assignedModules: moduleIds,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Assign modules to user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign modules to user."
+    });
+  }
+};
+
+/**
+ * Bulk Assign Modules to Users (SuperAdmin)
+ */
+export const bulkAssignModulesToUsers = async (req, res) => {
+  try {
+    const { userIds, moduleIds } = req.body;
+
+    if (!Array.isArray(userIds) || !Array.isArray(moduleIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "User IDs and Module IDs must be arrays."
+      });
+    }
+
+    if (userIds.length === 0 || moduleIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one user and one module must be selected."
+      });
+    }
+
+    // Find users
+    const users = await EximclientUser.find({ _id: { $in: userIds } });
+    if (users.length !== userIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Some users not found."
+      });
+    }
+
+    // Update all users' assigned modules (add new modules to existing ones)
+    const bulkOperations = users.map(user => {
+      const existingModules = user.assignedModules || [];
+      const newModules = [...new Set([...existingModules, ...moduleIds])]; // Remove duplicates
+      
+      return {
+        updateOne: {
+          filter: { _id: user._id },
+          update: { $set: { assignedModules: newModules } }
+        }
+      };
+    });
+
+    await EximclientUser.bulkWrite(bulkOperations);
+
+    // Log activity for each user
+    for (const user of users) {
+      await logActivity(
+        req.superAdmin.id,
+        'BULK_MODULE_ASSIGNMENT',
+        `Bulk assigned ${moduleIds.length} modules to user ${user.name} (${user.email})`,
+        {
+          userId: user._id,
+          userEmail: user.email,
+          userName: user.name,
+          ie_code_no: user.ie_code_no,
+          newModules: moduleIds,
+          moduleCount: moduleIds.length,
+          bulkOperation: true
+        },
+        req.ip
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully assigned ${moduleIds.length} modules to ${users.length} users.`,
+      data: {
+        affectedUsers: users.length,
+        assignedModules: moduleIds.length,
+        updatedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Bulk assign modules error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to bulk assign modules."
+    });
+  }
+};
+

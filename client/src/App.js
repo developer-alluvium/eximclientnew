@@ -25,7 +25,8 @@ import SuperAdminLayout from "./components/SuperAdmin/SuperAdminLayout.jsx";
 import ModuleAccessManagement from "./components/SuperAdmin/ModuleAccessManagement.jsx";
 import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
-import ImportVideoPage from "./pages/ImportVideoPage"; // Import the new ImportVideoPage component
+import ImportVideoPage from "./pages/ImportVideoPage";
+import UserManagement from "./pages/UserManagement/UserManagement.jsx"
 
 // Protected route component for backward compatibility
 const LegacyProtectedRoute = ({ children }) => {
@@ -116,6 +117,9 @@ function App() {
                 />
                 <Route path="/trademasterguide" element={
                   localStorage.getItem("exim_user") ? <ImportVideoPage /> : <UserLoginPage />
+                } />
+                <Route path="/user-management" element={
+                  localStorage.getItem("exim_user") ? <UserManagement /> : <UserLoginPage />
                 } />
                 
               </Routes>
