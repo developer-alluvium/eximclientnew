@@ -1,4 +1,17 @@
+
+import SuperAdminModel from "../models/superAdminModel.js";
+import AdminModel from "../models/adminModel.js";
+import EximclientUser from "../models/eximclientUserModel.js";
 import CustomerModel from "../models/customerModel.js";
+import JobModel from "../models/jobModel.js";
+import Notification from "../models/notificationModel.js";
+import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
+import { logActivity } from "../utils/activityLogger.js";
+import jwt from "jsonwebtoken";
+
+// Environment variables
+const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "your-secret-key";
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 // Get tab visibility for a customer
 export async function getCustomerTabVisibility(req, res) {
   try {
@@ -34,19 +47,7 @@ export async function updateCustomerTabVisibility(req, res) {
 }
 // Endpoint to get allowed customers for Gandhidham tab
 
-import SuperAdminModel from "../models/superAdminModel.js";
-import AdminModel from "../models/adminModel.js";
-import EximclientUser from "../models/eximclientUserModel.js";
-import CustomerModel from "../models/customerModel.js";
-import JobModel from "../models/jobModel.js";
-import Notification from "../models/notificationModel.js";
-import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
-import { logActivity } from "../utils/activityLogger.js";
-import jwt from "jsonwebtoken";
 
-// Environment variables
-const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "your-secret-key";
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 
 /**
  * SuperAdmin Login
