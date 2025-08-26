@@ -123,9 +123,7 @@ function AdminLoginPage() {
                         mb: 2 
                       }} 
                     />
-                    <Typography variant="h4" className="auth-title">
-                      Admin Login
-                    </Typography>
+            
                     <Typography variant="body2" color="text.secondary">
                       Access your admin dashboard
                     </Typography>
@@ -137,66 +135,12 @@ function AdminLoginPage() {
                     </Alert>
                   )}
 
-                  <Box component="form" onSubmit={handleSubmit} className="auth-form">
-                    <TextField
-                      fullWidth
-                      label="IE Code Number"
-                      name="ie_code_no"
-                      type="text"
-                      value={formData.ie_code_no}
-                      onChange={handleChange}
-                      required
-                      variant="outlined"
-                      className="auth-input"
-                      disabled={loading}
-                      autoComplete="username"
-                      placeholder="Enter your IE Code (e.g., 0812023773)"
-                    />
-
-                    <TextField
-                      fullWidth
-                      label="Password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                      variant="outlined"
-                      className="auth-input"
-                      disabled={loading}
-                      autoComplete="current-password"
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowPassword(!showPassword)}
-                              edge="end"
-                            >
-                              {showPassword ? <VisibilityOff /> : <Visibility />}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-
-                    <Button
-                      type="submit"
-                      fullWidth
-                      variant="contained"
-                      size="large"
-                      disabled={loading}
-                      className="auth-submit-btn"
-                      sx={{ mt: 2 }}
-                    >
-                      {loading ? "Signing In..." : "Sign In"}
-                    </Button>
-                  </Box>
 
                   <Box className="auth-footer">
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       <MuiLink 
                         component={Link} 
-                        to="/user/login" 
+                        to="/login" 
                         color="secondary"
                         underline="hover"
                       >
@@ -205,7 +149,7 @@ function AdminLoginPage() {
                       {" | "}
                       <MuiLink 
                         component={Link} 
-                        to="/superadmin-login" 
+                        to="/login" 
                         color="secondary"
                         underline="hover"
                       >

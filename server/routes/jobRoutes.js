@@ -40,6 +40,8 @@ router.get(
   "/api/:year/jobs/:status/:detailedStatus/:importer",
   getJobsByStatusAndImporter
 );
+
+
 router.patch("/api/jobs/:id", updateJob);
 
 router.patch('/api/jobs/container/:id', updateContainerTransporter);

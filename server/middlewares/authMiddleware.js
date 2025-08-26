@@ -48,7 +48,7 @@ export const generateRefreshToken = (user) => {
     {
       id: user._id,
       ie_code_no: user.ie_code_no,
-      role: user.role || 'customer',
+      role: user.role,
     },
     REFRESH_TOKEN_SECRET,
     {
@@ -338,6 +338,7 @@ export const sanitizeUserData = (user) => {
     role: user.role || "customer",
     isActive: user.isActive,
     lastLogin: user.lastLogin,
+    
   };
 
   // Additional fields if they exist in the user object
@@ -353,7 +354,7 @@ export const sanitizeUserData = (user) => {
     "department",
     "employment_type",
     "assigned_importer",
-    "assigned_importer_name",
+    "assignedImporterName",
     "modules",
     "assignedModules",
     "isAdmin",  // Added isAdmin field
@@ -387,6 +388,7 @@ export const generateUserToken = (user, userType = 'user') => {
   // Add specific fields based on user type
   if (userType === 'user' || userType === 'admin') {
     payload.ie_code_no = user.ie_code_no;
+    
   }
   
   if (userType === 'user') {
@@ -493,26 +495,57 @@ export const authenticateUser = async (req, res, next) => {
 /**
  * Authorization middleware to check user roles
  */
+// export const authorize = (...roles) => {
+//   return (req, res, next) => {
+//     if (!req.user || !req.userType) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Authentication required.",
+//       });
+//     }
+
+//     if (!roles.includes(req.user.role) ) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "Insufficient permissions.",
+//       });
+//     }
+
+//     next();
+//   };
+// };
+// In your authMiddleware.js
+
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !req.userType) {
+    if (!req.user || (Object.keys(req.user).length === 0)) {
       return res.status(401).json({
         success: false,
         message: "Authentication required.",
       });
     }
 
-    if (!roles.includes(req.userType)) {
+    const userPermission = req.user.role || req.userType;
+
+    if (!userPermission) {
+        return res.status(403).json({
+            success: false,
+            message: "Permission property not found on user object.",
+        });
+    }
+
+    // THIS IS THE FIX: Only check for roles if the 'roles' array is not empty.
+    // If roles is empty, it means any authenticated user is allowed.
+    if (roles.length > 0 && !roles.includes(userPermission)) {
       return res.status(403).json({
         success: false,
-        message: "Insufficient permissions.",
+        message: `Insufficient permissions. Access denied for role: '${userPermission}'.`,
       });
     }
 
     next();
   };
 };
-
 /**
  * Middleware to check IE code access
  */

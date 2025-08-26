@@ -1,5 +1,5 @@
 // Test SuperAdmin Login Flow
-// Run this in browser console after going to /superadmin-login
+// Run this in browser console after going to /login
 
 const testSuperAdminLogin = async () => {
   console.log('🧪 Testing SuperAdmin Login Flow...');

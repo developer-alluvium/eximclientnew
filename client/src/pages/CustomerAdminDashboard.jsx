@@ -77,7 +77,7 @@ function CustomerAdminDashboard() {
     } catch (error) {
       console.error('Dashboard fetch error:', error);
       if (error.response?.status === 401) {
-        navigate('/admin/login');
+        navigate('/login');
       }
       setError('Failed to fetch dashboard data');
     }
@@ -122,7 +122,9 @@ function CustomerAdminDashboard() {
     try {
       await axios.post('/api/logout', {}, { withCredentials: true });
       localStorage.removeItem('exim_user');
-      navigate('/admin/login');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token'); 
+      navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }

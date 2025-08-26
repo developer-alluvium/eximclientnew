@@ -50,7 +50,7 @@ const SuperAdminLayout = () => {
       const user = localStorage.getItem("superadmin_user");
       
       if (!token || !user) {
-        navigate("/superadmin-login");
+        navigate("/login");
         return;
       }
       
@@ -74,7 +74,7 @@ const SuperAdminLayout = () => {
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
-        navigate("/superadmin-login");
+        navigate("/login");
       } else {
         setError("Failed to load dashboard data");
       }
@@ -175,13 +175,13 @@ const SuperAdminLayout = () => {
       // Clear localStorage and redirect
       localStorage.removeItem("superadmin_token");
       localStorage.removeItem("superadmin_user");
-      navigate("/superadmin-login");
+      navigate("/login");
     } catch (error) {
       console.error('Error during SuperAdmin logout:', error);
       // Still clear localStorage and redirect even if API call fails
       localStorage.removeItem("superadmin_token");
       localStorage.removeItem("superadmin_user");
-      navigate("/superadmin-login");
+      navigate("/login");
     }
   };
 

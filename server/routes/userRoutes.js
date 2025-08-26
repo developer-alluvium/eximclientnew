@@ -17,7 +17,7 @@ router.post("/login", loginUser);
 
 // Protected routes (requires authentication)
 router.use(authenticateUser);
-router.use(authorize('user'));
+router.use(authorize('user', 'admin'));
 
 router.get("/profile", getUserProfile);
 router.get("/dashboard", getUserDashboard);

@@ -41,7 +41,7 @@ const setupSuperAdmin = async () => {
     console.log(`Email: ${defaultSuperAdmin.email}`);
     console.log('==========================================');
     console.log('⚠️  IMPORTANT: Change these credentials immediately after first login!');
-    console.log('🔐 Access the registration page at: /superadmin-login');
+    console.log('🔐 Access the registration page at: /login');
     
   } catch (error) {
     console.error('❌ Error setting up SuperAdmin:', error.message);

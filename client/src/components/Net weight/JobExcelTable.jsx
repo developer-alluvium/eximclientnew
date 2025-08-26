@@ -116,7 +116,7 @@ const JobExcelTable = ({ userId }) => {
       const userDataFromStorage = localStorage.getItem("exim_user");
       if (userDataFromStorage) {
         const parsedUser = JSON.parse(userDataFromStorage);
-        return parsedUser?.name || null;
+        return parsedUser?.assignedImporterName || null;
       }
     } catch (error) {
       console.error("Error parsing user data:", error);

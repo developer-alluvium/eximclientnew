@@ -13,14 +13,24 @@ import {
   getAllCustomers,
   getAllUsers,
   updateCustomerAdminStatus,
+  assignModulesToUser,
+  bulkAssignModulesToUsers,
+  getAvailableIeCodes
+} from "../controllers/superAdminController.js";
+
+import { 
   promoteUserToAdmin,
   demoteUserFromAdmin,
   updateUserStatus,
-  assignModulesToUser,
-  bulkAssignModulesToUsers,
-   getAvailableIeCodes
-} from "../controllers/superAdminController.js";
-import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
+  // Column permission functions
+  getAvailableColumns,
+  getUserColumnPermissions,
+  updateUserColumnPermissions,
+  getCustomerColumnPermissions,
+  updateCustomerColumnPermissions,
+  bulkUpdateUserColumnPermissions,
+  bulkUpdateCustomerColumnPermissions
+} from "../controllers/sharedUserActionController.js";
 
 const router = express.Router();
 
@@ -49,5 +59,18 @@ router.put("/api/superadmin/users/:userId/demote-admin", protectSuperAdmin, demo
 router.put("/api/superadmin/users/:userId/status", protectSuperAdmin, updateUserStatus);
 router.put("/api/superadmin/users/:userId/modules", protectSuperAdmin, assignModulesToUser);
 router.post("/api/superadmin/users/bulk-assign-modules", protectSuperAdmin, bulkAssignModulesToUsers);
+
+// Column permissions routes (SuperAdmin only)
+router.get("/api/superadmin/available-columns", protectSuperAdmin, getAvailableColumns);
+
+// User column permissions
+router.get("/api/superadmin/users/:userId/column-permissions", protectSuperAdmin, getUserColumnPermissions);
+router.put("/api/superadmin/users/:userId/column-permissions", protectSuperAdmin, updateUserColumnPermissions);
+router.post("/api/superadmin/users/bulk-column-permissions", protectSuperAdmin, bulkUpdateUserColumnPermissions);
+
+// Customer column permissions (backward compatibility)
+router.get("/api/superadmin/customers/:customerId/column-permissions", protectSuperAdmin, getCustomerColumnPermissions);
+router.put("/api/superadmin/customers/:customerId/column-permissions", protectSuperAdmin, updateCustomerColumnPermissions);
+router.post("/api/superadmin/customers/bulk-column-permissions", protectSuperAdmin, bulkUpdateCustomerColumnPermissions);
 
 export default router;

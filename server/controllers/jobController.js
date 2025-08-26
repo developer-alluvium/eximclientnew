@@ -198,19 +198,19 @@ export const getExporters = async (req, res) => {
           latestJobDate: { $max: "$job_date" }
         }
       },
-      {
-        $match: {
-          _id: { 
-            $exists: true, 
-            $ne: null, 
-            $ne: "", 
-            $not: { $regex: "^\\s*$" } 
-          },
-          uniqueImporters: {
-            $in: [{ $regex: `^${importer}$`, $options: "i" }]
-          }
-        }
-      },
+      // This is the correct code
+{
+  $match: {
+    _id: { 
+      $exists: true, 
+      $ne: null, 
+      $ne: "", 
+      $not: { $regex: "^\\s*$" } 
+    },
+    // Apply the regex directly to the array field
+    uniqueImporters: { $regex: `^${importer}$`, $options: "i" }
+  }
+},
       {
         $project: {
           _id: 0,

@@ -486,3 +486,65 @@ export const getExportersByImporter = async (req, res) => {
     });
   }
 };
+
+
+
+/**
+ * Save or update the column order for the logged-in user.
+ */
+export const postColumnOrder = async (req, res) => {
+  try {
+    const { columnOrder } = req.body;
+    const userId = req.user._id; // Get user ID from the authenticated session
+
+    if (!columnOrder || !Array.isArray(columnOrder)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "A valid 'columnOrder' array is required." 
+      });
+    }
+
+    // Find the user and update their columnOrder
+    await EximclientUser.findByIdAndUpdate(userId, { columnOrder });
+
+    res.json({ 
+      success: true, 
+      message: "Column order saved successfully." 
+    });
+  } catch (err) {
+    console.error("Error saving column order:", err);
+    res.status(500).json({ success: false, message: "Server error while saving column order." });
+  }
+};
+
+/**
+ * Get the column order and permissions for the logged-in user.
+ */
+export const getColumnOrder = async (req, res) => {
+  try {
+    const userId = req.user._id; // Get user ID from the authenticated session
+
+    const user = await EximclientUser.findById(userId).select('columnOrder allowedColumns name ie_code_no').lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please try logging in again.",
+      });
+    }
+   
+    res.json({
+      success: true,
+      columnOrder: user.columnOrder || [],
+      allowedColumns: user.allowedColumns || [], // Also send their allowed columns
+      userInfo: {
+        id: user._id,
+        name: user.name,
+        ie_code_no: user.ie_code_no
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching column order:", err);
+    res.status(500).json({ success: false, message: "Server error while fetching column order." });
+  }
+};

@@ -39,7 +39,7 @@ const LegacyProtectedRoute = ({ children }) => {
   // Don't interfere with SuperAdmin routes - but still call useEffect
   const shouldBypass = location.pathname.startsWith('/superadmin-dashboard') || 
                       location.pathname.startsWith('/module-access-management') ||
-                      location.pathname === '/superadmin-login';
+                      location.pathname === '/login';
 
   useEffect(() => {
     if (!shouldBypass && !isAuthenticated && location.pathname !== "/login") {
@@ -77,49 +77,49 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 
                 {/* New user system routes */}
-                <Route path="/user/login" element={<UserLoginPage />} />
+                <Route path="/login" element={<UserLoginPage />} />
                 <Route path="/user/register" element={<UserRegistrationPage />} />
                 <Route path="/user/dashboard" element={
-                  localStorage.getItem("exim_user") ? <UserDashboard /> : <UserLoginPage />
+                  localStorage.getItem("exim_user") ? <UserDashboard /> : <LoginPage />
                 } />
                 
                 {/* Admin routes */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
+               
                 <Route path="/customer-admin/dashboard" element={
                   localStorage.getItem("exim_admin") ? <CustomerAdminDashboard /> : <AdminLoginPage />
                 } />
                 
                 {/* SuperAdmin routes */}
-                <Route path="/superadmin-login" element={<SuperAdminLoginPage />} />
+                <Route path="/login" element={<SuperAdminLoginPage />} />
                 <Route path="/superadmin-dashboard" element={
-                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <SuperAdminLoginPage />
+                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <LoginPage />
                 }>
                   <Route index element={<SuperAdminDashboard />} />
                   <Route path="customer/:customerId" element={<SuperAdminCustomerDetail />} />
                 </Route>
                 <Route path="/module-access-management" element={
-                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <SuperAdminLoginPage />
+                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <oginPage />
                 } />
 
                 {/* Legacy customer routes */}
                 <Route path="/" element={
                   localStorage.getItem("exim_user") ? <UserDashboard /> : 
-                  localStorage.getItem("exim_user") ? <HomePage /> : <UserLoginPage />
+                  localStorage.getItem("exim_user") ? <HomePage /> : <LoginPage />
                 } />
                 <Route path="/netpage" element={
-                  localStorage.getItem("exim_user") ? <NetPage /> : <UserLoginPage />
+                  localStorage.getItem("exim_user") ? <NetPage /> : <LoginPage />
                 } />
                 <Route
                   path="/importdsr"
                   element={
-                    localStorage.getItem("exim_user") ? <AppbarComponent /> : <UserLoginPage />
+                    localStorage.getItem("exim_user") ? <AppbarComponent /> : <LoginPage />
                   }
                 />
                 <Route path="/trademasterguide" element={
-                  localStorage.getItem("exim_user") ? <ImportVideoPage /> : <UserLoginPage />
+                  localStorage.getItem("exim_user") ? <ImportVideoPage /> : <LoginPage />
                 } />
                 <Route path="/user-management" element={
-                  localStorage.getItem("exim_user") ? <UserManagement /> : <UserLoginPage />
+                  localStorage.getItem("exim_user") ? <UserManagement /> : <LoginPage />
                 } />
                 
               </Routes>

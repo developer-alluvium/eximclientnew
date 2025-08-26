@@ -19,13 +19,14 @@ import {
   VisibilityOff,
   AdminPanelSettings,
   Security,
-  Person,
+  Email, // 1. Imported the Email icon
   Lock,
 } from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
 
 function SuperAdminLoginPage() {
-  const [username, setUsername] = useState("");
+  // 2. Changed state from 'username' to 'email'
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
@@ -34,7 +35,7 @@ function SuperAdminLoginPage() {
   const [sessionMessage, setSessionMessage] = useState(null);
   const navigate = useNavigate();
 
-  // Check if already logged in as superadmin
+  // Check if already logged in (no changes needed here)
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem("superadmin_token");
@@ -42,13 +43,11 @@ function SuperAdminLoginPage() {
 
       if (token && user) {
         try {
-          JSON.parse(user); // Validate user data
+          JSON.parse(user);
           console.log("Valid auth found, redirecting...");
-          // Valid token and user exist, redirect to SuperAdmin dashboard
           navigate("/superadmin-dashboard", { replace: true });
         } catch (error) {
           console.error("Invalid user data in localStorage:", error);
-          // Invalid user data, clear storage
           localStorage.removeItem("superadmin_token");
           localStorage.removeItem("superadmin_user");
         }
@@ -58,7 +57,7 @@ function SuperAdminLoginPage() {
     checkAuth();
   }, [navigate]);
 
-  // Listen for storage changes (helps with login state sync)
+  // Listen for storage changes (no changes needed here)
   useEffect(() => {
     const handleStorageChange = () => {
       const token = localStorage.getItem("superadmin_token");
@@ -76,20 +75,22 @@ function SuperAdminLoginPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
-    setSessionMessage(null); // Clear session message when attempting login
+    setSessionMessage(null);
     setIsLoading(true);
 
-    if (!username || !password) {
-      setError("Please provide both username and password");
+    // 3. Updated validation to check for 'email'
+    if (!email || !password) {
+      setError("Please provide both email and password");
       setIsLoading(false);
       return;
     }
 
     try {
       console.log("Attempting login...");
+      // 4. Send 'email' in the request payload
       const response = await axios.post(
         `${process.env.REACT_APP_API_STRING}/superadmin/login`,
-        { username, password },
+        { email, password },
         { withCredentials: true }
       );
 
@@ -99,30 +100,26 @@ function SuperAdminLoginPage() {
         console.log("Login successful, storing data...");
         setIsRedirecting(true);
         
-        // Store the superadmin token
         localStorage.setItem("superadmin_token", response.data.token);
         localStorage.setItem("superadmin_user", JSON.stringify(response.data.superAdmin));
         
-        // Clear form state
-        setUsername("");
+        // 5. Clear 'email' state on success
+        setEmail("");
         setPassword("");
         setError(null);
         setSessionMessage(null);
         
-        // Verify storage was successful
         const storedToken = localStorage.getItem("superadmin_token");
-        const storedUser = localStorage.getItem("superadmin_user");
+        const storedUser = localStorage.getItem("exim_user");
         console.log("Storage verification - Token:", !!storedToken, "User:", !!storedUser);
         
-        // Force page reload approach (most reliable)
         setTimeout(() => {
           console.log("Redirecting to dashboard...");
           window.location.href = "/superadmin-dashboard";
         }, 100);
         
-        // Fallback navigation attempt
         setTimeout(() => {
-          if (window.location.pathname === "/superadmin-login") {
+          if (window.location.pathname === "/login") {
             console.log("Fallback navigation...");
             navigate("/superadmin-dashboard", { replace: true });
           }
@@ -135,7 +132,7 @@ function SuperAdminLoginPage() {
       if (error.response) {
         switch (error.response.status) {
           case 401:
-            setError("Invalid username or password");
+            setError("Invalid email or password"); // Updated error message
             break;
           case 423:
             setError("Account is temporarily locked due to too many failed attempts. Please try again later.");
@@ -175,7 +172,7 @@ function SuperAdminLoginPage() {
             backdropFilter: "blur(10px)",
           }}
         >
-          {/* Header */}
+          {/* Header (no changes needed) */}
           <Box
             sx={{
               background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)",
@@ -206,14 +203,10 @@ function SuperAdminLoginPage() {
           </Box>
 
           <CardContent sx={{ p: 4 }}>
-            {/* Warning Alert */}
+            {/* Alerts (no changes needed) */}
             <Alert
               severity="warning"
-              sx={{
-                mb: 3,
-                borderRadius: 2,
-                "& .MuiAlert-icon": { fontSize: "1.5rem" },
-              }}
+              sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.5rem" } }}
             >
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 🔐 SuperAdmin Access Required
@@ -222,46 +215,28 @@ function SuperAdminLoginPage() {
                 Only authorized SuperAdmin users can access the customer registration system.
               </Typography>
             </Alert>
-
-            {/* Error Alert */}
             {error && (
               <Alert
                 severity="error"
-                sx={{
-                  mb: 3,
-                  borderRadius: 2,
-                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
-                }}
+                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
                 onClose={() => setError(null)}
               >
                 {error}
               </Alert>
             )}
-
-            {/* Session Message Alert */}
             {sessionMessage && (
               <Alert
                 severity="info"
-                sx={{
-                  mb: 3,
-                  borderRadius: 2,
-                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
-                }}
+                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
                 onClose={() => setSessionMessage(null)}
               >
                 {sessionMessage}
               </Alert>
             )}
-
-            {/* Redirecting Alert */}
             {isRedirecting && (
               <Alert
                 severity="success"
-                sx={{
-                  mb: 3,
-                  borderRadius: 2,
-                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
-                }}
+                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
               >
                 Login successful! Redirecting to dashboard...
               </Alert>
@@ -269,30 +244,29 @@ function SuperAdminLoginPage() {
 
             {/* Login Form */}
             <form onSubmit={handleSubmit}>
+              {/* 6. Updated Email TextField */}
               <Box sx={{ mb: 3 }}>
                 <TextField
                   fullWidth
-                  label="SuperAdmin Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  label="SuperAdmin Email"
+                  type="email" // Added type="email" for better semantics
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   variant="outlined"
                   required
                   disabled={isLoading || isRedirecting}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Person color="action" />
+                        <Email color="action" />
                       </InputAdornment>
                     ),
                   }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 2,
-                    },
-                  }}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                 />
               </Box>
 
+              {/* Password field (no changes needed) */}
               <Box sx={{ mb: 4 }}>
                 <TextField
                   fullWidth
@@ -321,14 +295,11 @@ function SuperAdminLoginPage() {
                       </InputAdornment>
                     ),
                   }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 2,
-                    },
-                  }}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                 />
               </Box>
-
+              
+              {/* Submit button (no changes needed) */}
               <Button
                 type="submit"
                 fullWidth
@@ -347,9 +318,7 @@ function SuperAdminLoginPage() {
                       ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
                       : "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)",
                   },
-                  "&:disabled": {
-                    background: "#ccc",
-                  },
+                  "&:disabled": { background: "#ccc" },
                 }}
               >
                 {isLoading ? "Authenticating..." : isRedirecting ? "Redirecting..." : "Access SuperAdmin Portal"}
@@ -358,33 +327,17 @@ function SuperAdminLoginPage() {
 
             <Divider sx={{ my: 3 }} />
 
-            {/* Footer */}
+            {/* Footer and Security Notice (no changes needed) */}
             <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Need customer access instead?
               </Typography>
-              <Link
-                to="/login"
-                style={{
-                  textDecoration: "none",
-                  color: "#667eea",
-                  fontWeight: 600,
-                }}
-              >
+              <Link to="/login" style={{ textDecoration: "none", color: "#667eea", fontWeight: 600 }}>
                 Customer Login →
               </Link>
             </Box>
 
-            {/* Security Notice */}
-            <Box
-              sx={{
-                mt: 3,
-                p: 2,
-                bgcolor: "grey.50",
-                borderRadius: 2,
-                border: "1px solid #e0e0e0",
-              }}
-            >
+            <Box sx={{ mt: 3, p: 2, bgcolor: "grey.50", borderRadius: 2, border: "1px solid #e0e0e0" }}>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center" }}>
                 🛡️ This portal is protected by enterprise-grade security measures.
                 <br />
@@ -394,7 +347,6 @@ function SuperAdminLoginPage() {
           </CardContent>
         </Paper>
 
-        {/* Version Info */}
         <Box sx={{ textAlign: "center", mt: 3 }}>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>
             EXIM Client Management System v{process.env.REACT_APP_VERSION || "1.0.0"}

@@ -17,23 +17,24 @@ const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
  */
 export const superAdminLogin = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    // 1. Changed to destructure 'email' instead of 'username'
+    const { email, password } = req.body;
 
-    console.log(`SuperAdmin login attempt for username: ${username}`);
+    console.log(`SuperAdmin login attempt for email: ${email}`);
 
-    // Validate input
-    if (!username || !password) {
+    // 2. Updated validation to check for 'email'
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please provide username and password",
+        message: "Please provide email and password",
       });
     }
 
-    // Find superadmin by username
-    const superAdmin = await SuperAdminModel.findOne({ username });
+    // 3. Find superadmin by 'email'
+    const superAdmin = await SuperAdminModel.findOne({ email });
 
     if (!superAdmin) {
-      console.log(`SuperAdmin with username ${username} not found`);
+      console.log(`SuperAdmin with email ${email} not found`);
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -42,7 +43,7 @@ export const superAdminLogin = async (req, res) => {
 
     // Check if account is locked
     if (superAdmin.isLocked()) {
-      console.log(`SuperAdmin account ${username} is locked`);
+      console.log(`SuperAdmin account for email ${email} is locked`);
       return res.status(423).json({
         success: false,
         message: "Account is temporarily locked due to too many failed login attempts. Please try again later.",
@@ -51,7 +52,7 @@ export const superAdminLogin = async (req, res) => {
 
     // Check if account is active
     if (!superAdmin.isActive) {
-      console.log(`SuperAdmin account ${username} is inactive`);
+      console.log(`SuperAdmin account for email ${email} is inactive`);
       return res.status(401).json({
         success: false,
         message: "Account is deactivated",
@@ -62,7 +63,7 @@ export const superAdminLogin = async (req, res) => {
     const isPasswordCorrect = await superAdmin.comparePassword(password);
 
     if (!isPasswordCorrect) {
-      console.log(`Invalid password for SuperAdmin ${username}`);
+      console.log(`Invalid password for SuperAdmin with email ${email}`);
       
       // Increment login attempts
       await superAdmin.incLoginAttempts();
@@ -76,7 +77,7 @@ export const superAdminLogin = async (req, res) => {
     // Reset login attempts on successful login
     await superAdmin.resetLoginAttempts();
 
-    // Generate JWT token with superadmin role
+    // Generate JWT token (payload remains the same)
     const token = jwt.sign(
       { 
         id: superAdmin._id, 
@@ -87,7 +88,7 @@ export const superAdminLogin = async (req, res) => {
       { expiresIn: JWT_EXPIRATION }
     );
 
-    console.log(`SuperAdmin ${username} logged in successfully`);
+    console.log(`SuperAdmin ${superAdmin.username} (email: ${email}) logged in successfully`);
 
     // Send successful response
     res.status(200).json({

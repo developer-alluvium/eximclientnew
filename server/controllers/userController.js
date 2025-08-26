@@ -83,6 +83,7 @@ export const registerUser = async (req, res) => {
       status: 'pending',
       isActive: false,
       registrationIp: req.ip || req.connection.remoteAddress,
+      
     });
 
     // Generate email verification token
@@ -165,7 +166,7 @@ export const loginUser = async (req, res) => {
     const user = await EximclientUser.findOne({ 
       email: email.toLowerCase() 
     })
-    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules')
+    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName' )
     .populate('adminId', 'name ie_code_no'); // Populating customer as admin
 
     if (!user) {
@@ -194,7 +195,7 @@ export const loginUser = async (req, res) => {
     if (!isPasswordValid) {
       console.log("Password invalid, incrementing login attempts");
       // Increment login attempts
-      await user.incLoginAttempts();
+      await user.loginAttempts();
       
       return res.status(401).json({
         success: false,
@@ -230,7 +231,7 @@ export const loginUser = async (req, res) => {
 
     console.log("Sending auth response");
     // Send auth response
-    sendUserAuthResponse(user, 'user', 200, res);
+    sendUserAuthResponse(user, 'user', 200, res, true);
     console.log("Auth response sent successfully");
 
   } catch (error) {

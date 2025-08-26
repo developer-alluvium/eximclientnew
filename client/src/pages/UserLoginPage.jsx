@@ -10,9 +10,11 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Link as MuiLink
+  Link as MuiLink,
+  Switch, // Added for the toggle
+  FormControlLabel, // Added for the toggle
 } from "@mui/material";
-import { Visibility, VisibilityOff, Login } from "@mui/icons-material";
+import { Visibility, VisibilityOff, Login, SupervisorAccount } from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
 import { modernTheme } from "../styles/modernTheme";
@@ -29,10 +31,17 @@ function UserLoginPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Check if user is already logged in
+  // 1. State to toggle between User and SuperAdmin login
+  const [isSuperAdminLogin, setIsSuperAdminLogin] = useState(false);
+
+  // 2. Updated useEffect to check for both user and superadmin sessions
   useEffect(() => {
-    const savedUser = localStorage.getItem("exim_user");
-    if (savedUser) {
+    const superAdminToken = localStorage.getItem("superadmin_token");
+    const userToken = localStorage.getItem("access_token");
+
+    if (superAdminToken) {
+      navigate("/superadmin-dashboard", { replace: true });
+    } else if (userToken) {
       navigate("/user/dashboard", { replace: true });
     }
   }, [navigate]);
@@ -43,15 +52,14 @@ function UserLoginPage() {
       ...prev,
       [name]: value
     }));
-    // Clear errors when user starts typing
     if (error) setError(null);
   };
 
+  // 3. Consolidated handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!formData.email || !formData.password) {
       setError("Email and password are required.");
       return;
@@ -59,33 +67,50 @@ function UserLoginPage() {
 
     setLoading(true);
 
+    // Determine API endpoint and payload based on the toggle state
+    const endpoint = isSuperAdminLogin
+      ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
+      : `${process.env.REACT_APP_API_STRING}/users/login`;
+    
+    const payload = { email: formData.email, password: formData.password };
+
     try {
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/users/login`,
-        formData,
-        { withCredentials: true }
-      );
+      const response = await axios.post(endpoint, payload, { withCredentials: true });
 
       if (response.data.success) {
-        // Store user data
-        localStorage.setItem("exim_user", JSON.stringify(response.data.data.user));
-        
-        // Navigate to dashboard
-        navigate("/user/dashboard", { replace: true });
+        if (isSuperAdminLogin) {
+          // Handle SuperAdmin successful login
+          localStorage.setItem("superadmin_token", response.data.token);
+          localStorage.setItem("superadmin_user", JSON.stringify(response.data.superAdmin));
+          navigate("/superadmin-dashboard", { replace: true });
+        } else {
+          // Handle User successful login
+          const { user } = response.data.data;
+          const { accessToken, refreshToken } = response.data;
+          localStorage.setItem("exim_user", JSON.stringify(user));
+          localStorage.setItem("access_token", accessToken);
+          localStorage.setItem("refresh_token", refreshToken);
+          navigate("/user/dashboard", { replace: true });
+        }
       }
-    } catch (error) {
+    } catch (err) {
       let errorMessage = "Login failed. Please try again.";
-      
-      if (error.response?.status === 401) {
-        errorMessage = "Invalid email or password.";
-      } else if (error.response?.status === 423) {
-        errorMessage = "Account is temporarily locked. Please try again later.";
-      } else if (error.response?.status === 403) {
-        errorMessage = error.response.data.message || "Account pending verification.";
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      if (err.response) {
+        switch (err.response.status) {
+          case 401:
+            errorMessage = "Invalid email or password.";
+            break;
+          case 423:
+            errorMessage = "Account is temporarily locked. Please try again later.";
+            break;
+          case 403: // Specific to user login
+            errorMessage = err.response.data.message || "Account pending verification.";
+            break;
+          default:
+            errorMessage = err.response.data.message || "An unexpected error occurred.";
+            break;
+        }
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -118,15 +143,13 @@ function UserLoginPage() {
               <Card className="auth-card">
                 <CardContent>
                   <Box className="auth-header">
-                    <Login 
-                      sx={{ 
-                        fontSize: 40, 
-                        color: 'primary.main',
-                        mb: 2 
-                      }} 
-                    />
+                    {isSuperAdminLogin ? (
+                       <SupervisorAccount sx={{ fontSize: 40, color: 'error.main', mb: 2 }} />
+                    ) : (
+                       <Login sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
+                    )}
                     <Typography variant="h4" className="auth-title">
-                      User Login
+                      {isSuperAdminLogin ? "SuperAdmin Login" : "User Login"}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Enter your credentials to continue
@@ -183,6 +206,20 @@ function UserLoginPage() {
                       }}
                     />
 
+                    {/* 4. Added the Switch for toggling login type */}
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={isSuperAdminLogin}
+                          onChange={(e) => setIsSuperAdminLogin(e.target.checked)}
+                          name="superAdminToggle"
+                          color="primary"
+                        />
+                      }
+                      label="Log in as SuperAdmin"
+                      sx={{ mt: 1, mb: 1, color: 'text.secondary' }}
+                    />
+
                     <Button
                       type="submit"
                       fullWidth
@@ -190,7 +227,7 @@ function UserLoginPage() {
                       size="large"
                       disabled={loading}
                       className="auth-submit-btn"
-                      sx={{ mt: 2 }}
+                      sx={{ mt: 1 }}
                     >
                       {loading ? "Signing In..." : "Sign In"}
                     </Button>
@@ -206,26 +243,6 @@ function UserLoginPage() {
                         underline="hover"
                       >
                         Register here
-                      </MuiLink>
-                    </Typography>
-                    
-                    <Typography variant="body2" color="text.secondary">
-                      <MuiLink 
-                        component={Link} 
-                        to="/admin/login" 
-                        color="secondary"
-                        underline="hover"
-                      >
-                        Admin Login
-                      </MuiLink>
-                      {" | "}
-                      <MuiLink 
-                        component={Link} 
-                        to="/superadmin-login" 
-                        color="secondary"
-                        underline="hover"
-                      >
-                        SuperAdmin Login
                       </MuiLink>
                     </Typography>
                   </Box>

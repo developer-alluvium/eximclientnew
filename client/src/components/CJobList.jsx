@@ -115,7 +115,7 @@ function CJobList(props) {
         
         // Handle both old and new user data structures
         const userId = parsedUser?.id 
-        const userName = parsedUser?.name 
+        const userName = parsedUser?.assignedImporterName
         const role = parsedUser?.role || 'customer'
         
         console.log("details", userId, userName, role);
@@ -140,12 +140,7 @@ function CJobList(props) {
         console.log("Skipping exporter fetch - no valid importer selected:", selectedImporter);
         return;
       }
-      
-      console.log("Fetching exporters with params:", {
-        importer: selectedImporter,
-        year: selectedYear,
-        status: props.status
-      });
+
       
       try {
         const res = await axios.get(
@@ -187,119 +182,93 @@ function CJobList(props) {
 
   // Track if column order has been fetched
   
-  // Only fetch column order when we have a valid userId and haven't tried yet
-  useEffect(() => {
-    // Skip if we've already tried to fetch or don't have a userId yet
-    if (hasAttemptedFetch || !currentUserId) {
+useEffect(() => {
+  if (hasAttemptedFetch || !currentUserId) {
+    return;
+  }
+  
+  const fetchColumnOrder = async () => {
+    setHasAttemptedFetch(true);
+    
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      console.error("Authentication token not found.");
+      setIsColumnOrderLoaded(true); // Stop loading
       return;
     }
     
-    const fetchColumnOrder = async () => {
-      // Mark that we've attempted to fetch
-      setHasAttemptedFetch(true);
-      
-      try {
-        const res = await axios.get(
-          `${process.env.REACT_APP_API_STRING}/column-order`,
-          {
-            params: { userId: currentUserId },
-          }
-        );
-
-        // Set allowed columns based on user role and backend response
-        if (userRole === 'superadmin') {
-          // Superadmin can see all columns
-          setAllowedColumns(columns.map(col => col.accessorKey));
-        } else {
-          // Regular user gets columns based on superadmin settings
-          // If allowedColumns is empty array, we treat it as "allow all columns" by default
-          const userAllowedColumns = res.data.allowedColumns && res.data.allowedColumns.length > 0 
-            ? res.data.allowedColumns 
-            : columns.map(col => col.accessorKey); // Default to all columns if none specified
-          setAllowedColumns(userAllowedColumns);
-        }
-  
-        if (res.data.columnOrder?.length) {
-          setColumnOrder(res.data.columnOrder);
-        } else {
-          // Create default order with only allowed columns
-          const allowedCols = userRole === 'superadmin' 
-            ? columns.map(col => col.accessorKey)
-            : (res.data.allowedColumns && res.data.allowedColumns.length > 0 
-                ? res.data.allowedColumns 
-                : columns.map(col => col.accessorKey));
-          setColumnOrder(allowedCols);
-        }
-        
-        // Check if user info was returned and update localStorage if there's a mismatch
-        if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
-          console.log("User ID mismatch detected. Updating localStorage with correct user data.");
-          
-          const userDataFromStorage = localStorage.getItem("exim_user");
-          if (userDataFromStorage) {
-            try {
-              const parsedUser = JSON.parse(userDataFromStorage);
-              
-              // Handle both old and new user data structures for updates
-              if (parsedUser.data && parsedUser.data.user) {
-                // Old structure
-                parsedUser.data.user.id = res.data.userInfo.id;
-                parsedUser.data.user.name = res.data.userInfo.name;
-                parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
-              } else {
-                // New structure
-                parsedUser.id = res.data.userInfo.id;
-                parsedUser.name = res.data.userInfo.name;
-                parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
-              }
-              
-              localStorage.setItem("exim_user", JSON.stringify(parsedUser));
-              setCurrentUserId(res.data.userInfo.id);
-              setUsername(res.data.userInfo.name);
-              setUserImporterName(res.data.userInfo.name);
-              setSelectedImporter(res.data.userInfo.name);
-              
-              console.log("LocalStorage updated with correct user data.");
-            } catch (e) {
-              console.error("Error updating user data in storage:", e);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch column order", err);
-        
-        // If it's a 404 and suggests logout, show a user-friendly message
-        if (err.response?.status === 404 && err.response?.data?.suggestion) {
-          console.warn("User session appears to be stale. Consider logging out and back in.");
-        }
-        
-        // Create a stable reference to the default column order
-        const defaultOrder = columns.map((col) => col.accessorKey);
-        setColumnOrder(defaultOrder); // fallback on error
-      } finally {
-        setIsColumnOrderLoaded(true);
-      }
-    };
-  
-    fetchColumnOrder();
-  }, [currentUserId, hasAttemptedFetch, userRole, columns]);
-  
-  const saveColumnOrderToBackend = async () => {
-    // Allow all users to save column order
-    if (!currentUserId) {
-      console.warn("No user ID found. Cannot save column layout.");
-      return;
-    }
     try {
-      await axios.post(`${process.env.REACT_APP_API_STRING}/column-order`, {
-        userId: currentUserId,
-        columnOrder: columnOrder,
-      });
-      setUnsavedChanges(false);
+      // 1. URL updated: '/api/' is removed as requested.
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`,
+        {
+          // 2. Authentication is now handled by the Authorization header.
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+          // 3. Redundant 'userId' and 'withCredentials' have been removed.
+        }
+      );
+      
+      // The rest of your logic for handling the response data remains the same.
+      if (userRole === 'superadmin') {
+        setAllowedColumns(columns.map(col => col.accessorKey));
+      } else {
+        const userAllowedColumns = res.data.allowedColumns?.length > 0 
+          ? res.data.allowedColumns 
+          : columns.map(col => col.accessorKey);
+        setAllowedColumns(userAllowedColumns);
+      }
+
+      if (res.data.columnOrder?.length) {
+        setColumnOrder(res.data.columnOrder);
+      } else {
+        const allowedCols = userRole === 'superadmin' 
+          ? columns.map(col => col.accessorKey)
+          : (res.data.allowedColumns?.length > 0 
+              ? res.data.allowedColumns 
+              : columns.map(col => col.accessorKey));
+        setColumnOrder(allowedCols);
+      }
+
     } catch (err) {
-      console.error("Failed to save column order", err);
+      console.error("Failed to fetch column order", err);
+      const defaultOrder = columns.map((col) => col.accessorKey);
+      setColumnOrder(defaultOrder);
+    } finally {
+      setIsColumnOrderLoaded(true);
     }
   };
+
+  fetchColumnOrder();
+}, [currentUserId, hasAttemptedFetch, userRole, columns]);
+  
+ const saveColumnOrderToBackend = async () => {
+  const token = localStorage.getItem("access_token");
+  if (!token) {
+    console.warn("No token found. Cannot save column layout.");
+    return;
+  }
+  
+  try {
+    // 1. URL updated: '/api/' is removed as requested.
+    await axios.post(
+      `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`, 
+      {
+        // 2. Request body now only sends the necessary 'columnOrder' data.
+        columnOrder: columnOrder
+      }, 
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    setUnsavedChanges(false);
+  } catch (err) {
+    console.error("Failed to save column order", err);
+  }
+};
   
   // Track dependencies for job fetching
   useEffect(() => {

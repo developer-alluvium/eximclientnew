@@ -35,7 +35,7 @@ export const useSuperAdminApi = () => {
     // Superadmin verification before API call
     if (!verifySuperAdmin()) {
       // Navigate to login page instead of dashboard
-      navigate('/superadmin-login');
+      navigate('/login');
       
       throw new Error('Authentication required');
     }
@@ -73,7 +73,7 @@ export const useSuperAdminApi = () => {
     localStorage.clear();
     localStorage.removeItem('superadmin_token');
     localStorage.removeItem('superadmin_user');
-    navigate('/superadmin-login');
+    navigate('/login');
     throw new Error('Session expired. Please login again.');
   } else if (err.response?.status === 403) {
     // Forbidden - likely a backend authorization issue

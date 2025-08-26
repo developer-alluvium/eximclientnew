@@ -92,7 +92,7 @@ function UserRegistrationPage() {
         
         // Redirect to login after 3 seconds
         setTimeout(() => {
-          navigate("/user/login");
+          navigate("/login");
         }, 3000);
       }
     } catch (error) {
@@ -277,7 +277,7 @@ function UserRegistrationPage() {
                       Already have an account?{" "}
                       <MuiLink 
                         component={Link} 
-                        to="/user/login" 
+                        to="/login" 
                         color="primary"
                         underline="hover"
                       >

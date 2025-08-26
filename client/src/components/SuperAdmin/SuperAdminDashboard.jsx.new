@@ -46,7 +46,7 @@ const SuperAdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem("superadmin_token");
     localStorage.removeItem("superadmin_user");
-    navigate("/superadmin-login");
+    navigate("/login");
   };
 
   // Function to render the active component based on tab

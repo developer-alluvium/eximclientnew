@@ -320,13 +320,13 @@ function UserDashboard() {
             token = parsed.token || parsed.accessToken || parsed.jwt;
           } catch (e) {
             console.error('Error parsing user data:', e);
-            navigate('/user/login');
+            navigate('/login');
             return;
           }
         }
 
         if (!token) {
-          navigate('/user/login');
+          navigate('/login');
           return;
         }
 
@@ -356,7 +356,7 @@ function UserDashboard() {
         console.error('SSO token generation error:', err);
         
         if (err.response?.status === 401) {
-          navigate('/user/login');
+          navigate('/login');
         } else {
           alert("Error generating SSO token for E-Lock.");
         }
@@ -414,12 +414,12 @@ function UserDashboard() {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("sso_token");
-      navigate("/user/login", { replace: true });
+      navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout error:", error);
       // Still clear local storage and redirect even if API call fails
       localStorage.removeItem("exim_user");
-      navigate("/user/login", { replace: true });
+      navigate("/login", { replace: true });
     }
   };
 

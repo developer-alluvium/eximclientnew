@@ -117,6 +117,9 @@ const NetPage = () => {
       );
       
       localStorage.removeItem("exim_user");
+            localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('sso_token');
       setUser(null);
       navigate("/login");
     } catch (error) {

@@ -33,7 +33,7 @@ function checkSuperAdminAuth() {
 // Step 2: Test SuperAdmin login
 function testSuperAdminLogin() {
   console.log('\n📋 SuperAdmin Login Test:');
-  console.log('1. Navigate to: /superadmin-login');
+  console.log('1. Navigate to: /login');
   console.log('2. Enter SuperAdmin credentials');
   console.log('3. After successful login, check localStorage:');
   console.log('   - superadmin_token should be set');
@@ -48,7 +48,7 @@ function testDashboardAccess() {
   console.log('   localStorage.removeItem("superadmin_token");');
   console.log('   localStorage.removeItem("superadmin_user");');
   console.log('2. Try to access /superadmin-dashboard');
-  console.log('3. Should redirect to /superadmin-login');
+  console.log('3. Should redirect to /login');
   console.log('4. Login and try again - should work');
 }
 
@@ -87,7 +87,7 @@ function showFixInstructions() {
   console.log('\n🔧 To Fix SuperAdmin Dashboard Access:');
   console.log('=====================================');
   console.log('1. **Login as SuperAdmin first:**');
-  console.log('   - Navigate to /superadmin-login');
+  console.log('   - Navigate to /login');
   console.log('   - Enter valid SuperAdmin credentials');
   console.log('   - This will store authentication tokens');
   console.log('');

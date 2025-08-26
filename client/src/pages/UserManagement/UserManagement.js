@@ -41,7 +41,7 @@ const UserManagement = () => {
   useEffect(() => {
     // Redirect if not logged in or not an admin
     if (!currentUser || !currentUser.ie_code_no) {
-      navigate('/user/login', { replace: true });
+      navigate('/login', { replace: true });
       return;
     }
   }, []);
@@ -76,7 +76,7 @@ const UserManagement = () => {
       showToast(error.response?.data?.message || 'Error fetching users', 'error');
       if (error.response?.status === 401) {
         // Session expired
-        navigate('/user/login', { replace: true });
+        navigate('/login', { replace: true });
       }
     } finally {
       setLoading(false);
@@ -107,7 +107,7 @@ const UserManagement = () => {
     } catch (error) {
       showToast(error.response?.data?.message || 'Error inviting user', 'error');
       if (error.response?.status === 401) {
-        navigate('/user/login', { replace: true });
+        navigate('/login', { replace: true });
       }
     }
     setInviteDialogOpen(false);
@@ -134,7 +134,7 @@ const UserManagement = () => {
     } catch (error) {
       showToast(error.response?.data?.message || 'Error updating user', 'error');
       if (error.response?.status === 401) {
-        navigate('/user/login', { replace: true });
+        navigate('/login', { replace: true });
       }
     }
     setEditDialogOpen(false);
