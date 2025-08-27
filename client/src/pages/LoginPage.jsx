@@ -13,7 +13,8 @@ import {
   FormControlLabel,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+// Import Link from react-router-dom
+import { Link, useNavigate } from "react-router-dom";
 import { UserContext } from "../context/UserContext";
 import { logActivity } from "../utils/activityLogger";
 import "../styles/login.scss";
@@ -237,15 +238,22 @@ function LoginPage() {
                     {loading ? "Signing In..." : "Sign In"}
                   </Button>
                   
+                  {/* UPDATED SECTION */}
                   {!isSuperAdminLogin && (
-                     <Typography
-                        variant="body2"
-                        align="center"
-                        sx={{ cursor: "pointer", color: "primary.main", mt: 2 }}
-                        onClick={() => setForgotPassword(true)}
-                      >
-                        Forgot Password?
-                      </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                        <Typography
+                            variant="body2"
+                            sx={{ cursor: "pointer", color: "primary.main" }}
+                            onClick={() => setForgotPassword(true)}
+                        >
+                            Forgot Password?
+                        </Typography>
+                        <Link to="/user/register" style={{ textDecoration: 'none' }}>
+                            <Typography variant="body2" color="primary">
+                                Register
+                            </Typography>
+                        </Link>
+                    </Box>
                   )}
                 </form>
               )}

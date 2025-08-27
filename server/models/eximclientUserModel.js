@@ -115,6 +115,14 @@ const eximclientUserSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    jobsTabVisible: {
+      type: Boolean,
+      default: true,
+    },
+    gandhidhamTabVisible: {
+      type: Boolean,
+      default: false,
+    },
   },
   { 
     timestamps: true,

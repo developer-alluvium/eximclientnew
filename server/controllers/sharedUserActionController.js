@@ -188,6 +188,123 @@ export const updateUserStatus = async (req, res) => {
     }
 };
 
+// ================== TAB VISIBILITY FUNCTIONS ==================
+
+/**
+ * Get tab visibility settings for a specific customer.
+ * Can be called by SuperAdmin or Admin (within IE code restrictions).
+ */
+export const getCustomerTabVisibility = async (req, res) => {
+  try {
+    const actor = req.superAdmin || req.user;
+    if (!actor) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const { userId } = req.params;
+    const user = await EximclientUser.findById(userId).select("jobsTabVisible gandhidhamTabVisible ie_code_no");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Security Check for Admins
+    if (actor.role === 'admin' && user.ie_code_no !== actor.ie_code_no) {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: You can only view users within your own IE Code."
+        });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        jobsTabVisible: customer.jobsTabVisible,
+        gandhidhamTabVisible: customer.gandhidhamTabVisible,
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching customer tab visibility:", error);
+    res.status(500).json({ success: false, message: "Error fetching customer tab visibility" });
+  }
+};
+
+/**
+ * Update tab visibility settings for a specific customer.
+ * Can be called by SuperAdmin or Admin (within IE code restrictions).
+ */
+export const updateCustomerTabVisibility = async (req, res) => {
+  try {
+    const actor = req.superAdmin || req.user;
+    if (!actor) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const { userId } = req.params;
+    const { jobsTabVisible, gandhidhamTabVisible } = req.body;
+
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Security Check for Admins
+    if (actor.role === 'admin' && user.ie_code_no !== actor.ie_code_no) {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: You can only manage users within your own IE Code."
+        });
+    }
+
+    const updates = {};
+    const previousSettings = {
+        jobsTabVisible: user.jobsTabVisible,
+        gandhidhamTabVisible: user.gandhidhamTabVisible
+    };
+
+    if (typeof jobsTabVisible === "boolean") {
+      user.jobsTabVisible = jobsTabVisible;
+      updates.jobsTabVisible = jobsTabVisible;
+    }
+    if (typeof gandhidhamTabVisible === "boolean") {
+      user.gandhidhamTabVisible = gandhidhamTabVisible;
+      updates.gandhidhamTabVisible = gandhidhamTabVisible;
+    }
+
+    await user.save();
+
+    // Log activity
+    await logActivity(
+      actor.id,
+      'USER_TAB_VISIBILITY_UPDATED',
+      `Updated tab visibility for user ${user.name}`,
+      {
+        userId: user._id,
+        userName: user.name,
+        ie_code_no: user.ie_code_no,
+        previousSettings,
+        newSettings: updates,
+        updatedBy: actor.id,
+        updaterRole: actor.role || 'superadmin'
+      },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: "User tab visibility updated successfully.",
+      data: {
+        jobsTabVisible: user.jobsTabVisible,
+        gandhidhamTabVisible: user.gandhidhamTabVisible,
+      }
+    });
+  } catch (error) {
+    console.error("Error updating user tab visibility:", error);
+    res.status(500).json({ success: false, message: "Error updating customer tab visibility" });
+  }
+};
+
+
 // ================== COLUMN PERMISSIONS FUNCTIONS ==================
 
 /**

@@ -355,9 +355,12 @@ export const sanitizeUserData = (user) => {
     "employment_type",
     "assigned_importer",
     "assignedImporterName",
+    "jobsTabVisible",
+    "gandhidhamTabVisible",
     "modules",
     "assignedModules",
     "isAdmin",  // Added isAdmin field
+    
   ];
 
   additionalFields.forEach((field) => {

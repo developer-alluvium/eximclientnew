@@ -166,7 +166,7 @@ export const loginUser = async (req, res) => {
     const user = await EximclientUser.findOne({ 
       email: email.toLowerCase() 
     })
-    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName' )
+    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible' )
     .populate('adminId', 'name ie_code_no'); // Populating customer as admin
 
     if (!user) {

@@ -24,7 +24,8 @@ const ImportAnalytics = () => {
       const userDataFromStorage = localStorage.getItem("exim_user");
       if (userDataFromStorage) {
         const parsedUser = JSON.parse(userDataFromStorage);
-        return parsedUser?.data?.user?.name || null;
+
+        return parsedUser?.assignedImporterName;
       }
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -35,12 +36,12 @@ const ImportAnalytics = () => {
   // Function to fetch HS codes for dropdown
   const fetchHsCodes = useCallback(async () => {
     const userImporter = getUserImporterName();
-    
+     
     if (!userImporter) {
-      console.log("Skipping HS codes fetch - no valid importer found");
+    
       return;
     }
-    
+  
     // Sanitize the importer name by replacing non-breaking spaces with regular spaces
     const sanitizedImporter = userImporter.replace(/\u00A0/g, ' ').trim();
     

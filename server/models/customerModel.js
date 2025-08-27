@@ -55,7 +55,7 @@ const customerSchema = new mongoose.Schema(
     roleGrantedAt: {
       type: Date,
       default: null,
-    }, // ← Fixed: Added missing closing brace and comma
+    }, 
     jobsTabVisible: {
       type: Boolean,
       default: true,

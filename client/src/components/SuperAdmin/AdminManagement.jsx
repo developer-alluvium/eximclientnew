@@ -121,7 +121,7 @@ const AdminManagement = ({ onRefresh }) => {
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [adminAction, setAdminAction] = useState(''); // 'promote', 'demote'
   const [statusAction, setStatusAction] = useState(''); // 'activate', 'deactivate'
-  
+    const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
   // Module assignment states
   const [selectedUserModules, setSelectedUserModules] = useState([]);
   const [bulkSelectedUsers, setBulkSelectedUsers] = useState([]);
@@ -130,6 +130,7 @@ const AdminManagement = ({ onRefresh }) => {
   // Search states
   const [customerSearch, setCustomerSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+   const [tabSettings, setTabSettings] = useState({ jobsTabVisible: false, gandhidhamTabVisible: false }); // <-- New State
 
   // IE Code selection states
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
@@ -459,6 +460,49 @@ const handleRevokeAdmin = async (entity, type) => {
     }
   };
 
+  const handleUpdateTabVisibility = async () => {
+    if (!selectedEntity) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      // Using the corrected endpoint
+      const endpoint = `${process.env.REACT_APP_API_STRING}/user-management/superadmin/user/${selectedEntity._id}/tab-visibility`;
+      const data = tabSettings;
+
+      const response = await axios.patch(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Tab visibility for ${selectedEntity.name} updated successfully.`);
+        fetchData();
+        setTabVisibilityDialog(false);
+      }
+    } catch (error) {
+      console.error('Error updating tab visibility:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to update tab visibility');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
   const openAdminDialog = (entity, action, type) => {
     setSelectedEntity({ ...entity, type });
     setAdminAction(action);
@@ -480,6 +524,15 @@ const handleRevokeAdmin = async (entity, type) => {
 
   const openBulkModuleDialog = () => {
     setBulkModuleDialog(true);
+  };
+
+   const openTabVisibilityDialog = (customer) => {
+    setSelectedEntity(customer);
+    setTabSettings({
+      jobsTabVisible: customer.jobsTabVisible || false,
+      gandhidhamTabVisible: customer.gandhidhamTabVisible || false
+    });
+    setTabVisibilityDialog(true);
   };
 
   const getModuleIcon = (moduleId) => {
@@ -649,7 +702,7 @@ const handleRevokeAdmin = async (entity, type) => {
       </Grid>
 
       {/* Tabs */}
-      <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
+     <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
             <Tab label="Customer Admin Management" />
@@ -678,65 +731,71 @@ const handleRevokeAdmin = async (entity, type) => {
                   <TableRow sx={{ bgcolor: '#f9fafb' }}>
                     <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Admin Status</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Users Count</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Users</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell> {/* <-- New Column */}
                     <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredCustomers.map((customer) => (
                     <TableRow key={customer._id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ mr: 2, bgcolor: '#e5e7eb', color: '#374151' }}>
-                            {customer.name?.charAt(0) || 'C'}
-                          </Avatar>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {customer.name}
-                          </Typography>
-                        </Box>
-                      </TableCell>
+                      {/* ... Customer, IE Code, Admin Status cells ... */}
+                      <TableCell>{customer.name}</TableCell>
                       <TableCell>{customer.ie_code_no}</TableCell>
-                      <TableCell>{customer.email || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
-                          label={customer.isAdmin ? 'Admin' : 'Regular Customer'}
+                          label={customer.isAdmin ? 'Admin' : 'Regular'}
                           color={customer.isAdmin ? 'success' : 'default'}
                           size="small"
-                          icon={customer.isAdmin ? <AdminPanelSettings /> : <Business />}
                         />
                       </TableCell>
                       <TableCell>
                         {users.filter(u => u.ie_code_no === customer.ie_code_no).length}
                       </TableCell>
+                      {/* --- New Cell for Tab Visibility --- */}
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Chip
+                            label={`Jobs: ${customer.jobsTabVisible ? 'On' : 'Off'}`}
+                            color={customer.jobsTabVisible ? 'success' : 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={`Gandhidham: ${customer.gandhidhamTabVisible ? 'On' : 'Off'}`}
+                            color={customer.gandhidhamTabVisible ? 'success' : 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Box>
+                      </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           {customer.isAdmin ? (
                             <Tooltip title="Revoke Admin Access">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => openAdminDialog(customer, 'demote', 'customer')}
-                              >
+                              <IconButton size="small" color="error" onClick={() => openAdminDialog(customer, 'demote', 'customer')}>
                                 <Delete />
                               </IconButton>
                             </Tooltip>
                           ) : (
                             <Tooltip title="Make Admin">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => openAdminDialog(customer, 'promote', 'customer')}
-                              >
+                              <IconButton size="small" color="primary" onClick={() => openAdminDialog(customer, 'promote', 'customer')}>
                                 <AdminPanelSettings />
                               </IconButton>
                             </Tooltip>
                           )}
+                          {/* --- New Button to Manage Tabs --- */}
+                           <Tooltip title="Manage Tab Visibility">
+                            <IconButton size="small" color="secondary" onClick={() => openTabVisibilityDialog(customer)}>
+                              <ToggleOn />
+                            </IconButton>
+                          </Tooltip>
                         </Box>
                       </TableCell>
                     </TableRow>
                   ))}
+              
                   {filteredCustomers.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
@@ -787,6 +846,7 @@ const handleRevokeAdmin = async (entity, type) => {
                     <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Assigned Modules</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -820,6 +880,7 @@ const handleRevokeAdmin = async (entity, type) => {
                           size="small"
                         />
                       </TableCell>
+                 
                       <TableCell>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxWidth: 300 }}>
                           {user.assignedModules && user.assignedModules.length > 0 ? (
@@ -850,6 +911,22 @@ const handleRevokeAdmin = async (entity, type) => {
                               sx={{ fontSize: '0.7rem' }}
                             />
                           )}
+                        </Box>
+                      </TableCell>
+                           <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Chip
+                            label={`Jobs: ${user.jobsTabVisible ? 'On' : 'Off'}`}
+                            color={user.jobsTabVisible ? 'success' : 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={`Gandhidham: ${user.gandhidhamTabVisible ? 'On' : 'Off'}`}
+                            color={user.gandhidhamTabVisible ? 'success' : 'default'}
+                            size="small"
+                            variant="outlined"
+                          />
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -898,6 +975,12 @@ const handleRevokeAdmin = async (entity, type) => {
                               </IconButton>
                             </Tooltip>
                           )}
+
+                          <Tooltip title="Manage Tab Visibility">
+                            <IconButton size="small" color="secondary" onClick={() => openTabVisibilityDialog(user)}>
+                              <ToggleOn />
+                            </IconButton>
+                          </Tooltip>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1307,6 +1390,53 @@ const handleRevokeAdmin = async (entity, type) => {
             startIcon={<GroupWork />}
           >
             Assign to {bulkSelectedUsers.length} Users
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+       {/* --- New Tab Visibility Dialog --- */}
+    <Dialog 
+        open={tabVisibilityDialog} 
+        onClose={() => setTabVisibilityDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>Manage Tab Visibility for {selectedEntity?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Control which data tabs are visible to this specific user.
+          </Typography>
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={tabSettings.jobsTabVisible}
+                  onChange={(e) => setTabSettings(prev => ({ ...prev, jobsTabVisible: e.target.checked }))}
+                />
+              }
+              label="Jobs Tab Visibility"
+            />
+          </Box>
+          <Box sx={{ mt: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={tabSettings.gandhidhamTabVisible}
+                  onChange={(e) => setTabSettings(prev => ({ ...prev, gandhidhamTabVisible: e.target.checked }))}
+                />
+              }
+              label="Gandhidham Tab Visibility"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTabVisibilityDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleUpdateTabVisibility}
+            disabled={loading}
+          >
+            Save Settings
           </Button>
         </DialogActions>
       </Dialog>

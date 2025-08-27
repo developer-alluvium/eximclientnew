@@ -52,7 +52,7 @@ import axios from "axios";
 
 // Styled components similar to HomePage
 const StyledCard = styled(Card)(({ theme }) => ({
-  height: "160px",
+  height: "180px", // Fixed height for uniform appearance
   display: "flex",
   flexDirection: "column",
   cursor: "pointer",
@@ -184,6 +184,14 @@ function UserDashboard() {
       category: "core"
     },
     {
+      name: "E-Lock",
+      description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
+      path: process.env.REACT_APP_ELOCK_URL,
+      icon: <LockOutlinedIcon />,
+      category: "core",
+      isExternal: true
+    },
+    {
       name: "SnapCheck",
       description: "Beta Version - Quality control and inspection management system",
       path: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/",
@@ -206,28 +214,6 @@ function UserDashboard() {
       icon: <SecurityOutlinedIcon />,
       category: "core",
       isExternal: true
-    },
-    {
-      name: "E-Lock",
-      description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      path: process.env.REACT_APP_ELOCK_URL,
-      icon: <LockOutlinedIcon />,
-      category: "core",
-      isExternal: true
-    },
-    {
-      name: "Intendor Management System",
-      description: "Coming Soon -  Complete solution in material procurement and purchase indent.",
-      path: "#",
-      icon: <BusinessOutlinedIcon />,
-      category: "coming-soon"
-    },
-    {
-      name: "DocSure",
-      description: "Coming Soon - Document management and verification platform",
-      path: "#",
-      icon: <DescriptionOutlinedIcon />,
-      category: "coming-soon"
     },
     {
       name: "Trademaster Guide", 
@@ -602,7 +588,7 @@ function UserDashboard() {
             padding: "20px",
           }}
         >
-          <Container maxWidth="lg" sx={{ mt: 2, px: { xs: 2, sm: 3, md: 4 } }}>
+          <Container maxWidth="xl" sx={{ mt: 7, px: { xs: 2, sm: 3, md: 4 } }}>
             {/* Welcome Banner */}
             <WelcomeBanner elevation={0}>
               <Box sx={{ position: 'relative', zIndex: 1 }}>
@@ -635,411 +621,154 @@ function UserDashboard() {
             )}
 
             {/* Import Management Section */}
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#2c3e50' }}>
               Available Modules
             </Typography>
-            
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3, md: 4 } }}>
-              {/* First row: Import DSR, CostIQ, E-Lock */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: { xs: 2, sm: 2.5, md: 3 }, 
-                flexWrap: 'wrap',
-                '& > *': { 
-                  flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(33.333% - 16px)' },
-                  maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
-                }
-              }}>
-                {modules.filter(module => ["Import DSR", "CostIQ", "E-Lock"].includes(module.name)).map((module, index) => (
-                  <StyledCard 
-                    key={index}
-                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
-                    sx={{
-                      ...(module.category === "beta" ? { 
-                        "&:before": {
-                          backgroundColor: "#ff9800"
-                        }
-                      } : {}),
-                      ...(module.isLocked ? {
-                        opacity: 0.6,
-                        filter: "grayscale(50%)",
-                        cursor: "not-allowed",
-                        "&:hover": {
-                          transform: "none",
-                          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                        },
-                        "&:before": {
-                          backgroundColor: "#f44336"
-                        }
-                      } : {})
-                    }}
-                  >
-                    <CardContent sx={{ 
-                      height: "100%", 
-                      display: "flex", 
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: { xs: "16px", sm: "20px", md: "24px" },
-                      gap: 1,
-                      position: "relative"
-                    }}>
-                      {module.isLocked && (
-                        <Box sx={{ 
-                          position: "absolute", 
-                          top: 8, 
-                          right: 8, 
-                          backgroundColor: "error.main", 
-                          borderRadius: "50%", 
-                          p: 0.5,
-                          minWidth: 24,
-                          minHeight: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <LockOutlinedIcon sx={{ fontSize: 16, color: "white" }} />
-                        </Box>
-                      )}
-                      
-                      <IconContainer sx={{
-                        ...(module.category === "beta" ? { backgroundColor: "rgba(255, 152, 0, 0.1)" } : {}),
-                        ...(module.isLocked ? { backgroundColor: "rgba(244, 67, 54, 0.1)" } : {})
-                      }}>
-                        {module.category === "beta" ? 
-                          React.cloneElement(module.icon, { 
-                            sx: { 
-                              color: module.isLocked ? "#f44336" : "#ff9800"
-                            } 
-                          }) : 
-                          React.cloneElement(module.icon, { 
-                            sx: { 
-                              color: module.isLocked ? "#f44336" : undefined
-                            } 
-                          })
-                        }
-                      </IconContainer>
-                      
-                      <Typography 
-                        variant="subtitle1" 
-                        fontWeight="500" 
-                        gutterBottom
-                        sx={{ 
-                          color: module.isLocked ? "#666" : '#424242', 
-                          fontSize: '16px' 
-                        }}
-                      >
-                        {module.name}
-                      </Typography>
-                      
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          maxWidth: "90%", 
-                          mx: "auto", 
-                          lineHeight: 1.4,
-                          fontSize: "13px"
-                        }}
-                      >
-                        {module.isLocked ? "Contact Admin for Access" : module.description}
-                      </Typography>
-                      
-                      {module.isLocked && (
-                        <Chip
-                          size="small"
-                          label="Access Restricted"
-                          color="error"
-                          sx={{ mt: 1, fontSize: "0.7rem" }}
-                        />
-                      )}
-                    </CardContent>
-                  </StyledCard>
-                ))}
-              </Box>
-              
-              {/* Second row: QR Locker, Task Flow AI, SnapCheck */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: { xs: 2, sm: 2.5, md: 3 }, 
-                flexWrap: 'wrap',
-                '& > *': { 
-                  flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(33.333% - 16px)' },
-                  maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
-                }
-              }}>
-                {modules.filter(module => ["QR Locker", "Task Flow AI", "SnapCheck"].includes(module.name)).map((module, index) => (
-                  <StyledCard 
-                    key={`second-row-${index}`}
-                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked || module.category === "coming-soon", module.name)}
-                    sx={{
-                      ...(module.category === "beta" ? { 
-                        "&:before": {
-                          backgroundColor: "#ff9800"
-                        }
-                      } : {}),
-                      ...(module.category === "coming-soon" ? {
-                        opacity: 0.7,
-                        cursor: "not-allowed",
-                        "&:hover": {
-                          transform: "none",
-                          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                        },
-                        "&:before": {
-                          backgroundColor: "#9e9e9e"
-                        }
-                      } : {}),
-                      ...(module.isLocked ? {
-                        opacity: 0.6,
-                        filter: "grayscale(50%)",
-                        cursor: "not-allowed",
-                        "&:hover": {
-                          transform: "none",
-                          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                        },
-                        "&:before": {
-                          backgroundColor: "#f44336"
-                        }
-                      } : {})
-                    }}
-                  >
-                    <CardContent sx={{ 
-                      height: "100%", 
-                      display: "flex", 
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: { xs: "16px", sm: "20px", md: "24px" },
-                      gap: 1,
-                      position: "relative"
-                    }}>
-                      {(module.isLocked || module.category === "coming-soon") && (
-                        <Box sx={{ 
-                          position: "absolute", 
-                          top: 8, 
-                          right: 8, 
-                          backgroundColor: module.category === "coming-soon" ? "#9e9e9e" : "error.main", 
-                          borderRadius: "50%", 
-                          p: 0.5,
-                          minWidth: 24,
-                          minHeight: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <LockOutlinedIcon sx={{ fontSize: 16, color: "white" }} />
-                        </Box>
-                      )}
-                      
-                      <IconContainer sx={{
-                        ...(module.category === "beta" ? { backgroundColor: "rgba(255, 152, 0, 0.1)" } : {}),
-                        ...(module.category === "coming-soon" ? { backgroundColor: "rgba(158, 158, 158, 0.1)" } : {}),
-                        ...(module.isLocked ? { backgroundColor: "rgba(244, 67, 54, 0.1)" } : {})
-                      }}>
-                        {module.category === "beta" ? 
-                          React.cloneElement(module.icon, { 
-                            sx: { 
-                              color: module.isLocked ? "#f44336" : "#ff9800"
-                            } 
-                          }) : 
-                          React.cloneElement(module.icon, { 
-                            sx: { 
-                              color: module.isLocked ? "#f44336" : module.category === "coming-soon" ? "#9e9e9e" : undefined
-                            } 
-                          })
-                        }
-                      </IconContainer>
-                      
-                      <Typography 
-                        variant="subtitle1" 
-                        fontWeight="500" 
-                        gutterBottom
-                        sx={{ 
-                          color: module.isLocked ? "#666" : module.category === "coming-soon" ? "#9e9e9e" : '#424242', 
-                          fontSize: '16px' 
-                        }}
-                      >
-                        {module.name}
-                      </Typography>
-                      
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          maxWidth: "90%", 
-                          mx: "auto", 
-                          lineHeight: 1.4,
-                          fontSize: "13px"
-                        }}
-                      >
-                        {module.isLocked ? "Contact Admin for Access" : module.description}
-                      </Typography>
-                      
-                      {module.isLocked && (
-                        <Chip
-                          size="small"
-                          label="Access Restricted"
-                          color="error"
-                          sx={{ mt: 1, fontSize: "0.7rem" }}
-                        />
-                      )}
-                      
-                      {module.category === "coming-soon" && (
-                        <Chip
-                          size="small"
-                          label="Coming Soon"
-                          sx={{ mt: 1, fontSize: "0.7rem", backgroundColor: "#9e9e9e", color: "white" }}
-                        />
-                      )}
-                    </CardContent>
-                  </StyledCard>
-                ))}
-              </Box>
 
-              {/* Third row: Remaining modules */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: { xs: 2, sm: 2.5, md: 3 }, 
-                flexWrap: 'wrap',
-                '& > *': { 
-                  flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)', md: '1 1 calc(33.333% - 16px)' },
-                  maxWidth: { xs: '100%', sm: 'calc(50% - 12px)', md: 'calc(33.333% - 16px)' }
-                }
-              }}>
-                {modules.filter(module => !["Import DSR", "CostIQ", "E-Lock", "QR Locker", "Task Flow AI", "SnapCheck"].includes(module.name)).map((module, index) => (
-                  <StyledCard 
-                    key={`third-row-${index}`}
-                    onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked || module.category === "coming-soon", module.name)}
-                    sx={{
-                      ...(module.category === "admin" ? { 
-                        "&:before": {
-                          backgroundColor: "#9c27b0"
-                        }
-                      } : {}),
-                      ...(module.category === "coming-soon" ? {
-                        opacity: 0.7,
-                        cursor: "not-allowed",
-                        "&:hover": {
-                          transform: "none",
-                          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                        },
-                        "&:before": {
-                          backgroundColor: "#9e9e9e"
-                        }
-                      } : {}),
-                      ...(module.isLocked ? {
-                        opacity: 0.6,
-                        filter: "grayscale(50%)",
-                        cursor: "not-allowed",
-                        "&:hover": {
-                          transform: "none",
-                          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                        },
-                        "&:before": {
-                          backgroundColor: "#f44336"
-                        }
-                      } : {})
-                    }}
-                  >
-                    <CardContent sx={{ 
-                      height: "100%", 
-                      display: "flex", 
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: { xs: "16px", sm: "20px", md: "24px" },
-                      gap: 1,
-                      position: "relative"
-                    }}>
-                      {(module.isLocked || module.category === "coming-soon") && (
-                        <Box sx={{ 
-                          position: "absolute", 
-                          top: 8, 
-                          right: 8, 
-                          backgroundColor: module.category === "coming-soon" ? "#9e9e9e" : "error.main", 
-                          borderRadius: "50%", 
-                          p: 0.5,
-                          minWidth: 24,
-                          minHeight: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <LockOutlinedIcon sx={{ fontSize: 16, color: "white" }} />
-                        </Box>
-                      )}
-                      
-                      <IconContainer sx={{
-                        ...(module.category === "admin" ? { backgroundColor: "rgba(156, 39, 176, 0.1)" } : {}),
-                        ...(module.category === "coming-soon" ? { backgroundColor: "rgba(158, 158, 158, 0.1)" } : {}),
-                        ...(module.isLocked ? { backgroundColor: "rgba(244, 67, 54, 0.1)" } : {})
+            {/* Single Grid Layout for all modules */}
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+                md: 'repeat(3, 1fr)'
+              },
+              gap: 3,
+              mb: 4
+            }}>
+              {modules.map((module, index) => (
+                <StyledCard 
+                  key={index}
+                  onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
+                  sx={{
+                    ...(module.category === "beta" ? { 
+                      "&:before": {
+                        backgroundColor: "#ff9800"
+                      }
+                    } : {}),
+                    ...(module.category === "coming-soon" ? {
+                      opacity: 0.7,
+                      cursor: "not-allowed",
+                      "&:hover": {
+                        transform: "none",
+                        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                      },
+                      "&:before": {
+                        backgroundColor: "#9e9e9e"
+                      }
+                    } : {}),
+                    ...(module.isLocked ? {
+                      opacity: 0.6,
+                      filter: "grayscale(50%)",
+                      cursor: "not-allowed",
+                      "&:hover": {
+                        transform: "none",
+                        boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                      },
+                      "&:before": {
+                        backgroundColor: "#f44336"
+                      }
+                    } : {})
+                  }}
+                >
+                  <CardContent sx={{ 
+                    height: "100%", 
+                    display: "flex", 
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    padding: "24px",
+                    position: "relative"
+                  }}>
+                    {module.isLocked && (
+                      <Box sx={{ 
+                        position: "absolute", 
+                        top: 12, 
+                        right: 12, 
+                        backgroundColor: "error.main", 
+                        borderRadius: "50%", 
+                        p: 0.5,
+                        minWidth: 28,
+                        minHeight: 28,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
                       }}>
-                        {React.cloneElement(module.icon, { 
+                        <LockOutlinedIcon sx={{ fontSize: 18, color: "white" }} />
+                      </Box>
+                    )}
+                    
+                    <IconContainer sx={{
+                      width: "48px",
+                      height: "48px",
+                      ...(module.category === "beta" ? 
+                        { backgroundColor: "rgba(255, 152, 0, 0.1)" } : 
+                      module.category === "coming-soon" ? 
+                        { backgroundColor: "rgba(158, 158, 158, 0.1)" } : 
+                        {}),
+                      ...(module.isLocked ? { backgroundColor: "rgba(244, 67, 54, 0.1)" } : {})
+                    }}>
+                      {module.category === "beta" ?
+                        React.cloneElement(module.icon, { 
                           sx: { 
-                            color: module.isLocked ? "#f44336" : 
-                                   module.category === "coming-soon" ? "#9e9e9e" :
-                                   module.category === "admin" ? "#9c27b0" : undefined
+                            fontSize: "24px",
+                            color: module.isLocked ? "#f44336" : "#ff9800"
                           } 
-                        })}
-                      </IconContainer>
-                      
-                      <Typography 
-                        variant="subtitle1" 
-                        fontWeight="500" 
-                        gutterBottom
-                        sx={{ 
-                          color: module.isLocked ? "#666" : 
-                                 module.category === "coming-soon" ? "#9e9e9e" : '#424242', 
-                          fontSize: '16px' 
-                        }}
-                      >
-                        {module.name}
-                      </Typography>
-                      
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          maxWidth: "90%", 
-                          mx: "auto", 
-                          lineHeight: 1.4,
-                          fontSize: "13px"
-                        }}
-                      >
-                        {module.isLocked ? "Contact Admin for Access" : module.description}
-                      </Typography>
-                      
-                      {module.isLocked && (
-                        <Chip
-                          size="small"
-                          label="Access Restricted"
-                          color="error"
-                          sx={{ mt: 1, fontSize: "0.7rem" }}
-                        />
-                      )}
-                      
-                      {module.category === "coming-soon" && (
-                        <Chip
-                          size="small"
-                          label="Coming Soon"
-                          sx={{ mt: 1, fontSize: "0.7rem", backgroundColor: "#9e9e9e", color: "white" }}
-                        />
-                      )}
-
-                      {module.category === "admin" && (
-                        <Chip
-                          size="small"
-                          label="Admin Only"
-                          sx={{ mt: 1, fontSize: "0.7rem", backgroundColor: "#9c27b0", color: "white" }}
-                        />
-                      )}
-                    </CardContent>
-                  </StyledCard>
-                ))}
-              </Box>
+                        }) :
+                       module.category === "coming-soon" ?
+                        React.cloneElement(module.icon, { 
+                          sx: { 
+                            fontSize: "24px",
+                            color: module.isLocked ? "#f44336" : "#9e9e9e"
+                          } 
+                        }) :
+                        React.cloneElement(module.icon, { 
+                          sx: { 
+                            fontSize: "24px",
+                            color: module.isLocked ? "#f44336" : undefined
+                          } 
+                        })
+                      }
+                    </IconContainer>
+                    
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="500" 
+                      sx={{ 
+                        color: module.isLocked ? "#666" : '#2c3e50', 
+                        fontSize: '16px',
+                        lineHeight: 1.3,
+                        mb: 1
+                      }}
+                    >
+                      {module.name}
+                    </Typography>
+                    
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary"
+                      sx={{ 
+                        maxWidth: "90%", 
+                        mx: "auto", 
+                        lineHeight: 1.4,
+                        fontSize: "13px"
+                      }}
+                    >
+                      {module.isLocked ? "Contact Admin for Access" : module.description}
+                    </Typography>
+                    
+                    {module.isLocked && (
+                      <Chip
+                        size="small"
+                        label="Access Restricted"
+                        color="error"
+                        sx={{ mt: 1, fontSize: "0.7rem" }}
+                      />
+                    )}
+                  </CardContent>
+                </StyledCard>
+              ))}
             </Box>
           </Container>
         </Box>
