@@ -335,7 +335,7 @@ export const sanitizeUserData = (user) => {
     id: user._id,
     name: user.name,
     ie_code_no: user.ie_code_no,
-    role: user.role || "customer",
+    role: user.role || "user",
     isActive: user.isActive,
     lastLogin: user.lastLogin,
     
@@ -360,6 +360,7 @@ export const sanitizeUserData = (user) => {
     "modules",
     "assignedModules",
     "isAdmin",  // Added isAdmin field
+    "emailVerified"
     
   ];
 
@@ -416,7 +417,7 @@ export const authenticateUser = async (req, res, next) => {
   try {
     // Get token from cookie or Authorization header
     const token =
-      (req.cookies && req.cookies.user_access_token) ||
+      (req.cookies && req.cookies.user_access_token) || 
       (req.headers.authorization && req.headers.authorization.split(" ")[1]);
 
     if (!token) {

@@ -8,6 +8,7 @@ import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
 import { logActivity } from "../utils/activityLogger.js";
 import jwt from "jsonwebtoken";
+import CustomerKycModel from "../models/customerKycModel.js";
 
 // Environment variables
 const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "your-secret-key";
@@ -1488,3 +1489,288 @@ export async function getAllowedGandhidhamCustomers(req, res) {
     res.status(500).json({ error: "Error fetching allowed Gandhidham customers" });
   }
 }
+
+
+/* IEcode controller*/
+
+/**
+ * Assign IE code to a specific user and set assignedImporterName from CustomerKyc.
+ * Can be called by SuperAdmin or Admin (within IE code restrictions).
+ */
+export const assignIeCodeToUser = async (req, res) => {
+  try {
+    const actor = req.superAdmin || req.user;
+    if (!actor) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const { userId } = req.params;
+    const { ieCodeNo, reason } = req.body;
+
+    // Validate required fields
+    if (!ieCodeNo) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code is required."
+      });
+    }
+
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    // Security Check for Admins - they can only assign their own IE code to users
+    if (actor.role === 'admin' && ieCodeNo !== actor.ie_code_no) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Admins can only assign their own IE Code to users."
+      });
+    }
+
+    // Check if the IE code exists in the CustomerKyc table and get name_of_individual
+    const customerKyc = await CustomerKycModel.findOne({ iec_no: ieCodeNo });
+    if (!customerKyc) {
+      return res.status(400).json({
+        success: false,
+        message: `No customer KYC record found with IEC number ${ieCodeNo}.`
+      });
+    }
+
+    if (!customerKyc.name_of_individual) {
+      return res.status(400).json({
+        success: false,
+        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`
+      });
+    }
+
+    // Store previous values for logging
+    const previousIeCode = user.ie_code_no;
+    const previousImporterName = user.assignedImporterName;
+
+    // Update user's IE code and assigned importer name
+    user.ie_code_no = ieCodeNo;
+    user.assignedImporterName = customerKyc.name_of_individual; // Use name_of_individual from CustomerKyc
+    user.ieCodeAssignedBy = actor.id;
+    user.ieCodeAssignedAt = new Date();
+    await user.save();
+
+
+
+    // Log activity
+    await logActivity(
+      actor.id,
+      'USER_IE_CODE_ASSIGNED',
+      `Assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to user ${user.name}`,
+      {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        previousIeCode,
+        newIeCode: ieCodeNo,
+        previousImporterName,
+        newImporterName: customerKyc.name_of_individual,
+        customerKycId: customerKyc._id,
+        reason,
+        assignedBy: actor.id,
+        assignerRole: actor.role || 'superadmin'
+      },
+      req.ip
+    );
+
+    console.log(`IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to user ${user.name} by ${actor.role || 'superadmin'}`);
+
+    res.json({
+      success: true,
+      message: "IEC and Importer assigned to user successfully.",
+      data: {
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        previousIeCode,
+        newIeCode: ieCodeNo,
+        previousImporterName,
+        newImporterName: customerKyc.name_of_individual,
+        assignedBy: actor.id,
+        assignedAt: user.ieCodeAssignedAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Assign IE code to user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign IE code to user.",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Bulk assign IE code to multiple users and set assignedImporterName from CustomerKyc.
+ * Can be called by SuperAdmin or Admin (within IE code restrictions).
+ */
+export const bulkAssignIeCodeToUsers = async (req, res) => {
+  try {
+    const actor = req.superAdmin || req.user;
+    if (!actor) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const { userIds, ieCodeNo, reason } = req.body;
+
+    // Validate required fields
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "userIds must be a non-empty array."
+      });
+    }
+
+    if (!ieCodeNo) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code is required."
+      });
+    }
+
+    // Security Check for Admins - they can only assign their own IE code
+    if (actor.role === 'admin' && ieCodeNo !== actor.ie_code_no) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: Admins can only assign their own IE Code to users."
+      });
+    }
+
+    // Check if the IE code exists in CustomerKyc and get name_of_individual
+    const customerKyc = await CustomerKycModel.findOne({ iec_no: ieCodeNo });
+    if (!customerKyc) {
+      return res.status(400).json({
+        success: false,
+        message: `No customer KYC record found with IEC number ${ieCodeNo}.`
+      });
+    }
+
+    if (!customerKyc.name_of_individual) {
+      return res.status(400).json({
+        success: false,
+        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`
+      });
+    }
+
+    // Update multiple users with IE code and importer name
+    const result = await EximclientUser.updateMany(
+      { _id: { $in: userIds } },
+      {
+        ie_code_no: ieCodeNo,
+        assignedImporterName: customerKyc.name_of_individual, // Use name_of_individual from CustomerKyc
+        ieCodeAssignedBy: actor.id,
+        ieCodeAssignedAt: new Date()
+      }
+    );
+
+    // Get updated users for notification
+    const updatedUsers = await EximclientUser.find({ _id: { $in: userIds } }).select('_id name email');
+
+    // Create notifications for all users
+    const notifications = updatedUsers.map(user => ({
+      type: 'ie_code_assigned',
+      recipient: user._id,
+      recipientModel: 'EximclientUser',
+      sender: actor.id,
+      senderModel: actor.role === 'superadmin' ? 'SuperAdmin' : 'EximclientUser',
+      title: 'IE Code and Importer Assigned',
+      message: `Your account has been assigned IEC: ${ieCodeNo} and Importer: ${customerKyc.name_of_individual}. ${reason ? 'Reason: ' + reason : ''}`,
+    }));
+
+    // Bulk create notifications
+    await Notification.insertMany(notifications);
+
+    // Log activity
+    await logActivity(
+      actor.id,
+      'BULK_USER_IE_CODE_ASSIGNED',
+      `Bulk assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to ${result.modifiedCount} users`,
+      {
+        userIds,
+        ieCodeNo,
+        importerName: customerKyc.name_of_individual,
+        customerKycId: customerKyc._id,
+        reason,
+        modifiedCount: result.modifiedCount,
+        assignedBy: actor.id,
+        assignerRole: actor.role || 'superadmin'
+      },
+      req.ip
+    );
+
+    console.log(`Bulk IEC assignment: ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
+
+    res.json({
+      success: true,
+      message: `IEC and Importer assigned to ${result.modifiedCount} users successfully.`,
+      data: {
+        ieCodeNo,
+        importerName: customerKyc.name_of_individual,
+        modifiedCount: result.modifiedCount,
+        assignedBy: actor.id,
+        assignedAt: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Bulk assign IE code error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to bulk assign IE code to users.",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get all available IEC codes with their corresponding importer names
+ * Can be called by SuperAdmin or Admin (within IE code restrictions)
+ */
+export const getAvailableIecCodes = async (req, res) => {
+  try {
+    const actor = req.superAdmin || req.user;
+    if (!actor) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    // Build query based on user role
+    let query = { iec_no: { $exists: true, $ne: null, $ne: '' } };
+    
+    // Security Check for Admins - can only see their own IEC code
+    if (actor.role === 'admin') {
+      query.iec_no = actor.ie_code_no;
+    }
+
+    const iecCodes = await CustomerKycModel.find(query)
+      .select('iec_no name_of_individual status approval')
+      .sort({ name_of_individual: 1 });
+
+    const formattedData = iecCodes.map(kyc => ({
+      iecNo: kyc.iec_no,
+      importerName: kyc.name_of_individual,
+      status: kyc.status,
+      approval: kyc.approval,
+      id: kyc._id
+    }));
+
+    res.json({
+      success: true,
+      data: formattedData,
+      message: `Found ${formattedData.length} IEC codes`
+    });
+
+  } catch (error) {
+    console.error("Get available IEC codes error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get available IEC codes.",
+      error: error.message
+    });
+  }
+};

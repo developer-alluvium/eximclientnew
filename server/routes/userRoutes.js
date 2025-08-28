@@ -5,7 +5,10 @@ import {
   getUserProfile, 
   getUserDashboard, 
   logoutUser,
-  requestModuleAccess 
+  requestModuleAccess ,
+  verifyEmail,
+  requestPasswordReset,
+  resetPassword
 } from "../controllers/userController.js";
 import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
 
@@ -14,6 +17,12 @@ const router = express.Router();
 // Public routes
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.get("/verify-email/:token", verifyEmail);
+
+router.post("/request-password-reset", requestPasswordReset);
+
+// POST /api/users/reset-password/:token
+router.post("/reset-password/:token", resetPassword);
 
 // Protected routes (requires authentication)
 router.use(authenticateUser);

@@ -1,5 +1,6 @@
 import ActivityLogModel from "../models/ActivityLogModel.js";
 import CustomerModel from "../models/customerModel.js";
+import EximclientUser from "../models/eximclientUserModel.js";
 
 /**
  * Log user activity utility function
@@ -35,7 +36,7 @@ export const logUserActivity = async (options) => {
     }
 
     // Get user information
-    const user = await CustomerModel.findById(user_id);
+    const user = await EximclientUser.findById(user_id);
     if (!user) {
       console.error('User not found for activity logging:', user_id);
       return null;
@@ -242,7 +243,7 @@ export const logSearchActivity = async (options) => {
 export const logActivity = async (userId, activityType, description, details = {}, ipAddress = null) => {
   try {
     // Get user information to fill required fields
-    const user = await CustomerModel.findById(userId);
+    const user = await EximclientUser.findById(userId);
     if (!user) {
       console.error('User not found for activity logging:', userId);
       return null;

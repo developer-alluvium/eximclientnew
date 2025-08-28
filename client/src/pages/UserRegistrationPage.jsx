@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import {
   TextField,
@@ -10,10 +10,17 @@ import {
   InputAdornment,
   Card,
   CardContent,
-  Link as MuiLink
+  Link as MuiLink,
+  Chip
 } from "@mui/material";
-import { Visibility, VisibilityOff, PersonAdd } from "@mui/icons-material";
-import { useNavigate, Link } from "react-router-dom";
+import { 
+  Visibility, 
+  VisibilityOff, 
+  PersonAdd, 
+  Email,
+  CheckCircle 
+} from "@mui/icons-material";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { ThemeProvider } from '@mui/material/styles';
 import { modernTheme } from "../styles/modernTheme";
 import axios from "axios";
@@ -25,15 +32,36 @@ function UserRegistrationPage() {
     email: "",
     password: "",
     confirmPassword: "",
-    ie_code_no: "",
-    importer: ""
+
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [registrationStep, setRegistrationStep] = useState('form'); // 'form' or 'email-sent'
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for verification success/error messages
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const verified = urlParams.get('verified');
+    const message = urlParams.get('message');
+    const errorParam = urlParams.get('error');
+    
+    if (verified === 'true' && message) {
+      setSuccess(message);
+      // Auto redirect to login after showing success
+      setTimeout(() => {
+        navigate("/login", { 
+          state: { message: "Email verified successfully! You can now log in." }
+        });
+      }, 3000);
+    } else if (errorParam && message) {
+      setError(message);
+    }
+  }, [location.search, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,8 +79,7 @@ function UserRegistrationPage() {
     setSuccess(null);
 
     // Validation
-    if (!formData.name || !formData.email || !formData.password || !formData.ie_code_no || 
-        !formData.importer) {
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       setError("All required fields must be filled.");
       return;
     }
@@ -74,26 +101,21 @@ function UserRegistrationPage() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        ie_code_no: formData.ie_code_no,
-        importer: formData.importer
+    
       });
 
       if (response.data.success) {
-        setSuccess("Registration successful! Your account is pending verification. You can now login with your credentials.");
+        setRegistrationStep('email-sent');
+        setSuccess("Registration successful! Please check your email to verify your account before logging in.");
+        
         // Clear form
         setFormData({
           name: "",
           email: "",
           password: "",
           confirmPassword: "",
-          ie_code_no: "",
-          importer: ""
+     
         });
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate("/login");
-        }, 3000);
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Registration failed. Please try again.";
@@ -103,6 +125,114 @@ function UserRegistrationPage() {
     }
   };
 
+  // Render email verification sent screen
+  if (registrationStep === 'email-sent') {
+    return (
+      <ThemeProvider theme={modernTheme}>
+        <Container fluid className="auth-container">
+          <Row className="auth-row">
+            <Col lg={6} className="auth-left-col">
+              <div className="auth-left-content">
+                <Typography variant="h2" className="auth-left-title">
+                  Check Your Email
+                </Typography>
+                <Typography variant="body1" className="auth-left-subtitle">
+                  We've sent you a verification link
+                </Typography>
+              </div>
+            </Col>
+            
+            <Col lg={6} className="auth-right-col">
+              <div className="auth-right-content">
+                <Card className="auth-card">
+                  <CardContent>
+                    <Box className="auth-header" textAlign="center">
+                      <Email 
+                        sx={{ 
+                          fontSize: 60, 
+                          color: 'primary.main',
+                          mb: 2 
+                        }} 
+                      />
+                      <Typography variant="h4" className="auth-title">
+                        Verify Your Email
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary" sx={{ mt: 2, mb: 3 }}>
+                        We've sent a verification email to your registered email address. 
+                        Please click the link in the email to activate your account.
+                      </Typography>
+                      
+                      <Chip 
+                        icon={<CheckCircle />}
+                        label="Email Sent Successfully"
+                        color="success"
+                        sx={{ mb: 3 }}
+                      />
+                    </Box>
+
+                    {success && (
+                      <Alert severity="success" sx={{ mb: 2 }}>
+                        {success}
+                      </Alert>
+                    )}
+
+                    <Box className="email-verification-instructions">
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        <strong>Next steps:</strong>
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" component="div">
+                        1. Check your email inbox<br/>
+                        2. Click the verification link<br/>
+                        3. You'll be redirected to login<br/>
+                        4. Sign in with your credentials
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ mt: 3, textAlign: 'center' }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => setRegistrationStep('form')}
+                        sx={{ mr: 2 }}
+                      >
+                        Register Another Account
+                      </Button>
+                      <Button
+                        variant="contained"
+                        component={Link}
+                        to="/login"
+                      >
+                        Go to Login
+                      </Button>
+                    </Box>
+
+                    <Box className="auth-footer" sx={{ mt: 3 }}>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Didn't receive the email? Check your spam folder or{" "}
+                        <MuiLink 
+                          component="button"
+                          type="button"
+                          color="primary"
+                          underline="hover"
+                          onClick={() => {
+                            setRegistrationStep('form');
+                            setError('Please try registering again or contact support.');
+                          }}
+                        >
+                          contact support
+                        </MuiLink>
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </div>
+            </Col>
+          </Row>
+        </Container>
+      </ThemeProvider>
+    );
+  }
+
+  // Render registration form
   return (
     <ThemeProvider theme={modernTheme}>
       <Container fluid className="auth-container">
@@ -119,7 +249,7 @@ function UserRegistrationPage() {
                 <Typography variant="body2">✓ Secure document management</Typography>
                 <Typography variant="body2">✓ Real-time analytics</Typography>
                 <Typography variant="body2">✓ Compliance tracking</Typography>
-                <Typography variant="body2">✓ Admin verification process</Typography>
+                <Typography variant="body2">✓ Email verification required</Typography>
               </div>
             </div>
           </Col>
@@ -180,33 +310,9 @@ function UserRegistrationPage() {
                       variant="outlined"
                       className="auth-input"
                       disabled={loading}
+                      helperText="A verification email will be sent to this address"
                     />
 
-                    <TextField
-                      fullWidth
-                      label="IE Code"
-                      name="ie_code_no"
-                      value={formData.ie_code_no}
-                      onChange={handleChange}
-                      required
-                      variant="outlined"
-                      className="auth-input"
-                      disabled={loading}
-                      helperText="Enter your Import/Export Code"
-                    />
-
-                    <TextField
-                      fullWidth
-                      label="Importer/Company Name"
-                      name="importer"
-                      value={formData.importer}
-                      onChange={handleChange}
-                      required
-                      variant="outlined"
-                      className="auth-input"
-                      disabled={loading}
-                      helperText="Enter your company or importer name"
-                    />
 
                     <TextField
                       fullWidth
@@ -268,7 +374,7 @@ function UserRegistrationPage() {
                       className="auth-submit-btn"
                       sx={{ mt: 2 }}
                     >
-                      {loading ? "Creating Account..." : "Register"}
+                      {loading ? "Creating Account..." : "Register & Send Verification Email"}
                     </Button>
                   </Box>
 

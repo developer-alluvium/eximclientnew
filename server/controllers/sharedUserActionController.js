@@ -274,21 +274,7 @@ export const updateCustomerTabVisibility = async (req, res) => {
     await user.save();
 
     // Log activity
-    await logActivity(
-      actor.id,
-      'USER_TAB_VISIBILITY_UPDATED',
-      `Updated tab visibility for user ${user.name}`,
-      {
-        userId: user._id,
-        userName: user.name,
-        ie_code_no: user.ie_code_no,
-        previousSettings,
-        newSettings: updates,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
+  
 
     res.json({
       success: true,
@@ -438,22 +424,7 @@ export const updateUserColumnPermissions = async (req, res) => {
     await user.save();
 
     // Log activity
-    await logActivity(
-      actor.id,
-      'USER_COLUMN_PERMISSIONS_UPDATED',
-      `Updated column permissions for user ${user.name}`,
-      { 
-        userId: user._id, 
-        userName: user.name,
-        userEmail: user.email,
-        ie_code_no: user.ie_code_no,
-        previousColumns,
-        newColumns: allowedColumns,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
+  
 
     console.log(`Column permissions updated for user ${user.name} (${user.ie_code_no}) by ${actor.role || 'superadmin'}`);
 
@@ -650,21 +621,7 @@ export const bulkUpdateUserColumnPermissions = async (req, res) => {
       { allowedColumns }
     );
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'BULK_USER_COLUMN_PERMISSIONS_UPDATED',
-      `Bulk updated column permissions for ${result.modifiedCount} users`,
-      { 
-        userIds,
-        allowedColumns,
-        modifiedCount: result.modifiedCount,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin',
-        ieCodeRestriction: actor.role === 'admin' ? actor.ie_code_no : null
-      },
-      req.ip
-    );
+
 
     console.log(`Bulk column permissions updated for ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
 
@@ -760,3 +717,5 @@ export const bulkUpdateCustomerColumnPermissions = async (req, res) => {
     });
   }
 };
+
+

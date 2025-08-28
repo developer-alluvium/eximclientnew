@@ -175,6 +175,7 @@ const SuperAdminLayout = () => {
       // Clear localStorage and redirect
       localStorage.removeItem("superadmin_token");
       localStorage.removeItem("superadmin_user");
+      localStorage.removeItem("user_access_token");
       navigate("/login");
     } catch (error) {
       console.error('Error during SuperAdmin logout:', error);

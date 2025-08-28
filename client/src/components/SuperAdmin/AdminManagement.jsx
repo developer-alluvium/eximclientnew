@@ -28,9 +28,8 @@ import {
   MenuItem,
   Switch,
   FormControlLabel,
-  Tabs,
-  Tab,
-  Avatar
+  Avatar,
+  InputAdornment
 } from '@mui/material';
 import {
   AdminPanelSettings,
@@ -51,11 +50,12 @@ import {
   Apps,
   Close,
   SelectAll,
-  ExpandMore
+  ExpandMore,
+  AccountBox
 } from '@mui/icons-material';
 import axios from 'axios';
 
-// Available modules for assignment
+// Available modules for assignment (unchanged)
 const AVAILABLE_MODULES = [
   {
     id: "/importdsr",
@@ -64,7 +64,7 @@ const AVAILABLE_MODULES = [
     category: "core"
   },
   {
-    id: "/netpage", 
+    id: "/netpage",
     name: "CostIQ",
     description: "Calculate shipping costs per kilogram for better pricing decisions",
     category: "core"
@@ -78,7 +78,7 @@ const AVAILABLE_MODULES = [
   },
   {
     id: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/",
-    name: "QR Locker", 
+    name: "QR Locker",
     description: "Beta Version - Digital locker management with QR code integration",
     category: "beta",
     isExternal: true
@@ -106,35 +106,36 @@ const AVAILABLE_MODULES = [
 ];
 
 const AdminManagement = ({ onRefresh }) => {
-  const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
-  
+
   // Dialog states
   const [adminDialog, setAdminDialog] = useState(false);
   const [statusDialog, setStatusDialog] = useState(false);
   const [moduleDialog, setModuleDialog] = useState(false);
   const [bulkModuleDialog, setBulkModuleDialog] = useState(false);
+  const [ieCodeDialog, setIeCodeDialog] = useState(false); // New IE Code dialog
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [adminAction, setAdminAction] = useState(''); // 'promote', 'demote'
   const [statusAction, setStatusAction] = useState(''); // 'activate', 'deactivate'
-    const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
+  const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
+  
   // Module assignment states
   const [selectedUserModules, setSelectedUserModules] = useState([]);
   const [bulkSelectedUsers, setBulkSelectedUsers] = useState([]);
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
-  
+
   // Search states
-  const [customerSearch, setCustomerSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
-   const [tabSettings, setTabSettings] = useState({ jobsTabVisible: false, gandhidhamTabVisible: false }); // <-- New State
+  const [ieCodeSearch, setIeCodeSearch] = useState(''); // New IE Code search
+  const [tabSettings, setTabSettings] = useState({ jobsTabVisible: false, gandhidhamTabVisible: false });
 
   // IE Code selection states
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
   const [selectedIeCode, setSelectedIeCode] = useState('');
+  const [ieCodeReason, setIeCodeReason] = useState(''); // New reason field
 
   useEffect(() => {
     fetchData();
@@ -147,7 +148,7 @@ const AdminManagement = ({ onRefresh }) => {
       // Check for SuperAdmin authentication
       const superadminToken = localStorage.getItem('superadmin_token');
       const superadminUser = localStorage.getItem('superadmin_user');
-      
+
       if (!superadminToken || !superadminUser) {
         setError('SuperAdmin authentication required. Please login again.');
         return;
@@ -162,28 +163,22 @@ const AdminManagement = ({ onRefresh }) => {
         withCredentials: true
       };
 
-      const [customersRes, usersRes, ieCodesRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/customers`, config),
+      const [usersRes, ieCodesRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/all-users`, config),
-        axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/available-ie-codes`, config)
+        axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/available-iec-codes`, config)
       ]);
 
-      if (customersRes.data.success) {
-        setCustomers(customersRes.data.data.customers || []);
-      }
-      
       if (usersRes.data.success) {
         setUsers(usersRes.data.data.users || []);
       }
 
       if (ieCodesRes.data.success) {
-        setAvailableIeCodes(ieCodesRes.data.data.availableIeCodes || []);
+        setAvailableIeCodes(ieCodesRes.data.data || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError('SuperAdmin authentication expired. Please login again.');
-        // Clear invalid tokens
         localStorage.removeItem('superadmin_token');
         localStorage.removeItem('superadmin_user');
       } else {
@@ -194,38 +189,82 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-const handlePromoteToAdmin = async (entity, type) => {
-  try {
-    setLoading(true);
-    setError(null);
+  // New IE Code Assignment Handler
+  const handleAssignIeCode = async () => {
+    if (!selectedEntity || !selectedIeCode) return;
 
-    // Check for SuperAdmin authentication
-    const superadminToken = localStorage.getItem('superadmin_token');
-    if (!superadminToken) {
-      setError('SuperAdmin authentication required. Please login again.');
-      return;
+    try {
+      setLoading(true);
+      setError(null);
+
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/assign-ie-code`;
+      const data = {
+        ieCodeNo: selectedIeCode,
+        reason: ieCodeReason
+      };
+
+      const response = await axios.post(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Successfully assigned IE Code ${selectedIeCode} to ${selectedEntity.name}`);
+        fetchData();
+        setIeCodeDialog(false);
+        setSelectedIeCode('');
+        setIeCodeReason('');
+      }
+    } catch (error) {
+      console.error('Error assigning IE code:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to assign IE code');
+      }
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const config = {
-      headers: {
-        'Authorization': `Bearer ${superadminToken}`,
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    };
+  // All existing handler functions remain the same...
+  const handlePromoteToAdmin = async (entity, type) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    let endpoint, data;
-    if (type === 'customer') {
-      // For customers, we just update their admin status
-      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
-      data = { role: 'admin' };
-    } else {
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
       // For users, we promote them to admin with optional IE code assignment
-      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/promote-admin`;
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/promote-admin`;
       
       // Check if user already has an IE code
       const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
-      
+
+      let data;
       if (hasExistingIeCode) {
         // User has IE code - selectedIeCode is optional
         data = selectedIeCode ? { ie_code_no: selectedIeCode } : {};
@@ -238,17 +277,13 @@ const handlePromoteToAdmin = async (entity, type) => {
         }
         data = { ie_code_no: selectedIeCode };
       }
-    }
 
-    const response = await axios.put(endpoint, data, config);
+      const response = await axios.put(endpoint, data, config);
 
-    if (response.data.success) {
-      // Enhanced success message based on IE code assignment
-      let successMessage;
-      if (type === 'customer') {
-        successMessage = `Successfully promoted ${entity.name} to admin`;
-      } else {
+      if (response.data.success) {
+        // Enhanced success message based on IE code assignment
         const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
+        let successMessage;
         if (hasExistingIeCode && !selectedIeCode) {
           successMessage = `Successfully promoted ${entity.name} to admin using existing IE code`;
         } else if (selectedIeCode) {
@@ -256,84 +291,74 @@ const handlePromoteToAdmin = async (entity, type) => {
         } else {
           successMessage = `Successfully promoted ${entity.name} to admin`;
         }
+
+        setSuccess(successMessage);
+        fetchData();
+        setAdminDialog(false);
+        setSelectedIeCode('');
       }
-      
-      setSuccess(successMessage);
-      fetchData();
-      setAdminDialog(false);
-      setSelectedIeCode(''); // Reset selection
+    } catch (error) {
+      console.error('Error promoting to admin:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+        localStorage.removeItem('superadmin_token');
+        localStorage.removeItem('superadmin_user');
+      } else {
+        setError(error.response?.data?.message || 'Failed to promote to admin');
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Error promoting to admin:', error);
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      setError('SuperAdmin authentication expired. Please login again.');
-      localStorage.removeItem('superadmin_token');
-      localStorage.removeItem('superadmin_user');
-    } else {
-      setError(error.response?.data?.message || 'Failed to promote to admin');
+  };
+
+  const handleRevokeAdmin = async (entity, type) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const superadminToken = localStorage.getItem('superadmin_token');
+      if (!superadminToken) {
+        setError('SuperAdmin authentication required. Please login again.');
+        return;
+      }
+
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${superadminToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/demote-admin`;
+      const data = {};
+
+      const response = await axios.put(endpoint, data, config);
+
+      if (response.data.success) {
+        setSuccess(`Successfully revoked admin access for ${entity.name}`);
+        fetchData();
+        setAdminDialog(false);
+      }
+    } catch (error) {
+      console.error('Error revoking admin:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setError('SuperAdmin authentication expired. Please login again.');
+        localStorage.removeItem('superadmin_token');
+        localStorage.removeItem('superadmin_user');
+      } else {
+        setError(error.response?.data?.message || 'Failed to revoke admin access');
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
-
-const handleRevokeAdmin = async (entity, type) => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    // Check for SuperAdmin authentication
-    const superadminToken = localStorage.getItem('superadmin_token');
-    if (!superadminToken) {
-      setError('SuperAdmin authentication required. Please login again.');
-      return;
-    }
-
-    const config = {
-      headers: {
-        'Authorization': `Bearer ${superadminToken}`,
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    };
-
-    let endpoint, data;
-    if (type === 'customer') {
-      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/customers/${entity._id}/admin-status`;
-      data = { role: 'customer' };
-    } else {
-      endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/demote-admin`;
-      data = {};
-    }
-
-    const response = await axios.put(endpoint, data, config);
-
-    if (response.data.success) {
-      setSuccess(`Successfully revoked admin access for ${entity.name}`);
-      fetchData();
-      setAdminDialog(false);
-    }
-  } catch (error) {
-    console.error('Error revoking admin:', error);
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      setError('SuperAdmin authentication expired. Please login again.');
-      localStorage.removeItem('superadmin_token');
-      localStorage.removeItem('superadmin_user');
-    } else {
-      setError(error.response?.data?.message || 'Failed to revoke admin access');
-    }
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const handleChangeUserStatus = async (user, newStatus) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Check for SuperAdmin authentication
       const superadminToken = localStorage.getItem('superadmin_token');
       if (!superadminToken) {
         setError('SuperAdmin authentication required. Please login again.');
@@ -372,6 +397,7 @@ const handleRevokeAdmin = async (entity, type) => {
     }
   };
 
+  // All other handler functions remain the same...
   const handleAssignModules = async (userId, moduleIds) => {
     try {
       setLoading(true);
@@ -434,9 +460,9 @@ const handleRevokeAdmin = async (entity, type) => {
       };
 
       const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/bulk-assign-modules`;
-      const data = { 
+      const data = {
         userIds: bulkSelectedUsers,
-        moduleIds: bulkSelectedModules 
+        moduleIds: bulkSelectedModules
       };
 
       const response = await axios.post(endpoint, data, config);
@@ -481,7 +507,6 @@ const handleRevokeAdmin = async (entity, type) => {
         withCredentials: true
       };
 
-      // Using the corrected endpoint
       const endpoint = `${process.env.REACT_APP_API_STRING}/user-management/superadmin/user/${selectedEntity._id}/tab-visibility`;
       const data = tabSettings;
 
@@ -503,6 +528,8 @@ const handleRevokeAdmin = async (entity, type) => {
       setLoading(false);
     }
   };
+
+  // Dialog helper functions
   const openAdminDialog = (entity, action, type) => {
     setSelectedEntity({ ...entity, type });
     setAdminAction(action);
@@ -517,7 +544,6 @@ const handleRevokeAdmin = async (entity, type) => {
 
   const openModuleDialog = (user) => {
     setSelectedEntity(user);
-    // Get user's current modules - assuming they're stored in assignedModules field
     setSelectedUserModules(user.assignedModules || []);
     setModuleDialog(true);
   };
@@ -526,17 +552,25 @@ const handleRevokeAdmin = async (entity, type) => {
     setBulkModuleDialog(true);
   };
 
-   const openTabVisibilityDialog = (customer) => {
-    setSelectedEntity(customer);
+  const openTabVisibilityDialog = (user) => {
+    setSelectedEntity(user);
     setTabSettings({
-      jobsTabVisible: customer.jobsTabVisible || false,
-      gandhidhamTabVisible: customer.gandhidhamTabVisible || false
+      jobsTabVisible: user.jobsTabVisible || false,
+      gandhidhamTabVisible: user.gandhidhamTabVisible || false
     });
     setTabVisibilityDialog(true);
   };
 
+  // New IE Code dialog opener
+  const openIeCodeDialog = (user) => {
+    setSelectedEntity(user);
+    setSelectedIeCode('');
+    setIeCodeReason('');
+    setIeCodeDialog(true);
+  };
+
+  // Utility functions
   const getModuleIcon = (moduleId) => {
-    // Simple icon mapping based on module ID or category
     if (moduleId.includes('dsr')) return '📊';
     if (moduleId.includes('net') || moduleId.includes('cost')) return '⚖️';
     if (moduleId.includes('snap')) return '📷';
@@ -556,16 +590,17 @@ const handleRevokeAdmin = async (entity, type) => {
     }
   };
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.ie_code_no?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(customerSearch.toLowerCase())
-  );
-
   const filteredUsers = users.filter(user =>
     user.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
     user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    user.ie_code_no?.toLowerCase().includes(userSearch.toLowerCase())
+    user.ie_code_no?.toLowerCase().includes(userSearch.toLowerCase()) ||
+    user.assignedImporterName?.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
+  // Filter IE codes based on search
+  const filteredIeCodes = availableIeCodes.filter(ieCode =>
+    ieCode.iecNo?.toLowerCase().includes(ieCodeSearch.toLowerCase()) ||
+    ieCode.importerName?.toLowerCase().includes(ieCodeSearch.toLowerCase())
   );
 
   return (
@@ -574,39 +609,40 @@ const handleRevokeAdmin = async (entity, type) => {
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 600, color: '#1a1a1a', mb: 1 }}>
-            Admin Management
+            User Admin Management
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage customer and user admin privileges
+            Manage user admin privileges, modules, and settings
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Refresh />}
-          onClick={fetchData}
-          disabled={loading}
-          sx={{ 
-            borderRadius: 2,
-            textTransform: 'none',
-            px: 3,
-            mr: 2
-          }}
-        >
-          Refresh
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<GroupWork />}
-          onClick={openBulkModuleDialog}
-          disabled={loading}
-          sx={{ 
-            borderRadius: 2,
-            textTransform: 'none',
-            px: 3
-          }}
-        >
-          Bulk Module Assignment
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Refresh />}
+            onClick={fetchData}
+            disabled={loading}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3
+            }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<GroupWork />}
+            onClick={openBulkModuleDialog}
+            disabled={loading}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3
+            }}
+          >
+            Bulk Module Assignment
+          </Button>
+        </Box>
       </Box>
 
       {/* Alerts */}
@@ -623,44 +659,6 @@ const handleRevokeAdmin = async (entity, type) => {
 
       {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
-                    {customers.length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Customers
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: '#dbeafe', color: '#1d4ed8' }}>
-                  <Business />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
-                    {customers.filter(c => c.isAdmin).length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Customer Admins
-                  </Typography>
-                </Box>
-                <Avatar sx={{ bgcolor: '#dcfce7', color: '#16a34a' }}>
-                  <SupervisorAccount />
-                </Avatar>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
             <CardContent>
@@ -686,7 +684,7 @@ const handleRevokeAdmin = async (entity, type) => {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
-                    {users.filter(u => u.isAdmin).length}
+                    {users.filter(u => u.role === 'admin').length}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     User Admins
@@ -699,316 +697,368 @@ const handleRevokeAdmin = async (entity, type) => {
             </CardContent>
           </Card>
         </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
+                    {users.filter(u => u.isActive).length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Active Users
+                  </Typography>
+                </Box>
+                <Avatar sx={{ bgcolor: '#dcfce7', color: '#16a34a' }}>
+                  <CheckCircle />
+                </Avatar>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
+                    {availableIeCodes.length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Available IE Codes
+                  </Typography>
+                </Box>
+                <Avatar sx={{ bgcolor: '#dbeafe', color: '#1d4ed8' }}>
+                  <Business />
+                </Avatar>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
-      {/* Tabs */}
-     <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-            <Tab label="Customer Admin Management" />
-            <Tab label="User Admin Management" />
-          </Tabs>
-        </Box>
-
-        {/* Customer Admin Management Tab */}
-        {activeTab === 0 && (
-          <Box sx={{ p: 3 }}>
-            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <TextField
-                placeholder="Search customers..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                sx={{ flexGrow: 1 }}
-              />
-            </Box>
-
-            <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                    <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Admin Status</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Users</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell> {/* <-- New Column */}
-                    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredCustomers.map((customer) => (
-                    <TableRow key={customer._id} hover>
-                      {/* ... Customer, IE Code, Admin Status cells ... */}
-                      <TableCell>{customer.name}</TableCell>
-                      <TableCell>{customer.ie_code_no}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={customer.isAdmin ? 'Admin' : 'Regular'}
-                          color={customer.isAdmin ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {users.filter(u => u.ie_code_no === customer.ie_code_no).length}
-                      </TableCell>
-                      {/* --- New Cell for Tab Visibility --- */}
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Chip
-                            label={`Jobs: ${customer.jobsTabVisible ? 'On' : 'Off'}`}
-                            color={customer.jobsTabVisible ? 'success' : 'default'}
-                            size="small"
-                            variant="outlined"
-                          />
-                          <Chip
-                            label={`Gandhidham: ${customer.gandhidhamTabVisible ? 'On' : 'Off'}`}
-                            color={customer.gandhidhamTabVisible ? 'success' : 'default'}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {customer.isAdmin ? (
-                            <Tooltip title="Revoke Admin Access">
-                              <IconButton size="small" color="error" onClick={() => openAdminDialog(customer, 'demote', 'customer')}>
-                                <Delete />
-                              </IconButton>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title="Make Admin">
-                              <IconButton size="small" color="primary" onClick={() => openAdminDialog(customer, 'promote', 'customer')}>
-                                <AdminPanelSettings />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {/* --- New Button to Manage Tabs --- */}
-                           <Tooltip title="Manage Tab Visibility">
-                            <IconButton size="small" color="secondary" onClick={() => openTabVisibilityDialog(customer)}>
-                              <ToggleOn />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              
-                  {filteredCustomers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography color="text.secondary">
-                          No customers found
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+      {/* Main Content Card */}
+      <Card sx={{ borderRadius: 2, border: '1px solid #e5e7eb' }}>
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              placeholder="Search users..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              InputProps={{
+                startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+              }}
+              sx={{ flexGrow: 1 }}
+            />
           </Box>
-        )}
 
-        {/* User Admin Management Tab */}
-        {activeTab === 1 && (
-          <Box sx={{ p: 3 }}>
-            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <TextField
-                placeholder="Search users..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                sx={{ flexGrow: 1 }}
-              />
-            </Box>
+          {/* Info Alert for IE Code Source */}
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              IE codes are fetched from active jobs in year 25-26. You can assign or reassign IE codes to users at any time.
+              {availableIeCodes.length > 0 && (
+                <span> Currently {availableIeCodes.length} IE codes are available for assignment.</span>
+              )}
+            </Typography>
+          </Alert>
 
-            {/* Info Alert for IE Code Source */}
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                IE codes are fetched from active jobs in year 25-26. Only codes not already assigned to admins are available for assignment.
-                {availableIeCodes.length > 0 && (
-                  <span> Currently {availableIeCodes.length} IE codes are available for assignment.</span>
-                )}
-              </Typography>
-            </Alert>
-
-            <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                    <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Assigned Modules</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user._id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ mr: 2, bgcolor: '#e5e7eb', color: '#374151' }}>
-                            {user.name?.charAt(0) || 'U'}
-                          </Avatar>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {user.name}
+          <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#f9fafb' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Importer</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Assigned Modules</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user._id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar sx={{ mr: 2, bgcolor: '#e5e7eb', color: '#374151' }}>
+                          {user.name?.charAt(0) || 'U'}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {user.name}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {user.ie_code_no || 'Not Assigned'}
+                        </Typography>
+                        {user.ieCodeAssignedAt && (
+                          <Typography variant="caption" color="text.secondary">
+                            Assigned: {new Date(user.ieCodeAssignedAt).toLocaleDateString()}
                           </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.ie_code_no}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={user.role === 'admin' ? 'Admin' : 'User'}
-                          color={user.role === 'admin' ? 'secondary' : 'default'}
-                          size="small"
-                          icon={user.role === 'admin' ? <AdminPanelSettings /> : <People />}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={user.isActive ? 'Active' : 'Inactive'}
-                          color={user.isActive ? 'success' : 'error'}
-                          size="small"
-                        />
-                      </TableCell>
-                 
-                      <TableCell>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxWidth: 300 }}>
-                          {user.assignedModules && user.assignedModules.length > 0 ? (
-                            user.assignedModules.slice(0, 3).map((moduleId) => {
-                              const module = AVAILABLE_MODULES.find(m => m.id === moduleId);
-                              return (
-                                <Chip
-                                  key={moduleId}
-                                  label={module?.name || moduleId.split('/').pop() || moduleId}
-                                  color={getModuleCategoryColor(module?.category)}
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{ fontSize: '0.7rem' }}
-                                />
-                              );
-                            })
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No modules assigned
-                            </Typography>
-                          )}
-                          {user.assignedModules && user.assignedModules.length > 3 && (
-                            <Chip
-                              label={`+${user.assignedModules.length - 3} more`}
-                              size="small"
-                              variant="outlined"
-                              color="default"
-                              sx={{ fontSize: '0.7rem' }}
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                           <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {user.assignedImporterName || 'Not Assigned'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.role === 'admin' ? 'Admin' : 'User'}
+                        color={user.role === 'admin' ? 'secondary' : 'default'}
+                        size="small"
+                        icon={user.role === 'admin' ? <AdminPanelSettings /> : <People />}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.isActive ? 'Active' : 'Inactive'}
+                        color={user.isActive ? 'success' : 'error'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxWidth: 300 }}>
+                        {user.assignedModules && user.assignedModules.length > 0 ? (
+                          user.assignedModules.slice(0, 3).map((moduleId) => {
+                            const module = AVAILABLE_MODULES.find(m => m.id === moduleId);
+                            return (
+                              <Chip
+                                key={moduleId}
+                                label={module?.name || moduleId.split('/').pop() || moduleId}
+                                color={getModuleCategoryColor(module?.category)}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontSize: '0.7rem' }}
+                              />
+                            );
+                          })
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No modules assigned
+                          </Typography>
+                        )}
+                        {user.assignedModules && user.assignedModules.length > 3 && (
                           <Chip
-                            label={`Jobs: ${user.jobsTabVisible ? 'On' : 'Off'}`}
-                            color={user.jobsTabVisible ? 'success' : 'default'}
+                            label={`+${user.assignedModules.length - 3} more`}
                             size="small"
                             variant="outlined"
+                            color="default"
+                            sx={{ fontSize: '0.7rem' }}
                           />
-                          <Chip
-                            label={`Gandhidham: ${user.gandhidhamTabVisible ? 'On' : 'Off'}`}
-                            color={user.gandhidhamTabVisible ? 'success' : 'default'}
+                        )}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Chip
+                          label={`Jobs: ${user.jobsTabVisible ? 'On' : 'Off'}`}
+                          color={user.jobsTabVisible ? 'success' : 'default'}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`Gandhidham: ${user.gandhidhamTabVisible ? 'On' : 'Off'}`}
+                          color={user.gandhidhamTabVisible ? 'success' : 'default'}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {/* IE Code Assignment Button */}
+                        <Tooltip title="Assign IE Code">
+                          <IconButton
                             size="small"
-                            variant="outlined"
-                          />
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          {/* Status Toggle Button */}
-                          <Tooltip title={user.isActive ? 'Deactivate User' : 'Activate User'}>
+                            color="info"
+                            onClick={() => openIeCodeDialog(user)}
+                          >
+                            <AccountBox />
+                          </IconButton>
+                        </Tooltip>
+
+                        {/* Status Toggle Button */}
+                        <Tooltip title={user.isActive ? 'Deactivate User' : 'Activate User'}>
+                          <IconButton
+                            size="small"
+                            color={user.isActive ? 'warning' : 'success'}
+                            onClick={() => openStatusDialog(user, user.isActive ? 'deactivate' : 'activate')}
+                          >
+                            {user.isActive ? <ToggleOff /> : <ToggleOn />}
+                          </IconButton>
+                        </Tooltip>
+
+                        {/* Module Assignment Button */}
+                        <Tooltip title="Assign Modules">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => openModuleDialog(user)}
+                          >
+                            <Assignment />
+                          </IconButton>
+                        </Tooltip>
+
+                        {/* Admin Role Toggle Button */}
+                        {user.role === 'admin' ? (
+                          <Tooltip title="Remove Admin Role">
                             <IconButton
                               size="small"
-                              color={user.isActive ? 'warning' : 'success'}
-                              onClick={() => openStatusDialog(user, user.isActive ? 'deactivate' : 'activate')}
+                              color="error"
+                              onClick={() => openAdminDialog(user, 'demote', 'user')}
                             >
-                              {user.isActive ? <ToggleOff /> : <ToggleOn />}
+                              <Delete />
                             </IconButton>
                           </Tooltip>
-
-                          {/* Module Assignment Button */}
-                          <Tooltip title="Assign Modules">
+                        ) : (
+                          <Tooltip title="Promote to Admin">
                             <IconButton
                               size="small"
-                              color="info"
-                              onClick={() => openModuleDialog(user)}
+                              color="primary"
+                              onClick={() => openAdminDialog(user, 'promote', 'user')}
                             >
-                              <Assignment />
+                              <AdminPanelSettings />
                             </IconButton>
                           </Tooltip>
-                          
-                          {/* Admin Role Toggle Button */}
-                          {user.role == 'admin' ? (
-                            <Tooltip title="Remove Admin Role">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => openAdminDialog(user, 'demote', 'user')}
-                              >
-                                <Delete />
-                              </IconButton>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title="Promote to Admin">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => openAdminDialog(user, 'promote', 'user')}
-                              >
-                                <AdminPanelSettings />
-                              </IconButton>
-                            </Tooltip>
-                          )}
+                        )}
 
-                          <Tooltip title="Manage Tab Visibility">
-                            <IconButton size="small" color="secondary" onClick={() => openTabVisibilityDialog(user)}>
-                              <ToggleOn />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredUsers.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography color="text.secondary">
-                          No users found
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
+                        <Tooltip title="Manage Tab Visibility">
+                          <IconButton size="small" color="secondary" onClick={() => openTabVisibilityDialog(user)}>
+                            <ToggleOn />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography color="text.secondary">
+                        No users found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       </Card>
 
+      {/* IE Code Assignment Dialog */}
+      <Dialog
+        open={ieCodeDialog}
+        onClose={() => setIeCodeDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <AccountBox color="primary" />
+            Assign IE Code to {selectedEntity?.name}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {selectedEntity?.ie_code_no 
+              ? `Current IE Code: ${selectedEntity.ie_code_no} (${selectedEntity.assignedImporterName || 'No Importer Name'}). You can reassign a different IE code.`
+              : 'Select an IE code to assign to this user.'
+            }
+          </Typography>
+
+          {/* IE Code Search */}
+          <TextField
+            fullWidth
+            placeholder="Search IE codes..."
+            value={ieCodeSearch}
+            onChange={(e) => setIeCodeSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              )
+            }}
+            sx={{ mb: 2 }}
+          />
+
+          {/* IE Code Selection */}
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Select IE Code</InputLabel>
+            <Select
+              value={selectedIeCode}
+              onChange={(e) => setSelectedIeCode(e.target.value)}
+              label="Select IE Code"
+              required
+            >
+              {filteredIeCodes.map((ieCode) => (
+                <MenuItem key={ieCode.iecNo} value={ieCode.iecNo}>
+                  <Box sx={{ py: 1 }}>
+                    <Typography variant="body2" fontWeight="bold" color="primary">
+                      {ieCode.iecNo}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                      {ieCode.importerName}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Chip label={ieCode.status} size="small" color="primary" variant="outlined" />
+                      <Chip label={ieCode.approval} size="small" color="secondary" variant="outlined" />
+                    </Box>
+                  </Box>
+                </MenuItem>
+              ))}
+              {filteredIeCodes.length === 0 && (
+                <MenuItem disabled>
+                  <Typography variant="body2" color="text.secondary">
+                    {ieCodeSearch ? 'No IE codes found matching your search' : 'No available IE codes'}
+                  </Typography>
+                </MenuItem>
+              )}
+            </Select>
+          </FormControl>
+
+          {/* Reason Field */}
+          <TextField
+            fullWidth
+            label="Reason (Optional)"
+            placeholder="Enter reason for IE code assignment..."
+            value={ieCodeReason}
+            onChange={(e) => setIeCodeReason(e.target.value)}
+            multiline
+            rows={3}
+            helperText="Provide a reason for this IE code assignment. This will be logged for audit purposes."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIeCodeDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleAssignIeCode}
+            disabled={loading || !selectedIeCode}
+            startIcon={<AccountBox />}
+          >
+            Assign IE Code
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* All existing dialogs remain the same... */}
       {/* Admin Action Dialog */}
-      <Dialog 
-        open={adminDialog} 
+      <Dialog
+        open={adminDialog}
         onClose={() => {
           setAdminDialog(false);
-          setSelectedIeCode(''); // Reset IE code selection when dialog closes
-        }} 
-        maxWidth="sm" 
+          setSelectedIeCode('');
+        }}
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
@@ -1016,13 +1066,13 @@ const handleRevokeAdmin = async (entity, type) => {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            {adminAction === 'promote' 
+            {adminAction === 'promote'
               ? `Are you sure you want to promote "${selectedEntity?.name}" to admin?`
               : `Are you sure you want to revoke admin access for "${selectedEntity?.name}"?`
             }
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {adminAction === 'promote' 
+            {adminAction === 'promote'
               ? 'This will give them administrative privileges over users and modules.'
               : 'This will remove their administrative privileges.'
             }
@@ -1036,39 +1086,33 @@ const handleRevokeAdmin = async (entity, type) => {
                 value={selectedIeCode}
                 onChange={(e) => setSelectedIeCode(e.target.value)}
                 label="Select IE Code to Assign"
-                required
               >
                 {availableIeCodes.map((ieCode) => (
-                  <MenuItem key={ieCode.ie_code_no} value={ieCode.ie_code_no}>
+                  <MenuItem key={ieCode.iecNo} value={ieCode.iecNo}>
                     <Box sx={{ py: 1 }}>
                       <Typography variant="body2" fontWeight="bold" color="primary">
-                        {ieCode.ie_code_no}
+                        {ieCode.iecNo}
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {ieCode.name}
+                        {ieCode.importerName}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Jobs: {ieCode.jobCount || 0} | PAN: {ieCode.pan_number || 'Not Available'}
+                        Status: {ieCode.status} | Approval: {ieCode.approval}
                       </Typography>
-                      {ieCode.lastJobDate && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                          Last Job: {new Date(ieCode.lastJobDate).toLocaleDateString()}
-                        </Typography>
-                      )}
                     </Box>
                   </MenuItem>
                 ))}
                 {availableIeCodes.length === 0 && (
                   <MenuItem disabled>
                     <Typography variant="body2" color="text.secondary">
-                      No available IE codes for year 25-26
+                      No available IE codes
                     </Typography>
                   </MenuItem>
                 )}
               </Select>
               {availableIeCodes.length === 0 && (
                 <Typography variant="caption" color="warning.main" sx={{ mt: 1 }}>
-                  Note: Only IE codes from jobs in year 25-26 that are not already assigned to admins are shown.
+                  Note: Only IE codes that are not already assigned to admins are shown.
                 </Typography>
               )}
             </FormControl>
@@ -1077,7 +1121,7 @@ const handleRevokeAdmin = async (entity, type) => {
         <DialogActions>
           <Button onClick={() => {
             setAdminDialog(false);
-            setSelectedIeCode(''); // Reset IE code selection
+            setSelectedIeCode('');
           }}>Cancel</Button>
           <Button
             variant="contained"
@@ -1089,18 +1133,18 @@ const handleRevokeAdmin = async (entity, type) => {
                 handleRevokeAdmin(selectedEntity, selectedEntity?.type);
               }
             }}
-            disabled={loading || (adminAction === 'promote' && selectedEntity?.type === 'user' && !selectedIeCode)}
+            disabled={loading || (adminAction === 'promote' && selectedEntity?.type === 'user' && !selectedEntity?.ie_code_no && !selectedIeCode)}
           >
             {adminAction === 'promote' ? 'Promote' : 'Revoke'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* User Status Change Dialog */}
-      <Dialog 
-        open={statusDialog} 
-        onClose={() => setStatusDialog(false)} 
-        maxWidth="sm" 
+      {/* Status Dialog */}
+      <Dialog
+        open={statusDialog}
+        onClose={() => setStatusDialog(false)}
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>
@@ -1108,18 +1152,18 @@ const handleRevokeAdmin = async (entity, type) => {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            {statusAction === 'activate' 
+            {statusAction === 'activate'
               ? `Are you sure you want to activate "${selectedEntity?.name}"?`
               : `Are you sure you want to deactivate "${selectedEntity?.name}"?`
             }
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {statusAction === 'activate' 
+            {statusAction === 'activate'
               ? 'This will allow the user to log in and access their assigned modules.'
               : 'This will prevent the user from logging in and accessing the system.'
             }
           </Typography>
-          
+
           {statusAction === 'deactivate' && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               <Typography variant="body2">
@@ -1145,10 +1189,10 @@ const handleRevokeAdmin = async (entity, type) => {
       </Dialog>
 
       {/* Module Assignment Dialog */}
-      <Dialog 
-        open={moduleDialog} 
-        onClose={() => setModuleDialog(false)} 
-        maxWidth="md" 
+      <Dialog
+        open={moduleDialog}
+        onClose={() => setModuleDialog(false)}
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>
@@ -1161,15 +1205,15 @@ const handleRevokeAdmin = async (entity, type) => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Select modules to assign to this user. Users can only access modules that are assigned to them.
           </Typography>
-          
+
           <Grid container spacing={2}>
             {AVAILABLE_MODULES.map((module) => {
               const isAssigned = selectedUserModules.includes(module.id);
               return (
                 <Grid item xs={12} md={6} key={module.id}>
-                  <Card 
-                    variant="outlined" 
-                    sx={{ 
+                  <Card
+                    variant="outlined"
+                    sx={{
                       cursor: 'pointer',
                       border: isAssigned ? '2px solid' : '1px solid',
                       borderColor: isAssigned ? 'primary.main' : 'divider',
@@ -1199,16 +1243,16 @@ const handleRevokeAdmin = async (entity, type) => {
                         {module.description}
                       </Typography>
                       <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={module.category || 'general'} 
-                          size="small" 
+                        <Chip
+                          label={module.category || 'general'}
+                          size="small"
                           color={getModuleCategoryColor(module.category)}
                           variant="outlined"
                         />
                         {module.isExternal && (
-                          <Chip 
-                            label="External" 
-                            size="small" 
+                          <Chip
+                            label="External"
+                            size="small"
                             color="secondary"
                             variant="outlined"
                             sx={{ ml: 0.5 }}
@@ -1221,7 +1265,7 @@ const handleRevokeAdmin = async (entity, type) => {
               );
             })}
           </Grid>
-          
+
           <Typography variant="body2" color="primary" sx={{ mt: 2, fontWeight: 500 }}>
             Selected: {selectedUserModules.length} modules
           </Typography>
@@ -1240,10 +1284,10 @@ const handleRevokeAdmin = async (entity, type) => {
       </Dialog>
 
       {/* Bulk Module Assignment Dialog */}
-      <Dialog 
-        open={bulkModuleDialog} 
-        onClose={() => setBulkModuleDialog(false)} 
-        maxWidth="lg" 
+      <Dialog
+        open={bulkModuleDialog}
+        onClose={() => setBulkModuleDialog(false)}
+        maxWidth="lg"
         fullWidth
       >
         <DialogTitle>
@@ -1256,7 +1300,7 @@ const handleRevokeAdmin = async (entity, type) => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             Select users and modules to assign in bulk. This will add the selected modules to all selected users.
           </Typography>
-          
+
           <Grid container spacing={3}>
             {/* User Selection */}
             <Grid item xs={12} md={6}>
@@ -1264,7 +1308,7 @@ const handleRevokeAdmin = async (entity, type) => {
                 <People />
                 Select Users ({bulkSelectedUsers.length} selected)
               </Typography>
-              
+
               <Box sx={{ mb: 2 }}>
                 <Button
                   size="small"
@@ -1280,7 +1324,7 @@ const handleRevokeAdmin = async (entity, type) => {
                   {bulkSelectedUsers.length === filteredUsers.length ? 'Deselect All' : 'Select All'}
                 </Button>
               </Box>
-              
+
               <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
                 {filteredUsers.map((user) => (
                   <FormControlLabel
@@ -1313,14 +1357,14 @@ const handleRevokeAdmin = async (entity, type) => {
                 ))}
               </Box>
             </Grid>
-            
+
             {/* Module Selection */}
             <Grid item xs={12} md={6}>
               <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Apps />
                 Select Modules ({bulkSelectedModules.length} selected)
               </Typography>
-              
+
               <Box sx={{ mb: 2 }}>
                 <Button
                   size="small"
@@ -1336,7 +1380,7 @@ const handleRevokeAdmin = async (entity, type) => {
                   {bulkSelectedModules.length === AVAILABLE_MODULES.length ? 'Deselect All' : 'Select All'}
                 </Button>
               </Box>
-              
+
               <Box sx={{ maxHeight: 300, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
                 {AVAILABLE_MODULES.map((module) => (
                   <FormControlLabel
@@ -1373,10 +1417,10 @@ const handleRevokeAdmin = async (entity, type) => {
               </Box>
             </Grid>
           </Grid>
-          
+
           <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="body2">
-              <strong>Note:</strong> This will add the selected modules to the selected users. 
+              <strong>Note:</strong> This will add the selected modules to the selected users.
               Existing module assignments will be preserved.
             </Typography>
           </Alert>
@@ -1394,11 +1438,11 @@ const handleRevokeAdmin = async (entity, type) => {
         </DialogActions>
       </Dialog>
 
-       {/* --- New Tab Visibility Dialog --- */}
-    <Dialog 
-        open={tabVisibilityDialog} 
-        onClose={() => setTabVisibilityDialog(false)} 
-        maxWidth="sm" 
+      {/* Tab Visibility Dialog */}
+      <Dialog
+        open={tabVisibilityDialog}
+        onClose={() => setTabVisibilityDialog(false)}
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle>Manage Tab Visibility for {selectedEntity?.name}</DialogTitle>

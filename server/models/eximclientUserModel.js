@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from 'crypto';
+import { type } from "os";
 
 const eximclientUserSchema = new mongoose.Schema(
   {
@@ -25,14 +27,14 @@ const eximclientUserSchema = new mongoose.Schema(
     },
     importer: {
       type: String,
-      required: false,
+     
       trim: true,
       maxlength: 200,
       default: 'Not Specified'
     },
     ie_code_no: {
       type: String,
-      required: true,
+
       trim: true,
       uppercase: true,
     },
@@ -48,8 +50,8 @@ const eximclientUserSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['super_admin', 'admin' , 'customer'],
-      default: 'customer'
+      enum: ['super_admin', 'admin' , 'user'],
+      default: 'user'
     },
     isActive: {
       type: Boolean,
@@ -58,10 +60,6 @@ const eximclientUserSchema = new mongoose.Schema(
     emailVerified: {
       type: Boolean,
       default: false,
-    },
-    emailVerificationToken: {
-      type: String,
-      default: null,
     },
     assignedModules: {
       type: [String],
@@ -123,6 +121,23 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    emailVerificationToken: {
+      type: String,
+      default: null,
+    },
+    emailVerificationTokenExpires: {
+      type: Date,
+      default: null
+    },
+    passwordResetToken: {
+    type: String,
+    default: null,
+  },
+  passwordResetExpires: {
+    type: Date,
+    default: null,
+  },
+
   },
   { 
     timestamps: true,
@@ -188,10 +203,37 @@ eximclientUserSchema.methods.resetLoginAttempts = function() {
 };
 
 // Generate email verification token
+// eximclientUserSchema.methods.generateVerificationToken = function() {
+//   const token = Math.random().toString(36).substr(2, 15) + Math.random().toString(36).substr(2, 15);
+//   this.emailVerificationToken = token;
+//   return token;
+// };
+
+// Generate email verification token
 eximclientUserSchema.methods.generateVerificationToken = function() {
-  const token = Math.random().toString(36).substr(2, 15) + Math.random().toString(36).substr(2, 15);
+  const token = crypto.randomBytes(32).toString('hex');
   this.emailVerificationToken = token;
-  return token;
+  this.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return token; // Important: return the token
+};
+
+// Add this method inside your eximclientUserSchema definition
+
+// Generate password reset token
+eximclientUserSchema.methods.generatePasswordResetToken = function() {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  // Store the hashed token in the database for security
+  this.passwordResetToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  
+  // Set token to expire in 10 minutes
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; 
+
+  // Return the unhashed token to be sent via email
+  return resetToken; 
 };
 
 // Index for better performance

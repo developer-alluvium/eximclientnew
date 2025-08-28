@@ -5,7 +5,7 @@ const activityLogSchema = new mongoose.Schema(
     // User information
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer",
+      ref: "EximclientUser",
       required: true,
     },
     user_email: {
@@ -20,7 +20,6 @@ const activityLogSchema = new mongoose.Schema(
     },
     ie_code_no: {
       type: String,
-      required: true,
       trim: true,
     },
     

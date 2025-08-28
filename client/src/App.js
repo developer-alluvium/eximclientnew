@@ -27,7 +27,8 @@ import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
 import ImportVideoPage from "./pages/ImportVideoPage";
 import UserManagement from "./pages/UserManagement/UserManagement.jsx"
-
+import EmailVerification from "./pages/EmailVerification.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx"
 // Protected route component for backward compatibility
 const LegacyProtectedRoute = ({ children }) => {
   const navigate = useNavigate();
@@ -79,6 +80,8 @@ function App() {
                 {/* New user system routes */}
                 <Route path="/login" element={<UserLoginPage />} />
                 <Route path="/user/register" element={<UserRegistrationPage />} />
+                <Route path="/verify-email/:token" element={<EmailVerification />} />
+                <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
                 <Route path="/user/dashboard" element={
                   localStorage.getItem("exim_user") ? <UserDashboard /> : <LoginPage />
                 } />

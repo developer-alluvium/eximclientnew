@@ -50,83 +50,90 @@ function LoginPage() {
     }
   }, [navigate]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
+const handleSubmit = async (event) => {
+  event.preventDefault();
+  setError(null);
+  setLoading(true);
 
-    if (!email || !password) {
-      setError("Email and password are required.");
-      setLoading(false);
-      return;
-    }
+  if (!email || !password) {
+    setError("Email and password are required.");
+    setLoading(false);
+    return;
+  }
 
-    const endpoint = isSuperAdminLogin
-      ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
-      : `${process.env.REACT_APP_API_STRING}/users/login`;
+  const endpoint = isSuperAdminLogin
+    ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
+    : `${process.env.REACT_APP_API_STRING}/users/login`;
 
-    const payload = { email, password };
+  const payload = { email, password };
 
-    try {
-      const res = await axios.post(endpoint, payload, { withCredentials: true });
+  try {
+    const res = await axios.post(endpoint, payload, { withCredentials: true });
 
-      if (res.data.success) {
-        if (isSuperAdminLogin) {
-          // Handle SuperAdmin successful login
-          localStorage.setItem("superadmin_token", res.data.token);
-          localStorage.setItem("superadmin_user", JSON.stringify(res.data.superAdmin));
-          navigate("/superadmin-dashboard", { replace: true });
-        } else {
-          // Handle User successful login (keeping original logic)
-          const userData = res.data.data.user;
-          const { accessToken, refreshToken } = res.data;
+    if (res.data.success) {
+      if (isSuperAdminLogin) {
+        // Handle SuperAdmin successful login
+        localStorage.setItem("superadmin_token", res.data.token);
+        localStorage.setItem("user_access_token", res.data.token);
+        localStorage.setItem("superadmin_user", JSON.stringify(res.data.superAdmin));
+        navigate("/superadmin-dashboard", { replace: true });
+      } else {
+        // Handle User successful login
+        const userData = res.data.data.user;
+        const { accessToken, refreshToken } = res.data;
 
-          localStorage.setItem("exim_user", JSON.stringify(userData));
-          localStorage.setItem("access_token", accessToken);
-          localStorage.setItem("refresh_token", refreshToken);
-          
-          setUser(userData);
-          navigate("/", { replace: true }); // Navigate to home as per original logic
-
-          logActivity({
-            userId: userData.id,
-            activityType: 'login',
-            description: `Successful login for user: ${email}`,
-          }).catch(logError => console.error('Failed to log login activity:', logError));
+        // CHECK IF USER IS ACTIVE
+        if (!userData.isActive) {
+          setError("Your account is not active. Please contact a SuperAdmin or higher authority for access.");
+          setLoading(false);
+          return;
         }
-      }
-    } catch (err) {
-      let errorMessage = "Login failed. Please try again.";
-      if (err.response) {
-        switch (err.response.status) {
-          case 401:
-            errorMessage = "Invalid email or password.";
-            break;
-          case 423:
-            errorMessage = "Account is temporarily locked. Please try again later.";
-            break;
-          case 403:
-            errorMessage = err.response.data.message || "Account pending verification.";
-            break;
-          default:
-            errorMessage = err.response.data.message || "An unexpected error occurred.";
-            break;
-        }
-      }
-      setError(errorMessage);
 
-      logActivity({
-        userId: null,
-        activityType: 'failed_login',
-        description: `Failed login attempt for: ${email}`,
-        severity: 'medium',
-        metadata: { email, errorMessage }
-      }).catch(logError => console.error('Failed to log failed login activity:', logError));
-    } finally {
-      setLoading(false);
+        localStorage.setItem("exim_user", JSON.stringify(userData));
+        localStorage.setItem("access_token", accessToken);
+        localStorage.setItem("refresh_token", refreshToken);
+        
+        setUser(userData);
+        navigate("/", { replace: true });
+
+        logActivity({
+          userId: userData.id,
+          activityType: 'login',
+          description: `Successful login for user: ${email}`,
+        }).catch(logError => console.error('Failed to log login activity:', logError));
+      }
     }
-  };
+  } catch (err) {
+    let errorMessage = "Login failed. Please try again.";
+    if (err.response) {
+      switch (err.response.status) {
+        case 401:
+          errorMessage = "Invalid email or password.";
+          break;
+        case 423:
+          errorMessage = "Account is temporarily locked. Please try again later.";
+          break;
+        case 403:
+          errorMessage = err.response.data.message || "Account pending verification.";
+          break;
+        default:
+          errorMessage = err.response.data.message || "An unexpected error occurred.";
+          break;
+      }
+    }
+    setError(errorMessage);
 
+    logActivity({
+      userId: null,
+      activityType: 'failed_login',
+      description: `Failed login attempt for: ${email}`,
+      severity: 'medium',
+      metadata: { email, errorMessage }
+    }).catch(logError => console.error('Failed to log failed login activity:', logError));
+  } finally {
+    setLoading(false);
+  }
+};
   const handleForgotPassword = async (event) => {
     event.preventDefault();
     setResetPasswordError(null);
@@ -134,22 +141,17 @@ function LoginPage() {
     setIsResettingPassword(true);
 
     try {
-      // Assuming the forgot password endpoint for users is now this
+      // Point to the new endpoint for requesting the reset link
       const res = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/users/forgot-password`,
-        { email: forgotPasswordEmail },
-        { withCredentials: true }
+        `${process.env.REACT_APP_API_STRING}/users/request-password-reset`,
+        { email: forgotPasswordEmail }
       );
 
       if (res.status === 200) {
-        setResetPasswordSuccess({
-          message: res.data.message,
-          temporaryPassword: res.data.temporaryPassword,
-        });
+        setResetPasswordSuccess(res.data.message); // Display the confirmation message
         setForgotPasswordEmail("");
       }
     } catch (error) {
-       // Error handling remains similar
        setResetPasswordError(error.response?.data?.message || "An error occurred.");
     } finally {
       setIsResettingPassword(false);
@@ -238,13 +240,13 @@ function LoginPage() {
                     {loading ? "Signing In..." : "Sign In"}
                   </Button>
                   
-                  {/* UPDATED SECTION */}
+               
                   {!isSuperAdminLogin && (
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
                         <Typography
                             variant="body2"
                             sx={{ cursor: "pointer", color: "primary.main" }}
-                            onClick={() => setForgotPassword(true)}
+                            onClick={() => setForgotPassword(true)} // Toggle the forgot password view
                         >
                             Forgot Password?
                         </Typography>
@@ -259,21 +261,23 @@ function LoginPage() {
               )}
 
               {/* Forgot Password Form */}
-              {forgotPassword && (
+               {forgotPassword && (
                  <Box sx={{ mt: 2 }}>
                     {resetPasswordSuccess ? (
                       <Box sx={{ textAlign: "center" }}>
                         <Alert severity="success" sx={{ mb: 2 }}>
-                          {resetPasswordSuccess.message}
+                          {resetPasswordSuccess}
                         </Alert>
-                        <Typography>New Password: {resetPasswordSuccess.temporaryPassword}</Typography>
                         <Button variant="contained" color="primary" onClick={handleBackToLogin} fullWidth sx={{ mt: 2 }}>
                           Back to Login
                         </Button>
                       </Box>
                     ) : (
                       <Box>
-                        <Typography variant="h6" align="center" sx={{ mb: 2 }}>Reset Password</Typography>
+                        <Typography variant="h6" align="center" sx={{ mb: 2 }}>Forgot Your Password?</Typography>
+                        <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
+                          Enter your email address below and we'll send you a link to reset your password.
+                        </Typography>
                         {resetPasswordError && <Alert severity="error" sx={{ mb: 2 }}>{resetPasswordError}</Alert>}
                         <form onSubmit={handleForgotPassword}>
                           <TextField
@@ -283,11 +287,10 @@ function LoginPage() {
                             margin="normal"
                             value={forgotPasswordEmail}
                             onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                            helperText="Enter your email to reset your password"
                             required
                           />
                           <Button type="submit" fullWidth variant="contained" color="primary" sx={{ mt: 2, mb: 1 }} disabled={isResettingPassword}>
-                            {isResettingPassword ? "Resetting..." : "Reset Password"}
+                            {isResettingPassword ? "Sending..." : "Send Reset Link"}
                           </Button>
                           <Button fullWidth variant="text" color="primary" onClick={handleBackToLogin}>
                             Back to Login

@@ -28,7 +28,8 @@ import {
   Notifications as NotificationsIcon,
   Logout as LogoutIcon,
   AccountCircle as AccountCircleIcon,
-  AccessTime as AccessTimeIcon
+  AccessTime as AccessTimeIcon,
+  ManageAccounts as ManageAccountsIcon
 } from "@mui/icons-material";
 
 // Import module icons
@@ -542,6 +543,10 @@ function UserDashboard() {
           <MenuItem onClick={() => navigate('/user/profile')}>
             <PersonIcon sx={{ mr: 2 }} />
             Profile
+          </MenuItem>
+          <MenuItem onClick={() => navigate('/user-management')}>
+            <ManageAccountsIcon sx={{ mr: 2 }} />
+            UsersManagment
           </MenuItem>
           <MenuItem onClick={handleLogout}>
             <LogoutIcon sx={{ mr: 2 }} />

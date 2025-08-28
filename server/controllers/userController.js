@@ -6,25 +6,25 @@ import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
 import { logActivity } from "../utils/activityLogger.js";
 import crypto from "crypto";
-
+import {sendVerificationEmail} from "../services/emailService.js";
+import { sendPasswordResetEmail } from "../services/emailService.js";
 /**
  * User Registration
  */
+
 export const registerUser = async (req, res) => {
   try {
     const { 
       name, 
       email, 
-      password, 
-      ie_code_no, 
-      importer
+      password,
     } = req.body;
 
     // Validate required fields
-    if (!name || !email || !password || !ie_code_no || !importer) {
+    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "All required fields must be provided (name, email, password, ie_code_no, importer)."
+        message: "All required fields must be provided (name, email, password)."
       });
     }
 
@@ -54,77 +54,49 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // Verify IE code exists and get associated customer (who acts as admin)
-    const ieCodeUpper = ie_code_no.toUpperCase();
-    const customer = await CustomerModel.findOne({ ie_code_no: ieCodeUpper });
-    if (!customer) {
-      return res.status(404).json({
-        success: false,
-        message: "Invalid IE Code. Please contact support."
-      });
-    }
-
-    // Check if customer is active
-    if (!customer.isActive) {
-      return res.status(404).json({
-        success: false,
-        message: "IE Code is inactive. Please contact support."
-      });
-    }
-
-    // Create user with customer as admin
+    // Create user instance (not saved yet)
     const user = new EximclientUser({
       name: name.trim(),
       email: email.toLowerCase(),
       password,
-      ie_code_no: ieCodeUpper,
-      importer: importer.trim(),
-      adminId: customer._id, // Using customer as admin
       status: 'pending',
       isActive: false,
+      emailVerified: false, 
       registrationIp: req.ip || req.connection.remoteAddress,
-      
     });
 
-    // Generate email verification token
-    user.generateVerificationToken();
-    
+    // Generate email verification token and assign to user instance
+    const emailVerificationToken = user.generateVerificationToken();
+
+    // Save user with verification token persisted
     await user.save();
 
-    // Create notification for customer (who acts as admin)
-    await Notification.createNotification({
-      type: 'user_registration',
-      recipient: customer._id,
-      recipientModel: 'Customer', // Changed to Customer
-      title: 'New User Registration',
-      message: `New user ${name} (${email}) has registered under your IE Code ${ieCodeUpper}. Please verify and activate their account.`,
-      data: {
-        userId: user._id,
-        userEmail: email,
-        userName: name,
-        ie_code_no: ieCodeUpper
-      },
-      priority: 'medium',
-      actionRequired: true,
-      actionUrl: `/admin/users/pending`
-    });
+    // Send verification email after saving
+    try {
+      await sendVerificationEmail(user.email, user.name, emailVerificationToken);
+      console.log(`Verification email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Optionally handle by deleting the user or retrying
+    }
 
     // Log activity
     await logActivity(
       user._id,
       'USER_REGISTRATION',
       'User registered successfully',
-      { email, ie_code_no: ieCodeUpper },
+      { email },
       req.ip
     );
 
     res.status(201).json({
       success: true,
-      message: "Registration successful! Your account is pending verification. You will be notified once approved.",
+      message: "Registration successful! Please check your email to verify your account before logging in.",
       data: {
         userId: user._id,
         email: user.email,
-        status: user.status
+        status: user.status,
+        emailVerified: user.emailVerified
       }
     });
 
@@ -144,6 +116,147 @@ export const registerUser = async (req, res) => {
     });
   }
 };
+
+
+
+// routes/controllers/userController.js
+/**
+ * Verify Email 
+ */
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token is required"
+      });
+    }
+
+    // Find user with this verification token
+    const user = await EximclientUser.findOne({
+      emailVerificationToken: token,
+      emailVerificationTokenExpires: { $gt: Date.now() } // Check if token hasn't expired
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification token",
+      });
+    }
+
+    // Update user as verified
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined; // Clear the token
+    user.emailVerificationTokenExpires = undefined; // Clear the expiration
+    user.isActive = true;
+    user.status = 'active';
+
+    await user.save();
+
+    // ✅ ADD THIS SUCCESS RESPONSE!
+    // This tells the frontend that everything worked.
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully."
+    });
+
+  } catch (error) {
+    console.error("Email verification error:", error);
+    
+    // Send a generic server error response in case of other issues
+    res.status(500).json({
+        success: false,
+        message: "An error occurred during email verification."
+    });
+  }
+};
+
+// This is the controller for the FIRST step of the process
+export const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await EximclientUser.findOne({ email });
+
+    // Important: Don't reveal if a user exists or not for security reasons.
+    // Always send a success-like response.
+    if (!user) {
+      return res.status(200).json({ success: true, message: "If an account with that email exists, a password reset link has been sent." });
+    }
+
+    // Generate the reset token (this is the unhashed version)
+    const resetToken = user.generatePasswordResetToken();
+    await user.save({ validateBeforeSave: false }); // Skip validation to save without a password change
+
+    // Send the email
+    await sendPasswordResetEmail(user.email, user.name, resetToken);
+
+    res.status(200).json({ success: true, message: "If an account with that email exists, a password reset link has been sent." });
+
+  } catch (error) {
+    console.error("Request password reset error:", error);
+    // In case of error, clear the token to allow the user to try again
+    const user = await EximclientUser.findOne({ email: req.body.email });
+    if (user) {
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        await user.save({ validateBeforeSave: false });
+    }
+    res.status(500).json({ success: false, message: "Failed to send password reset email." });
+  }
+};
+/** 
+ * Forgot Password 
+ */
+// This is your provided controller, renamed and modified for the SECOND step.
+// It now uses the token from the URL to reset the password.
+export const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, message: "Token and new password are required" });
+    }
+
+    // 1. Hash the incoming token to match the one in the DB
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // 2. Find user with the valid, unexpired hashed token
+    const user = await EximclientUser.findOne({
+      passwordResetToken: hashedToken, // Use the hashed token for lookup
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid or expired reset token" });
+    }
+
+    // Update password (hashed through pre-save hook)
+    user.password = newPassword;
+
+    // Clear reset token and expiry
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password has been reset successfully. Please log in." });
+  } catch (error) {
+    console.error("Password reset error:", error);
+    res.status(500).json({ success: false, message: "Failed to reset password" });
+  }
+};
+
 
 /**
  * User Login
@@ -166,7 +279,7 @@ export const loginUser = async (req, res) => {
     const user = await EximclientUser.findOne({ 
       email: email.toLowerCase() 
     })
-    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible' )
+    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified' )
     .populate('adminId', 'name ie_code_no'); // Populating customer as admin
 
     if (!user) {
@@ -195,7 +308,7 @@ export const loginUser = async (req, res) => {
     if (!isPasswordValid) {
       console.log("Password invalid, incrementing login attempts");
       // Increment login attempts
-      await user.loginAttempts();
+      // await user.loginAttempts();
       
       return res.status(401).json({
         success: false,
@@ -355,13 +468,13 @@ export const logoutUser = async (req, res) => {
       await user.save();
 
       // Log activity
-      await logActivity(
-        user._id,
-        'USER_LOGOUT',
-        'User logged out',
-        { email: user.email },
-        req.ip
-      );
+      // await logActivity(
+      //   user._id,
+      //   'USER_LOGOUT',
+      //   'User logged out',
+      //   { email: user.email },
+      //   req.ip
+      // );
     }
 
     // Clear cookies
