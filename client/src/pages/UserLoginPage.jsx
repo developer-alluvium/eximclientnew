@@ -87,9 +87,28 @@ function UserLoginPage() {
           // Handle User successful login
           const { user } = response.data.data;
           const { accessToken, refreshToken } = response.data;
-          localStorage.setItem("exim_user", JSON.stringify(user));
+
+          // Enhanced user data storage with IE code assignments
+          const enhancedUserData = {
+            ...user,
+            auth: {
+              accessToken,
+              refreshToken,
+              lastLogin: new Date().toISOString()
+            },
+            preferences: {
+              defaultIeCode: user.primary_ie_code || (user.ie_code_assignments?.[0]?.ie_code_no),
+              lastActiveModule: null
+            }
+          };
+
+          localStorage.setItem("exim_user", JSON.stringify(enhancedUserData));
           localStorage.setItem("access_token", accessToken);
           localStorage.setItem("refresh_token", refreshToken);
+          
+          // Store IE code assignments separately for quick access
+          localStorage.setItem("ie_code_assignments", JSON.stringify(user.ie_code_assignments || []));
+          
           navigate("/user/dashboard", { replace: true });
         }
       }

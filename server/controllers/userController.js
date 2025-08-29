@@ -274,10 +274,13 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    console.log("Finding user:", email);
-    // Find user by email and select necessary fields
+    console.log("Finding user by email or IE code:", email);
+    // Find user by email or IE code and select necessary fields
     const user = await EximclientUser.findOne({ 
-      email: email.toLowerCase() 
+      $or: [
+        { email: email.toLowerCase() },
+        { ie_code_no: email.toUpperCase() }
+      ]
     })
     .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified' )
     .populate('adminId', 'name ie_code_no'); // Populating customer as admin

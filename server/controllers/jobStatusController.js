@@ -152,11 +152,117 @@ export async function updateContainerTransporter(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+// Controller function to get jobs by multiple IE codes
+export async function getJobsByMultipleIECodes(req, res) {
+  try {
+    const { year, status, detailedStatus } = req.params;
+    const { page = 1, limit = 100, search = "", exporter = "", ieCodes = "" } = req.query;
+    const skip = (page - 1) * limit;
+
+    if (!ieCodes) {
+      return res.status(400).json({ message: "IE Codes are required" });
+    }
+
+    // Split the IE codes string into an array
+    const ieCodeArray = ieCodes.split(',').map(code => code.trim());
+
+    // Base query with year filter and IE codes
+    const query = {
+      year,
+      ie_code_no: { $in: ieCodeArray }
+    };
+
+    // Add status conditions similar to getJobsByStatusAndImporter
+    const statusLower = status.toLowerCase();
+    
+    if (statusLower === "all") {
+      query.$and = [
+        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+        { status: { $not: { $regex: "^cancelled$", $options: "i" } } }
+      ];
+    } else if (statusLower === "pending") {
+      query.$and = [
+        { status: { $regex: "^pending$", $options: "i" } },
+        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+        {
+          $or: [
+            { bill_date: { $in: [null, ""] } },
+            { status: { $regex: "^pending$", $options: "i" } },
+          ],
+        },
+      ];
+    } else if (statusLower === "completed") {
+      query.$and = [
+        { status: { $regex: "^completed$", $options: "i" } },
+        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+        {
+          $or: [
+            { bill_date: { $nin: [null, ""] } },
+            { status: { $regex: "^completed$", $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    // Handle detailed status and search similar to original function
+    if (detailedStatus !== "all") {
+      query.detailed_status = statusMapping[detailedStatus] || detailedStatus;
+    }
+
+    if (search) {
+      query.$and = query.$and || [];
+      query.$and.push(buildSearchQuery(search));
+    }
+
+    if (exporter && exporter !== "all") {
+      query.supplier_exporter = {
+        $regex: `^${escapeRegex(exporter)}$`,
+        $options: "i",
+      };
+    }
+
+    const jobs = await JobModel.find(query).select(
+      getSelectedFields(detailedStatus === "all" ? "all" : detailedStatus)
+    );
+
+    // Apply the same ranking and sorting logic as the original function
+    const rankedJobs = jobs.filter((job) => statusRank[job.detailed_status]);
+    const unrankedJobs = jobs.filter((job) => !statusRank[job.detailed_status]);
+
+    const sortedRankedJobs = Object.entries(statusRank).reduce(
+      (acc, [status, { field }]) => [
+        ...acc,
+        ...rankedJobs
+          .filter((job) => job.detailed_status === status)
+          .sort(
+            (a, b) =>
+              parseDate(a.container_nos?.[0]?.[field] || a[field]) -
+              parseDate(b.container_nos?.[0]?.[field] || b[field])
+          ),
+      ],
+      []
+    );
+
+    const allJobs = [...sortedRankedJobs, ...unrankedJobs];
+    const paginatedJobs = allJobs.slice(skip, skip + parseInt(limit));
+
+    res.json({
+      message: "Jobs fetched successfully",
+      data: paginatedJobs,
+      total: allJobs.length,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(allJobs.length / limit),
+    });
+
+  } catch (error) {
+    console.error("Error fetching jobs by IE codes:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
 // Controller function to get jobs by status, detailed status and importer
 export async function getJobsByStatusAndImporter(req, res) {
   try {
-
-    
     const { year, status, detailedStatus, importer } = req.params;
     const { page = 1, limit = 100, search = "", exporter = "" } = req.query;
     const skip = (page - 1) * limit;

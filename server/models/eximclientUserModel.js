@@ -1,7 +1,35 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from 'crypto';
-import { type } from "os";
+
+const ieCodeAssignmentSchema = new mongoose.Schema({
+  ie_code_no: {
+    type: String,
+    required: true,
+    trim: true,
+    uppercase: true
+  },
+  importer_name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  assigned_at: {
+    type: Date,
+    required: true,
+    default: Date.now
+  },
+  assigned_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    refPath: 'assigned_by_model'
+  },
+  assigned_by_model: {
+    type: String,
+    required: true,
+    enum: ['SuperAdmin', 'Admin', 'Customer']
+  }
+}, { _id: false });
 
 const eximclientUserSchema = new mongoose.Schema(
   {
@@ -25,19 +53,20 @@ const eximclientUserSchema = new mongoose.Schema(
       required: true,
       minlength: 8,
     },
-    importer: {
-      type: String,
-     
-      trim: true,
-      maxlength: 200,
-      default: 'Not Specified'
-    },
+    // Deprecated: To be migrated to ie_code_assignments
     ie_code_no: {
       type: String,
-
       trim: true,
       uppercase: true,
     },
+    // Deprecated: To be migrated to ie_code_assignments 
+    assignedImporterName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    // New field for multiple IE code assignments
+    ie_code_assignments: [ieCodeAssignmentSchema],
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer", // Changed from Admin to Customer

@@ -134,8 +134,9 @@ const AdminManagement = ({ onRefresh }) => {
 
   // IE Code selection states
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
-  const [selectedIeCode, setSelectedIeCode] = useState('');
-  const [ieCodeReason, setIeCodeReason] = useState(''); // New reason field
+  const [selectedIeCodes, setSelectedIeCodes] = useState([]); // Now an array
+  const [ieCodeReason, setIeCodeReason] = useState('');
+  const [isRemovingIeCode, setIsRemovingIeCode] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -189,9 +190,9 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-  // New IE Code Assignment Handler
-  const handleAssignIeCode = async () => {
-    if (!selectedEntity || !selectedIeCode) return;
+  // IE Code Assignment/Removal Handler
+  const handleIeCodeOperation = async () => {
+    if (!selectedEntity || (!isRemovingIeCode && selectedIeCodes.length === 0)) return;
 
     try {
       setLoading(true);
@@ -211,20 +212,36 @@ const AdminManagement = ({ onRefresh }) => {
         withCredentials: true
       };
 
-      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/assign-ie-code`;
-      const data = {
-        ieCodeNo: selectedIeCode,
-        reason: ieCodeReason
-      };
+      let endpoint;
+      let data;
+      
+      if (isRemovingIeCode) {
+        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/remove-ie-codes`;
+        data = {
+          ieCodes: selectedIeCodes,
+          reason: ieCodeReason
+        };
+      } else {
+        endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes`;
+        data = {
+          ieCodes: selectedIeCodes,
+          reason: ieCodeReason
+        };
+        
+        
+      }
 
       const response = await axios.post(endpoint, data, config);
 
       if (response.data.success) {
-        setSuccess(`Successfully assigned IE Code ${selectedIeCode} to ${selectedEntity.name}`);
+        const action = isRemovingIeCode ? 'removed' : 'assigned';
+        const ieCodesStr = selectedIeCodes.join(', ');
+        setSuccess(`Successfully ${action} IE Code(s) ${ieCodesStr} ${isRemovingIeCode ? 'from' : 'to'} ${selectedEntity.name}`);
         fetchData();
         setIeCodeDialog(false);
-        setSelectedIeCode('');
+        setSelectedIeCodes([]);
         setIeCodeReason('');
+        setIsRemovingIeCode(false);
       }
     } catch (error) {
       console.error('Error assigning IE code:', error);
@@ -258,36 +275,37 @@ const AdminManagement = ({ onRefresh }) => {
         withCredentials: true
       };
 
-      // For users, we promote them to admin with optional IE code assignment
+      // For users, we promote them to admin with optional IE code assignments
       const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${entity._id}/promote-admin`;
       
-      // Check if user already has an IE code
-      const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
+      // Check if user already has any IE codes
+      const hasExistingIeCodes = entity.ie_code_assignments?.length > 0 || entity.ie_code_no;
 
       let data;
-      if (hasExistingIeCode) {
-        // User has IE code - selectedIeCode is optional
-        data = selectedIeCode ? { ie_code_no: selectedIeCode } : {};
+      if (hasExistingIeCodes) {
+        // User has IE codes - new assignments are optional
+        data = selectedIeCodes.length > 0 ? { ieCodes: selectedIeCodes } : {};
       } else {
-        // User doesn't have IE code - selectedIeCode is required
-        if (!selectedIeCode) {
-          setError('This user does not have an IE code. Please select an IE code to assign.');
+        // User doesn't have any IE codes - at least one is required
+        if (selectedIeCodes.length === 0) {
+          setError('This user does not have any IE codes. Please select at least one IE code to assign.');
           setLoading(false);
           return;
         }
-        data = { ie_code_no: selectedIeCode };
+        data = { ieCodes: selectedIeCodes };
       }
 
       const response = await axios.put(endpoint, data, config);
 
       if (response.data.success) {
-        // Enhanced success message based on IE code assignment
-        const hasExistingIeCode = entity.ie_code_no || entity.assignedIeCode;
+        // Enhanced success message based on IE code assignments
+        const hasExistingIeCodes = entity.ie_code_assignments?.length > 0 || entity.ie_code_no;
         let successMessage;
-        if (hasExistingIeCode && !selectedIeCode) {
-          successMessage = `Successfully promoted ${entity.name} to admin using existing IE code`;
-        } else if (selectedIeCode) {
-          successMessage = `Successfully promoted ${entity.name} to admin with IE code ${selectedIeCode}`;
+        if (hasExistingIeCodes && selectedIeCodes.length === 0) {
+          successMessage = `Successfully promoted ${entity.name} to admin using existing IE codes`;
+        } else if (selectedIeCodes.length > 0) {
+          const ieCodesStr = selectedIeCodes.join(', ');
+          successMessage = `Successfully promoted ${entity.name} to admin with IE codes: ${ieCodesStr}`;
         } else {
           successMessage = `Successfully promoted ${entity.name} to admin`;
         }
@@ -295,7 +313,7 @@ const AdminManagement = ({ onRefresh }) => {
         setSuccess(successMessage);
         fetchData();
         setAdminDialog(false);
-        setSelectedIeCode('');
+        setSelectedIeCodes([]);
       }
     } catch (error) {
       console.error('Error promoting to admin:', error);
@@ -561,11 +579,12 @@ const AdminManagement = ({ onRefresh }) => {
     setTabVisibilityDialog(true);
   };
 
-  // New IE Code dialog opener
-  const openIeCodeDialog = (user) => {
+  // IE Code dialog opener
+  const openIeCodeDialog = (user, isRemoving = false) => {
     setSelectedEntity(user);
-    setSelectedIeCode('');
+    setSelectedIeCodes([]);
     setIeCodeReason('');
+    setIsRemovingIeCode(isRemoving);
     setIeCodeDialog(true);
   };
 
@@ -792,21 +811,51 @@ const AdminManagement = ({ onRefresh }) => {
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {user.ie_code_no || 'Not Assigned'}
-                        </Typography>
-                        {user.ieCodeAssignedAt && (
-                          <Typography variant="caption" color="text.secondary">
-                            Assigned: {new Date(user.ieCodeAssignedAt).toLocaleDateString()}
+                      <Box sx={{ maxWidth: 250 }}>
+                        {user.ie_code_assignments && user.ie_code_assignments.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {user.ie_code_assignments.map((assignment, idx) => (
+                              <Chip
+                                key={assignment.ie_code_no}
+                                size="small"
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                      {assignment.ie_code_no}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ({new Date(assignment.assigned_at).toLocaleDateString()})
+                                    </Typography>
+                                  </Box>
+                                }
+                                color={idx === 0 ? 'primary' : 'default'}
+                                variant="outlined"
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Not Assigned
                           </Typography>
                         )}
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {user.assignedImporterName || 'Not Assigned'}
-                      </Typography>
+                      <Box sx={{ maxWidth: 200 }}>
+                        {user.ie_code_assignments && user.ie_code_assignments.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {user.ie_code_assignments.map(assignment => (
+                              <Typography key={assignment.ie_code_no} variant="caption" color="text.secondary">
+                                {assignment.importer_name || 'No Name'}
+                              </Typography>
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Not Assigned
+                          </Typography>
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -873,16 +922,27 @@ const AdminManagement = ({ onRefresh }) => {
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        {/* IE Code Assignment Button */}
-                        <Tooltip title="Assign IE Code">
+                        {/* IE Code Assignment Buttons */}
+                        <Tooltip title="Manage IE Codes">
                           <IconButton
                             size="small"
                             color="info"
-                            onClick={() => openIeCodeDialog(user)}
+                            onClick={() => openIeCodeDialog(user, false)}
                           >
                             <AccountBox />
                           </IconButton>
                         </Tooltip>
+                        {user.ie_code_assignments?.length > 0 && (
+                          <Tooltip title="Remove IE Codes">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => openIeCodeDialog(user, true)}
+                            >
+                              <Delete />
+                            </IconButton>
+                          </Tooltip>
+                        )}
 
                         {/* Status Toggle Button */}
                         <Tooltip title={user.isActive ? 'Deactivate User' : 'Activate User'}>
@@ -956,22 +1016,35 @@ const AdminManagement = ({ onRefresh }) => {
       {/* IE Code Assignment Dialog */}
       <Dialog
         open={ieCodeDialog}
-        onClose={() => setIeCodeDialog(false)}
+        onClose={() => {
+          setIeCodeDialog(false);
+          setSelectedIeCodes([]);
+          setIsRemovingIeCode(false);
+          setIeCodeReason('');
+        }}
         maxWidth="md"
         fullWidth
       >
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <AccountBox color="primary" />
-            Assign IE Code to {selectedEntity?.name}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <AccountBox color="primary" />
+              {isRemovingIeCode ? 'Remove' : 'Assign'} IE Codes - {selectedEntity?.name}
+            </Box>
+            <Button 
+              size="small" 
+              onClick={() => setIsRemovingIeCode(!isRemovingIeCode)}
+              startIcon={isRemovingIeCode ? <Assignment /> : <Delete />}
+            >
+              Switch to {isRemovingIeCode ? 'Assignment' : 'Removal'}
+            </Button>
           </Box>
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            {selectedEntity?.ie_code_no 
-              ? `Current IE Code: ${selectedEntity.ie_code_no} (${selectedEntity.assignedImporterName || 'No Importer Name'}). You can reassign a different IE code.`
-              : 'Select an IE code to assign to this user.'
-            }
+            {selectedEntity?.ie_code_assignments?.length > 0
+              ? `Current IE Codes: ${selectedEntity.ie_code_assignments.map(a => `${a.ie_code_no} (${a.importer_name || 'No Importer Name'})`).join(', ')}`
+              : 'No IE codes currently assigned.'}
           </Typography>
 
           {/* IE Code Search */}
@@ -992,33 +1065,63 @@ const AdminManagement = ({ onRefresh }) => {
 
           {/* IE Code Selection */}
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Select IE Code</InputLabel>
+            <InputLabel>{isRemovingIeCode ? 'Select IE Codes to Remove' : 'Select IE Codes to Assign'}</InputLabel>
             <Select
-              value={selectedIeCode}
-              onChange={(e) => setSelectedIeCode(e.target.value)}
-              label="Select IE Code"
+              multiple
+              value={selectedIeCodes}
+              onChange={(e) => setSelectedIeCodes(e.target.value)}
+              label={isRemovingIeCode ? 'Select IE Codes to Remove' : 'Select IE Codes to Assign'}
               required
             >
-              {filteredIeCodes.map((ieCode) => (
-                <MenuItem key={ieCode.iecNo} value={ieCode.iecNo}>
-                  <Box sx={{ py: 1 }}>
-                    <Typography variant="body2" fontWeight="bold" color="primary">
-                      {ieCode.iecNo}
-                    </Typography>
+              {(isRemovingIeCode ? selectedEntity?.ie_code_assignments || [] : filteredIeCodes).map((ieCode) => (
+                <MenuItem 
+                  key={ieCode.ie_code_no || ieCode.iecNo} 
+                  value={ieCode.ie_code_no || ieCode.iecNo}
+                  sx={{
+                    opacity: selectedIeCodes.includes(ieCode.ie_code_no || ieCode.iecNo) ? 0.5 : 1,
+                    '&.Mui-selected': { opacity: 1 }
+                  }}
+                >
+                  <Box sx={{ py: 1, width: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="body2" fontWeight="bold" color="primary">
+                        {ieCode.ie_code_no || ieCode.iecNo}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {ieCode.assigned_at ? `Assigned: ${new Date(ieCode.assigned_at).toLocaleDateString()}` : ''}
+                      </Typography>
+                    </Box>
                     <Typography variant="body2" sx={{ mb: 0.5 }}>
-                      {ieCode.importerName}
+                      {ieCode.importer_name || ieCode.importerName}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Chip label={ieCode.status} size="small" color="primary" variant="outlined" />
-                      <Chip label={ieCode.approval} size="small" color="secondary" variant="outlined" />
+                      <Chip 
+                        label={ieCode.status || 'Active'} 
+                        size="small" 
+                        color={ieCode.status === 'Inactive' ? 'error' : 'primary'} 
+                        variant="outlined" 
+                      />
+                      {ieCode.approval && (
+                        <Chip 
+                          label={ieCode.approval} 
+                          size="small" 
+                          color="secondary" 
+                          variant="outlined" 
+                        />
+                      )}
                     </Box>
                   </Box>
                 </MenuItem>
               ))}
-              {filteredIeCodes.length === 0 && (
+              {(isRemovingIeCode ? selectedEntity?.ie_code_assignments?.length === 0 : filteredIeCodes.length === 0) && (
                 <MenuItem disabled>
                   <Typography variant="body2" color="text.secondary">
-                    {ieCodeSearch ? 'No IE codes found matching your search' : 'No available IE codes'}
+                    {isRemovingIeCode 
+                      ? 'No IE codes available for removal'
+                      : ieCodeSearch 
+                        ? 'No IE codes found matching your search' 
+                        : 'No available IE codes'
+                    }
                   </Typography>
                 </MenuItem>
               )}
@@ -1029,23 +1132,31 @@ const AdminManagement = ({ onRefresh }) => {
           <TextField
             fullWidth
             label="Reason (Optional)"
-            placeholder="Enter reason for IE code assignment..."
+            placeholder={`Enter reason for IE code ${isRemovingIeCode ? 'removal' : 'assignment'}...`}
             value={ieCodeReason}
             onChange={(e) => setIeCodeReason(e.target.value)}
             multiline
             rows={3}
-            helperText="Provide a reason for this IE code assignment. This will be logged for audit purposes."
+            helperText={`Provide a reason for this IE code ${isRemovingIeCode ? 'removal' : 'assignment'}. This will be logged for audit purposes.`}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIeCodeDialog(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setIeCodeDialog(false);
+            setSelectedIeCodes([]);
+            setIsRemovingIeCode(false);
+            setIeCodeReason('');
+          }}>Cancel</Button>
           <Button
             variant="contained"
-            onClick={handleAssignIeCode}
-            disabled={loading || !selectedIeCode}
-            startIcon={<AccountBox />}
+            onClick={handleIeCodeOperation}
+            disabled={loading || selectedIeCodes.length === 0}
+            color={isRemovingIeCode ? 'error' : 'primary'}
+            startIcon={isRemovingIeCode ? <Delete /> : <AccountBox />}
           >
-            Assign IE Code
+            {isRemovingIeCode 
+              ? `Remove ${selectedIeCodes.length} IE Code${selectedIeCodes.length > 1 ? 's' : ''}`
+              : `Assign ${selectedIeCodes.length} IE Code${selectedIeCodes.length > 1 ? 's' : ''}`}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1056,7 +1167,7 @@ const AdminManagement = ({ onRefresh }) => {
         open={adminDialog}
         onClose={() => {
           setAdminDialog(false);
-          setSelectedIeCode('');
+          setSelectedIeCodes([]);
         }}
         maxWidth="sm"
         fullWidth
@@ -1081,11 +1192,12 @@ const AdminManagement = ({ onRefresh }) => {
           {/* IE Code Selection for User Promotion */}
           {adminAction === 'promote' && selectedEntity?.type === 'user' && (
             <FormControl fullWidth sx={{ mt: 2 }}>
-              <InputLabel>Select IE Code to Assign</InputLabel>
+              <InputLabel>Select IE Codes to Assign</InputLabel>
               <Select
-                value={selectedIeCode}
-                onChange={(e) => setSelectedIeCode(e.target.value)}
-                label="Select IE Code to Assign"
+                multiple
+                value={selectedIeCodes}
+                onChange={(e) => setSelectedIeCodes(e.target.value)}
+                label="Select IE Codes to Assign"
               >
                 {availableIeCodes.map((ieCode) => (
                   <MenuItem key={ieCode.iecNo} value={ieCode.iecNo}>
@@ -1121,7 +1233,7 @@ const AdminManagement = ({ onRefresh }) => {
         <DialogActions>
           <Button onClick={() => {
             setAdminDialog(false);
-            setSelectedIeCode('');
+            setSelectedIeCodes([]);
           }}>Cancel</Button>
           <Button
             variant="contained"
@@ -1133,9 +1245,12 @@ const AdminManagement = ({ onRefresh }) => {
                 handleRevokeAdmin(selectedEntity, selectedEntity?.type);
               }
             }}
-            disabled={loading || (adminAction === 'promote' && selectedEntity?.type === 'user' && !selectedEntity?.ie_code_no && !selectedIeCode)}
+            disabled={loading || (adminAction === 'promote' && selectedEntity?.type === 'user' && !selectedEntity?.ie_code_assignments?.length && selectedIeCodes.length === 0)}
+            startIcon={adminAction === 'promote' ? <SupervisorAccount /> : <Block />}
           >
-            {adminAction === 'promote' ? 'Promote' : 'Revoke'}
+            {adminAction === 'promote' ? 
+              `Promote${selectedIeCodes.length > 0 ? ` with ${selectedIeCodes.length} IE Code${selectedIeCodes.length > 1 ? 's' : ''}` : ''}` 
+              : 'Revoke'}
           </Button>
         </DialogActions>
       </Dialog>

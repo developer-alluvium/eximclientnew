@@ -40,12 +40,23 @@ router.patch("/superadmin/user/:userId/tab-visibility", protectSuperAdmin, updat
 
 router.use(authenticateUser);
 
+// User management routes with multiple IE code support
+router.get('/users', getUsersByIECode); // Now supports querying users by multiple IE codes
 
-// Get users by IE Code
-router.get('/users', getUsersByIECode);
-
-// Create/Invite new user
-router.post('/users/invite', inviteUser);
+// Create/Invite new user (updated to support multiple IE codes)
+router.post('/users/invite', 
+  authorize('superadmin', 'admin'),
+  async (req, res, next) => {
+    // Convert single IE code to array format if needed
+    if (req.body.ie_code_no && !Array.isArray(req.body.ie_code_no)) {
+      req.body.ie_code_assignments = [{
+        ie_code_no: req.body.ie_code_no,
+        importer_name: req.body.importer || 'Unknown'
+      }];
+    }
+    next();
+  },
+  inviteUser);
 
 // Update user role
 router.patch('/users/:userId/role', authorize('admin'), updateUserRole);

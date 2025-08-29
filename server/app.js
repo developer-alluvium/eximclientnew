@@ -16,6 +16,7 @@ import userRoutes from "./routes/userRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import customerAdminRoutes from "./routes/customerAdminRoutes.js";
 import userManagementRoutes from "./routes/userManagementRoutes.js";
+import superAdminIeCodeRoutes from "./routes/superAdminIeCodeRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -81,6 +82,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/customer-admin", customerAdminRoutes);
 app.use("/api/user-management", userManagementRoutes);
+app.use("/api/superadmin", superAdminIeCodeRoutes);
 
 // Root route
 app.get("/", (req, res) => {

@@ -80,7 +80,14 @@ export const getJobsByIECode = async (req, res) => {
     let aggregationPipeline = [];
 
     // Build base match query with simplified status logic
-    const baseQuery = { year, ie_code_no: ieCode };
+    const baseQuery = { year };
+    
+    // Handle multiple IE codes
+    if (ieCode.includes(',')) {
+      baseQuery.ie_code_no = { $in: ieCode.split(',') };
+    } else {
+      baseQuery.ie_code_no = ieCode;
+    }
     
     if (status === 'all') {
       // For 'all' status, exclude only explicitly cancelled jobs

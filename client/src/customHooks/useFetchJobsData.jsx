@@ -31,7 +31,32 @@ function useFetchJobsData(
     setError(null);
 
     try {
-      // Clean the importer name by replacing non-breaking spaces with regular spaces
+      const ieCodeAssignments = localStorage.getItem('ieCodeAssignments');
+      
+      // If we have IE code assignments, use the multiple IE codes endpoint
+      if (ieCodeAssignments) {
+        const apiString = process.env.REACT_APP_API_STRING || "";
+        const formattedSearchQuery = searchQuery ? encodeURIComponent(searchQuery) : "";
+        const formattedExporter = selectedExporter && selectedExporter !== "all"
+          ? encodeURIComponent(selectedExporter)
+          : "";
+
+        let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/multiple?ieCodes=${ieCodeAssignments}&page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+        
+        console.log("Fetching jobs data with multiple IE codes from:", apiUrl);
+        
+        const response = await axios.get(apiUrl);
+        const { data, total, totalPages, currentPage } = response.data;
+        
+        setRows(data || []);
+        setTotal(total || 0);
+        setTotalPages(totalPages || 1);
+        setCurrentPage(currentPage || 1);
+        
+        return;
+      }
+
+      // If no IE code assignments, use the original importer-based endpoint
       const cleanImporter = selectedImporter
         ? selectedImporter.replace(/\u00A0/g, " ").trim()
         : null;

@@ -19,6 +19,7 @@ import {
   getJobsByStatusAndImporter,
   updateContainerTransporter,
   updateJob,
+  getJobsByMultipleIECodes,
 } from "../controllers/jobStatusController.js";
 import { getJobsOverview } from "../controllers/jobOverviewController.js";
 import {
@@ -37,6 +38,12 @@ router.get("/api/get-job-numbers/:ie_code_no", getJobNumbersByIECode); // Suppor
 // Optimized routes for IE code based filtering
 router.get("/api/optimized/:year/jobs/:ieCode/:status", getJobsByIECode);
 router.get("/api/optimized/:year/jobs/:ieCode/all", getJobsMultiStatus);
+
+// Route for multiple IE codes
+router.get(
+  "/api/:year/jobs/:status/:detailedStatus/multiple",
+  getJobsByMultipleIECodes
+);
 
 router.get(
   "/api/:year/jobs/:status/:detailedStatus/:importer",
