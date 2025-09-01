@@ -167,7 +167,7 @@ export async function getJobsByMultipleIECodes(req, res) {
     const ieCodeArray = ieCodes.split(',').map(code => code.trim());
     
     // Split importers string into array if provided
-    const importerArray = importers ? importers.split(',').map(imp => imp.trim()) : [];
+    const importerArray = importers ? importers.split(';').map(imp => imp.trim()) : [];
     
     console.log('Received IE codes:', ieCodeArray);
 
