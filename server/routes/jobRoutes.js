@@ -13,7 +13,8 @@ import {
   getSuppliers,
   updateJobDutyAndWeight,
   getContainerSummary,
-  getContainerDetails
+  getContainerDetails,
+  getJobNumbersByMultipleIECodes
 } from "../controllers/jobController.js";
 import {
   getJobsByStatusAndImporter,
@@ -33,7 +34,9 @@ const router = express.Router();
 
 router.get("/api/get-importer-jobs/:importerURL/:year", getImporterJobCounts);
 router.get("/api/get-job/:year/:jobNo", getJobByNumber);
+router.get('/api/get-job-numbers/multiple', getJobNumbersByMultipleIECodes);
 router.get("/api/get-job-numbers/:ie_code_no", getJobNumbersByIECode); // Supports ?year= query param
+
 
 // Optimized routes for IE code based filtering
 router.get("/api/optimized/:year/jobs/:ieCode/:status", getJobsByIECode);

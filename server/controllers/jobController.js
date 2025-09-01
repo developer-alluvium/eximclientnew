@@ -672,42 +672,58 @@ export const getduty = async (req, res) => {
 export const lookup = async (req, res) => {
   try {
     const { hsCode, jobNo, year } = req.params;
-    const userIeCode = req.query.ie_code_no; // Get the specific parameter
+    const userIeCodes = req.query.ie_code_nos; // Changed to support multiple IE codes
 
     console.log("Query parameters:", req.query);
-    console.log("User IE Code:", userIeCode);
+    console.log("User IE Codes:", userIeCodes);
 
-    // First find the job to get its IE code
-    const job = await JobModel.findOne({
-      job_no: jobNo,
-      year: year,
-    }).select(
-      "cth_no total_duty total_inv_value assbl_value assessable_ammount exrate clearanceValue unit_price awb_bl_date job_net_weight loading_port shipping_line_airline port_of_reporting net_weight_calculator ie_code_no"
-    );
+    // Parse comma-separated IE codes if provided
+    let ieCodeArray = [];
+    if (userIeCodes) {
+      ieCodeArray = userIeCodes.split(',').map(code => code.trim()).filter(code => code);
+    }
 
-    console.log("Database IE Code:", job?.ie_code_no);
-
-    // If no job found or IE codes don't match, return job not found
-    if (!job || job.ie_code_no !== userIeCode) {
-      console.log("Job not found or IE code mismatch");
-      console.log("Job found:", !!job);
-      console.log("IE code comparison:", job?.ie_code_no, "!==", userIeCode);
-      return res.status(404).json({
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Job not found",
+        message: "IE codes are required",
       });
     }
 
+    // Find the job and check if its IE code is in the allowed list
+    const job = await JobModel.findOne({
+      job_no: jobNo,
+      year: year,
+      ie_code_no: { $in: ieCodeArray } // Use $in to match any of the provided IE codes
+    }).select(
+      "cth_no total_duty total_inv_value assbl_value assessable_ammount exrate clearanceValue unit_price awb_bl_date job_net_weight loading_port shipping_line_airline port_of_reporting net_weight_calculator ie_code_no hs_code"
+    );
+
+    console.log("Database IE Code:", job?.ie_code_no);
+    console.log("Allowed IE Codes:", ieCodeArray);
+
+    // If no job found with matching IE codes, return job not found
+    if (!job) {
+      console.log("Job not found or IE code not authorized");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found or not authorized for this IE code",
+      });
+    }
+
+    // Use HS code from job data (cth_no) or the passed hsCode parameter
+    const hsCodeToLookup = job.hs_code || job.cth_no || hsCode;
+
     // Get CTH data only if job exists and IE codes match
     const cthEntry = await CthModel.findOne({
-      hs_code: job.cth_no,
+      hs_code: hsCodeToLookup,
     }).select("hs_code basic_duty_sch basic_duty_ntfn igst sws_10_percent");
 
     if (!cthEntry) {
-      console.log("CTH entry not found for HS code:", job.cth_no);
+      console.log("CTH entry not found for HS code:", hsCodeToLookup);
       return res.status(404).json({
         success: false,
-        message: "Job not found",
+        message: "HS Code data not found",
       });
     }
 
@@ -763,6 +779,7 @@ export const lookup = async (req, res) => {
           per_kg_cost: "0.00",
         },
         ie_code_no: job.ie_code_no,
+        hs_code: job.hs_code,
       },
     };
 
@@ -774,10 +791,11 @@ export const lookup = async (req, res) => {
     console.error("Error looking up job data:", error);
     res.status(500).json({
       success: false,
-      message: "Job not found",
+      message: "Internal server error",
     });
   }
 };
+
 // Updated updatePerKgCost API with IE code filtering
 export const updatePerKgCost = async (req, res) => {
   try {
@@ -933,6 +951,106 @@ export const storeCalculatorData = async (req, res) => {
     });
   }
 };
+
+
+export async function getJobNumbersByMultipleIECodes(req, res) {
+  try {
+    const { ieCodes, year, search } = req.query; // All from query parameters
+
+    console.log('Multiple IE Codes Request:', { ieCodes, year, search }); // Debug log
+
+    if (!ieCodes) {
+      return res.status(400).json({
+        success: false,
+        message: "ieCodes parameter is required in query string",
+      });
+    }
+
+    // Parse comma-separated IE codes
+    const ieCodeArray = ieCodes.split(',').map(code => code.trim()).filter(code => code);
+    
+    console.log('Parsed IE Codes:', ieCodeArray); // Debug log
+    
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid IE codes are required",
+      });
+    }
+
+    // Build query object
+    const query = { 
+      ie_code_no: { $in: ieCodeArray }
+    };
+    
+    // Add year filter if provided
+    if (year) {
+      query.year = year;
+    }
+
+    // Add search filter for job number or exporter name if provided
+    if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
+      query.$or = [
+        { job_no: searchRegex },
+        { supplier_exporter: searchRegex }
+      ];
+    }
+
+    console.log('MongoDB Query:', JSON.stringify(query, null, 2)); // Debug log
+
+    // Find all jobs with the given ie_code_no array
+    const jobs = await JobModel.find(
+      query,
+      { 
+        job_no: 1, 
+        year: 1, 
+        job_date: 1, 
+        supplier_exporter: 1, 
+        ie_code_no: 1, 
+        importer: 1, 
+        _id: 0 
+      }
+    ).sort({ year: -1, job_no: 1 });
+
+    console.log(`Found ${jobs.length} jobs`); // Debug log
+
+    if (!jobs || jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: search 
+          ? `No jobs found for IE codes: ${ieCodeArray.join(', ')} matching search: ${search}`
+          : `No jobs found for IE codes: ${ieCodeArray.join(', ')}`,
+      });
+    }
+
+    // Format response
+    const jobNumbers = jobs.map(job => ({
+      job_no: job.job_no,
+      year: job.year,
+      job_date: job.job_date,
+      supplier_exporter: job.supplier_exporter || "N/A",
+      ie_code_no: job.ie_code_no,
+      importer: job.importer || "N/A"
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${jobs.length} job(s) for IE codes: ${ieCodeArray.join(', ')}`,
+      data: jobNumbers,
+      total_count: jobs.length,
+      ie_codes_searched: ieCodeArray
+    });
+  } catch (error) {
+    console.error("Error fetching job numbers by multiple IE codes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching job numbers",
+      error: error.message,
+    });
+  }
+}
+
 
 //* GET ALL JOB NUMBERS BY IE_CODE_NO
 export async function getJobNumbersByIECode(req, res) {

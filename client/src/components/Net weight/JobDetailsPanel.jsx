@@ -1,5 +1,5 @@
 import { SimpleHeader } from "./SharedComponents";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const JobDetailsPanel = ({
   years,
@@ -12,21 +12,76 @@ const JobDetailsPanel = ({
   apiError,
   jobData,
   dutyRates,
-  userId // Add userId prop
+  gandhidham // Add gandhidham prop if needed for different API endpoints
 }) => {
   const [jobsList, setJobsList] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [showJobsList, setShowJobsList] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // New state for search term
+  const [searchTerm, setSearchTerm] = useState("");
+  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
+  const [selectedImporter, setSelectedImporter] = useState(null);
   const dropdownRef = useRef(null);
 
-  // Function to fetch jobs list with optional search
-  const fetchJobsList = async (search = "") => {
-    if (!userId) return;
+  // Get IE code assignments from localStorage
+  const getUserIeCodeAssignments = useCallback(() => {
+    try {
+      const userDataFromStorage = localStorage.getItem("exim_user");
+      if (userDataFromStorage) {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        return parsedUser?.ie_code_assignments || [];
+      }
+    } catch (error) {
+      console.error("Error parsing user data from storage:", error);
+    }
+    return [];
+  }, []);
+
+  // Initialize IE code assignments on component mount
+  useEffect(() => {
+    const assignments = getUserIeCodeAssignments();
+    setIeCodeAssignments(assignments);
+    
+    // Set default importer if only one assignment
+    if (assignments.length === 1) {
+      setSelectedImporter(assignments[0].importer_name);
+    } else if (assignments.length > 1) {
+      setSelectedImporter("All Importers");
+    }
+  }, [getUserIeCodeAssignments]);
+
+  // Function to fetch jobs list with optional search for multiple IE codes
+  const fetchJobsList = useCallback(async (search = "") => {
+    if (!ieCodeAssignments.length || !selectedYear) {
+      setJobsList([]);
+      setShowJobsList(false);
+      return;
+    }
     
     setJobsLoading(true);
     try {
-      let url = `${process.env.REACT_APP_API_STRING}/get-job-numbers/${userId}?year=${selectedYear}`;
+      let filteredIeCodes = [];
+      
+      if (selectedImporter && selectedImporter !== "All Importers") {
+        const matching = ieCodeAssignments.find(a => a.importer_name === selectedImporter);
+        if (matching) {
+          filteredIeCodes = [matching.ie_code_no];
+        } else {
+          setJobsList([]);
+          setShowJobsList(false);
+          setJobsLoading(false);
+          return;
+        }
+      } else {
+        filteredIeCodes = ieCodeAssignments.map(a => a.ie_code_no);
+      }
+
+      let url;
+      if (gandhidham) {
+        url = `${process.env.REACT_APP_API_STRING}/gandhidham/get-job-numbers/multiple?ieCodes=${filteredIeCodes.join(',')}&year=${selectedYear}`;
+      } else {
+        url = `${process.env.REACT_APP_API_STRING}/get-job-numbers/multiple?ieCodes=${filteredIeCodes.join(',')}&year=${selectedYear}`;
+      }
+      
       if (search) {
         url += `&search=${encodeURIComponent(search)}`;
       }
@@ -37,7 +92,6 @@ const JobDetailsPanel = ({
         const data = await response.json();
         if (data.success) {
           setJobsList(data.data);
-          // Don't automatically show the list, let user trigger it
         } else {
           setJobsList([]);
           setShowJobsList(false);
@@ -53,14 +107,14 @@ const JobDetailsPanel = ({
     } finally {
       setJobsLoading(false);
     }
-  };
+  }, [ieCodeAssignments, selectedYear, selectedImporter, gandhidham]);
 
-  // Effect to fetch jobs when year changes or component mounts
+  // Effect to fetch jobs when year or importer changes
   useEffect(() => {
-    if (userId && selectedYear) {
+    if (ieCodeAssignments.length > 0 && selectedYear) {
       fetchJobsList();
     }
-  }, [userId, selectedYear]);
+  }, [ieCodeAssignments, selectedYear, selectedImporter, fetchJobsList]);
 
   // Debounce search effect
   useEffect(() => {
@@ -71,7 +125,7 @@ const JobDetailsPanel = ({
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, userId, selectedYear]);
+  }, [searchTerm, fetchJobsList]);
 
   // Effect to handle click outside dropdown
   useEffect(() => {
@@ -93,7 +147,7 @@ const JobDetailsPanel = ({
     setShowJobsList(false);
     // Auto-trigger search when job is selected
     setTimeout(() => {
-      handleSearch(); // Now this will work without an event object
+      handleSearch();
     }, 100);
   };
 
@@ -160,7 +214,7 @@ const JobDetailsPanel = ({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 3fr",
+            gridTemplateColumns: "1fr 1fr 2fr",
             gap: "12px",
             marginBottom: "16px",
           }}
@@ -194,6 +248,44 @@ const JobDetailsPanel = ({
               ))}
             </select>
           </div>
+
+          {/* Importer Selection */}
+          {ieCodeAssignments.length > 1 && (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                }}
+              >
+                Importer
+              </label>
+              <select
+                value={selectedImporter || "All Importers"}
+                onChange={(e) => {
+                  const value = e.target.value === "All Importers" ? null : e.target.value;
+                  setSelectedImporter(value);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  border: "1px solid #D1D5DB",
+                  borderRadius: "4px",
+                  backgroundColor: "#FFFFFF",
+                  fontSize: "12px"
+                }}
+              >
+                <option value="All Importers">All Importers</option>
+                {ieCodeAssignments.map((assignment, index) => (
+                  <option key={index} value={assignment.importer_name}>
+                    {assignment.importer_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label
@@ -293,8 +385,13 @@ const JobDetailsPanel = ({
                           {job.job_no}
                         </div>
                         <div style={{ fontSize: "12px", color: "#6B7280", marginTop: "2px" }}>
-                          {job.supplier_exporter || "N/A"}
+                          {job.supplier_exporter || "N/A"} | IE: {job.ie_code_no}
                         </div>
+                        {job.importer && (
+                          <div style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "1px" }}>
+                            {job.importer}
+                          </div>
+                        )}
                         {job.job_date && (
                           <div style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "1px" }}>
                             {new Date(job.job_date).toLocaleDateString()}
@@ -441,20 +538,20 @@ const JobDetailsPanel = ({
                 }`}
               />
               <DetailField label="SWS" value={`10%`} />
-            <DetailField
-  label="SWS Amount"
-  value={`₹ ${
-    getFinalAssessableValue(jobData) !== "0.00" && dutyRates?.sws_10_percent
-      ? (() => {
-          const finalAssessableValue = parseFloat(getFinalAssessableValue(jobData));
-          const basicDutyAmount = dutyRates?.basic_duty_ntfn === "nan"
-            ? (finalAssessableValue * parseFloat(dutyRates?.basic_duty_sch || 0)) / 100
-            : (finalAssessableValue * parseFloat(dutyRates?.basic_duty_ntfn || dutyRates?.basic_duty_sch || 0)) / 100;
-          return ((basicDutyAmount * 10) / 100).toFixed(2);
-        })()
-      : "0.00"
-  }`}
-/>
+              <DetailField
+                label="SWS Amount"
+                value={`₹ ${
+                  getFinalAssessableValue(jobData) !== "0.00" && dutyRates?.sws_10_percent
+                    ? (() => {
+                        const finalAssessableValue = parseFloat(getFinalAssessableValue(jobData));
+                        const basicDutyAmount = dutyRates?.basic_duty_ntfn === "nan"
+                          ? (finalAssessableValue * parseFloat(dutyRates?.basic_duty_sch || 0)) / 100
+                          : (finalAssessableValue * parseFloat(dutyRates?.basic_duty_ntfn || dutyRates?.basic_duty_sch || 0)) / 100;
+                        return ((basicDutyAmount * 10) / 100).toFixed(2);
+                      })()
+                    : "0.00"
+                }`}
+              />
               <DetailField
                 label="Total duty"
                 value={`₹ ${jobData.total_duty || "0.00"} `}

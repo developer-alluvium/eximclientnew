@@ -34,7 +34,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedYear, setSelectedYear] = useState('25-26');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [totalCount, setTotalCount] = useState(0);
@@ -43,6 +43,10 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   const [selectedExporter, setSelectedExporter] = useState("all");
   const [detailedStatus, setDetailedStatus] = useState("all");
   const [exporters, setExporters] = useState([]);
+
+   // IE code assignments and importer filter states
+  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
+  const [selectedImporter, setSelectedImporter] = useState(null);
   
   // Use useRef for search input to improve performance
   const searchInputRef = useRef(null);
@@ -85,6 +89,19 @@ const JobExcelTable = ({ userId, gandhidham }) => {
     }
   };
 
+
+    useEffect(() => {
+    const userDataFromStorage = localStorage.getItem("exim_user");
+    if (userDataFromStorage) {
+      try {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
+      } catch (e) {
+        console.error("Error parsing user data from storage:", e);
+      }
+    }
+  }, []);
+
   // Debounce search query with improved handling
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -126,42 +143,27 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   }, []);
 
   // Add effect to fetch exporters when dependencies change
-  useEffect(() => {
+ useEffect(() => {
     const fetchExporters = async () => {
-      const userImporter = getUserImporterName();
-      
-      if (!userImporter) {
-        console.log("Skipping exporter fetch - no valid importer found");
+      if (!selectedImporter || selectedImporter === "All Importers") {
+        setExporters([]);
+        setSelectedExporter("all");
         return;
       }
-      
-      // Sanitize the importer name by replacing non-breaking spaces with regular spaces
-      const sanitizedImporter = userImporter.replace(/\u00A0/g, ' ').trim();
-      
-      console.log("Fetching exporters with params:", {
-        importer: sanitizedImporter,
-        year: selectedYear,
-        status: selectedStatus
-      });
-      
+
       try {
+        const sanitizedImporter = selectedImporter.replace(/\u00A0/g, ' ').trim();
+
         const res = await axios.get(
           `${process.env.REACT_APP_API_STRING}/get-exporters`,
           {
-            params: { 
+            params: {
               importer: sanitizedImporter,
-              // year: selectedYear,
-              // status: selectedStatus 
             }
           }
         );
-        
-        console.log("Exporters API response:", res.data);
-        
-        // Filter out null/undefined exporters and remove duplicates
-        const uniqueExporters = [...new Set(res.data.filter(exporter => exporter && exporter.trim() !== ''))];
-        console.log("Filtered exporters:", uniqueExporters);
-        
+
+        const uniqueExporters = [...new Set(res.data.filter(exp => exp && exp.trim() !== ''))];
         setExporters(uniqueExporters);
       } catch (error) {
         console.error("Error fetching exporters:", error);
@@ -170,7 +172,8 @@ const JobExcelTable = ({ userId, gandhidham }) => {
     };
 
     fetchExporters();
-  }, [getUserImporterName, selectedYear, selectedStatus]);
+  }, [selectedImporter, selectedYear, selectedStatus]);
+
 
   // Reset exporter selection when year or status changes
   useEffect(() => {
@@ -179,76 +182,104 @@ const JobExcelTable = ({ userId, gandhidham }) => {
 
   // Optimized fetch job data using new backend endpoints
   const fetchJobData = useCallback(async () => {
-    const ieCode = getUserIECode();
-    const userImporter = getUserImporterName();
-    console.log('ieCode:', ieCode, 'selectedYear:', selectedYear, 'userImporter:', userImporter);
-
-    if (!ieCode || !selectedYear || !userImporter) {
-      // console.log('Missing IE code, selected year, or importer name');
-      return;
+  const ieCodeAssignments = (() => {
+    const userDataFromStorage = localStorage.getItem("exim_user");
+    if (!userDataFromStorage) return [];
+    try {
+      const parsedUser = JSON.parse(userDataFromStorage);
+      return parsedUser?.ie_code_assignments || [];
+    } catch {
+      return [];
     }
+  })();
 
-    setLoading(true);
-    setError(null);
-
-   try {
-  // Use jobStatusController endpoint for consistency with CJobList
-  // Sanitize the importer name by replacing non-breaking spaces with regular spaces
-  const sanitizedImporter = userImporter.replace(/\u00A0/g, ' ').trim();
-  const formattedImporter = encodeURIComponent(sanitizedImporter);
+  const selectedImporterValue = selectedImporter || null;
   const formattedSearchQuery = debouncedSearchQuery ? encodeURIComponent(debouncedSearchQuery) : "";
   const formattedExporter = selectedExporter && selectedExporter !== "all" ? encodeURIComponent(selectedExporter) : "";
-  
-  // Use the same API URL construction as CJobList for consistency
 
- let apiUrl;
+  if (!selectedYear || !selectedStatus || !ieCodeAssignments.length) {
+    setJobData([]);
+    setTotalCount(0);
+    return;
+  }
 
-// Utility function to capitalize first letter
+  setLoading(true);
+  setError(null);
 
+  try {
+    let filteredIeCodes = [];
+    let importersParam = "";
 
-if (gandhidham) {
-  console.log("gandhidham is true");
-
-
-  apiUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
-} else {
-  apiUrl = `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
-  console.log("gandhidham is false");
-}
-
-  //const apiUrl = `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/${formattedImporter}?page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
-
-  console.log("Fetching jobs data from:", apiUrl);
-
-  const response = await axios.get(apiUrl);
-  
-  // Filter by user's IE code since the API returns all jobs for the importer
-  const userJobs = response.data.data ? response.data.data.filter(job => {
-    const matches = job.ie_code_no == ieCode;
-    if (!matches) {
-      console.log('IE code mismatch:', {
-        jobIECode: job.ie_code_no,
-        userIECode: ieCode,
-        jobIECodeType: typeof job.ie_code_no,
-        userIECodeType: typeof ieCode
-      });
+    if (selectedImporterValue && selectedImporterValue !== "All Importers") {
+      const matching = ieCodeAssignments.find(a => a.importer_name === selectedImporterValue);
+      if (matching) {
+        filteredIeCodes = [matching.ie_code_no];
+        importersParam = encodeURIComponent(matching.importer_name);
+      } else {
+        setJobData([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+    } else {
+      filteredIeCodes = ieCodeAssignments.map(a => a.ie_code_no);
+      importersParam = "";
     }
-    return matches;
-  }) : [];
-  
-  setJobData(userJobs);
-  setTotalCount(userJobs.length); // Note: This is the filtered count, not the total from API
 
-} catch (error) {
-  console.error('Error fetching job data:', error);
-  
-  // Fallback to original API approach
-  console.log('Falling back to original API...');
-  await fetchJobDataFallback();
-} finally {
-  setLoading(false);
-}
-  }, [selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, debouncedSearchQuery, getUserIECode, getUserImporterName]);
+    const apiString = process.env.REACT_APP_API_STRING || "";
+
+    let apiUrl;
+    if (gandhidham) {
+      apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/multiple?ieCodes=${filteredIeCodes.join(',')}`;
+      if (importersParam) apiUrl += `&importers=${importersParam}`;
+      apiUrl += `&page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}`;
+      if (formattedExporter) apiUrl += `&exporter=${formattedExporter}`;
+    } else {
+      apiUrl = `${apiString}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/multiple?ieCodes=${filteredIeCodes.join(',')}`;
+      if (importersParam) apiUrl += `&importers=${importersParam}`;
+      apiUrl += `&page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}`;
+      if (formattedExporter) apiUrl += `&exporter=${formattedExporter}`;
+    }
+
+    console.log("Fetching jobs data from:", apiUrl);
+    const response = await axios.get(apiUrl);
+
+    // Use the server response data directly
+    if (response.data && response.data.data) {
+      setJobData(response.data.data);
+      
+      // Set totalCount from server response - this is the key fix!
+      // The server should return total count in response.data.total or similar field
+      setTotalCount(response.data.total || response.data.totalCount || response.data.count || 0);
+      
+      console.log("Server response:", {
+        dataLength: response.data.data.length,
+        totalCount: response.data.total || response.data.totalCount || response.data.count,
+        currentPage: page + 1
+      });
+    } else {
+      setJobData([]);
+      setTotalCount(0);
+    }
+
+  } catch (error) {
+    console.error('Error fetching job data:', error);
+    setError('Failed to fetch job data');
+    
+    // Try fallback method
+    try {
+      await fetchJobDataFallback();
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+      setJobData([]);
+      setTotalCount(0);
+    }
+  } finally {
+    setLoading(false);
+  }
+}, [selectedImporter, selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, debouncedSearchQuery, gandhidham]);
+
+
 
   // Fallback method using original API structure
   const fetchJobDataFallback = useCallback(async () => {
@@ -661,6 +692,22 @@ if (gandhidham) {
             </Select>
           </FormControl>
 
+<Autocomplete
+            size="small"
+            options={["All Importers", ...ieCodeAssignments.map(a => a.importer_name)]}
+            value={selectedImporter || "All Importers"}
+            onChange={(event, newValue) => {
+              setSelectedImporter(newValue === "All Importers" ? null : newValue);
+              setPage(0);
+            }}
+            sx={{ minWidth: 200, width: { xs: "200px", sm: "250px", md: "300px" }, '& .MuiInputBase-input': { fontSize: '0.75rem', padding: '6px 8px' } }}
+            renderInput={(params) => <TextField {...params} placeholder="Select Importer" />}
+            isOptionEqualToValue={(option, value) => {
+              if (value === "All Importers" && option === "All Importers") return true;
+              if (value !== "All Importers" && option !== "All Importers" && option === value) return true;
+              return false;
+            }}
+          />
           <Autocomplete
             size="small"
             options={["All Exporters", ...exporters]}
