@@ -49,6 +49,7 @@ function CJobList(props) {
   const [username, setUsername] = useState(null);
   const [selectedImporter, setSelectedImporter] = useState(null);
   const [userImporterName, setUserImporterName] = useState(null);
+  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
   
   // Ref for table container scroll handling
   const tableContainerRef = useRef(null);
@@ -231,39 +232,40 @@ useEffect(() => {
       }
       
       // Check if user info was returned and update localStorage if there's a mismatch
-      if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
-        const userDataFromStorage = localStorage.getItem("exim_user");
-        if (userDataFromStorage) {
-          try {
-            const parsedUser = JSON.parse(userDataFromStorage);
+    //   if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
+    //     const userDataFromStorage = localStorage.getItem("exim_user");
+    //     if (userDataFromStorage) {
+    //       try {
+    //         const parsedUser = JSON.parse(userDataFromStorage);
             
-            if (parsedUser.data && parsedUser.data.user) {
-              parsedUser.data.user.id = res.data.userInfo.id;
-              parsedUser.data.user.name = res.data.userInfo.name;
-              parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
-            } else {
-              parsedUser.id = res.data.userInfo.id;
-              parsedUser.name = res.data.userInfo.name;
-              parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
-            }
+    //         if (parsedUser.data && parsedUser.data.user) {
+    //           parsedUser.data.user.id = res.data.userInfo.id;
+    //           parsedUser.data.user.name = res.data.userInfo.name;
+    //           parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
+    //         } else {
+    //           parsedUser.id = res.data.userInfo.id;
+    //           parsedUser.name = res.data.userInfo.name;
+    //           parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
+    //         }
             
-            localStorage.setItem("exim_user", JSON.stringify(parsedUser));
-            setCurrentUserId(res.data.userInfo.id);
-            setUsername(res.data.userInfo.name);
-            setUserImporterName(res.data.userInfo.name);
-            setSelectedImporter(res.data.userInfo.name);
+    //         localStorage.setItem("exim_user", JSON.stringify(parsedUser));
             
-          } catch (e) {
-            console.error("Error updating user data in storage:", e);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch column order", err);
+    //         setCurrentUserId(res.data.userInfo.id);
+    //         setUsername(res.data.userInfo.name);
+    //         setUserImporterName(res.data.userInfo.name);
+    //         setSelectedImporter(res.data.userInfo.name);
+            
+    //       } catch (e) {
+    //         console.error("Error updating user data in storage:", e);
+    //       }
+    //     }
+    //   }
+    // } catch (err) {
+    //   console.error("Failed to fetch column order", err);
       
-      if (err.response?.status === 404 && err.response?.data?.suggestion) {
-        console.warn("User session appears to be stale. Consider logging out and back in.");
-      }
+      // if (err.response?.status === 404 && err.response?.data?.suggestion) {
+      //   console.warn("User session appears to be stale. Consider logging out and back in.");
+      // }
       
       const defaultOrder = columns.map((col) => col.accessorKey);
       setColumnOrder(defaultOrder);
@@ -378,6 +380,15 @@ selectedExporter  ]);
       clearTimeout(handler);
     };
   }, [searchQuery]);
+
+  // Load IE code assignments from localStorage
+  useEffect(() => {
+    const userDataFromStorage = localStorage.getItem('exim_user');
+    if (userDataFromStorage) {
+      const userData = JSON.parse(userDataFromStorage);
+      setIeCodeAssignments(userData?.ie_code_assignments || []);
+    }
+  }, []);
   
   // Table scroll handlers
   const mouseDownHandler = (e) => {
@@ -591,6 +602,29 @@ selectedExporter  ]);
               </MenuItem>
             ))}
           </TextField>
+
+          <Autocomplete
+            size="small"
+            options={["All Importers", ...(ieCodeAssignments?.map(assignment => assignment.importer_name) || [])]}
+            value={selectedImporter || "All Importers"}
+            onChange={(event, newValue) => {
+              setSelectedImporter(newValue === "All Importers" ? null : newValue);
+            }}
+            sx={{ 
+              width: { xs: "200px", sm: "250px", md: "300px" },
+              minWidth: "200px",
+              '& .MuiInputBase-input': {
+                fontSize: '0.75rem',
+                padding: '6px 8px'
+              }
+            }}
+            renderInput={(params) => <TextField {...params} placeholder="Select Importer" />}
+            isOptionEqualToValue={(option, value) => {
+              if (value === "All Importers" && option === "All Importers") return true;
+              if (value !== "All Importers" && option !== "All Importers" && option === value) return true;
+              return false;
+            }}
+          />
 
           <TextField
             select

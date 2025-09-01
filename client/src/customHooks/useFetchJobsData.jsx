@@ -31,17 +31,43 @@ function useFetchJobsData(
     setError(null);
 
     try {
-      const ieCodeAssignments = localStorage.getItem('ieCodeAssignments');
+      const userDataFromStorage = localStorage.getItem('exim_user');
+
+      const ieCodeAssignments = userDataFromStorage
+        ? JSON.parse(userDataFromStorage)?.ie_code_assignments || []
+        : [];
       
       // If we have IE code assignments, use the multiple IE codes endpoint
-      if (ieCodeAssignments) {
+      if (ieCodeAssignments && ieCodeAssignments.length > 0) {
         const apiString = process.env.REACT_APP_API_STRING || "";
         const formattedSearchQuery = searchQuery ? encodeURIComponent(searchQuery) : "";
         const formattedExporter = selectedExporter && selectedExporter !== "all"
           ? encodeURIComponent(selectedExporter)
           : "";
+        
+        // Find the IE code for the selected importer, or use all IE codes if no importer selected
+        let selectedIeCode = "";
+        let importerToFilter = "";
+        
+        if (selectedImporter && selectedImporter !== "all") {
+          // Find the matching assignment for the selected importer
+          const matchingAssignment = ieCodeAssignments.find(
+            assignment => assignment.importer_name === selectedImporter
+          );
+          
+          if (matchingAssignment) {
+            selectedIeCode = matchingAssignment.ie_code_no;
+            importerToFilter = encodeURIComponent(matchingAssignment.importer_name);
+          }
+        } else {
+          // If no importer selected, use all IE codes
+          selectedIeCode = ieCodeAssignments.map(assignment => assignment.ie_code_no).join(',');
+          importerToFilter = encodeURIComponent(
+            ieCodeAssignments.map(assignment => assignment.importer_name).join(',')
+          );
+        }
 
-        let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/multiple?ieCodes=${ieCodeAssignments}&page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+        let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/multiple?ieCodes=${selectedIeCode}&importers=${importerToFilter}&page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
         
         console.log("Fetching jobs data with multiple IE codes from:", apiUrl);
         

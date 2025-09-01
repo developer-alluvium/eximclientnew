@@ -156,7 +156,7 @@ export async function updateContainerTransporter(req, res) {
 export async function getJobsByMultipleIECodes(req, res) {
   try {
     const { year, status, detailedStatus } = req.params;
-    const { page = 1, limit = 100, search = "", exporter = "", ieCodes = "" } = req.query;
+    const { page = 1, limit = 100, search = "", exporter = "", ieCodes = "", importers = "" } = req.query;
     const skip = (page - 1) * limit;
 
     if (!ieCodes) {
@@ -165,12 +165,27 @@ export async function getJobsByMultipleIECodes(req, res) {
 
     // Split the IE codes string into an array
     const ieCodeArray = ieCodes.split(',').map(code => code.trim());
+    
+    // Split importers string into array if provided
+    const importerArray = importers ? importers.split(',').map(imp => imp.trim()) : [];
+    
+    console.log('Received IE codes:', ieCodeArray);
 
     // Base query with year filter and IE codes
     const query = {
       year,
       ie_code_no: { $in: ieCodeArray }
     };
+
+    // Add importer filter if provided
+    if (importerArray.length > 0) {
+          query.importer = { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) };
+
+    }
+    
+    // Log the query for debugging
+    console.log('Query:', JSON.stringify(query, null, 2));
+    console.log('Importers:', importerArray);
 
     // Add status conditions similar to getJobsByStatusAndImporter
     const statusLower = status.toLowerCase();
@@ -409,6 +424,7 @@ export async function getJobsByStatusAndImporter(req, res) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
 
 
 
