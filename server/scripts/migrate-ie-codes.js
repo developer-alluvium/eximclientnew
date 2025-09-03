@@ -33,18 +33,7 @@ async function migrateIeCodes() {
         });
         
         // Log the migration
-        await logActivity(
-          'SYSTEM',
-          'IE_CODE_MIGRATION',
-          `Migrated user ${user.name} (${user.email}) IE code ${user.ie_code_no} to new structure`,
-          {
-            userId: user._id,
-            oldIeCode: user.ie_code_no,
-            oldImporterName: user.assignedImporterName,
-            assignmentCount: user.ie_code_assignments.length
-          }
-        );
-      }
+        
       
       await user.save();
     }

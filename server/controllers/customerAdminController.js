@@ -46,13 +46,7 @@ export const loginCustomerAdmin = async (req, res) => {
     await customer.save();
 
     // Log activity
-    await logActivity(
-      customer._id,
-      'CUSTOMER_ADMIN_LOGIN',
-      'Customer logged in as admin',
-      { ie_code_no: customer.ie_code_no, name: customer.name },
-      req.ip
-    );
+ 
 
     // Send auth response with admin role
     sendUserAuthResponse({ 
@@ -270,21 +264,7 @@ export const updateUserStatus = async (req, res) => {
       priority: status === 'inactive' ? 'high' : 'medium'
     });
 
-    // Log activity
-    await logActivity(
-      customer._id,
-      'USER_STATUS_UPDATE',
-      `Updated user ${user.name} status from ${oldStatus} to ${status}`,
-      { 
-        userId: user._id,
-        userEmail: user.email,
-        oldStatus,
-        newStatus: status,
-        reason 
-      },
-      req.ip
-    );
-
+ 
     res.json({
       success: true,
       message: `User status updated to ${status} successfully.`,

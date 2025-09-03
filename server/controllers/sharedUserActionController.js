@@ -72,20 +72,7 @@ export const promoteUserToAdmin = async (req, res) => {
     customer.roleGrantedAt = new Date();
     await customer.save();
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_PROMOTED_TO_ADMIN',
-      `Promoted user ${user.name} to admin`,
-      { 
-        userId: user._id, 
-        customerId: customer._id, 
-        promotedBy: actor.id, 
-        promoterRole: actor.role || 'superadmin',
-        userIeCodeAssignments: user.ie_code_assignments
-      },
-      req.ip
-    );
+    
 
     res.json({
       success: true,
@@ -145,20 +132,7 @@ export const demoteUserFromAdmin = async (req, res) => {
     customer.roleGrantedAt = null;
     await customer.save();
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_DEMOTED_FROM_ADMIN',
-      `Demoted user ${user.name} from admin`,
-      { 
-        userId: user._id, 
-        customerId: customer._id, 
-        demotedBy: actor.id, 
-        demoterRole: actor.role || 'superadmin',
-        userIeCodeAssignments: user.ie_code_assignments
-      },
-      req.ip
-    );
+
 
     res.json({
       success: true,
@@ -220,20 +194,7 @@ export const updateUserStatus = async (req, res) => {
       message: `Your account has been ${isActive ? 'activated' : 'deactivated'}. ${reason ? 'Reason: ' + reason : ''}`,
     });
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_STATUS_UPDATE',
-      `${isActive ? 'Activated' : 'Deactivated'} user ${user.name}`,
-      { 
-        userId: user._id, 
-        newStatus: status, 
-        reason, 
-        updatedBy: actor.id,
-        userIeCodeAssignments: user.ie_code_assignments
-      },
-      req.ip
-    );
+ 
 
     res.json({
       success: true,
@@ -328,24 +289,7 @@ export const updateCustomerTabVisibility = async (req, res) => {
 
     await user.save();
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_TAB_VISIBILITY_UPDATED',
-      `Updated tab visibility for user ${user.name}`,
-      { 
-        userId: user._id,
-        previousSettings,
-        newSettings: {
-          jobsTabVisible: user.jobsTabVisible,
-          gandhidhamTabVisible: user.gandhidhamTabVisible
-        },
-        updatedBy: actor.id,
-        userIeCodeAssignments: user.ie_code_assignments
-      },
-      req.ip
-    );
-
+  
     res.json({
       success: true,
       message: "User tab visibility updated successfully.",
@@ -493,23 +437,7 @@ export const updateUserColumnPermissions = async (req, res) => {
     user.allowedColumns = allowedColumns;
     await user.save();
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_COLUMN_PERMISSIONS_UPDATED',
-      `Updated column permissions for user ${user.name}`,
-      { 
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        previousColumns,
-        newColumns: allowedColumns,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin',
-        userIeCodeAssignments: user.ie_code_assignments
-      },
-      req.ip
-    );
+
 
     console.log(`Column permissions updated for user ${user.name} by ${actor.role || 'superadmin'}`);
 
@@ -634,23 +562,7 @@ export const updateCustomerColumnPermissions = async (req, res) => {
     customer.allowedColumns = allowedColumns;
     await customer.save();
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'CUSTOMER_COLUMN_PERMISSIONS_UPDATED',
-      `Updated column permissions for customer ${customer.name}`,
-      { 
-        customerId: customer._id, 
-        customerName: customer.name,
-        ie_code_no: customer.ie_code_no,
-        previousColumns,
-        newColumns: allowedColumns,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
-
+  
     console.log(`Column permissions updated for customer ${customer.name} (${customer.ie_code_no}) by ${actor.role || 'superadmin'}`);
 
     res.status(200).json({
@@ -717,21 +629,6 @@ export const bulkUpdateUserColumnPermissions = async (req, res) => {
       { allowedColumns }
     );
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'BULK_USER_COLUMN_PERMISSIONS_UPDATED',
-      `Bulk updated column permissions for ${result.modifiedCount} users`,
-      { 
-        userIds,
-        allowedColumns,
-        modifiedCount: result.modifiedCount,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin',
-        ieCodeRestriction: actor.role === 'admin' ? (actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no]) : null
-      },
-      req.ip
-    );
 
     console.log(`Bulk column permissions updated for ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
 
@@ -792,22 +689,7 @@ export const bulkUpdateCustomerColumnPermissions = async (req, res) => {
       { allowedColumns }
     );
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'BULK_CUSTOMER_COLUMN_PERMISSIONS_UPDATED',
-      `Bulk updated column permissions for ${result.modifiedCount} customers`,
-      { 
-        customerIds,
-        allowedColumns,
-        modifiedCount: result.modifiedCount,
-        updatedBy: actor.id,
-        updaterRole: actor.role || 'superadmin',
-        ieCodeRestriction: actor.role === 'admin' ? (actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no]) : null
-      },
-      req.ip
-    );
-
+ 
     console.log(`Bulk column permissions updated for ${result.modifiedCount} customers by ${actor.role || 'superadmin'}`);
 
     res.status(200).json({

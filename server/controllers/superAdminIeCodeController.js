@@ -160,20 +160,7 @@ export const removeIeCodeFromUser = async (req, res) => {
     });
 
     // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'USER_IE_CODE_REMOVED',
-      `Removed IEC ${ieCodeNo} from user ${user.name}`,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        ieCodeNo,
-        remainingAssignments: user.ie_code_assignments.length
-      },
-      req.ip
-    );
-
+   
     res.json({
       success: true,
       message: "IE code removed successfully.",
@@ -298,22 +285,6 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       await Notification.insertMany(notifications);
     }
 
-    // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'BULK_ADDITIONAL_IE_CODE_ASSIGNED',
-      `Bulk assigned additional IEC ${ieCodeNo} to users (${successCount} successful, ${failureCount} failed)`,
-      {
-        userIds,
-        ieCodeNo,
-        importerName: customerKyc.name_of_individual,
-        reason,
-        successCount,
-        failureCount,
-        errors
-      },
-      req.ip
-    );
 
     res.json({
       success: true,

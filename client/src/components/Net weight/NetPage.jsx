@@ -108,23 +108,7 @@ const NetPage = () => {
   const handleLogout = async () => {
     try {
       // Log logout activity before calling logout API
-      try {
-        await logActivity({
-          userId: user?.id,
-          activityType: 'logout',
-          description: `User logged out from CostIQ module with IE Code: ${user?.ie_code_no || 'Unknown'}`,
-          severity: 'low',
-          metadata: {
-            ieCode: user?.ie_code_no,
-            logoutTime: new Date().toISOString(),
-            logoutMethod: 'manual',
-            module: 'CostIQ',
-            userAgent: navigator.userAgent
-          }
-        });
-      } catch (logError) {
-        console.error('Failed to log logout activity:', logError);
-      }
+     
 
       // Call logout API with user ID for logout time tracking
       const logoutData = {};

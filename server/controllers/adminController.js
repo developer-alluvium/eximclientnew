@@ -62,13 +62,7 @@ export const loginAdmin = async (req, res) => {
     await admin.save();
 
     // Log activity
-    await logActivity(
-      admin._id,
-      'ADMIN_LOGIN',
-      'Admin logged in successfully',
-      { email: admin.email, ie_code_no: admin.ie_code_no },
-      req.ip
-    );
+
 
     // Send auth response
     sendUserAuthResponse(admin, 'admin', 200, res);
@@ -297,19 +291,7 @@ export const updateUserStatus = async (req, res) => {
     });
 
     // Log activity
-    await logActivity(
-      admin._id,
-      'USER_STATUS_UPDATE',
-      `Updated user ${user.name} status from ${oldStatus} to ${status}`,
-      { 
-        userId: user._id,
-        userEmail: user.email,
-        oldStatus,
-        newStatus: status,
-        reason 
-      },
-      req.ip
-    );
+  
 
     res.json({
       success: true,
@@ -422,20 +404,6 @@ export const manageModuleAccess = async (req, res) => {
     });
 
     // Log activity
-    await logActivity(
-      admin._id,
-      'MODULE_ACCESS_UPDATE',
-      `${action.charAt(0).toUpperCase() + action.slice(1)} module ${moduleAccess.moduleName} for user ${user.name}`,
-      {
-        userId: user._id,
-        userEmail: user.email,
-        moduleKey,
-        moduleName: moduleAccess.moduleName,
-        isEnabled,
-        permissions
-      },
-      req.ip
-    );
 
     res.json({
       success: true,
@@ -511,15 +479,6 @@ export const logoutAdmin = async (req, res) => {
     if (admin) {
       admin.lastLogout = new Date();
       await admin.save();
-
-      // Log activity
-      await logActivity(
-        admin._id,
-        'ADMIN_LOGOUT',
-        'Admin logged out',
-        { email: admin.email },
-        req.ip
-      );
     }
 
     // Clear cookies
@@ -539,6 +498,7 @@ export const logoutAdmin = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Get Available Modules

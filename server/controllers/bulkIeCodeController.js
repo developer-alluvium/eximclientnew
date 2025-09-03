@@ -89,24 +89,7 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
     }
 
     // Log activity
-    await logActivity(
-      actor.id,
-      'BULK_USER_IE_CODE_ASSIGNED',
-      `Bulk assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to users (${successCount} successful, ${failureCount} failed)`,
-      {
-        userIds,
-        ieCodeNo,
-        importerName: customerKyc.name_of_individual,
-        customerKycId: customerKyc._id,
-        reason,
-        successCount,
-        failureCount,
-        errors,
-        assignedBy: actor.id,
-        assignerRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
+ 
 
     res.json({
       success: true,

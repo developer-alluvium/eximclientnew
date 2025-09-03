@@ -96,11 +96,7 @@ const handleSubmit = async (event) => {
         setUser(userData);
         navigate("/", { replace: true });
 
-        logActivity({
-          userId: userData.id,
-          activityType: 'login',
-          description: `Successful login for user: ${email}`,
-        }).catch(logError => console.error('Failed to log login activity:', logError));
+       
       }
     }
   } catch (err) {
@@ -123,13 +119,7 @@ const handleSubmit = async (event) => {
     }
     setError(errorMessage);
 
-    logActivity({
-      userId: null,
-      activityType: 'failed_login',
-      description: `Failed login attempt for: ${email}`,
-      severity: 'medium',
-      metadata: { email, errorMessage }
-    }).catch(logError => console.error('Failed to log failed login activity:', logError));
+
   } finally {
     setLoading(false);
   }

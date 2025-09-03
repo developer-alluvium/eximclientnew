@@ -81,14 +81,7 @@ export const registerUser = async (req, res) => {
     }
 
     // Log activity
-    await logActivity(
-      user._id,
-      'USER_REGISTRATION',
-      'User registered successfully',
-      { email },
-      req.ip
-    );
-
+   
     res.status(201).json({
       success: true,
       message: "Registration successful! Please check your email to verify your account before logging in.",
@@ -335,15 +328,7 @@ export const loginUser = async (req, res) => {
     console.log("Last login updated successfully");
 
     console.log("Starting activity logging");
-   // Log activity - temporarily commented out for debugging
-    // await logActivity(
-    //   user._id,
-    //   'USER_LOGIN',
-    //   'User logged in successfully',
-    //   { email: user.email },
-    //   req.ip
-    // );
-    // console.log("Activity logging completed");
+
 
     console.log("Sending auth response");
     // Send auth response
@@ -470,14 +455,7 @@ export const logoutUser = async (req, res) => {
       user.lastLogout = new Date();
       await user.save();
 
-      // Log activity
-      // await logActivity(
-      //   user._id,
-      //   'USER_LOGOUT',
-      //   'User logged out',
-      //   { email: user.email },
-      //   req.ip
-      // );
+      
     }
 
     // Clear cookies

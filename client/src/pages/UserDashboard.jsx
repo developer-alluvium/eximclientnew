@@ -369,22 +369,7 @@ function UserDashboard() {
   const handleLogout = async () => {
     try {
       // Log logout activity
-      try {
-        await logActivity({
-          userId: dashboardData?.user?.id,
-          activityType: 'logout',
-          description: `User logged out from IE Code: ${dashboardData?.user?.ie_code_no || 'Unknown'}`,
-          severity: 'low',
-          metadata: {
-            ieCode: dashboardData?.user?.ie_code_no,
-            logoutTime: new Date().toISOString(),
-            logoutMethod: 'manual',
-            userAgent: navigator.userAgent
-          }
-        });
-      } catch (logError) {
-        console.error('Failed to log logout activity:', logError);
-      }
+    
 
       const logoutData = {};
       if (dashboardData?.user?.id) {

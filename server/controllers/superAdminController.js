@@ -427,19 +427,7 @@ export const registerAdmin = async (req, res) => {
 
     await admin.save();
 
-    // Log activity
-    await logActivity(
-      superAdmin._id,
-      'ADMIN_REGISTRATION',
-      `SuperAdmin registered new admin: ${name} for IE Code: ${ieCodeUpper}`,
-      { 
-        adminId: admin._id,
-        adminEmail: email,
-        adminName: name,
-        ie_code_no: ieCodeUpper 
-      },
-      req.ip
-    );
+
 
     // Create notification for the new admin (welcome message)
     await Notification.createNotification({
@@ -609,22 +597,7 @@ export const updateAdminStatus = async (req, res) => {
     });
 
     // Log activity
-    await logActivity(
-      superAdmin._id,
-      'ADMIN_STATUS_UPDATE',
-      `${isActive ? 'Activated' : 'Deactivated'} admin ${admin.name} (${admin.email})`,
-      {
-        adminId: admin._id,
-        adminEmail: admin.email,
-        adminName: admin.name,
-        ie_code_no: admin.ie_code_no,
-        oldStatus,
-        newStatus: isActive,
-        reason
-      },
-      req.ip
-    );
-
+ 
     res.json({
       success: true,
       message: `Admin ${isActive ? 'activated' : 'deactivated'} successfully.`,
@@ -689,18 +662,7 @@ export const designateCustomerAsAdmin = async (req, res) => {
     await customer.save();
 
     // Log activity
-    await logActivity(
-      superAdmin._id,
-      'CUSTOMER_ROLE_CHANGED',
-      `SuperAdmin promoted customer ${customer.name} (IE: ${ieCodeUpper}) to admin role`,
-      { 
-        customerId: customer._id,
-        customerName: customer.name,
-        ie_code_no: ieCodeUpper,
-        newRole: 'admin' 
-      },
-      req.ip
-    );
+ 
 
     res.status(200).json({
       success: true,
@@ -977,18 +939,7 @@ export const updateCustomerAdminStatus = async (req, res) => {
     await customer.save();
 
     // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'CUSTOMER_ADMIN_STATUS_UPDATE',
-      `${isAdmin ? 'Granted' : 'Revoked'} admin access for customer ${customer.name}`,
-      {
-        customerId: customer._id,
-        customerName: customer.name,
-        ie_code_no: customer.ie_code_no,
-        newAdminStatus: isAdmin
-      },
-      req.ip
-    );
+   
 
     res.json({
       success: true,
@@ -1077,25 +1028,7 @@ export const promoteUserToAdmin = async (req, res) => {
       ? `Promoted user ${user.name} to admin and assigned new IE code ${ie_code_no}`
       : `Promoted user ${user.name} to admin using existing IE code ${ieCodeToUse}`;
 
-    // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'USER_PROMOTED_TO_ADMIN',
-      logMessage,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        assignedIeCode: ieCodeToUse,
-        newIeCodeProvided: ie_code_no ? true : false,
-        previousIeCode: existingIeCode,
-        customerId: customer._id,
-        customerName: customer.name,
-        previousRole: 'customer',
-        newRole: 'admin'
-      },
-      req.ip
-    );
+
 
     res.json({
       success: true,
@@ -1201,23 +1134,7 @@ export const demoteUserFromAdmin = async (req, res) => {
     customer.roleGrantedAt = null; // Clear the granted date or set to demotion date
     await customer.save();
 
-    // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'USER_DEMOTED_FROM_ADMIN',
-      `Demoted user ${user.name} from admin to customer`,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        ie_code_no: userIeCode,
-        customerId: customer._id,
-        customerName: customer.name,
-        previousRole: 'admin',
-        newRole: 'customer'
-      },
-      req.ip
-    );
+  
 
     res.json({
       success: true,
@@ -1293,21 +1210,6 @@ export const updateUserStatus = async (req, res) => {
     });
 
     // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'USER_STATUS_UPDATE',
-      `${isActive ? 'Activated' : 'Deactivated'} user ${user.name} (${user.email})`,
-      {
-        userId: user._id,
-        userEmail: user.email,
-        userName: user.name,
-        ie_code_no: user.ie_code_no,
-        oldStatus,
-        newStatus: isActive,
-        reason
-      },
-      req.ip
-    );
 
     res.json({
       success: true,
@@ -1358,20 +1260,7 @@ export const assignModulesToUser = async (req, res) => {
     await user.save();
 
     // Log activity
-    await logActivity(
-      req.superAdmin.id,
-      'MODULE_ASSIGNMENT_UPDATE',
-      `Updated module assignments for user ${user.name} (${user.email})`,
-      {
-        userId: user._id,
-        userEmail: user.email,
-        userName: user.name,
-        ie_code_no: user.ie_code_no,
-        assignedModules: moduleIds,
-        moduleCount: moduleIds.length
-      },
-      req.ip
-    );
+
 
     res.json({
       success: true,
@@ -1438,23 +1327,7 @@ export const bulkAssignModulesToUsers = async (req, res) => {
     await EximclientUser.bulkWrite(bulkOperations);
 
     // Log activity for each user
-    for (const user of users) {
-      await logActivity(
-        req.superAdmin.id,
-        'BULK_MODULE_ASSIGNMENT',
-        `Bulk assigned ${moduleIds.length} modules to user ${user.name} (${user.email})`,
-        {
-          userId: user._id,
-          userEmail: user.email,
-          userName: user.name,
-          ie_code_no: user.ie_code_no,
-          newModules: moduleIds,
-          moduleCount: moduleIds.length,
-          bulkOperation: true
-        },
-        req.ip
-      );
-    }
+    
 
     res.json({
       success: true,
@@ -1558,25 +1431,6 @@ export const assignIeCodeToUser = async (req, res) => {
 
 
     // Log activity
-    await logActivity(
-      actor.id,
-      'USER_IE_CODE_ASSIGNED',
-      `Assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to user ${user.name}`,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        previousIeCode,
-        newIeCode: ieCodeNo,
-        previousImporterName,
-        newImporterName: customerKyc.name_of_individual,
-        customerKycId: customerKyc._id,
-        reason,
-        assignedBy: actor.id,
-        assignerRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
 
     console.log(`IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to user ${user.name} by ${actor.role || 'superadmin'}`);
 
@@ -1687,22 +1541,7 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
     await Notification.insertMany(notifications);
 
     // Log activity
-    await logActivity(
-      actor.id,
-      'BULK_USER_IE_CODE_ASSIGNED',
-      `Bulk assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to ${result.modifiedCount} users`,
-      {
-        userIds,
-        ieCodeNo,
-        importerName: customerKyc.name_of_individual,
-        customerKycId: customerKyc._id,
-        reason,
-        modifiedCount: result.modifiedCount,
-        assignedBy: actor.id,
-        assignerRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
+    
 
     console.log(`Bulk IEC assignment: ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
 

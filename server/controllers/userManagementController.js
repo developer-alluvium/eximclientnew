@@ -414,17 +414,7 @@ export const inviteUser = async (req, res) => {
     await user.save();
 
     // Log activity
-    await logActivity(
-      requestingUser._id,
-      'USER_INVITED',
-      `Invited user ${email} with IE Code assignments: ${assignments.map(a => a.ie_code_no).join(', ')}`,
-      {
-        invitedUserEmail: email,
-        invitedUserName: name,
-        ie_code_assignments: assignments
-      },
-      req.ip
-    );
+ 
 
     res.status(201).json({
       success: true,
@@ -500,19 +490,7 @@ export const updateUserRole = async (req, res) => {
     targetUser.role = newRole;
     await targetUser.save();
 
-    await logActivity(
-      requestingUser._id,
-      'USER_ROLE_UPDATED',
-      `Updated user ${targetUser.email} role from ${previousRole} to ${newRole}`,
-      {
-        targetUserId: targetUser._id,
-        targetUserEmail: targetUser.email,
-        previousRole,
-        newRole,
-        ie_code_assignments: targetUser.ie_code_assignments
-      },
-      req.ip
-    );
+  
 
     res.status(200).json({
       success: true,
@@ -595,19 +573,6 @@ export const updateUserStatus = async (req, res) => {
 
     await targetUser.save();
 
-    await logActivity(
-      requestingUser._id,
-      'USER_STATUS_UPDATED',
-      `Updated user ${targetUser.email} status from ${previousStatus} to ${status}`,
-      {
-        targetUserId: targetUser._id,
-        targetUserEmail: targetUser.email,
-        previousStatus,
-        newStatus: status,
-        ie_code_assignments: targetUser.ie_code_assignments
-      },
-      req.ip
-    );
 
     res.status(200).json({
       success: true,
@@ -679,19 +644,7 @@ export const updateColumnPermissions = async (req, res) => {
     targetUser.allowedColumns = allowedColumns;
     await targetUser.save();
 
-    await logActivity(
-      requestingUser._id,
-      'COLUMN_PERMISSIONS_UPDATED',
-      `Updated column permissions for user ${targetUser.email}`,
-      {
-        targetUserId: targetUser._id,
-        targetUserEmail: targetUser.email,
-        previousColumns,
-        newColumns: allowedColumns,
-        ie_code_assignments: targetUser.ie_code_assignments
-      },
-      req.ip
-    );
+
 
     res.status(200).json({
       success: true,

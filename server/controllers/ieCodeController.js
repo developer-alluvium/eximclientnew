@@ -59,25 +59,7 @@ export const assignIeCodeToUser = async (req, res) => {
       message: `IE Code ${ieCodeNo} and Importer ${customerKyc.name_of_individual} has been assigned to your account. ${reason ? 'Reason: ' + reason : ''}`
     });
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_IE_CODE_ASSIGNED',
-      `Assigned IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} to user ${user.name}`,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        ieCodeNo,
-        importerName: customerKyc.name_of_individual,
-        customerKycId: customerKyc._id,
-        reason,
-        assignedBy: actor.id,
-        assignerRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
-
+    
     res.json({
       success: true,
       message: "IE code assigned successfully.",
@@ -151,21 +133,6 @@ export const removeIeCodeFromUser = async (req, res) => {
       message: `IE Code ${ieCodeNo} has been removed from your account.`
     });
 
-    // Log activity
-    await logActivity(
-      actor.id,
-      'USER_IE_CODE_REMOVED',
-      `Removed IEC ${ieCodeNo} from user ${user.name}`,
-      {
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        ieCodeNo,
-        removedBy: actor.id,
-        removerRole: actor.role || 'superadmin'
-      },
-      req.ip
-    );
 
     res.json({
       success: true,
