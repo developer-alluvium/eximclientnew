@@ -94,34 +94,49 @@ const ContainerSummaryModal = ({ open, onClose }) => {
   const [detailsModalSize, setDetailsModalSize] = useState('');
   const [detailsModalYear, setDetailsModalYear] = useState('');
 
-  // Get user IE code from localStorage
-  const getUserIECode = () => {
+  // Get user IE codes from localStorage - supporting multiple IE codes
+  const getUserIeCodes = () => {
     try {
       const userData = localStorage.getItem("exim_user");
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        // Return the actual IE code, not the user's MongoDB _id
-        return parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no;
+        
+        // Check for multiple IE code assignments first
+        if (parsedUser.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+          return parsedUser.ie_code_assignments.map(assignment => assignment.ie_code_no);
+        }
+        
+        // Fallback to single IE code for backward compatibility
+        if (parsedUser.data?.user?.ie_code_no) {
+          return [parsedUser.data.user.ie_code_no];
+        }
+        
+        if (parsedUser.ie_code_no) {
+          return [parsedUser.ie_code_no];
+        }
       }
     } catch (error) {
-      console.error("Error getting user IE code:", error);
+      console.error("Error getting user IE codes:", error);
     }
-    return null;
+    return [];
   };
 
-  // Fetch container summary data
+  // Fetch container summary data with multiple IE codes support
   const fetchContainerSummary = async (year) => {
     setLoading(true);
     setError(null);
     
     try {
-      const ieCode = getUserIECode();
-      if (!ieCode) {
-        throw new Error("User authorization required");
+      const ieCodes = getUserIeCodes();
+      if (!ieCodes.length) {
+        throw new Error("User authorization required - no IE codes found");
       }
 
+      // Create comma-separated string of IE codes for the API call
+      const ieCodesParam = ieCodes.join(',');
+      
       const response = await fetch(
-        `${process.env.REACT_APP_API_STRING}/container-summary?year=${year}&ie_code_no=${ieCode}`
+        `${process.env.REACT_APP_API_STRING}/container-summary?year=${year}&ie_codes=${ieCodesParam}`
       );
 
       if (!response.ok) {
@@ -182,7 +197,14 @@ const ContainerSummaryModal = ({ open, onClose }) => {
     setDetailsModalYear('');
   };
 
-
+  // Get IE codes display text for header
+  const getIeCodesDisplayText = () => {
+    const ieCodes = getUserIeCodes();
+    if (ieCodes.length === 0) return '';
+    if (ieCodes.length === 1) return `IE Code: ${ieCodes[0]}`;
+    if (ieCodes.length <= 3) return `IE Codes: ${ieCodes.join(', ')}`;
+    return `${ieCodes.length} IE Codes`;
+  };
 
   return (
     <Dialog 
@@ -205,6 +227,11 @@ const ContainerSummaryModal = ({ open, onClose }) => {
         pb: 1
       }}>
         🚢 Shipping Container Analysis Summary
+        {/* {getUserIeCodes().length > 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {getIeCodesDisplayText()}
+          </Typography>
+        )} */}
       </DialogTitle>
 
       <DialogContent>
@@ -418,6 +445,14 @@ const ContainerSummaryModal = ({ open, onClose }) => {
                 variant="filled"
                 size="medium"
               />
+              {/* {getUserIeCodes().length > 1 && (
+                <Chip 
+                  label={`Across ${getUserIeCodes().length} IE Codes`}
+                  color="info"
+                  variant="outlined"
+                  size="medium"
+                />
+              )} */}
             </Box>
           </>
         )}

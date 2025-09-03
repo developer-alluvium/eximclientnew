@@ -1192,8 +1192,7 @@ export const updateJobDutyAndWeight = async (req, res) => {
 // Shipping Container Data Analysis API
 export const getContainerSummary = async (req, res) => {
   try {
-    const { year, groupBy = 'status' } = req.query;
-    const userIeCode = req.query.ie_code_no || req.headers['x-ie-code'];
+    const { year, groupBy = 'status', ie_codes } = req.query;
 
     if (!year) {
       return res.status(400).json({
@@ -1202,12 +1201,15 @@ export const getContainerSummary = async (req, res) => {
       });
     }
 
-    if (!userIeCode) {
+    if (!ie_codes) {
       return res.status(400).json({
         success: false,
-        message: "IE code is required for authorization",
+        message: "IE codes are required for authorization",
       });
     }
+
+    // Parse comma-separated IE codes from query param
+    const userIeCodes = ie_codes.split(',').map(code => code.trim()).filter(code => code);
 
     // Validate groupBy parameter
     const validGroupByOptions = ['status', 'size', 'month', 'port'];
@@ -1218,10 +1220,10 @@ export const getContainerSummary = async (req, res) => {
       });
     }
 
-    // Build match query - filter records with empty/undefined bill_no
+    // Build match query - support multiple IE codes
     const matchQuery = {
       year: year,
-      ie_code_no: userIeCode,
+      ie_code_no: { $in: userIeCodes }, // Changed to support multiple IE codes
       $or: [
         { bill_no: { $exists: false } },
         { bill_no: null },
@@ -1275,7 +1277,7 @@ export const getContainerSummary = async (req, res) => {
       });
     }
 
-    // Group containers data - always maintain the status/size structure for frontend compatibility
+    // Group containers data
     pipeline.push({
       $group: {
         _id: null,
@@ -1287,9 +1289,9 @@ export const getContainerSummary = async (req, res) => {
             emptyContainerOffLoadDate: "$container_nos.emptyContainerOffLoadDate",
             container_rail_out_date: "$container_nos.container_rail_out_date",
             delivery_planning: "$container_nos.delivery_planning",
-            // Add additional fields for potential future grouping features
             port_of_reporting: "$port_of_reporting",
-            arrival_month: "$container_nos.arrival_month"
+            arrival_month: "$container_nos.arrival_month",
+            ie_code_no: "$ie_code_no" // Include IE code for tracking
           }
         }
       }
@@ -1303,14 +1305,9 @@ export const getContainerSummary = async (req, res) => {
     let count20Transit = 0;
     let count40Transit = 0;
 
-    // Process container data if results exist
+    // Process container data if results exist (business logic unchanged)
     if (result.length > 0 && result[0].containers) {
-      result[0].containers.forEach((container, index) => {
-        // Business Logic:
-        // - Exclude containers that are fully completed (have emptyContainerOffLoadDate)
-        // - "Arrived" = containers that have arrival_date but no emptyContainerOffLoadDate
-        // - "Transit" = containers that have no arrival_date and no emptyContainerOffLoadDate
-        
+      result[0].containers.forEach((container) => {
         const isFullyCompleted = container.emptyContainerOffLoadDate && 
           container.emptyContainerOffLoadDate.trim() !== "" && 
           container.emptyContainerOffLoadDate !== null;
@@ -1319,7 +1316,6 @@ export const getContainerSummary = async (req, res) => {
           container.arrival_date.trim() !== "" && 
           container.arrival_date !== null;
 
-        // Skip fully completed containers
         if (isFullyCompleted) {
           return;
         }
@@ -1345,7 +1341,6 @@ export const getContainerSummary = async (req, res) => {
     const totalTransit = count20Transit + count40Transit;
     const grandTotal = totalArrived + totalTransit;
 
-    // Prepare response
     const summary = {
       "20_arrived": count20Arrived,
       "40_arrived": count40Arrived,
@@ -1361,8 +1356,9 @@ export const getContainerSummary = async (req, res) => {
       summary: summary,
       year_filter: year,
       group_by: groupBy,
+      ie_codes_used: userIeCodes,
       last_updated: new Date().toISOString(),
-      message: `Container summary for year ${year} grouped by ${groupBy} generated successfully`
+      message: `Container summary for year ${year} generated successfully`
     });
 
   } catch (error) {
@@ -1375,11 +1371,10 @@ export const getContainerSummary = async (req, res) => {
   }
 };
 
-// Container Details API - Get detailed list of containers by status
+// Updated Container Details API
 export const getContainerDetails = async (req, res) => {
   try {
-    const { year, status, size } = req.query;
-    const userIeCode = req.query.ie_code_no || req.headers['x-ie-code'];
+    const { year, status, size, ie_codes } = req.query;
 
     if (!year) {
       return res.status(400).json({
@@ -1388,10 +1383,10 @@ export const getContainerDetails = async (req, res) => {
       });
     }
 
-    if (!userIeCode) {
+    if (!ie_codes) {
       return res.status(400).json({
         success: false,
-        message: "IE code is required for authorization",
+        message: "IE codes are required for authorization",
       });
     }
 
@@ -1409,10 +1404,13 @@ export const getContainerDetails = async (req, res) => {
       });
     }
 
-    // Build match query - filter records with empty/undefined bill_no
+    // Parse comma-separated IE codes from query param
+    const userIeCodes = ie_codes.split(',').map(code => code.trim()).filter(code => code);
+
+    // Build match query - support multiple IE codes
     const matchQuery = {
       year: year,
-      ie_code_no: userIeCode,
+      ie_code_no: { $in: userIeCodes }, // Changed to support multiple IE codes
       $or: [
         { bill_no: { $exists: false } },
         { bill_no: null },
@@ -1448,6 +1446,7 @@ export const getContainerDetails = async (req, res) => {
           loading_port: 1,
           port_of_reporting: 1,
           shipping_line_airline: 1,
+          ie_code_no: 1, // Include IE code for tracking
           container: {
             container_number: "$container_nos.container_number",
             size: "$container_nos.size",
@@ -1468,16 +1467,14 @@ export const getContainerDetails = async (req, res) => {
 
     const result = await JobModel.aggregate(pipeline);
     
-    // Filter containers based on status and business logic
+    // Filter containers based on status and business logic (unchanged)
     const filteredContainers = result.filter(item => {
       const container = item.container;
       
-      // Check if container is fully completed
       const isFullyCompleted = container.emptyContainerOffLoadDate && 
         container.emptyContainerOffLoadDate.trim() !== "" && 
         container.emptyContainerOffLoadDate !== null;
         
-      // Skip fully completed containers
       if (isFullyCompleted) {
         return false;
       }
@@ -1486,7 +1483,6 @@ export const getContainerDetails = async (req, res) => {
         container.arrival_date.trim() !== "" && 
         container.arrival_date !== null;
 
-      // Filter based on requested status
       if (status === 'arrived') {
         return hasArrivedAtPort;
       } else if (status === 'transit') {
@@ -1496,7 +1492,7 @@ export const getContainerDetails = async (req, res) => {
       return false;
     });
 
-    // Format the response with additional computed fields
+    // Format the response with additional computed fields (unchanged)
     const formattedContainers = filteredContainers.map(item => ({
       job_no: item.job_no,
       job_date: item.job_date,
@@ -1508,6 +1504,7 @@ export const getContainerDetails = async (req, res) => {
       loading_port: item.loading_port,
       port_of_reporting: item.port_of_reporting,
       shipping_line_airline: item.shipping_line_airline,
+      ie_code_no: item.ie_code_no, // Include IE code info
       container_number: item.container.container_number,
       container_size: item.container.size,
       arrival_date: item.container.arrival_date,
@@ -1520,14 +1517,12 @@ export const getContainerDetails = async (req, res) => {
       delivery_address: item.container.delivery_address,
       delivery_planning: item.container.delivery_planning,
       net_weight_as_per_PL_document: item.container.net_weight_as_per_PL_document,
-      // Add computed status for clarity
       container_status: status,
-      // Calculate days since arrival (for arrived containers)
       days_since_arrival: item.container.arrival_date ? 
         Math.floor((new Date() - new Date(item.container.arrival_date)) / (1000 * 60 * 60 * 24)) : null
     }));
 
-    // Sort containers: by arrival date for arrived, by job_no for transit
+    // Sort containers (unchanged logic)
     if (status === 'arrived') {
       formattedContainers.sort((a, b) => new Date(b.arrival_date) - new Date(a.arrival_date));
     } else {
@@ -1542,7 +1537,7 @@ export const getContainerDetails = async (req, res) => {
         year: year,
         status: status,
         size: size || 'all',
-        ie_code: userIeCode
+        ie_codes: userIeCodes
       },
       last_updated: new Date().toISOString(),
       message: `Found ${formattedContainers.length} container(s) with status '${status}' for year ${year}`

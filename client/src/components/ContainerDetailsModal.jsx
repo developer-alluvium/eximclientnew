@@ -84,24 +84,32 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedContainer, setSelectedContainer] = useState(null);
-  const [groupBy, setGroupBy] = useState('none'); // New state for group by option
+  const [groupBy, setGroupBy] = useState('none');
   const [groupedContainers, setGroupedContainers] = useState({});
 
-  // Get user IE code from localStorage
-  const getUserIECode = () => {
+  // Get user IE codes from localStorage - supporting multiple IE codes
+  const getUserIeCodes = () => {
     try {
       const userData = localStorage.getItem("exim_user");
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        return parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no;
+        
+        // Check for multiple IE code assignments first
+        if (parsedUser.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+          return parsedUser.ie_code_assignments.map(assignment => assignment.ie_code_no);
+        }
+        
+        // Fallback to single IE code
+        return parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no ? 
+          [parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no] : [];
       }
     } catch (error) {
-      console.error("Error getting user IE code:", error);
+      console.error("Error getting user IE codes:", error);
     }
-    return null;
+    return [];
   };
 
-  // Fetch container details
+  // Fetch container details with multiple IE codes support
   const fetchContainerDetails = async () => {
     if (!status || !year) return;
     
@@ -109,14 +117,17 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     setError(null);
     
     try {
-      const ieCode = getUserIECode();
-      if (!ieCode) {
-        throw new Error("User authorization required");
+      const ieCodes = getUserIeCodes();
+      if (!ieCodes.length) {
+        throw new Error("User authorization required - no IE codes found");
       }
 
+      // Create comma-separated string of IE codes
+      const ieCodesParam = ieCodes.join(',');
       const sizeParam = size ? `&size=${size}` : '';
+      
       const response = await fetch(
-        `${process.env.REACT_APP_API_STRING}/container-details?year=${year}&status=${status}&ie_code_no=${ieCode}${sizeParam}`
+        `${process.env.REACT_APP_API_STRING}/container-details?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`
       );
 
       if (!response.ok) {
@@ -141,7 +152,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     }
   };
 
-  // Group containers based on selected criteria
+  // Group containers based on selected criteria (unchanged)
   const groupContainers = (containerData, groupByOption) => {
     if (groupByOption === 'none') {
       setGroupedContainers({ 'All Containers': containerData });
@@ -182,6 +193,9 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
         case 'job_no':
           groupKey = container.job_no || 'Unknown Job No';
           break;
+        case 'ie_code':
+          groupKey = `IE Code: ${container.ie_code_no || 'Unknown'}`;
+          break;
         default:
           groupKey = 'All Containers';
       }
@@ -213,7 +227,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     if (open && status && year) {
       fetchContainerDetails();
     }
-  }, [open, status, year, size]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, status, year, size]);
 
   // Update grouping when containers or groupBy changes
   useEffect(() => {
@@ -615,7 +629,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     );
   };
 
-  return (
+return (
     <Dialog 
       open={open} 
       onClose={handleClose}
@@ -660,7 +674,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
           </Typography>
         </Box>
 
-        {/* Group By Controls */}
+        {/* Group By Controls - Added IE Code option */}
         {!loading && !error && containers.length > 0 && !selectedContainer && (
           <Box sx={{ mb: 3 }}>
             <FormControl sx={{ minWidth: 250 }}>
@@ -685,6 +699,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
                 <MenuItem value="size">Container Size</MenuItem>
                 <MenuItem value="month">Arrival Month</MenuItem>
                 <MenuItem value="job_date">Job Month</MenuItem>
+                <MenuItem value="ie_code">IE Code</MenuItem>
               </Select>
             </FormControl>
             <Divider sx={{ mt: 2 }} />
