@@ -171,16 +171,16 @@ export async function getJobsByMultipleIECodes(req, res) {
     
     console.log('Received IE codes:', ieCodeArray);
 
-    // Base query with year filter and IE codes
+    // Base query with year filter, IE codes, and initialized $and array
     const query = {
       year,
-      ie_code_no: { $in: ieCodeArray }
+      ie_code_no: { $in: ieCodeArray },
+      $and: [] // Initialize $and as empty array
     };
 
     // Add importer filter if provided
     if (importerArray.length > 0) {
-          query.importer = { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) };
-
+      query.importer = { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) };
     }
     
     // Log the query for debugging
@@ -190,13 +190,8 @@ export async function getJobsByMultipleIECodes(req, res) {
     // Add status conditions similar to getJobsByStatusAndImporter
     const statusLower = status.toLowerCase();
     
-    if (statusLower === "all") {
-      query.$and = [
-        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
-        { status: { $not: { $regex: "^cancelled$", $options: "i" } } }
-      ];
-    } else if (statusLower === "pending") {
-      query.$and = [
+    if (statusLower === "pending") {
+      query.$and.push(
         { status: { $regex: "^pending$", $options: "i" } },
         { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
         {
@@ -204,10 +199,10 @@ export async function getJobsByMultipleIECodes(req, res) {
             { bill_date: { $in: [null, ""] } },
             { status: { $regex: "^pending$", $options: "i" } },
           ],
-        },
-      ];
+        }
+      );
     } else if (statusLower === "completed") {
-      query.$and = [
+      query.$and.push(
         { status: { $regex: "^completed$", $options: "i" } },
         { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
         {
@@ -215,8 +210,20 @@ export async function getJobsByMultipleIECodes(req, res) {
             { bill_date: { $nin: [null, ""] } },
             { status: { $regex: "^completed$", $options: "i" } },
           ],
-        },
-      ];
+        }
+      );
+    } else if (statusLower === "cancelled") {
+      query.$and.push({
+        $or: [
+          { status: { $regex: "^cancelled$", $options: "i" } },
+          { be_no: { $regex: "^cancelled$", $options: "i" } },
+        ],
+      });
+    } else {
+      query.$and.push(
+        { status: { $regex: `^${status}$`, $options: "i" } },
+        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } }
+      );
     }
 
     // Handle detailed status and search similar to original function
@@ -225,7 +232,6 @@ export async function getJobsByMultipleIECodes(req, res) {
     }
 
     if (search) {
-      query.$and = query.$and || [];
       query.$and.push(buildSearchQuery(search));
     }
 
@@ -274,6 +280,7 @@ export async function getJobsByMultipleIECodes(req, res) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
 
 // Controller function to get jobs by status, detailed status and importer
 export async function getJobsByStatusAndImporter(req, res) {
