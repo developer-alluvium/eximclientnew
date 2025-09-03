@@ -509,15 +509,15 @@ function UserDashboard() {
               color="inherit"
               onClick={(e) => setNotificationAnchor(e.currentTarget)}
             >
-              <Badge badgeContent={dashboardData?.notifications?.length || 0} color="warning">
+              {/* <Badge badgeContent={dashboardData?.notifications?.length || 0} color="warning">
                 <NotificationsIcon />
-              </Badge>
+              </Badge> */}
             </IconButton>
 
             <UserMenu onClick={handleUserMenuOpen}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: '#1976d2', mr: 1 }}>
+              {/* <Avatar sx={{ width: 32, height: 32, bgcolor: '#1976d2', mr: 1 }}>
                 {userInitial}
-              </Avatar>
+              </Avatar> */}
               <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
                 {userName}
               </Typography>
@@ -540,10 +540,10 @@ function UserDashboard() {
             },
           }}
         >
-          <MenuItem onClick={() => navigate('/user/profile')}>
+          {/* <MenuItem onClick={() => navigate('/user/profile')}>
             <PersonIcon sx={{ mr: 2 }} />
             Profile
-          </MenuItem>
+          </MenuItem> */}
           <MenuItem onClick={() => navigate('/user-management')}>
             <ManageAccountsIcon sx={{ mr: 2 }} />
             UsersManagment

@@ -1,23 +1,21 @@
-
 import express from 'express';
 import {
   getUsersByIECode,
+  getAvailableImporters,
+  getUserStatsByImporter,
   inviteUser,
   updateUserRole,
+  updateUserStatus,
   updateColumnPermissions,
   postColumnOrder,
   getColumnOrder
 } from '../controllers/userManagementController.js';
 
-import{ 
-  protectSuperAdmin
-} from '../controllers/superAdminController.js';
+import { protectSuperAdmin } from '../controllers/superAdminController.js';
 
 import { 
   promoteUserToAdmin,
   demoteUserFromAdmin,
-  updateUserStatus,
-  // Column permission functions
   getAvailableColumns,
   getUserColumnPermissions,
   updateUserColumnPermissions,
@@ -25,7 +23,6 @@ import {
   updateCustomerColumnPermissions,
   bulkUpdateUserColumnPermissions,
   bulkUpdateCustomerColumnPermissions,
-  // Tab visibility functions
   getCustomerTabVisibility,
   updateCustomerTabVisibility
 } from "../controllers/sharedUserActionController.js";
@@ -34,54 +31,45 @@ import { authenticateUser, authorize, checkIECodeAccess } from "../middlewares/a
 
 const router = express.Router();
 
-
+// SuperAdmin routes
 router.get("/superadmin/user/:userId/tab-visibility", protectSuperAdmin, getCustomerTabVisibility);
 router.patch("/superadmin/user/:userId/tab-visibility", protectSuperAdmin, updateCustomerTabVisibility);
 
 router.use(authenticateUser);
 
-// User management routes with multiple IE code support
-router.get('/users', getUsersByIECode); // Now supports querying users by multiple IE codes
+// User management routes with multiple IE code and importer filtering support
+router.get('/users', getUsersByIECode); // ?ie_code_nos=IE001,IE002&importer=ABC%20Imports&page=1&limit=50
 
-// Create/Invite new user (updated to support multiple IE codes)
+// Importer management routes
+router.get('/importers', getAvailableImporters); // ?ie_code_nos=IE001,IE002
+router.get('/users/stats', getUserStatsByImporter); // ?ie_code_nos=IE001,IE002
+
+// Create/Invite new user (supports multiple IE code assignments)
 router.post('/users/invite', 
   authorize('superadmin', 'admin'),
-  async (req, res, next) => {
-    // Convert single IE code to array format if needed
-    if (req.body.ie_code_no && !Array.isArray(req.body.ie_code_no)) {
-      req.body.ie_code_assignments = [{
-        ie_code_no: req.body.ie_code_no,
-        importer_name: req.body.importer || 'Unknown'
-      }];
-    }
-    next();
-  },
   inviteUser);
 
-// Update user role
-router.patch('/users/:userId/role', authorize('admin'), updateUserRole);
-router.patch('/manage/:userId/promote', authorize('admin'), promoteUserToAdmin);
-router.patch('/manage/:userId/demote', authorize('admin'), demoteUserFromAdmin);
+// Update user role (supports users with multiple IE codes)
+router.patch('/users/:userId/role', authorize('admin', 'superadmin'), updateUserRole);
+router.patch('/manage/:userId/promote', authorize('admin', 'superadmin'), promoteUserToAdmin);
+router.patch('/manage/:userId/demote', authorize('admin', 'superadmin'), demoteUserFromAdmin);
 
-// Update user status
-router.patch('/users/:userId/status', authorize('admin'), updateUserStatus);
+// Update user status (supports users with multiple IE codes)
+router.patch('/users/:userId/status', authorize('admin', 'superadmin'), updateUserStatus);
 
-// Column permissions routes (Admin can manage users within their IE Code)
-router.get('/available-columns', authorize('admin'), getAvailableColumns);
-router.get('/users/:userId/column-permissions', authorize('admin'), getUserColumnPermissions);
-router.put('/users/:userId/column-permissions', authorize('admin'), updateUserColumnPermissions);
-router.post('/users/bulk-column-permissions', authorize('admin'), bulkUpdateUserColumnPermissions);
+// Column permissions routes (supports multiple IE codes)
+router.get('/available-columns', authorize('admin', 'superadmin'), getAvailableColumns);
+router.get('/users/:userId/column-permissions', authorize('admin', 'superadmin'), getUserColumnPermissions);
+router.put('/users/:userId/column-permissions', authorize('admin', 'superadmin'), updateUserColumnPermissions);
+router.post('/users/bulk-column-permissions', authorize('admin', 'superadmin'), bulkUpdateUserColumnPermissions);
 
 // Legacy column permissions route
-router.patch('/users/:userId/columns', authorize('admin'), updateColumnPermissions);
+router.patch('/users/:userId/columns', authorize('admin', 'superadmin'), updateColumnPermissions);
 router.post('/users/columns/order', authorize(), postColumnOrder);
 router.get('/users/columns/order', authorize(), getColumnOrder);
 
-
-// Tab visibility routes (SuperAdmin only)
-
-
 export default router;
+
 
 
 // import express from 'express';

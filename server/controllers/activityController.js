@@ -1,6 +1,6 @@
 import ActivityLogModel from "../models/ActivityLogModel.js";
-import CustomerModel from "../models/customerModel.js";
 import axios from "axios";
+import EximclientUser from "../models/eximclientUserModel.js";
 
 /**
  * Helper function to get location from IP address
@@ -61,15 +61,10 @@ export const logActivity = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!user_id || !activity_type || !description) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: user_id, activity_type, description"
-      });
-    }
+
 
     // Get user information
-    const user = await CustomerModel.findById(user_id);
+    const user = await EximclientUser.findById(user_id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -88,7 +83,7 @@ export const logActivity = async (req, res) => {
     // Create activity log
     const activityLog = new ActivityLogModel({
       user_id,
-      user_email: user.email || `${user.ie_code_no}@example.com`,
+      user_email: user.email ,
       user_name: user.name,
       ie_code_no: user.ie_code_no,
       activity_type,
@@ -493,7 +488,7 @@ export const bulkLogActivities = async (req, res) => {
     // Process each activity
     const processedActivities = await Promise.all(
       activities.map(async (activity) => {
-        const user = await CustomerModel.findById(activity.user_id);
+        const user = await EximclientUser.findById(activity.user_id);
         if (!user) return null;
 
         const location = await getLocationFromIP(ipAddress);

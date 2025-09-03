@@ -7,38 +7,119 @@ import mongoose from "mongoose";
  */
 export const getUsersByIECode = async (req, res) => {
   try {
-    const { ie_code_no } = req.query;
+    const { ie_code_nos, importer, page = 1, limit = 50 } = req.query;
     const requestingUser = req.user;
 
-    // Validate ie_code_no parameter
-    if (!ie_code_no) {
+    // Parse IE codes - support both single and multiple
+    let ieCodeArray = [];
+    if (ie_code_nos) {
+      ieCodeArray = ie_code_nos.split(',').map(code => code.trim().toUpperCase()).filter(code => code);
+    } else {
+      // Fallback to user's assigned IE codes
+      ieCodeArray = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+    }
+
+    if (ieCodeArray.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "IE Code is required"
+        message: "IE Code(s) are required"
       });
     }
 
-    // Super admin can view any IECode's users
-    if (requestingUser.role !== 'superadmin' && requestingUser.ie_code_no !== ie_code_no) {
-      return res.status(403).json({
-        success: false,
-        message: "You can only view users under your IE Code"
-      });
+    // Super admin can view any IE codes' users
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const hasAccess = ieCodeArray.every(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view users under your assigned IE Codes"
+        });
+      }
     }
 
-    // Build query properly - avoid nested operators
-    const query = { 
-      ie_code_no: ie_code_no.toUpperCase().trim()
+    // Build base query - only use ie_code_assignments (no legacy support)
+    let query = {
+      'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
     };
 
+    // Add importer filter if provided
+    if (importer && importer !== "All Importers") {
+      query['ie_code_assignments'] = {
+        $elemMatch: {
+          ie_code_no: { $in: ieCodeArray },
+          importer_name: { $regex: new RegExp(importer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+        }
+      };
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get total count for pagination
+    const totalCount = await EximclientUser.countDocuments(query);
+
+    // Get paginated users
     const users = await EximclientUser.find(query)
-      .select('-password -emailVerificationToken -initialPassword')
-      .lean(); // Use lean() for better performance
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get unique importers for filtering dropdown (only from ie_code_assignments)
+    const importerAggregation = await EximclientUser.aggregate([
+      { 
+        $match: { 
+          'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+        } 
+      },
+      { $unwind: '$ie_code_assignments' },
+      {
+        $match: {
+          'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+        }
+      },
+      {
+        $group: {
+          _id: '$ie_code_assignments.importer_name',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $match: { 
+          _id: { $ne: null, $ne: '' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          importer_name: '$_id',
+          count: 1
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    const availableImporters = importerAggregation.map(imp => imp.importer_name);
 
     res.status(200).json({
       success: true,
       data: users,
-      count: users.length
+      pagination: {
+        current_page: parseInt(page),
+        per_page: parseInt(limit),
+        total_count: totalCount,
+        total_pages: Math.ceil(totalCount / parseInt(limit)),
+        has_next: parseInt(page) < Math.ceil(totalCount / parseInt(limit)),
+        has_previous: parseInt(page) > 1
+      },
+      filters: {
+        ie_codes_searched: ieCodeArray,
+        importer_filter: importer || null,
+        available_importers: availableImporters
+      }
     });
   } catch (error) {
     console.error("Get users by IE Code error:", error);
@@ -51,28 +132,251 @@ export const getUsersByIECode = async (req, res) => {
 };
 
 /**
+ * Get available importers for a set of IE codes (only from ie_code_assignments)
+ */
+export const getAvailableImporters = async (req, res) => {
+  try {
+    const { ie_code_nos } = req.query;
+    const requestingUser = req.user;
+
+    // Parse IE codes
+    let ieCodeArray = [];
+    if (ie_code_nos) {
+      ieCodeArray = ie_code_nos.split(',').map(code => code.trim().toUpperCase()).filter(code => code);
+    } else {
+      ieCodeArray = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+    }
+
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code(s) are required"
+      });
+    }
+
+    // Check permissions
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const hasAccess = ieCodeArray.every(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view importers for your assigned IE Codes"
+        });
+      }
+    }
+
+    // Aggregate unique importers for the specified IE codes (only from ie_code_assignments)
+    const importerAggregation = await EximclientUser.aggregate([
+      {
+        $match: {
+          'ie_code_assignments': { $exists: true, $ne: [] }
+        }
+      },
+      { $unwind: '$ie_code_assignments' },
+      {
+        $match: {
+          'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+        }
+      },
+      {
+        $group: {
+          _id: '$ie_code_assignments.importer_name',
+          count: { $sum: 1 },
+          ie_codes: { $addToSet: '$ie_code_assignments.ie_code_no' }
+        }
+      },
+      {
+        $match: { 
+          _id: { $ne: null, $ne: '' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          importer_name: '$_id',
+          user_count: '$count',
+          ie_codes: 1
+        }
+      },
+      { $sort: { user_count: -1 } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: importerAggregation,
+      count: importerAggregation.length,
+      ie_codes_searched: ieCodeArray
+    });
+  } catch (error) {
+    console.error("Get available importers error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching available importers",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get user statistics by importer and IE code (only from ie_code_assignments)
+ */
+export const getUserStatsByImporter = async (req, res) => {
+  try {
+    const { ie_code_nos } = req.query;
+    const requestingUser = req.user;
+
+    // Parse IE codes
+    let ieCodeArray = [];
+    if (ie_code_nos) {
+      ieCodeArray = ie_code_nos.split(',').map(code => code.trim().toUpperCase()).filter(code => code);
+    } else {
+      ieCodeArray = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+    }
+
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code(s) are required"
+      });
+    }
+
+    // Check permissions
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const hasAccess = ieCodeArray.every(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view statistics for your assigned IE Codes"
+        });
+      }
+    }
+
+    // Get detailed statistics (only from ie_code_assignments)
+    const stats = await EximclientUser.aggregate([
+      {
+        $match: {
+          'ie_code_assignments': { $exists: true, $ne: [] }
+        }
+      },
+      { $unwind: '$ie_code_assignments' },
+      {
+        $match: {
+          'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            ie_code: '$ie_code_assignments.ie_code_no',
+            importer: '$ie_code_assignments.importer_name',
+            status: '$status',
+            role: '$role'
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            ie_code: '$_id.ie_code',
+            importer: '$_id.importer'
+          },
+          total_users: { $sum: '$count' },
+          status_breakdown: {
+            $push: {
+              status: '$_id.status',
+              role: '$_id.role',
+              count: '$count'
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          ie_code: '$_id.ie_code',
+          importer_name: '$_id.importer',
+          total_users: 1,
+          status_breakdown: 1
+        }
+      },
+      { $sort: { ie_code: 1, total_users: -1 } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+      ie_codes_searched: ieCodeArray,
+      summary: {
+        total_ie_codes: [...new Set(stats.map(s => s.ie_code))].length,
+        total_importers: [...new Set(stats.map(s => s.importer_name))].filter(Boolean).length,
+        total_users: stats.reduce((sum, s) => sum + s.total_users, 0)
+      }
+    });
+  } catch (error) {
+    console.error("Get user stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user statistics",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
  * Create/Invite a new user under an IECode
  */
 export const inviteUser = async (req, res) => {
   try {
-    const { name, email, ie_code_no, importer } = req.body;
+    const { name, email, ie_code_assignments, ie_code_no, importer } = req.body; // Support both new and old format
     const requestingUser = req.user;
 
     // Validate required fields
-    if (!name || !email || !ie_code_no) {
+    if (!name || !email) {
       return res.status(400).json({
         success: false,
-        message: "Name, email, and IE Code are required"
+        message: "Name and email are required"
       });
     }
 
-    // Validate permissions
-    if (requestingUser.role !== 'superadmin' && 
-        (requestingUser.role !== 'admin' || requestingUser.ie_code_no !== ie_code_no)) {
-      return res.status(403).json({
+    // Handle IE code assignments - support both new and legacy formats
+    let assignments = [];
+    if (ie_code_assignments && Array.isArray(ie_code_assignments)) {
+      assignments = ie_code_assignments;
+    } else if (ie_code_no) {
+      // Legacy support
+      assignments = [{
+        ie_code_no: ie_code_no.toUpperCase().trim(),
+        importer_name: importer?.trim() || 'Unknown',
+        assigned_by: requestingUser._id,
+        assigned_by_model: requestingUser.role === 'superadmin' ? 'SuperAdmin' : 'Admin',
+        assigned_at: new Date()
+      }];
+    }
+
+    if (assignments.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "You don't have permission to invite users for this IE Code"
+        message: "At least one IE code assignment is required"
       });
+    }
+
+    // Validate permissions for each IE code
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const requestedIeCodes = assignments.map(a => a.ie_code_no);
+      const hasAccess = requestedIeCodes.every(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to invite users for some of these IE Codes"
+        });
+      }
     }
 
     // Check if user already exists
@@ -94,26 +398,30 @@ export const inviteUser = async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: tempPassword,
-      initialPassword: tempPassword,
-      ie_code_no: ie_code_no.toUpperCase().trim(),
-      importer: importer?.trim(),
-      role: 'customer',
+      ie_code_assignments: assignments.map(a => ({
+        ...a,
+        assigned_by: requestingUser._id,
+        assigned_by_model: requestingUser.role === 'superadmin' ? 'SuperAdmin' : 'Admin'
+      })),
+      // Keep legacy fields for backward compatibility
+      ie_code_no: assignments[0]?.ie_code_no,
+      assignedImporterName: assignments[0]?.importer_name,
+      role: 'user', // Changed from 'customer' to match schema
       isActive: false,
       password_changed: false
     });
 
     await user.save();
 
-    // Log activity with proper structure
+    // Log activity
     await logActivity(
       requestingUser._id,
       'USER_INVITED',
-      `Invited user ${email} to IE Code ${ie_code_no}`,
+      `Invited user ${email} with IE Code assignments: ${assignments.map(a => a.ie_code_no).join(', ')}`,
       {
         invitedUserEmail: email,
         invitedUserName: name,
-        ie_code_no: ie_code_no,
-        importer: importer
+        ie_code_assignments: assignments
       },
       req.ip
     );
@@ -125,7 +433,7 @@ export const inviteUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        ie_code_no: user.ie_code_no,
+        ie_code_assignments: user.ie_code_assignments,
         role: user.role,
         tempPassword: tempPassword // In production, send via email instead
       }
@@ -141,7 +449,7 @@ export const inviteUser = async (req, res) => {
 };
 
 /**
- * Update user role (promote/demote)
+ * Update user role (promote/demote) - supports multiple IE codes
  */
 export const updateUserRole = async (req, res) => {
   try {
@@ -158,11 +466,11 @@ export const updateUserRole = async (req, res) => {
     }
 
     // Validate role
-    const validRoles = ['customer', 'admin'];
+    const validRoles = ['user', 'admin']; // Updated to match schema
     if (!validRoles.includes(newRole)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid role. Must be 'customer' or 'admin'"
+        message: "Invalid role. Must be 'user' or 'admin'"
       });
     }
 
@@ -174,26 +482,16 @@ export const updateUserRole = async (req, res) => {
       });
     }
 
-    // Only super_admin or admin of same IE code can modify roles
-    if (requestingUser.role !== 'superadmin' && 
-        (requestingUser.role !== 'admin' || requestingUser.ie_code_no !== targetUser.ie_code_no)) {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have permission to modify user roles"
-      });
-    }
-
-    // Prevent demoting the last admin
-    if (targetUser.role === 'admin' && newRole === 'customer') {
-      const adminCount = await EximclientUser.countDocuments({
-        ie_code_no: targetUser.ie_code_no,
-        role: 'admin'
-      });
-
-      if (adminCount <= 1 && requestingUser.role !== 'superadmin') {
+    // Check permissions based on IE code assignments
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const targetIeCodes = targetUser.ie_code_assignments?.map(a => a.ie_code_no) || [targetUser.ie_code_no];
+      const hasAccess = targetIeCodes.some(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
-          message: "Cannot demote the last admin. Only super admin can perform this action."
+          message: "You don't have permission to modify this user's role"
         });
       }
     }
@@ -211,7 +509,7 @@ export const updateUserRole = async (req, res) => {
         targetUserEmail: targetUser.email,
         previousRole,
         newRole,
-        ie_code_no: targetUser.ie_code_no
+        ie_code_assignments: targetUser.ie_code_assignments
       },
       req.ip
     );
@@ -236,6 +534,7 @@ export const updateUserRole = async (req, res) => {
   }
 };
 
+
 /**
  * Update user status (activate/deactivate)
  */
@@ -254,11 +553,11 @@ export const updateUserStatus = async (req, res) => {
     }
 
     // Validate status
-    const validStatuses = ['active', 'inactive', 'pending', 'suspended'];
+    const validStatuses = ['active', 'inactive', 'pending'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status. Must be 'active', 'inactive', 'pending', or 'suspended'"
+        message: "Invalid status. Must be 'active', 'inactive', or 'pending'"
       });
     }
 
@@ -270,22 +569,27 @@ export const updateUserStatus = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (requestingUser.role !== 'superadmin' && 
-        (requestingUser.role !== 'admin' || requestingUser.ie_code_no !== targetUser.ie_code_no)) {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have permission to modify user status"
-      });
+    // Check permissions based on IE code assignments
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const targetIeCodes = targetUser.ie_code_assignments?.map(a => a.ie_code_no) || [targetUser.ie_code_no];
+      const hasAccess = targetIeCodes.some(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to modify this user's status"
+        });
+      }
     }
 
     const previousStatus = targetUser.status;
     const previousIsActive = targetUser.isActive;
 
+    targetUser.status = status;
     targetUser.isActive = status === 'active';
     
-    // Update last login/logout based on status change
-    if (status === 'inactive' || status === 'suspended') {
+    if (status === 'inactive') {
       targetUser.lastLogout = new Date();
     }
 
@@ -294,13 +598,13 @@ export const updateUserStatus = async (req, res) => {
     await logActivity(
       requestingUser._id,
       'USER_STATUS_UPDATED',
-      `Updated user ${targetUser.email} status from ${previousIsActive ? 'active' : 'inactive'} to ${status}`,
+      `Updated user ${targetUser.email} status from ${previousStatus} to ${status}`,
       {
         targetUserId: targetUser._id,
         targetUserEmail: targetUser.email,
-        previousStatus: previousIsActive ? 'active' : 'inactive',
+        previousStatus,
         newStatus: status,
-        ie_code_no: targetUser.ie_code_no
+        ie_code_assignments: targetUser.ie_code_assignments
       },
       req.ip
     );
@@ -325,6 +629,7 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
+
 /**
  * Update user's import DSR column permissions
  */
@@ -334,7 +639,6 @@ export const updateColumnPermissions = async (req, res) => {
     const { allowedColumns } = req.body;
     const requestingUser = req.user;
 
-    // Validate userId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
@@ -342,7 +646,6 @@ export const updateColumnPermissions = async (req, res) => {
       });
     }
 
-    // Validate allowedColumns
     if (!Array.isArray(allowedColumns)) {
       return res.status(400).json({
         success: false,
@@ -358,21 +661,18 @@ export const updateColumnPermissions = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (requestingUser.role !== 'superadmin'||
-        (requestingUser.role !== 'admin' || requestingUser.ie_code_no !== targetUser.ie_code_no)) {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have permission to modify column permissions"
-      });
-    }
-
-    // Check if user has import DSR module assigned
-    if (!targetUser.assignedModules.includes('import_dsr')) {
-      return res.status(403).json({
-        success: false,
-        message: "User does not have Import DSR module assigned"
-      });
+    // Check permissions based on IE code assignments
+    if (requestingUser.role !== 'superadmin') {
+      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const targetIeCodes = targetUser.ie_code_assignments?.map(a => a.ie_code_no) || [targetUser.ie_code_no];
+      const hasAccess = targetIeCodes.some(code => userIeCodes.includes(code));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to modify this user's column permissions"
+        });
+      }
     }
 
     const previousColumns = targetUser.allowedColumns || [];
@@ -388,7 +688,7 @@ export const updateColumnPermissions = async (req, res) => {
         targetUserEmail: targetUser.email,
         previousColumns,
         newColumns: allowedColumns,
-        ie_code_no: targetUser.ie_code_no
+        ie_code_assignments: targetUser.ie_code_assignments
       },
       req.ip
     );
@@ -411,6 +711,7 @@ export const updateColumnPermissions = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Get exporters for a specific importer (for the aggregation error you're seeing)

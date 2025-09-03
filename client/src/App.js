@@ -29,6 +29,7 @@ import ImportVideoPage from "./pages/ImportVideoPage";
 import UserManagement from "./pages/UserManagement/UserManagement.jsx"
 import EmailVerification from "./pages/EmailVerification.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx"
+
 // Protected route component for backward compatibility
 const LegacyProtectedRoute = ({ children }) => {
   const navigate = useNavigate();
@@ -40,7 +41,10 @@ const LegacyProtectedRoute = ({ children }) => {
   // Don't interfere with SuperAdmin routes - but still call useEffect
   const shouldBypass = location.pathname.startsWith('/superadmin-dashboard') || 
                       location.pathname.startsWith('/module-access-management') ||
-                      location.pathname === '/login';
+                      location.pathname === '/login' ||
+                      location.pathname === '/user/login' ||
+                      location.pathname === '/admin/login' ||
+                      location.pathname === '/superadmin/login';
 
   useEffect(() => {
     if (!shouldBypass && !isAuthenticated && location.pathname !== "/login") {
@@ -74,11 +78,15 @@ function App() {
           <ImportersProvider>
             <BrowserRouter>
               <Routes>
-                {/* Legacy customer login */}
+                {/* Main login route - keep only one */}
                 <Route path="/login" element={<LoginPage />} />
                 
-                {/* New user system routes */}
-                <Route path="/login" element={<UserLoginPage />} />
+                {/* Specific login routes */}
+                <Route path="/user/login" element={<UserLoginPage />} />
+                <Route path="/admin/login" element={<AdminLoginPage />} />
+                <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+                
+                {/* User system routes */}
                 <Route path="/user/register" element={<UserRegistrationPage />} />
                 <Route path="/verify-email/:token" element={<EmailVerification />} />
                 <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
@@ -87,27 +95,24 @@ function App() {
                 } />
                 
                 {/* Admin routes */}
-               
                 <Route path="/customer-admin/dashboard" element={
                   localStorage.getItem("exim_admin") ? <CustomerAdminDashboard /> : <AdminLoginPage />
                 } />
                 
                 {/* SuperAdmin routes */}
-                <Route path="/login" element={<SuperAdminLoginPage />} />
                 <Route path="/superadmin-dashboard" element={
-                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <LoginPage />
+                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <SuperAdminLoginPage />
                 }>
                   <Route index element={<SuperAdminDashboard />} />
                   <Route path="customer/:customerId" element={<SuperAdminCustomerDetail />} />
                 </Route>
                 <Route path="/module-access-management" element={
-                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <oginPage />
+                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <SuperAdminLoginPage />
                 } />
 
                 {/* Legacy customer routes */}
                 <Route path="/" element={
-                  localStorage.getItem("exim_user") ? <UserDashboard /> : 
-                  localStorage.getItem("exim_user") ? <HomePage /> : <LoginPage />
+                  localStorage.getItem("exim_user") ? <UserDashboard /> : <LoginPage />
                 } />
                 <Route path="/netpage" element={
                   localStorage.getItem("exim_user") ? <NetPage /> : <LoginPage />
@@ -121,11 +126,23 @@ function App() {
                 <Route path="/trademasterguide" element={
                   localStorage.getItem("exim_user") ? <ImportVideoPage /> : <LoginPage />
                 } />
+                
+                {/* User Management route - check for admin role */}
                 <Route path="/user-management" element={
-                  localStorage.getItem("exim_user") ? <UserManagement /> : <LoginPage />
+                  (() => {
+                    const user = localStorage.getItem("exim_user");
+                    if (!user) return <LoginPage />;
+                    
+                    try {
+                      const userData = JSON.parse(user);
+                      const isAdmin = userData.role === 'admin' || userData.role === 'superadmin';
+                      return isAdmin ? <UserManagement /> : <LoginPage />;
+                    } catch (error) {
+                      console.error('Error parsing user data:', error);
+                      return <LoginPage />;
+                    }
+                  })()
                 } />
-                
-                
               </Routes>
             </BrowserRouter>
           </ImportersProvider>
