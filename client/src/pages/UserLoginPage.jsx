@@ -11,8 +11,8 @@ import {
   Card,
   CardContent,
   Link as MuiLink,
-  Switch, // Added for the toggle
-  FormControlLabel, // Added for the toggle
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { Visibility, VisibilityOff, Login, SupervisorAccount } from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
@@ -31,10 +31,10 @@ function UserLoginPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // 1. State to toggle between User and SuperAdmin login
+  // State to toggle between User and SuperAdmin login
   const [isSuperAdminLogin, setIsSuperAdminLogin] = useState(false);
 
-  // 2. Updated useEffect to check for both user and superadmin sessions
+  // Updated useEffect to check for both user and superadmin sessions
   useEffect(() => {
     const superAdminToken = localStorage.getItem("superadmin_token");
     const userToken = localStorage.getItem("access_token");
@@ -55,7 +55,7 @@ function UserLoginPage() {
     if (error) setError(null);
   };
 
-  // 3. Consolidated handleSubmit function
+  // Consolidated handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -102,6 +102,7 @@ function UserLoginPage() {
             }
           };
 
+          // Fixed the localStorage calls here - replaced 'storage' with 'localStorage'
           localStorage.setItem("exim_user", JSON.stringify(enhancedUserData));
           localStorage.setItem("access_token", accessToken);
           localStorage.setItem("refresh_token", refreshToken);
@@ -225,7 +226,7 @@ function UserLoginPage() {
                       }}
                     />
 
-                    {/* 4. Added the Switch for toggling login type */}
+                    {/* Switch for toggling login type */}
                     <FormControlLabel
                       control={
                         <Switch
