@@ -1,8 +1,40 @@
 import { useState, useEffect, useRef, useContext , useCallback} from "react";
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import { TextField, Box, Typography, Button, Paper } from "@mui/material";
-import axios from "axios";
+import {
+  Box,
+  Container,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Chip,
+  Alert,
+  IconButton,
+  AppBar,
+  Toolbar,
+  Menu,
+  MenuItem,
+  Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Paper,
+  Avatar
+} from "@mui/material";import axios from "axios";
+import { ThemeProvider, styled, alpha } from '@mui/material/styles';
+
+import {
+  Lock as LockIcon,
+  Person as PersonIcon,
+  Notifications as NotificationsIcon,
+  Logout as LogoutIcon,
+  AccountCircle as AccountCircleIcon,
+  AccessTime as AccessTimeIcon,
+  ManageAccounts as ManageAccountsIcon
+} from "@mui/icons-material";
 import ImportAnalytics from "./ImportAnalytics";
 import { SimpleHeader } from "./SharedComponents";
 import ChargesSummary from "./ChargesSummary";
@@ -24,9 +56,46 @@ const NetPage = () => {
     setTabValue(newValue);
   };
 
+
+  const HeaderBar = styled(AppBar)(({ theme }) => ({
+  backgroundColor: "#fff",
+  color: theme.palette.text.primary,
+  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+  position: "fixed",
+  zIndex: theme.zIndex.drawer + 1,
+}));
+
+const DateTimeContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  padding: theme.spacing(0.7, 2.5),
+  borderRadius: "24px",
+  backgroundColor: alpha(theme.palette.grey[100], 0.8),
+  marginRight: theme.spacing(2),
+  "& svg": {
+    marginRight: theme.spacing(1),
+    color: theme.palette.warning.main,
+  }
+}));
+
+const UserMenu = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  cursor: "pointer",
+  padding: theme.spacing(0.6, 1.2),
+  borderRadius: "24px",
+  transition: "background-color 0.2s ease",
+  "&:hover": {
+    backgroundColor: alpha(theme.palette.grey[100], 0.8),
+  }
+}));
+
+
   // Always check localStorage for tab visibility
-  const getTabVisibility = () => {
+
     const userDataFromStorage = localStorage.getItem("exim_user");
+  const getTabVisibility = () => {
+  
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
@@ -57,6 +126,7 @@ const NetPage = () => {
     const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
   const open = Boolean(anchorEl);
   
+  const userMenuRef = useRef(null);
   // Create refs for the input fields
   const inputRefs = {
     shipping: useRef(null),
@@ -96,9 +166,25 @@ const NetPage = () => {
     return () => clearInterval(timer);
   }, []);
 
+ useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setAnchorEl(null);
+      }
+    };
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [open]);
+
   // Header related functions
   const handleUserMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
+    event.stopPropagation();
+    setAnchorEl(anchorEl ? null : event.currentTarget);
   };
 
   const handleUserMenuClose = () => {
@@ -656,7 +742,7 @@ const saveCalculatorData = async () => {
       <CssBaseline />
       
       {/* Add Header Component */}
-      <Header
+      {/* <Header
         formattedDate={formattedDate}
         formattedTime={formattedTime}
         userName={userName}
@@ -667,7 +753,126 @@ const saveCalculatorData = async () => {
         handleUserMenuClose={handleUserMenuClose}
         handleLogout={handleLogout}
       />
-      
+       */}
+                  <HeaderBar position="fixed">
+        <Toolbar>
+  
+   <Box
+  component="img"
+  src={require('../../assets/images/logo.webp')}
+  alt="EXIM User Portal"
+  sx={{
+    height: 40,          // Ensure the logo fits well in a compact header
+    width: 'auto',       // Let the logo size proportionally
+    display: 'block',
+    mr: 2,               // Space after logo
+    objectFit: 'contain' // Keeps aspect ratio, prevents distortion
+  }}
+/>
+<Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+  
+</Box>
+
+          <DateTimeContainer>
+            <AccessTimeIcon />
+            <Box>
+              <Typography variant="body2" sx={{ fontSize: '0.875rem', lineHeight: 1.2 }}>
+                {formattedTime}
+              </Typography>
+              <Typography variant="caption" sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                {formattedDate}
+              </Typography>
+            </Box>
+          </DateTimeContainer>
+
+          <Box sx={{ position: 'relative' }} ref={userMenuRef}>
+            <UserMenu onClick={handleUserMenuOpen}>
+              <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
+                {userName}
+              </Typography>
+              <AccountCircleIcon />
+            </UserMenu>
+            
+            {open && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: "60px",
+                  right: "0",
+                  width: "15rem",
+                  backgroundColor: "white",
+                  borderRadius: "8px",
+                  boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
+                  zIndex: 1000,
+                  py: 1,
+                  border: "1px solid #e0e0e0"
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    '&:hover': {
+                      backgroundColor: "#f5f5f5"
+                    }
+                  }}
+                  onClick={() => {
+                    navigate("/user/profile");
+                    handleUserMenuClose();
+                  }}
+                >
+                  <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
+                  <Typography variant="body2">Profile</Typography>
+                </Box>
+
+                {JSON.parse(userDataFromStorage || '{}')?.role === "admin" && (
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      '&:hover': {
+                        backgroundColor: "#f5f5f5"
+                      }
+                    }}
+                    onClick={() => {
+                      navigate("/user-management");
+                      handleUserMenuClose();
+                    }}
+                  >
+                    <ManageAccountsIcon sx={{ mr: 1, fontSize: 20 }} />
+                    <Typography variant="body2">Users Management</Typography>
+                  </Box>
+                )}
+
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    '&:hover': {
+                      backgroundColor: "#f5f5f5"
+                    }
+                  }}
+                  onClick={handleLogout}
+                >
+                  <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
+                  <Typography variant="body2">Logout</Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </Toolbar>
+      </HeaderBar>
+
+                      
       <Box
         component="main"
         sx={{

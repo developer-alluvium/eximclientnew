@@ -8,6 +8,11 @@ import { logActivity } from "../utils/activityLogger.js";
 import crypto from "crypto";
 import {sendVerificationEmail} from "../services/emailService.js";
 import { sendPasswordResetEmail } from "../services/emailService.js";
+import jwt from "jsonwebtoken";
+
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 /**
  * User Registration
  */
@@ -560,6 +565,82 @@ export const requestModuleAccess = async (req, res) => {
   }
 };
 
+
+
+
+export const generateSSOToken = async (req, res) => {
+  try {
+    // Check if user is authenticated
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    console.log(`Generating SSO token for user: ${req.user.id} (${req.user.name})`);
+
+    // Get requested ie_code_no from query or body or params
+    // (Assuming frontend sends as query param ?ie_code_no=xxxx)
+    const requestedIeCode = req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
+    if (!requestedIeCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing IE code parameter",
+      });
+    }
+
+    // Extract user's assigned ie codes (array of strings)
+    let userIeCodes = [];
+    if (Array.isArray(req.user.ie_code_assignments) && req.user.ie_code_assignments.length > 0) {
+      userIeCodes = req.user.ie_code_assignments.map((a) => a.ie_code_no);
+    } else if (req.user.ie_code_no) {
+      userIeCodes = [req.user.ie_code_no];
+    }
+
+    // Check if requested IE code is assigned to this user
+    if (!userIeCodes.includes(requestedIeCode)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: IE code not assigned to user",
+      });
+    }
+
+    console.log(`User IE codes: ${userIeCodes.join(", ")}, requested IE code: ${requestedIeCode}`);
+
+    // Generate short-lived SSO token with standard JWT format
+    const ssoToken = jwt.sign(
+      {
+        sub: req.user.id, // Standard JWT subject field
+        ie_code_no: requestedIeCode, // Pass requested IE code only
+        name: req.user.name,
+      },
+      JWT_SECRET,
+      { expiresIn: "1d" } // 1 day expiry for security
+    );
+
+   
+
+    res.status(200).json({
+      success: true,
+      message: "SSO token generated successfully",
+      data: {
+        token: ssoToken,
+        ie_code_no: requestedIeCode,
+        expires_in: "1d",
+      },
+    });
+  } catch (error) {
+    console.error("Error generating SSO token:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate SSO token",
+      error: error.message,
+    });
+  }
+};
+
+
+
 /**
  * Get Available Modules
  */
@@ -609,5 +690,6 @@ export default {
   getUserProfile,
   getUserDashboard,
   logoutUser,
-  requestModuleAccess
+  requestModuleAccess,
+  generateSSOToken
 };

@@ -290,81 +290,90 @@ function UserDashboard() {
     }
   };
 
-  const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
-    if (isLocked) {
-      return;
-    }
+const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
+  if (isLocked) {
+    return;
+  }
 
-    if (moduleName === "E-Lock") {
-      try {
-        // Get user data from localStorage
-        const eximUser = localStorage.getItem('exim_user');
-        let token;
-        
-        if (eximUser) {
-          try {
-            const parsed = JSON.parse(eximUser);
-            token = parsed.token || parsed.accessToken || parsed.jwt;
-          } catch (e) {
-            console.error('Error parsing user data:', e);
-            navigate('/login');
-            return;
-          }
-        }
+  if (moduleName === "E-Lock") {
+    try {
+      // Get user data and token from localStorage
+      const eximUser = localStorage.getItem('exim_user');
+      let token = localStorage.getItem('access_token');
 
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const res = await axios.post(
-          `${process.env.REACT_APP_API_STRING}/generate-sso-token`,
-          {},
-          {
-            withCredentials: true,
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const ssoToken = res.data?.data?.token;
-        if (ssoToken) {
-          localStorage.setItem('sso_token', ssoToken);
-          const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
-            ? "http://localhost:3005"
-            : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
-          window.location.href = `${elockUrl}?token=${ssoToken}`;
-        } else {
-          alert("Failed to generate SSO token for E-Lock.");
-        }
-      } catch (err) {
-        console.error('SSO token generation error:', err);
-        
-        if (err.response?.status === 401) {
-          navigate('/login');
-        } else {
-          alert("Error generating SSO token for E-Lock.");
-        }
+      if (!eximUser) {
+        navigate('/login');
+        return;
       }
-      return;
-    }
-    
-    // Handle external links
-    if (isExternal && path && path.startsWith('http')) {
-      window.open(path, '_blank');
-      return;
-    }
+      if (!token) {
+        navigate('/login');
+        return;
+      }
 
-    // Handle internal navigation
-    if (path && path.startsWith('/')) {
-      navigate(path);
-      return;
-    }
+      // Parse user to extract the first ie_code_no from ie_code_assignments
+      const parsedUser = JSON.parse(eximUser);
+      let selectedIeCode = "";
+      if (parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+        selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
+      } else if (parsedUser?.ie_code_no) {
+        selectedIeCode = parsedUser.ie_code_no;
+      } else {
+        alert("IE Code not found. Cannot generate SSO token.");
+        return;
+      }
 
-    // If path is '#' or invalid, do nothing
-  };
+      // Call backend API with ie_code_no as query param
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/users/generate-sso-token?ie_code_no=${encodeURIComponent(selectedIeCode)}`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const ssoToken = res.data?.data?.token;
+      if (ssoToken) {
+        localStorage.setItem('sso_token', ssoToken);
+        // const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
+        //   ? "http://localhost:3005"
+        //   : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
+          const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
+        window.location.href = `${elockUrl}?token=${ssoToken}`;
+      } else {
+        alert("Failed to generate SSO token for E-Lock.");
+      }
+    } catch (err) {
+      console.error('SSO token generation error:', err);
+
+      if (err.response?.status === 401) {
+        navigate('/login');
+      } else {
+        alert("Error generating SSO token for E-Lock.");
+      }
+    }
+    return;
+  }
+
+  // Handle external links
+  if (isExternal && path && path.startsWith('http')) {
+    window.open(path, '_blank');
+    return;
+  }
+
+  // Handle internal navigation
+  if (path && path.startsWith('/')) {
+    navigate(path);
+    return;
+  }
+
+  // If path is '#' or invalid, do nothing
+};
+
+
 
   const handleLogout = async () => {
     try {
@@ -471,10 +480,20 @@ function UserDashboard() {
         {/* Custom Header Bar */}
         <HeaderBar position="fixed">
           <Toolbar>
+            <Box
+              component="img"
+              src={require('../../src/assets/images/logo.webp')}
+              alt="EXIM User Portal"
+              sx={{
+                height: 40,          // Ensure the logo fits well in a compact header
+                width: 'auto',       // Let the logo size proportionally
+                display: 'block',
+                mr: 2,               // Space after logo
+                objectFit: 'contain' // Keeps aspect ratio, prevents distortion
+              }}
+            />
             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-              <Typography variant="h6" component="div" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                EXIM User Portal
-              </Typography>
+              
             </Box>
 
             <DateTimeContainer>
@@ -489,15 +508,15 @@ function UserDashboard() {
               </Box>
             </DateTimeContainer>
 
-            <IconButton
+            {/* <IconButton
               size="large"
               color="inherit"
               onClick={(e) => setNotificationAnchor(e.currentTarget)}
             >
-              {/* <Badge badgeContent={dashboardData?.notifications?.length || 0} color="warning">
+              <Badge badgeContent={dashboardData?.notifications?.length || 0} color="warning">
                 <NotificationsIcon />
-              </Badge> */}
-            </IconButton>
+              </Badge>
+            </IconButton> */}
 
             <UserMenu onClick={handleUserMenuOpen}>
               {/* <Avatar sx={{ width: 32, height: 32, bgcolor: '#1976d2', mr: 1 }}>
@@ -525,14 +544,16 @@ function UserDashboard() {
             },
           }}
         >
-          {/* <MenuItem onClick={() => navigate('/user/profile')}>
+          <MenuItem onClick={() => navigate('/user/profile')}>
             <PersonIcon sx={{ mr: 2 }} />
             Profile
-          </MenuItem> */}
-          <MenuItem onClick={() => navigate('/user-management')}>
-            <ManageAccountsIcon sx={{ mr: 2 }} />
-            UsersManagment
           </MenuItem>
+      {dashboardData?.user?.role === "admin" && (
+  <MenuItem onClick={() => navigate('/user-management')}>
+    <ManageAccountsIcon sx={{ mr: 2 }} />
+    Users Management
+  </MenuItem>
+)}
           <MenuItem onClick={handleLogout}>
             <LogoutIcon sx={{ mr: 2 }} />
             Logout

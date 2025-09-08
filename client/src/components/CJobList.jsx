@@ -40,6 +40,7 @@ function CJobList(props) {
   const [years, setYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [detailedStatus, setDetailedStatus] = useState("all");
+  const [custom_house, setCustomHouse] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
    const [selectedExporter, setSelectedExporter] = useState("all");
@@ -50,7 +51,7 @@ function CJobList(props) {
   const [selectedImporter, setSelectedImporter] = useState(null);
   const [userImporterName, setUserImporterName] = useState(null);
   const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
-  
+    
   // Ref for table container scroll handling
   const tableContainerRef = useRef(null);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -69,6 +70,11 @@ function CJobList(props) {
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [tableKey, setTableKey] = useState(0); // Force table re-render on resize
+    const icdCodeOptions = [
+    "ICD SACHANA",
+    "ICD SANAND", 
+    "ICD KHODIYAR",
+  ];
 
   // Responsive hooks
   const theme = useTheme();
@@ -317,27 +323,30 @@ const saveColumnOrderToBackend = async () => {
   }, [
     selectedImporter,
     detailedStatus,
+    custom_house,
     selectedYear,
     props.status,
     debouncedSearchQuery,
 selectedExporter  ]);
+const {
+  rows,
+  total,
+  totalPages,
+  currentPage,
+  handlePageChange,
+  fetchJobsData,
+} = useFetchJobsData(
+  detailedStatus,
+  selectedYear,
+  props.status,
+  debouncedSearchQuery,
+  selectedImporter,
+  selectedExporter,
+  custom_house,            // <-- Place custom_house here
+  props.gandhidham   // <-- Place gandhidham after
+);
 
-  const {
-    rows,
-    total,
-    totalPages,
-    currentPage,
-    handlePageChange,
-    fetchJobsData,
-  } = useFetchJobsData(
-    detailedStatus,
-    selectedYear,
-    props.status,
-    debouncedSearchQuery,
-    selectedImporter,
-    selectedExporter,
-    props.gandhidham || false
-  );
+
 
   useEffect(() => {
     async function getYears() {
@@ -603,29 +612,47 @@ selectedExporter  ]);
             ))}
           </TextField>
 
-          <Autocomplete
-            size="small"
-            options={["All Importers", ...(ieCodeAssignments?.map(assignment => assignment.importer_name) || [])]}
-            value={selectedImporter || "All Importers"}
-            onChange={(event, newValue) => {
-              setSelectedImporter(newValue === "All Importers" ? null : newValue);
-            }}
-            sx={{ 
-              width: { xs: "200px", sm: "250px", md: "300px" },
-              minWidth: "200px",
-              '& .MuiInputBase-input': {
-                fontSize: '0.75rem',
-                padding: '6px 8px'
-              }
-            }}
-            renderInput={(params) => <TextField {...params} placeholder="Select Importer" />}
-            isOptionEqualToValue={(option, value) => {
-              if (value === "All Importers" && option === "All Importers") return true;
-              if (value !== "All Importers" && option !== "All Importers" && option === value) return true;
-              return false;
-            }}
-          />
+         {ieCodeAssignments && ieCodeAssignments.length > 1 && (
+  <Autocomplete
+    size="small"
+    options={["All Importers", ...(ieCodeAssignments?.map(assignment => assignment.importer_name) || [])]}
+    value={selectedImporter || "All Importers"}
+    onChange={(event, newValue) => {
+      setSelectedImporter(newValue === "All Importers" ? null : newValue);
+    }}
+    sx={{ 
+      width: { xs: "200px", sm: "250px", md: "300px" },
+      minWidth: "200px",
+      '& .MuiInputBase-input': {
+        fontSize: '0.75rem',
+        padding: '6px 8px'
+      }
+    }}
+    renderInput={(params) => <TextField {...params} placeholder="Select Importer" />}
+    isOptionEqualToValue={(option, value) => {
+      if (value === "All Importers" && option === "All Importers") return true;
+      if (value !== "All Importers" && option !== "All Importers" && option === value) return true;
+      return false;
+    }}
+  />
+)}
 
+
+<TextField
+  select
+  label="Select ICD"
+  value={custom_house}
+  onChange={e => setCustomHouse(e.target.value)}
+  size="small"
+  sx={{ minWidth: "140px", fontSize: '0.75rem' }}
+>
+  <MenuItem value="all">Select ICD</MenuItem>
+  {icdCodeOptions.map((port) => (
+    <MenuItem key={port} value={port}>
+      {port}
+    </MenuItem>
+  ))}
+</TextField>
           <TextField
             select
             size="small"
@@ -827,6 +854,7 @@ selectedExporter  ]);
         status={props.status}
         detailedStatus={detailedStatus}
         selectedImporter={userImporterName}
+        custom_house={custom_house}
       />
 
       {/* Container Modal */}

@@ -21,9 +21,10 @@ const canManageUser = (actor, targetUser) => {
     // Check if there's any overlap between actor's and target's IE codes
     return targetIeCodes.some(code => actorIeCodes.includes(code));
   }
-  
+
   return false;
 };
+
 
 /**
  * Generic function to promote a user to an admin.
@@ -156,7 +157,9 @@ export const updateUserStatus = async (req, res) => {
     if (!actor) {
       return res.status(401).json({ success: false, message: "Authentication required." });
     }
-
+    console.log('req.superAdmin',  req.superAdmin);
+    console.log('actor', actor);
+    
     const { userId } = req.params;
     const { status, reason } = req.body; // Changed from isActive to status for consistency
 

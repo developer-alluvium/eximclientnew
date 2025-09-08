@@ -297,14 +297,177 @@ function useCustomerJobList() {
           );
         },
       },
-      {
-      accessorKey: "checklist",
-      header: "Checklist",
-      enableSorting: false,
-      size: 200,
-      Cell: ChecklistCell,
-      sx: centeredCellStyle
-    },
+     {
+  accessorKey: "checklist",
+  header: "Checklist/Shipping Line Invoices",
+  enableSorting: false,
+  size: 200,
+  Cell: ({ cell }) => {
+    const { do_shipping_line_invoice = [] } = cell.row.original;
+    
+    return (
+      <div style={centeredCellStyle}>
+        {/* Original ChecklistCell component */}
+        <ChecklistCell {...{ cell }} />
+        
+        {/* DO Shipping Line Invoice Documents */}
+        <div style={{ 
+          marginTop: '12px',
+          width: '100%',
+          borderTop: '1px solid #e0e0e0',
+          paddingTop: '8px'
+        }}>
+          <div style={{ 
+            fontSize: '0.85rem',
+            fontWeight: 'bold',
+            marginBottom: '6px',
+            color: '#333'
+          }}>
+            Shipping Line Invoices:
+          </div>
+          
+          {do_shipping_line_invoice.length > 0 ? (
+            do_shipping_line_invoice.map((invoice, index) => (
+              <div key={index} style={{ 
+                marginBottom: '6px',
+                padding: '4px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '4px',
+                fontSize: '0.8rem'
+              }}>
+                {/* Document Name */}
+                <div style={{ 
+                  fontWeight: 'bold',
+                  marginBottom: '2px',
+                  color: '#1976d2'
+                }}>
+                  {invoice.document_name || `Invoice ${index + 1}`}
+                </div>
+                
+                {/* Document URLs */}
+                {Array.isArray(invoice.url) && invoice.url.length > 0 ? (
+                  invoice.url.map((link, urlIndex) => (
+                    <div key={urlIndex} style={{ marginBottom: '2px' }}>
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: '#007bff',
+                          textDecoration: 'underline',
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        Document {urlIndex + 1}
+                      </a>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ 
+                    color: '#999',
+                    fontSize: '0.75rem',
+                    fontStyle: 'italic'
+                  }}>
+                    No document available
+                  </div>
+                )}
+                
+                {/* Status Indicators */}
+                <div style={{ 
+                  display: 'flex',
+                  gap: '4px',
+                  marginTop: '4px',
+                  flexWrap: 'wrap'
+                }}>
+                  {invoice.is_draft && (
+                    <span style={{
+                      backgroundColor: '#fff3cd',
+                      color: '#856404',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      fontSize: '0.65rem'
+                    }}>
+                      Draft
+                    </span>
+                  )}
+                  
+                  {invoice.is_final && (
+                    <span style={{
+                      backgroundColor: '#d1e7dd',
+                      color: '#0f5132',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      fontSize: '0.65rem'
+                    }}>
+                      Final
+                    </span>
+                  )}
+                  
+                  {invoice.is_payment_made && (
+                    <span style={{
+                      backgroundColor: '#d1e7dd',
+                      color: '#0f5132',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      fontSize: '0.65rem'
+                    }}>
+                      Paid
+                    </span>
+                  )}
+                  
+                  {invoice.is_payment_requested && !invoice.is_payment_made && (
+                    <span style={{
+                      backgroundColor: '#cff4fc',
+                      color: '#055160',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      fontSize: '0.65rem'
+                    }}>
+                      Payment Requested
+                    </span>
+                  )}
+                </div>
+                
+                {/* Payment Details */}
+                {invoice.document_amount_details && (
+                  <div style={{ 
+                    fontSize: '0.7rem',
+                    color: '#666',
+                    marginTop: '2px'
+                  }}>
+                    Amount: {invoice.document_amount_details}
+                  </div>
+                )}
+                
+                {invoice.payment_mode && (
+                  <div style={{ 
+                    fontSize: '0.7rem',
+                    color: '#666'
+                  }}>
+                    Mode: {invoice.payment_mode}
+                    {invoice.wire_transfer_method && ` (${invoice.wire_transfer_method})`}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div style={{ 
+              color: '#999',
+              fontSize: '0.8rem',
+              fontStyle: 'italic',
+              textAlign: 'center',
+              padding: '8px'
+            }}>
+              No shipping line invoices
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  },
+  sx: centeredCellStyle
+},
+
 
 
       {
@@ -496,7 +659,8 @@ function useCustomerJobList() {
             out_of_charge,
             delivery_date,
             emptyContainerOffLoadDate,
-            consignment_type
+            consignment_type,
+            detention_from
           } = cell.row.original;
 
           // Format dates
@@ -555,10 +719,24 @@ function useCustomerJobList() {
                 <strong>OOC: </strong>
                 <span>{formattedOocDate}</span>
               </div>
-              
+
+              <div> 
+                <strong>Detention From: </strong>
+                  <span>
+                  {container_nos.length > 0
+                    ? container_nos.map((container, id) => (
+                        <React.Fragment key={id}>
+                          {container.detention_from?.split("T")[0] ?? "N/A"}
+                          <br />
+                        </React.Fragment>
+                      ))
+                    : "N/A"}
+                </span>
+              </div>
+
               <div>
                 <strong>Delivery: </strong>
-               <span>
+                <span>
                   {container_nos.length > 0
                     ? container_nos.map((container, id) => (
                         <React.Fragment key={id}>
@@ -568,7 +746,9 @@ function useCustomerJobList() {
                       ))
                     : "N/A"}
                 </span>
-              </div>
+                </div>
+              
+            
 
                 <div>
                 <strong>Empty Offload: </strong>

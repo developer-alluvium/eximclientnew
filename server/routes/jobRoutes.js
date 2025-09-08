@@ -44,7 +44,7 @@ router.get("/api/optimized/:year/jobs/:ieCode/all", getJobsMultiStatus);
 
 // Route for multiple IE codes
 router.get(
-  "/api/:year/jobs/:status/:detailedStatus/multiple",
+  "/api/:year/jobs/:status/:detailedStatus/:customHouse/multiple",
   getJobsByMultipleIECodes
 );
 

@@ -306,43 +306,52 @@ function HomePage() {
     return filteredModules;
   }, [user?.role]);
 
- const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
+// Frontend: updated handleCardClick to pass selected ie_code_no from user's ie_code_assignments
+
+const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
   if (isLocked) {
     return;
   }
 
-  if (moduleName == "E-Lock") {
+  if (moduleName === "E-Lock") {
     try {
-      // Get user data from localStorage
       const eximUser = localStorage.getItem('exim_user');
-      let token;
-      
+      let token, parsedUser;
+
       if (eximUser) {
         try {
-          const parsed = JSON.parse(eximUser);
-          // Make sure you're getting the correct token field
-          token = parsed.token || parsed.accessToken || parsed.jwt;
+          parsedUser = JSON.parse(eximUser);
+          token = parsedUser.token || parsedUser.accessToken || parsedUser.jwt;
         } catch (e) {
           console.error('Error parsing user data:', e);
-          // Redirect to login if user data is corrupted
           navigate('/login');
           return;
         }
       }
 
       if (!token) {
-        // No token found, redirect to login
         navigate('/login');
         return;
       }
 
+      // Pick first IE code from ie_code_assignments array
+      let selectedIeCode = "";
+      if (parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+        selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
+      } else if (parsedUser?.ie_code_no) {
+        selectedIeCode = parsedUser.ie_code_no;
+      } else {
+        alert("IE Code not found. Cannot generate SSO token.");
+        return;
+      }
+
       const res = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/generate-sso-token`,
+        `${process.env.REACT_APP_API_STRING}/users/generate-sso-token?ie_code_no=${encodeURIComponent(selectedIeCode)}`,
         {},
         {
           withCredentials: true,
           headers: {
-            'Authorization': `Bearer ${token}`, // Ensure this format matches your backend
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         }
@@ -351,19 +360,13 @@ function HomePage() {
       const ssoToken = res.data?.data?.token;
       if (ssoToken) {
         localStorage.setItem('sso_token', ssoToken);
-        // const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
-        //   ? "http://localhost:3005"
-        //   : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
-        // const elockUrl = "http://localhost:3005";
-        const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/"
+        const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
         window.location.href = `${elockUrl}?token=${ssoToken}`;
       } else {
         alert("Failed to generate SSO token for E-Lock.");
       }
     } catch (err) {
       console.error('SSO token generation error:', err);
-      
-      // If it's an authentication error, redirect to login
       if (err.response?.status === 401) {
         navigate('/login');
       } else {
@@ -372,21 +375,18 @@ function HomePage() {
     }
     return;
   }
-  
-  // Handle external links
+
   if (isExternal && path && path.startsWith('http')) {
     window.open(path, '_blank');
     return;
   }
 
-  // Handle internal navigation
   if (path && path.startsWith('/')) {
     navigate(path);
     return;
   }
-
-  // If path is '#' or invalid, do nothing
 };
+
 
   const handleUserMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);

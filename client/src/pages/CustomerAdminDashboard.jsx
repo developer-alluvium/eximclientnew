@@ -122,6 +122,7 @@ function CustomerAdminDashboard() {
     try {
       await axios.post('/api/logout', {}, { withCredentials: true });
       localStorage.removeItem('exim_user');
+              localStorage.clear();
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token'); 
       navigate('/login');

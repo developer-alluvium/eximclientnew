@@ -277,6 +277,7 @@ export const protectSuperAdmin = async (req, res, next) => {
       id: superAdmin._id,
       username: superAdmin.username,
       email: superAdmin.email,
+      role: 'superadmin'
     };
 
     next();

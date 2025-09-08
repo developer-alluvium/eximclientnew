@@ -21,7 +21,7 @@ const parseDate = (dateStr) => {
 
 // Field selection logic
 const defaultFields = `
-  job_no year importer custom_house awb_bl_no container_nos vessel_berthing transporter job_net_weight net_weight origin_country weight_shortage checklist is_checklist_aprroved_date is_checklist_clicked invoice_number invoice_date inv_currency total_inv_value
+  job_no year importer custom_house awb_bl_no container_nos vessel_berthing transporter job_net_weight url net_weight origin_country weight_shortage checklist is_checklist_aprroved_date is_checklist_clicked invoice_number invoice_date inv_currency total_inv_value detention_from do_shipping_line_invoice
   gateway_igm_date discharge_date detailed_status be_no be_date loading_port goods_delivery free_time net_weight delivery_address per_kg_cost   net_weight_calculator description ie_code_no weighment_slip_images is_checklist_aprroved remark_client emptyContainerOffLoadDate container_rail_out_date by_road_movement_date consignment_type
   port_of_reporting type_of_b_e consignment_type shipping_line_airline bill_date out_of_charge pcv_date delivery_date emptyContainerOffLoadDate do_completed do_validity  do_copies rail_out_date cth_documents payment_method supplier_exporter gross_weight job_net_weight processed_be_attachment ooc_copies gate_pass_copies do_planning_history doPlanning do_planning_date
 `;
@@ -93,6 +93,12 @@ const statusMapping = {
   custom_clearance_completed: "Custom Clearance Completed",
 };
 
+const customHouseMapping = {
+  "ICD SACHANA": "ICD SACHANA",
+  "ICD SANAND": "ICD SANAND",
+  "ICD KHODIYAR": "ICD KHODIYAR",
+};
+
 export async function updateJob(req, res) {
   try {
     const jobId = req.params.id;
@@ -153,43 +159,84 @@ export async function updateContainerTransporter(req, res) {
   }
 }
 // Controller function to get jobs by multiple IE codes
+// Helper function to extract IE codes from user object
+const extractIECodes = (user) => {
+  const ieCodes = [];
+  
+  // Check for new ie_code_assignments array
+  if (user.ie_code_assignments && user.ie_code_assignments.length > 0) {
+    if (Array.isArray(user.ie_code_assignments)) {
+      // Multiple IE code assignments
+      user.ie_code_assignments.forEach(assignment => {
+        if (assignment && assignment.ie_code_no) {
+          ieCodes.push(assignment.ie_code_no.toUpperCase().trim());
+        }
+      });
+    } else if (user.ie_code_assignments.ie_code_no) {
+      // Single IE code assignment (object instead of array)
+      ieCodes.push(user.ie_code_assignments.ie_code_no.toUpperCase().trim());
+    }
+  }
+  
+  // Fallback to legacy ie_code_no field
+  if (ieCodes.length === 0 && user.ie_code_no) {
+    ieCodes.push(user.ie_code_no.toUpperCase().trim());
+  }
+  
+  // Remove duplicates and empty values
+  return [...new Set(ieCodes.filter(code => code && code.length > 0))];
+};
+
+// Updated controller function to get jobs by multiple IE codes
 export async function getJobsByMultipleIECodes(req, res) {
   try {
-    const { year, status, detailedStatus } = req.params;
+    const { year, status, detailedStatus, customHouse } = req.params;
     const { page = 1, limit = 100, search = "", exporter = "", ieCodes = "", importers = "" } = req.query;
     const skip = (page - 1) * limit;
 
-    if (!ieCodes) {
-      return res.status(400).json({ message: "IE Codes are required" });
+    // Handle IE codes from multiple sources
+    let ieCodeArray = [];
+    
+    if (ieCodes) {
+      // If ieCodes are provided in query (existing functionality)
+      ieCodeArray = ieCodes.split(',').map(code => code.trim().toUpperCase());
+    } else if (req.user) {
+      // Extract IE codes from authenticated user (new functionality)
+      ieCodeArray = extractIECodes(req.user);
     }
 
-    // Split the IE codes string into an array
-    const ieCodeArray = ieCodes.split(',').map(code => code.trim());
-    
-    // Split importers string into array if provided
-    const importerArray = importers ? importers.split(';').map(imp => imp.trim()) : [];
-    
-    console.log('Received IE codes:', ieCodeArray);
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({ 
+        message: "No IE Codes found. Please ensure you have assigned IE codes or provide them in the request." 
+      });
+    }
 
-    // Base query with year filter, IE codes, and initialized $and array
+    console.log('IE Codes being used for query:', ieCodeArray);
+
+    const importerArray = importers ? importers.split(';').map(imp => imp.trim()) : [];
+
     const query = {
       year,
       ie_code_no: { $in: ieCodeArray },
-      $and: [] // Initialize $and as empty array
+      $and: [],
     };
 
-    // Add importer filter if provided
     if (importerArray.length > 0) {
-      query.importer = { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) };
+      query.$and.push({
+        importer: { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) },
+      });
     }
-    
-    // Log the query for debugging
-    console.log('Query:', JSON.stringify(query, null, 2));
-    console.log('Importers:', importerArray);
 
-    // Add status conditions similar to getJobsByStatusAndImporter
+    // Handle custom house filtering
+    if (customHouse && customHouse.toLowerCase() !== "all") {
+      query.custom_house = {
+        $regex: `^${escapeRegex(customHouse)}$`,
+        $options: "i",
+      };
+    }
+
+    // Status filtering logic (same as before)
     const statusLower = status.toLowerCase();
-    
     if (statusLower === "pending") {
       query.$and.push(
         { status: { $regex: "^pending$", $options: "i" } },
@@ -219,14 +266,19 @@ export async function getJobsByMultipleIECodes(req, res) {
           { be_no: { $regex: "^cancelled$", $options: "i" } },
         ],
       });
-    } else {
+    } else if (statusLower !== "all") {
       query.$and.push(
         { status: { $regex: `^${status}$`, $options: "i" } },
         { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } }
       );
+    } else {
+      // For 'all' status, just exclude cancelled jobs
+      query.$and.push(
+        { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+        { status: { $not: { $regex: "^cancelled$", $options: "i" } } }
+      );
     }
 
-    // Handle detailed status and search similar to original function
     if (detailedStatus !== "all") {
       query.detailed_status = statusMapping[detailedStatus] || detailedStatus;
     }
@@ -236,25 +288,34 @@ export async function getJobsByMultipleIECodes(req, res) {
     }
 
     if (exporter && exporter !== "all") {
-      query.supplier_exporter = {
-        $regex: `^${escapeRegex(exporter)}$`,
-        $options: "i",
-      };
+      query.$and.push({
+        supplier_exporter: {
+          $regex: new RegExp(`^${escapeRegex(exporter)}$`, "i"),
+        },
+      });
     }
+
+    if (query.$and && query.$and.length === 0) {
+      delete query.$and;
+    }
+
+    console.log('Final query:', JSON.stringify(query, null, 2));
 
     const jobs = await JobModel.find(query).select(
       getSelectedFields(detailedStatus === "all" ? "all" : detailedStatus)
     );
 
-    // Apply the same ranking and sorting logic as the original function
-    const rankedJobs = jobs.filter((job) => statusRank[job.detailed_status]);
-    const unrankedJobs = jobs.filter((job) => !statusRank[job.detailed_status]);
+    console.log(`Found ${jobs.length} jobs for IE codes: ${ieCodeArray.join(', ')}`);
+
+    // Rest of your sorting and pagination logic remains the same
+    const rankedJobs = jobs.filter(job => statusRank[job.detailed_status]);
+    const unrankedJobs = jobs.filter(job => !statusRank[job.detailed_status]);
 
     const sortedRankedJobs = Object.entries(statusRank).reduce(
       (acc, [status, { field }]) => [
         ...acc,
         ...rankedJobs
-          .filter((job) => job.detailed_status === status)
+          .filter(job => job.detailed_status === status)
           .sort(
             (a, b) =>
               parseDate(a.container_nos?.[0]?.[field] || a[field]) -
@@ -273,6 +334,7 @@ export async function getJobsByMultipleIECodes(req, res) {
       total: allJobs.length,
       currentPage: parseInt(page),
       totalPages: Math.ceil(allJobs.length / limit),
+      ieCodesUsed: ieCodeArray, // Include this for debugging
     });
 
   } catch (error) {
@@ -280,6 +342,10 @@ export async function getJobsByMultipleIECodes(req, res) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
+
+
+
 
 
 // Controller function to get jobs by status, detailed status and importer

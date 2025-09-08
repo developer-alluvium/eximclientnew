@@ -20,12 +20,97 @@ import {
   Chip,
   Autocomplete,
   IconButton
-   
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
 import TablePagination from '@mui/material/TablePagination';
 import { detailedStatusOptions } from '../../assets/data/detailedStatusOptions';
+
+// Helper function to extract IE codes from user data (matching the hook)
+const extractUserIECodes = (user) => {
+  if (!user) return [];
+  
+  const ieCodes = [];
+  
+  // Handle new ie_code_assignments structure
+  if (user.ie_code_assignments) {
+    if (Array.isArray(user.ie_code_assignments)) {
+      // Multiple assignments (existing functionality)
+      user.ie_code_assignments.forEach(assignment => {
+        if (assignment && assignment.ie_code_no) {
+          ieCodes.push(assignment.ie_code_no.toUpperCase().trim());
+        }
+      });
+    } else if (user.ie_code_assignments.ie_code_no) {
+      // Single assignment as object (new compatibility)
+      ieCodes.push(user.ie_code_assignments.ie_code_no.toUpperCase().trim());
+    }
+  }
+  
+  // Add primary_ie_code if it exists and isn't already included
+  if (user.primary_ie_code) {
+    const primaryCode = user.primary_ie_code.toUpperCase().trim();
+    if (!ieCodes.includes(primaryCode)) {
+      ieCodes.push(primaryCode);
+    }
+  }
+  
+  // Fallback to legacy field
+  if (ieCodes.length === 0 && user.ie_code_no) {
+    ieCodes.push(user.ie_code_no.toUpperCase().trim());
+  }
+  
+  return [...new Set(ieCodes.filter(code => code && code.length > 0))];
+};
+
+// Helper function to extract importers from user data
+const extractUserImporters = (user) => {
+  if (!user) return [];
+  
+  const importers = [];
+  
+  if (user.ie_code_assignments) {
+    if (Array.isArray(user.ie_code_assignments)) {
+      // Multiple assignments
+      user.ie_code_assignments.forEach(assignment => {
+        if (assignment && assignment.importer_name) {
+          importers.push({
+            ie_code_no: assignment.ie_code_no,
+            importer_name: assignment.importer_name.trim()
+          });
+        }
+      });
+    } else if (user.ie_code_assignments.importer_name) {
+      // Single assignment as object
+      importers.push({
+        ie_code_no: user.ie_code_assignments.ie_code_no,
+        importer_name: user.ie_code_assignments.importer_name.trim()
+      });
+    }
+  }
+  
+  // Add legacy assigned importer if available and not already included
+  if (user.assignedImporterName && (user.primary_ie_code || user.ie_code_no)) {
+    const legacyImporter = {
+      ie_code_no: user.primary_ie_code || user.ie_code_no,
+      importer_name: user.assignedImporterName.trim()
+    };
+    
+    // Only add if not already present
+    const exists = importers.some(imp => 
+      imp.importer_name === legacyImporter.importer_name && 
+      imp.ie_code_no === legacyImporter.ie_code_no
+    );
+    
+    if (!exists) {
+      importers.push(legacyImporter);
+    }
+  }
+  
+  console.log("Extracted importers from JobExcelTable:", importers);
+  
+  return importers;
+};
 
 const JobExcelTable = ({ userId, gandhidham }) => {
   const [jobData, setJobData] = useState([]);
@@ -44,8 +129,9 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   const [detailedStatus, setDetailedStatus] = useState("all");
   const [exporters, setExporters] = useState([]);
 
-   // IE code assignments and importer filter states
+  // IE code assignments and importer filter states
   const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
+  const [userImporters, setUserImporters] = useState([]);
   const [selectedImporter, setSelectedImporter] = useState(null);
   
   // Use useRef for search input to improve performance
@@ -89,13 +175,29 @@ const JobExcelTable = ({ userId, gandhidham }) => {
     }
   };
 
-
-    useEffect(() => {
+  // Load user data and extract IE code assignments and importers
+  useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
+        
+        // Extract IE codes and importers using helper functions
+        const extractedIECodes = extractUserIECodes(parsedUser);
+        const extractedImporters = extractUserImporters(parsedUser);
+        
+        console.log("📊 JobExcelTable - User data analysis:", {
+          hasMultipleIeCodes: parsedUser?.has_multiple_ie_codes,
+          primaryIeCode: parsedUser?.primary_ie_code,
+          ieCodeAssignments: parsedUser?.ie_code_assignments?.length || 0,
+          extractedIECodes,
+          extractedImporters: extractedImporters.map(imp => imp.importer_name)
+        });
+        
+        // Set legacy format for backward compatibility
         setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
+        setUserImporters(extractedImporters);
+        
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }
@@ -112,38 +214,8 @@ const JobExcelTable = ({ userId, gandhidham }) => {
     };
   }, [searchQuery]);
 
-  // Function to get user's IE code from localStorage
-  const getUserIECode = useCallback(() => {
-    try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
-      if (userDataFromStorage) {
-        const parsedUser = JSON.parse(userDataFromStorage);
-    
-        return parsedUser?.ie_code_no || null;
-      }
-      
-    } catch (error) {
-      console.error("Error parsing user data:", error);
-    }
-    return null;
-  }, []);
-
-  // Get importer name from localStorage
-  const getUserImporterName = useCallback(() => {
-    try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
-      if (userDataFromStorage) {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        return parsedUser?.assignedImporterName || null;
-      }
-    } catch (error) {
-      console.error("Error parsing user data:", error);
-    }
-    return null;
-  }, []);
-
   // Add effect to fetch exporters when dependencies change
- useEffect(() => {
+  useEffect(() => {
     const fetchExporters = async () => {
       if (!selectedImporter || selectedImporter === "All Importers") {
         setExporters([]);
@@ -174,112 +246,131 @@ const JobExcelTable = ({ userId, gandhidham }) => {
     fetchExporters();
   }, [selectedImporter, selectedYear, selectedStatus]);
 
-
   // Reset exporter selection when year or status changes
   useEffect(() => {
     setSelectedExporter("all");
   }, [selectedYear, selectedStatus]);
 
-  // Optimized fetch job data using new backend endpoints
+  // Updated fetch job data using consistent helper functions
   const fetchJobData = useCallback(async () => {
-  const ieCodeAssignments = (() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
-    if (!userDataFromStorage) return [];
-    try {
-      const parsedUser = JSON.parse(userDataFromStorage);
-      return parsedUser?.ie_code_assignments || [];
-    } catch {
-      return [];
+    const userData = userDataFromStorage ? JSON.parse(userDataFromStorage) : null;
+    
+    // Extract IE codes and importers using helper functions
+    const userIECodes = extractUserIECodes(userData);
+    const userImporters = extractUserImporters(userData);
+    
+    const selectedImporterValue = selectedImporter || null;
+    const formattedSearchQuery = debouncedSearchQuery ? encodeURIComponent(debouncedSearchQuery) : "";
+    const formattedExporter = selectedExporter && selectedExporter !== "all" ? encodeURIComponent(selectedExporter) : "";
+
+    if (!selectedYear || !selectedStatus || !userIECodes.length) {
+      console.log("📋 Missing required parameters:", {
+        selectedYear,
+        selectedStatus,
+        userIECodes: userIECodes.length
+      });
+      setJobData([]);
+      setTotalCount(0);
+      return;
     }
-  })();
 
-  const selectedImporterValue = selectedImporter || null;
-  const formattedSearchQuery = debouncedSearchQuery ? encodeURIComponent(debouncedSearchQuery) : "";
-  const formattedExporter = selectedExporter && selectedExporter !== "all" ? encodeURIComponent(selectedExporter) : "";
+    setLoading(true);
+    setError(null);
 
-  if (!selectedYear || !selectedStatus || !ieCodeAssignments.length) {
-    setJobData([]);
-    setTotalCount(0);
-    return;
-  }
+    try {
+      let selectedIeCodes = "";
+      let importerToFilter = "";
 
-  setLoading(true);
-  setError(null);
+      if (selectedImporterValue && selectedImporterValue !== "All Importers") {
+        // Find the matching assignment for the selected importer
+        const matchingImporter = userImporters.find(
+          importer => importer.importer_name === selectedImporterValue
+        );
+        
+        if (matchingImporter) {
+          selectedIeCodes = matchingImporter.ie_code_no;
+          importerToFilter = encodeURIComponent(matchingImporter.importer_name);
+          console.log("🎯 Filtering by specific importer:", {
+            importer: matchingImporter.importer_name,
+            ieCode: matchingImporter.ie_code_no
+          });
+        } else {
+          // If selected importer not found in ie_code_assignments, use all IE codes without importer filter
+          console.warn("⚠️ Selected importer not found in IE code assignments:", selectedImporterValue);
+          selectedIeCodes = userIECodes.join(',');
+          importerToFilter = ""; // Don't filter by importer since it's not in assignments
+        }
+      } else {
+        // If no importer selected or "All Importers" is chosen, use all IE codes
+        selectedIeCodes = userIECodes.join(',');
+        importerToFilter = ""; // Omit importers param in this case
+        console.log("📋 Using all IE codes for all importers");
+      }
 
-  try {
-    let filteredIeCodes = [];
-    let importersParam = "";
+      const apiString = process.env.REACT_APP_API_STRING || "";
 
-    if (selectedImporterValue && selectedImporterValue !== "All Importers") {
-      const matching = ieCodeAssignments.find(a => a.importer_name === selectedImporterValue);
-      if (matching) {
-        filteredIeCodes = [matching.ie_code_no];
-        importersParam = encodeURIComponent(matching.importer_name);
+      // Build API URL using the multiple IE codes endpoint
+      let apiUrl = `${apiString}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/all/multiple?ieCodes=${selectedIeCodes}`;
+      if (importerToFilter) {
+        apiUrl += `&importers=${importerToFilter}`;
+      }
+      apiUrl += `&page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}`;
+      if (formattedExporter) {
+        apiUrl += `&exporter=${formattedExporter}`;
+      }
+
+      console.log("🚀 JobExcelTable - Fetching jobs data from:", apiUrl);
+
+      const response = await axios.get(apiUrl);
+
+      // Use the server response data directly
+      if (response.data && response.data.data) {
+        setJobData(response.data.data);
+        setTotalCount(response.data.total || response.data.totalCount || response.data.count || 0);
+        
+        console.log("✅ JobExcelTable - Server response:", {
+          dataLength: response.data.data.length,
+          totalCount: response.data.total || response.data.totalCount || response.data.count,
+          currentPage: page + 1,
+          ieCodesUsed: selectedIeCodes
+        });
       } else {
         setJobData([]);
         setTotalCount(0);
-        setLoading(false);
-        return;
       }
-    } else {
-      filteredIeCodes = ieCodeAssignments.map(a => a.ie_code_no);
-      importersParam = "";
-    }
 
-    const apiString = process.env.REACT_APP_API_STRING || "";
-
-    let apiUrl;
-    if (gandhidham) {
-      apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/multiple?ieCodes=${filteredIeCodes.join(',')}`;
-      if (importersParam) apiUrl += `&importers=${importersParam}`;
-      apiUrl += `&page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}`;
-      if (formattedExporter) apiUrl += `&exporter=${formattedExporter}`;
-    } else {
-      apiUrl = `${apiString}/${selectedYear}/jobs/${selectedStatus}/${detailedStatus}/multiple?ieCodes=${filteredIeCodes.join(',')}`;
-      if (importersParam) apiUrl += `&importers=${importersParam}`;
-      apiUrl += `&page=${page + 1}&limit=${rowsPerPage}&search=${formattedSearchQuery}`;
-      if (formattedExporter) apiUrl += `&exporter=${formattedExporter}`;
-    }
-
-    console.log("Fetching jobs data from:", apiUrl);
-    const response = await axios.get(apiUrl);
-
-    // Use the server response data directly
-    if (response.data && response.data.data) {
-      setJobData(response.data.data);
+    } catch (error) {
+      console.error('❌ JobExcelTable - Error fetching job data:', error);
+      setError('Failed to fetch job data');
       
-      // Set totalCount from server response - this is the key fix!
-      // The server should return total count in response.data.total or similar field
-      setTotalCount(response.data.total || response.data.totalCount || response.data.count || 0);
-      
-      console.log("Server response:", {
-        dataLength: response.data.data.length,
-        totalCount: response.data.total || response.data.totalCount || response.data.count,
-        currentPage: page + 1
-      });
-    } else {
-      setJobData([]);
-      setTotalCount(0);
+      // Try fallback method if available
+      try {
+        await fetchJobDataFallback();
+      } catch (fallbackError) {
+        console.error('❌ JobExcelTable - Fallback also failed:', fallbackError);
+        setJobData([]);
+        setTotalCount(0);
+      }
+    } finally {
+      setLoading(false);
     }
+  }, [selectedImporter, selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, debouncedSearchQuery, gandhidham]);
 
-  } catch (error) {
-    console.error('Error fetching job data:', error);
-    setError('Failed to fetch job data');
-    
-    // Try fallback method
+  // Function to get user's IE code from localStorage (fallback method)
+  const getUserIECode = useCallback(() => {
     try {
-      await fetchJobDataFallback();
-    } catch (fallbackError) {
-      console.error('Fallback also failed:', fallbackError);
-      setJobData([]);
-      setTotalCount(0);
+      const userDataFromStorage = localStorage.getItem("exim_user");
+      if (userDataFromStorage) {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        // Try primary_ie_code first, then fallback to ie_code_no
+        return parsedUser?.primary_ie_code || parsedUser?.ie_code_no || null;
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
     }
-  } finally {
-    setLoading(false);
-  }
-}, [selectedImporter, selectedYear, selectedStatus, detailedStatus, selectedExporter, page, rowsPerPage, debouncedSearchQuery, gandhidham]);
-
-
+    return null;
+  }, []);
 
   // Fallback method using original API structure
   const fetchJobDataFallback = useCallback(async () => {
@@ -310,16 +401,11 @@ const JobExcelTable = ({ userId, gandhidham }) => {
       }
 
       // Filter by user's IE code
-      console.log('Fallback: Total jobs before IE filtering:', allJobs.length);
-      console.log('Fallback: User IE Code:', ieCode, typeof ieCode);
-      console.log('Fallback: Sample job IE codes:', allJobs.slice(0, 3).map(job => ({ 
-        job_no: job.job_no, 
-        ie_code_no: job.ie_code_no, 
-        ie_code_type: typeof job.ie_code_no 
-      })));
+      console.log('🔄 JobExcelTable Fallback: Total jobs before IE filtering:', allJobs.length);
+      console.log('🔄 JobExcelTable Fallback: User IE Code:', ieCode, typeof ieCode);
       
       let userJobs = allJobs.filter(job => job.ie_code_no == ieCode);
-      console.log('Fallback: Jobs after IE filtering:', userJobs.length);
+      console.log('🔄 JobExcelTable Fallback: Jobs after IE filtering:', userJobs.length);
       
       // Apply detailed status filter
       if (detailedStatus !== "all") {
@@ -353,7 +439,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
       setJobData(paginatedJobs);
       setTotalCount(userJobs.length);
       
-      console.log('Fallback fetch successful:', {
+      console.log('✅ JobExcelTable Fallback fetch successful:', {
         total: userJobs.length,
         page: page + 1,
         showing: paginatedJobs.length
@@ -372,6 +458,9 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   useEffect(() => {
     fetchJobData();
   }, [fetchJobData, gandhidham]);
+
+  // Rest of your component code remains the same...
+  // (formatDate, formatCharge, formatCustomCharges, etc.)
 
   // Memoized format functions for better performance
   const formatDate = useCallback((dateStr) => {
@@ -482,7 +571,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             '&:hover': { backgroundColor: '#F3F4F6' }
           }}
         >
-      
+        
         {/* Shipping */}
         <TableCell sx={{ fontSize: '0.8rem', textAlign: 'right' }}>
           {formatCharge(job.net_weight_calculator?.shipping)}
@@ -553,7 +642,6 @@ const JobExcelTable = ({ userId, gandhidham }) => {
         <TableCell sx={{ fontSize: '0.8rem', maxWidth: '150px' }}>
           <div style={{ 
             maxHeight: '60px', 
-          
             textOverflow: 'ellipsis',
             wordBreak: 'break-word'
           }}>
@@ -637,6 +725,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
               ))}
             </Select>
           </FormControl>
+          
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Status</InputLabel>
             <Select
@@ -692,9 +781,10 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             </Select>
           </FormControl>
 
-<Autocomplete
+          {/* Updated Importer Autocomplete using userImporters */}
+          <Autocomplete
             size="small"
-            options={["All Importers", ...ieCodeAssignments.map(a => a.importer_name)]}
+            options={["All Importers", ...userImporters.map(imp => imp.importer_name)]}
             value={selectedImporter || "All Importers"}
             onChange={(event, newValue) => {
               setSelectedImporter(newValue === "All Importers" ? null : newValue);
@@ -708,6 +798,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
               return false;
             }}
           />
+          
           <Autocomplete
             size="small"
             options={["All Exporters", ...exporters]}
@@ -752,7 +843,6 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                 
                   <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#F9FAFB', minWidth: '100px' }}>
                     Shipping
                   </TableCell>

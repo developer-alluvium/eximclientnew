@@ -239,6 +239,7 @@ const ModernSidebar = ({
   const handleLogout = () => {
     localStorage.removeItem('superadmin_token');
     localStorage.removeItem('superadmin_user');
+            localStorage.clear();
     if (typeof onLogout === 'function') {
       onLogout();
     }

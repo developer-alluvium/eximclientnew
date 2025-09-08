@@ -68,6 +68,9 @@ function CImportDSR() {
 
       // Clear user data and navigate
       localStorage.removeItem("exim_user");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+
       setUser(null);
       navigate("/login");
 

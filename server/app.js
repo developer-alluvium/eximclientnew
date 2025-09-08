@@ -13,6 +13,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import moduleRoutes from "./routes/moduleRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import userProfileRoutes from "./routes/userProfileRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import customerAdminRoutes from "./routes/customerAdminRoutes.js";
 import userManagementRoutes from "./routes/userManagementRoutes.js";
@@ -78,6 +79,7 @@ app.use(superAdminRoutes);
 app.use(dashboardRoutes);
 app.use(moduleRoutes);
 app.use(activityRoutes);
+app.use(userProfileRoutes)
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/customer-admin", customerAdminRoutes);

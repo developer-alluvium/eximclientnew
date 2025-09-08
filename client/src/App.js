@@ -29,6 +29,7 @@ import ImportVideoPage from "./pages/ImportVideoPage";
 import UserManagement from "./pages/UserManagement/UserManagement.jsx"
 import EmailVerification from "./pages/EmailVerification.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx"
+import UserProfile from "./pages/UserProfile.jsx";
 
 // Protected route component for backward compatibility
 const LegacyProtectedRoute = ({ children }) => {
@@ -127,6 +128,9 @@ function App() {
                   localStorage.getItem("exim_user") ? <ImportVideoPage /> : <LoginPage />
                 } />
                 
+                <Route path="/user/profile" element = {
+                  localStorage.getItem("exim_user") ? <UserProfile /> : <LoginPage />
+                } />
                 {/* User Management route - check for admin role */}
                 <Route path="/user-management" element={
                   (() => {

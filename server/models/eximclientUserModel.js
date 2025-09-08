@@ -166,6 +166,42 @@ const eximclientUserSchema = new mongoose.Schema(
     type: Date,
     default: null,
   },
+pendingEmail: {
+  type: String,
+  trim: true,
+  lowercase: true,
+  default: null,
+},
+
+documents: [{
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  url: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  uploadDate: {
+    type: Date,
+    default: Date.now
+  },
+  expirationDate: {
+    type: Date,
+    default: null
+  },
+  reminderDays: {
+    type: Number,
+    default: null
+  },
+  reminderSent: {
+    type: Boolean,
+    default: false
+  }
+}],
+
 
   },
   { 

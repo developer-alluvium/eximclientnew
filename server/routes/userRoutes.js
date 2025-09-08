@@ -8,7 +8,8 @@ import {
   requestModuleAccess ,
   verifyEmail,
   requestPasswordReset,
-  resetPassword
+  resetPassword, 
+  generateSSOToken
 } from "../controllers/userController.js";
 import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
 
@@ -24,9 +25,12 @@ router.post("/request-password-reset", requestPasswordReset);
 // POST /api/users/reset-password/:token
 router.post("/reset-password/:token", resetPassword);
 
+
 // Protected routes (requires authentication)
 router.use(authenticateUser);
 router.use(authorize('user', 'admin'));
+
+router.post("/generate-sso-token",  generateSSOToken);
 
 router.get("/profile", getUserProfile);
 router.get("/dashboard", getUserDashboard);
