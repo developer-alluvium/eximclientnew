@@ -54,7 +54,7 @@ router.get(
 );
 // Gandhidham jobs route
 router.get(
-  "/api/gandhidham/:year/jobs/:status/:detailedStatus/:importer",
+  "/api/gandhidham/:year/jobs/:status/:detailedStatus/:customHouse/multiple",
   getJobsByStatusAndImporterGandhidham
 );
 

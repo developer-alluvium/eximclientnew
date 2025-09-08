@@ -289,7 +289,7 @@ function UserDashboard() {
       setLoading(false);
     }
   };
-
+const eximUser = localStorage.getItem('exim_user');
 const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
   if (isLocked) {
     return;
@@ -298,7 +298,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
   if (moduleName === "E-Lock") {
     try {
       // Get user data and token from localStorage
-      const eximUser = localStorage.getItem('exim_user');
+
       let token = localStorage.getItem('access_token');
 
       if (!eximUser) {
@@ -377,7 +377,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
 
   const handleLogout = async () => {
     try {
-      // Log logout activity
+      // Log logout activity 
     
 
       const logoutData = {};
@@ -548,12 +548,12 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
             <PersonIcon sx={{ mr: 2 }} />
             Profile
           </MenuItem>
-      {dashboardData?.user?.role === "admin" && (
-  <MenuItem onClick={() => navigate('/user-management')}>
-    <ManageAccountsIcon sx={{ mr: 2 }} />
-    Users Management
-  </MenuItem>
-)}
+          {JSON.parse(eximUser || '{}')?.role === "admin" && (
+            <MenuItem onClick={() => navigate('/user-management')}>
+              <ManageAccountsIcon sx={{ mr: 2 }} />
+              Users Management
+            </MenuItem>
+          )}
           <MenuItem onClick={handleLogout}>
             <LogoutIcon sx={{ mr: 2 }} />
             Logout

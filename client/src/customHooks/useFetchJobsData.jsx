@@ -135,7 +135,16 @@ function useFetchJobsData(
         }
 
         // Build API URL conditionally: only add importers param if importerToFilter is present
-        let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
+       // let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
+       console.log("Gandhidham flag:", gandhidham);
+        let apiUrl;
+        if(gandhidham){
+          apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`
+        }
+        else{
+          apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
+        }
+
         if (importerToFilter) {
           apiUrl += `&importers=${importerToFilter}`;
         }
