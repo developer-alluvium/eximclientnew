@@ -186,17 +186,7 @@ export const updateUserStatus = async (req, res) => {
     }
     await user.save();
 
-    // Create notification
-    await Notification.create({
-      type: isActive ? 'user_activated' : 'user_deactivated',
-      recipient: user._id,
-      recipientModel: 'EximclientUser',
-      sender: actor.id,
-      senderModel: actor.role === 'superadmin' ? 'SuperAdmin' : 'Admin',
-      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
-      message: `Your account has been ${isActive ? 'activated' : 'deactivated'}. ${reason ? 'Reason: ' + reason : ''}`,
-    });
-
+   
  
 
     res.json({
