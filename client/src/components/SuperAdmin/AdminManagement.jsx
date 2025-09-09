@@ -393,7 +393,7 @@ const AdminManagement = ({ onRefresh }) => {
 
       const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${user._id}/status`;
       const data = { isActive: newStatus };
-
+      console.log('Changing user status with data:', data);
       const response = await axios.put(endpoint, data, config);
 
       if (response.data.success) {

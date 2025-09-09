@@ -187,7 +187,8 @@ function UserDashboard() {
     {
       name: "E-Lock",
       description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      path: process.env.REACT_APP_ELOCK_URL,
+      // path: process.env.REACT_APP_ELOCK_URL,
+      path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
       icon: <LockOutlinedIcon />,
       category: "core",
       isExternal: true
