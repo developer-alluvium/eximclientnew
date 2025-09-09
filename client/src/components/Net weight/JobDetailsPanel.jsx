@@ -20,7 +20,16 @@ const JobDetailsPanel = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
   const [selectedImporter, setSelectedImporter] = useState(null);
+  
+  // New state for BE numbers
+  const [beList, setBeList] = useState([]);
+  const [beLoading, setBeLoading] = useState(false);
+  const [showBeList, setShowBeList] = useState(false);
+  const [beSearchTerm, setBeSearchTerm] = useState("");
+  const [beNo, setBeNo] = useState("");
+  
   const dropdownRef = useRef(null);
+  const beDropdownRef = useRef(null);
 
   // Get IE code assignments from localStorage
   const getUserIeCodeAssignments = useCallback(() => {
@@ -109,14 +118,75 @@ const JobDetailsPanel = ({
     }
   }, [ieCodeAssignments, selectedYear, selectedImporter, gandhidham]);
 
+  // Function to fetch BE numbers list with optional search for multiple IE codes
+  const fetchBeList = useCallback(async (search = "") => {
+    if (!ieCodeAssignments.length || !selectedYear) {
+      setBeList([]);
+      setShowBeList(false);
+      return;
+    }
+    
+    setBeLoading(true);
+    try {
+      let filteredIeCodes = [];
+      
+      if (selectedImporter && selectedImporter !== "All Importers") {
+        const matching = ieCodeAssignments.find(a => a.importer_name === selectedImporter);
+        if (matching) {
+          filteredIeCodes = [matching.ie_code_no];
+        } else {
+          setBeList([]);
+          setShowBeList(false);
+          setBeLoading(false);
+          return;
+        }
+      } else {
+        filteredIeCodes = ieCodeAssignments.map(a => a.ie_code_no);
+      }
+
+      let url;
+      if (gandhidham) {
+        url = `${process.env.REACT_APP_API_STRING}/gandhidham/get-be-numbers/multiple?ieCodes=${filteredIeCodes.join(',')}&year=${selectedYear}`;
+      } else {
+        url = `${process.env.REACT_APP_API_STRING}/get-be-numbers/multiple?ieCodes=${filteredIeCodes.join(',')}&year=${selectedYear}`;
+      }
+      
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+      }
+      
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setBeList(data.data);
+        } else {
+          setBeList([]);
+          setShowBeList(false);
+        }
+      } else {
+        setBeList([]);
+        setShowBeList(false);
+      }
+    } catch (error) {
+      console.error("Error fetching BE numbers list:", error);
+      setBeList([]);
+      setShowBeList(false);
+    } finally {
+      setBeLoading(false);
+    }
+  }, [ieCodeAssignments, selectedYear, selectedImporter, gandhidham]);
+
   // Effect to fetch jobs when year or importer changes
   useEffect(() => {
     if (ieCodeAssignments.length > 0 && selectedYear) {
       fetchJobsList();
+      fetchBeList();
     }
-  }, [ieCodeAssignments, selectedYear, selectedImporter, fetchJobsList]);
+  }, [ieCodeAssignments, selectedYear, selectedImporter, fetchJobsList, fetchBeList]);
 
-  // Debounce search effect
+  // Debounce search effect for jobs
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm && searchTerm.length > 2) {
@@ -127,11 +197,25 @@ const JobDetailsPanel = ({
     return () => clearTimeout(timeoutId);
   }, [searchTerm, fetchJobsList]);
 
+  // Debounce search effect for BE numbers
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (beSearchTerm && beSearchTerm.length > 2) {
+        fetchBeList(beSearchTerm);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [beSearchTerm, fetchBeList]);
+
   // Effect to handle click outside dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowJobsList(false);
+      }
+      if (beDropdownRef.current && !beDropdownRef.current.contains(event.target)) {
+        setShowBeList(false);
       }
     };
 
@@ -144,8 +228,20 @@ const JobDetailsPanel = ({
   // Function to handle job selection from list
   const handleJobSelect = (selectedJobNo) => {
     setJobNo(selectedJobNo);
+    setBeNo(""); // Clear BE number when job is selected
     setShowJobsList(false);
     // Auto-trigger search when job is selected
+    setTimeout(() => {
+      handleSearch();
+    }, 100);
+  };
+
+  // Function to handle BE selection from list
+  const handleBeSelect = (selectedBeNo) => {
+    setBeNo(selectedBeNo);
+    setJobNo(selectedBeNo); // Set jobNo to BE number for search compatibility
+    setShowBeList(false);
+    // Auto-trigger search when BE is selected
     setTimeout(() => {
       handleSearch();
     }, 100);
@@ -287,6 +383,7 @@ const JobDetailsPanel = ({
             </div>
           )}
 
+          {/* Job Number Search */}
           <div>
             <label
               style={{
@@ -312,6 +409,7 @@ const JobDetailsPanel = ({
                 onChange={(e) => {
                   setJobNo(e.target.value);
                   setSearchTerm(e.target.value);
+                  setBeNo(""); // Clear BE number when typing in job field
                 }}
                 onFocus={() => {
                   setShowJobsList(true);
@@ -407,6 +505,130 @@ const JobDetailsPanel = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* BE Number Search Section */}
+        <div style={{ marginBottom: "16px" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "6px",
+              fontSize: "14px",
+              fontWeight: "500",
+            }}
+          >
+            BE Number / Search by Exporter
+          </label>
+          <div style={{ position: "relative", width: "50%" }} ref={beDropdownRef}>
+            <input
+              style={{
+                width: "100%",
+                padding: "8px",
+                border: "1px solid #D1D5DB",
+                borderRadius: "4px",
+                paddingRight: "40px",
+              }}
+              placeholder="Enter BE Number or Search by Exporter Name"
+              value={beNo}
+              onChange={(e) => {
+                setBeNo(e.target.value);
+                setBeSearchTerm(e.target.value);
+                setJobNo(""); // Clear job number when typing in BE field
+              }}
+              onFocus={() => {
+                setShowBeList(true);
+                if (beList.length === 0) {
+                  fetchBeList(beSearchTerm);
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowBeList(!showBeList)}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "14px",
+                color: "#6B7280",
+              }}
+            >
+              ▼
+            </button>
+            
+            {/* BE Numbers List Dropdown */}
+            {showBeList && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  backgroundColor: "white",
+                  border: "1px solid #D1D5DB",
+                  borderRadius: "4px",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  zIndex: 1000,
+                }}
+              >
+                {beLoading ? (
+                  <div style={{ padding: "12px", textAlign: "center", color: "#6B7280" }}>
+                    Loading BE numbers...
+                  </div>
+                ) : beList.length > 0 ? (
+                  beList.map((be, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleBeSelect(be.be_no)}
+                      style={{
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        borderBottom: index < beList.length - 1 ? "1px solid #E5E7EB" : "none",
+                        backgroundColor: be.be_no === beNo ? "#F3F4F6" : "white",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (be.be_no !== beNo) {
+                          e.target.style.backgroundColor = "#F9FAFB";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (be.be_no !== beNo) {
+                          e.target.style.backgroundColor = "white";
+                        }
+                      }}
+                    >
+                      <div style={{ fontWeight: "500", fontSize: "14px" }}>
+                        {be.be_no}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#6B7280", marginTop: "2px" }}>
+                        {be.supplier_exporter || "N/A"} | IE: {be.ie_code_no}
+                      </div>
+                      {be.importer && (
+                        <div style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "1px" }}>
+                          {be.importer}
+                        </div>
+                      )}
+                      {be.job_date && (
+                        <div style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "1px" }}>
+                          {new Date(be.job_date).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: "12px", textAlign: "center", color: "#6B7280" }}>
+                    {beSearchTerm ? `No BE numbers found matching "${beSearchTerm}"` : `No BE numbers found for ${selectedYear}`}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -574,7 +796,7 @@ const JobDetailsPanel = ({
           >
             <span style={{ marginRight: "8px" }}>📋</span>
             <span>
-              Enter a job number and click search to view job details
+              Enter a job number or BE number and click search to view job details
             </span>
           </div>
         )}

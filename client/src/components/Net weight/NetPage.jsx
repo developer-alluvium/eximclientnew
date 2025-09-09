@@ -518,159 +518,150 @@ const saveCalculatorData = async () => {
   }, []);
 
 // Updated fetchJobData function
-  const fetchJobData = async () => {
-    if (!jobNo) return;
+const fetchJobData = async () => {
+  if (!jobNo) return;
 
-    setLoading(true);
-    setApiError(null);
+  setLoading(true);
+  setApiError(null);
 
-    try {
-      // Get user's IE codes
-      const userIeCodes = getUserIeCodes();
+  try {
+    // Get user's IE codes
+    const userIeCodes = getUserIeCodes();
+    
+    if (userIeCodes.length === 0) {
+      throw new Error("No IE codes found for user");
+    }
+
+    // For NetPage, use ALL IE codes (no importer filtering)
+    const response = await fetch(
+      `${process.env.REACT_APP_API_STRING}/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(',')}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Job not found");
+    }
+
+    const data = await response.json();
+    if (data.success) {
+      // Store the job data from API response
+      const jobDataFromApi = data.data.job_data;
       
-      if (userIeCodes.length === 0) {
-        throw new Error("No IE codes found for user");
+      // Format the data to match the component's expected structure
+      const formattedJobData = {
+        ...jobDataFromApi,
+        hs_code: data.data.hs_code,
+        basic_duty_sch: data.data.basic_duty_sch,
+        basic_duty_ntfn: data.data.basic_duty_ntfn,
+        igst: data.data.igst,
+        sws_10_percent: data.data.sws_10_percent,
+        total_duty: jobDataFromApi.total_duty
+      };
+      
+      setJobData(formattedJobData);
+      setDutyRates(data.data);
+      setApiError(null);
+
+      // Automatically call update-per-kg-cost API after successful job lookup
+      try {
+        const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
+        const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
+        const calculatedPerKgCost = netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
+
+        // Updated API call with multiple IE codes support
+        const perKgCostResponse = await fetch(
+          `${process.env.REACT_APP_API_STRING}/update-per-kg-cost?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              jobNo: jobNo,
+              perKgCost: calculatedPerKgCost,
+            }),
+          }
+        );
+
+        if (perKgCostResponse.ok) {
+          const perKgCostData = await perKgCostResponse.json();
+          console.log('Per kg cost data updated:', perKgCostData);
+          
+          setCalculationResults(prev => ({
+            ...prev,
+            perKgCost: calculatedPerKgCost
+          }));
+        }
+      } catch (perKgError) {
+        console.warn('Failed to update per kg cost:', perKgError.message);
       }
 
-      // For NetPage, use ALL IE codes (no importer filtering)
-      const response = await fetch(
-        `${process.env.REACT_APP_API_STRING}/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(',')}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Job not found");
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        // Store the job data from API response
-        const jobDataFromApi = data.data.job_data;
-        
-        // Format the data to match the component's expected structure
-        const formattedJobData = {
-          ...jobDataFromApi,
-          hs_code: data.data.hs_code,
-          basic_duty_sch: data.data.basic_duty_sch,
-          basic_duty_ntfn: data.data.basic_duty_ntfn,
-          igst: data.data.igst,
-          sws_10_percent: data.data.sws_10_percent,
-          total_duty: jobDataFromApi.total_duty
+      // Automatically call store-calculator-data API
+      try {
+        const calculatorPayload = {
+          shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
+          customclearancecharges: jobDataFromApi.net_weight_calculator?.custom_clearance_charges || "0.00",
+          detention: jobDataFromApi.net_weight_calculator?.detention || "0.00",
+          cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
+          transport: jobDataFromApi.net_weight_calculator?.transport || "0.00",
+          Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
+          miscellaneous: jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
+          weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
+          totalCost: "0.00",
+          custom_fields: jobDataFromApi.net_weight_calculator?.custom_fields || [],
+          duty: jobDataFromApi.total_duty || "0.00"
         };
-        
-        setJobData(formattedJobData);
-        setDutyRates(data.data);
-        setApiError(null);
 
-        // Automatically call update-per-kg-cost API after successful job lookup
-        try {
-          const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
-          const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
-          const calculatedPerKgCost = netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
+        // Updated API call with multiple IE codes support
+        const storeCalculatorResponse = await fetch(
+          `${process.env.REACT_APP_API_STRING}/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(calculatorPayload),
+          }
+        );
 
-          const perKgCostResponse = await fetch(
-            `${process.env.REACT_APP_API_STRING}/update-per-kg-cost?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
-            {
-              method: "PATCH",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                jobNo: jobNo,
-                perKgCost: calculatedPerKgCost,
-              }),
-            }
-          );
+        if (storeCalculatorResponse.ok) {
+          const calculatorData = await storeCalculatorResponse.json();
+          console.log('Calculator data stored and total cost calculated:', calculatorData);
+          
+          if (calculatorData.success) {
+            const duty = parseFloat(jobDataFromApi.total_duty) || 0;
+            const shipping = parseFloat(calculatorPayload.shipping) || 0;
+            const customclearancecharges = parseFloat(calculatorPayload.customclearancecharges) || 0;
+            const detention = parseFloat(calculatorPayload.detention) || 0;
+            const cfs = parseFloat(calculatorPayload.cfs) || 0;
+            const transport = parseFloat(calculatorPayload.transport) || 0;
+            const Labour = parseFloat(calculatorPayload.Labour) || 0;
+            const customFieldsTotal = calculatorPayload.custom_fields?.reduce((sum, field) => 
+              sum + (parseFloat(field.value) || 0), 0) || 0;
 
-          if (perKgCostResponse.ok) {
-            const perKgCostData = await perKgCostResponse.json();
-            console.log('Per kg cost data updated:', perKgCostData);
+            const totalCost = (duty + shipping + customclearancecharges + detention + cfs + transport + Labour + customFieldsTotal).toFixed(2);
             
             setCalculationResults(prev => ({
               ...prev,
-              perKgCost: calculatedPerKgCost
+              totalCost: totalCost
             }));
-            
-            if (perKgCostData.success && perKgCostData.data) {
-              if (perKgCostData.data.job_data) {
-                setJobData(prevJobData => ({
-                  ...prevJobData,
-                  ...perKgCostData.data.job_data
-                }));
-              }
-              
-              if (perKgCostData.data.calculation_results) {
-                setCalculationResults(perKgCostData.data.calculation_results);
-              }
-            }
           }
-        } catch (perKgError) {
-          console.warn('Failed to update per kg cost:', perKgError.message);
         }
-
-        // Automatically call store-calculator-data API
-        try {
-          const calculatorPayload = {
-            shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
-            customclearancecharges: jobDataFromApi.net_weight_calculator?.custom_clearance_charges || "0.00",
-            detention: jobDataFromApi.net_weight_calculator?.detention || "0.00",
-            cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
-            transport: jobDataFromApi.net_weight_calculator?.transport || "0.00",
-            Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
-            miscellaneous: jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
-            weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
-            totalCost: "0.00",
-            custom_fields: jobDataFromApi.net_weight_calculator?.custom_fields || [],
-          };
-
-          const storeCalculatorResponse = await fetch(
-            `${process.env.REACT_APP_API_STRING}/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(calculatorPayload),
-            }
-          );
-
-          if (storeCalculatorResponse.ok) {
-            const calculatorData = await storeCalculatorResponse.json();
-            console.log('Calculator data stored and total cost calculated:', calculatorData);
-            
-            if (calculatorData.success) {
-              const duty = parseFloat(jobDataFromApi.total_duty) || 0;
-              const shipping = parseFloat(calculatorPayload.shipping) || 0;
-              const customclearancecharges = parseFloat(calculatorPayload.customclearancecharges) || 0;
-              const detention = parseFloat(calculatorPayload.detention) || 0;
-              const cfs = parseFloat(calculatorPayload.cfs) || 0;
-              const transport = parseFloat(calculatorPayload.transport) || 0;
-              const Labour = parseFloat(calculatorPayload.Labour) || 0;
-              const customFieldsTotal = calculatorPayload.custom_fields?.reduce((sum, field) => 
-                sum + (parseFloat(field.value) || 0), 0) || 0;
-
-              const totalCost = (duty + shipping + customclearancecharges + detention + cfs + transport + Labour + customFieldsTotal).toFixed(2);
-              
-              setCalculationResults(prev => ({
-                ...prev,
-                totalCost: totalCost
-              }));
-            }
-          }
-        } catch (calculatorError) {
-          console.warn('Failed to store calculator data:', calculatorError.message);
-        }
-        
-      } else {
-        throw new Error(data.message || "Job not found");
+      } catch (calculatorError) {
+        console.warn('Failed to store calculator data:', calculatorError.message);
       }
-    } catch (error) {
-      setApiError(error.message);
-      setJobData(null);
-      setDutyRates(null);
-    } finally {
-      setLoading(false);
+      
+    } else {
+      throw new Error(data.message || "Job not found");
     }
-  };
+  } catch (error) {
+    setApiError(error.message);
+    setJobData(null);
+    setDutyRates(null);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Search job when user submits
   const handleSearch = (e) => {
