@@ -932,7 +932,7 @@ const AdminManagement = ({ onRefresh }) => {
                             <AccountBox />
                           </IconButton>
                         </Tooltip>
-                        {user.ie_code_assignments?.length > 0 && (
+                        {/* {user.ie_code_assignments?.length > 0 && (
                           <Tooltip title="Remove IE Codes">
                             <IconButton
                               size="small"
@@ -942,7 +942,7 @@ const AdminManagement = ({ onRefresh }) => {
                               <Delete />
                             </IconButton>
                           </Tooltip>
-                        )}
+                        )} */}
 
                         {/* Status Toggle Button */}
                         <Tooltip title={user.isActive ? 'Deactivate User' : 'Activate User'}>
