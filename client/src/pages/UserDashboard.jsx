@@ -31,8 +31,10 @@ import {
   AccessTime as AccessTimeIcon,
   ManageAccounts as ManageAccountsIcon
 } from "@mui/icons-material";
+import CloseIcon from '@mui/icons-material/Close';
+import { useNavigate } from "react-router-dom";
 
-// Import module icons
+
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
@@ -46,14 +48,13 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 
 import { ThemeProvider, styled, alpha } from '@mui/material/styles';
 import { modernTheme } from "../styles/modernTheme";
-import { useNavigate } from "react-router-dom";
+
 import { filterModulesByAccess, getUserAssignedModules } from "../utils/moduleAccess";
 import { logActivity } from "../utils/activityLogger";
 import axios from "axios";
 
-// Styled components similar to HomePage
 const StyledCard = styled(Card)(({ theme }) => ({
-  height: "180px", // Fixed height for uniform appearance
+  height: "180px",
   display: "flex",
   flexDirection: "column",
   cursor: "pointer",
@@ -97,7 +98,7 @@ const IconContainer = styled(Box)(({ theme }) => ({
   flexShrink: 0,
   aspectRatio: "1 / 1",
   "& svg": {
-    fontSize: "24px", 
+    fontSize: "24px",
     color: theme.palette.warning.main,
   }
 }));
@@ -166,94 +167,30 @@ function UserDashboard() {
   const [selectedModule, setSelectedModule] = useState(null);
   const [requestReason, setRequestReason] = useState("");
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const [alertOpen, setAlertOpen] = useState(true);
   const navigate = useNavigate();
-
-  // Define all modules similar to HomePage
+const [docAlertOpen, setDocAlertOpen] = useState(true);
   const allModules = [
-    {
-      name: "Import DSR",
-      description: "View and manage import daily status reports and track shipments",
-      path: "/importdsr",
-      icon: <AssessmentOutlinedIcon />,
-      category: "core"
-    },
-    {
-      name: "CostIQ",
-      description: "Calculate shipping costs per kilogram for better pricing decisions",
-      path: "/netpage",
-      icon: <CalculateOutlinedIcon />,
-      category: "core"
-    },
-    {
-      name: "E-Lock",
-      description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      // path: process.env.REACT_APP_ELOCK_URL,
-      path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
-      icon: <LockOutlinedIcon />,
-      category: "core",
-      isExternal: true
-    },
-    {
-      name: "SnapCheck",
-      description: "Beta Version - Quality control and inspection management system",
-      path: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/",
-      icon: <CameraAltOutlinedIcon />,
-      category: "beta",
-      isExternal: true
-    },
-    {
-      name: "QR Locker",
-      description: "Beta Version - Digital locker management with QR code integration",
-      path: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/",
-      icon: <QrCodeScannerOutlinedIcon />,
-      category: "beta",
-      isExternal: true
-    },
-    {
-      name: "Task Flow AI",
-      description: "Task management system with organizational hierarchy",
-      path:"http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/",
-      icon: <SecurityOutlinedIcon />,
-      category: "core",
-      isExternal: true
-    },
-    {
-      name: "Trademaster Guide", 
-      description: "Tutorials to master import and export procedures",
-      path: "/trademasterguide", 
-      icon : <VideocamOutlinedIcon />,
-      category: "core"
-    }
+    { name: "Import DSR", description: "View and manage import daily status reports and track shipments", path: "/importdsr", icon: <AssessmentOutlinedIcon />, category: "core" },
+    { name: "CostIQ", description: "Calculate shipping costs per kilogram for better pricing decisions", path: "/netpage", icon: <CalculateOutlinedIcon />, category: "core" },
+    { name: "E-Lock", description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.", path: "http://localhost:3005/", icon: <LockOutlinedIcon />, category: "core", isExternal: true },
+    { name: "SnapCheck", description: "Beta Version - Quality control and inspection management system", path: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/", icon: <CameraAltOutlinedIcon />, category: "beta", isExternal: true },
+    { name: "QR Locker", description: "Beta Version - Digital locker management with QR code integration", path: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/", icon: <QrCodeScannerOutlinedIcon />, category: "beta", isExternal: true },
+    { name: "Task Flow AI", description: "Task management system with organizational hierarchy", path:"http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/", icon: <SecurityOutlinedIcon />, category: "core", isExternal: true },
+    { name: "Trademaster Guide", description: "Tutorials to master import and export procedures", path: "/trademasterguide", icon : <VideocamOutlinedIcon />, category: "core" }
   ];
 
-  // Format date and time
-  const formattedDate = currentDateTime.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  
-  const formattedTime = currentDateTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const formattedDate = currentDateTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   useEffect(() => {
     fetchDashboardData();
-    // Update time every minute
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
-    }, 60000);
+    const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // Filter modules based on user access (reactive to module changes)
   const modules = useMemo(() => {
-    const userModules = getUserAssignedModules();
     const filteredModules = filterModulesByAccess(allModules);
-    
-    // Add admin module if user is admin
     if (dashboardData?.user?.role === "admin") {
       filteredModules.push({
         name: "Admin Panel",
@@ -265,170 +202,128 @@ function UserDashboard() {
         isLocked: false
       });
     }
-    
     return filteredModules;
   }, [dashboardData?.user?.role]);
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/users/dashboard`,
-        { withCredentials: true }
-      );
-
+      const response = await axios.get(`${process.env.REACT_APP_API_STRING}/users/dashboard`, { withCredentials: true });
       if (response.data.success) {
         setDashboardData(response.data.data);
       }
     } catch (error) {
-      console.error("Dashboard fetch error:", error);
       setError("Failed to load dashboard data.");
-      
-      if (error.response?.status === 401) {
-        handleLogout();
-      }
+      if (error.response?.status === 401) handleLogout();
     } finally {
       setLoading(false);
     }
   };
-const eximUser = localStorage.getItem('exim_user');
-const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
-  if (isLocked) {
-    return;
-  }
 
-  if (moduleName === "E-Lock") {
-    try {
-      // Get user data and token from localStorage
+  const eximUser = localStorage.getItem('exim_user');
+  const parsedUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("exim_user")); } catch { return null; }
+  }, []);
 
-      let token = localStorage.getItem('access_token');
+  const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
+  const userImporterName = parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
 
-      if (!eximUser) {
-        navigate('/login');
-        return;
-      }
-      if (!token) {
-        navigate('/login');
-        return;
-      }
+  // --- DOCUMENT EXPIRY CHECK LOGIC STARTS HERE ---
+  const expiringDocs = useMemo(() => {
+    if (!parsedUser?.documents) return [];
+    const today = new Date();
+    return parsedUser.documents.filter(doc => {
+      const expirationDate = new Date(doc.expirationDate);
+      const daysUntilExpiration = Math.ceil((expirationDate - today) / (1000 * 60 * 60 * 24));
+      return daysUntilExpiration > 0 && daysUntilExpiration <= 30;
+    });
+  }, [parsedUser?.documents]);
 
-      // Parse user to extract the first ie_code_no from ie_code_assignments
-      const parsedUser = JSON.parse(eximUser);
-      let selectedIeCode = "";
-      if (parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
-        selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
-      } else if (parsedUser?.ie_code_no) {
-        selectedIeCode = parsedUser.ie_code_no;
-      } else {
-        alert("IE Code not found. Cannot generate SSO token.");
-        return;
-      }
+  const expiredDocs = useMemo(() => {
+    if (!parsedUser?.documents) return [];
+    const today = new Date();
+    return parsedUser.documents.filter(doc => {
+      const expirationDate = new Date(doc.expirationDate);
+      const daysUntilExpiration = Math.ceil((expirationDate - today) / (1000 * 60 * 60 * 24));
+      return daysUntilExpiration <= 0;
+    });
+  }, [parsedUser?.documents]);
+  // --- DOCUMENT EXPIRY CHECK LOGIC ENDS HERE ---
 
-      // Call backend API with ie_code_no as query param
-      const res = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/users/generate-sso-token?ie_code_no=${encodeURIComponent(selectedIeCode)}`,
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+  const handleCardClick = async (path, isExternal = false, isLocked = false, moduleName = '') => {
+    if (isLocked) return;
+    if (moduleName === "E-Lock") {
+      try {
+        let token = localStorage.getItem('access_token');
+        if (!eximUser || !token) {
+          navigate('/login');
+          return;
         }
-      );
-
-      const ssoToken = res.data?.data?.token;
-      if (ssoToken) {
-        localStorage.setItem('sso_token', ssoToken);
-        // const elockUrl = process.env.REACT_APP_ELOCK_URL || (process.env.NODE_ENV === "development"
-        //   ? "http://localhost:3005"
-        //   : "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/");
-          const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
-        window.location.href = `${elockUrl}?token=${ssoToken}`;
-      } else {
-        alert("Failed to generate SSO token for E-Lock.");
+        const parsedUser = JSON.parse(eximUser);
+        let selectedIeCode = "";
+        if (parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
+        else if (parsedUser?.ie_code_no) selectedIeCode = parsedUser.ie_code_no;
+        else {
+          alert("IE Code not found. Cannot generate SSO token.");
+          return;
+        }
+        const res = await axios.post(
+          `${process.env.REACT_APP_API_STRING}/users/generate-sso-token?ie_code_no=${encodeURIComponent(selectedIeCode)}`,
+          {},
+          { withCredentials: true, headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+        );
+        const ssoToken = res.data?.data?.token;
+        if (ssoToken) {
+          localStorage.setItem('sso_token', ssoToken);
+          const elockUrl = "http://localhost:3005/";
+          window.location.href = `${elockUrl}?token=${ssoToken}`;
+        } else alert("Failed to generate SSO token for E-Lock.");
+      } catch (err) {
+        if (err.response?.status === 401) navigate('/login');
+        else alert("Error generating SSO token for E-Lock.");
       }
-    } catch (err) {
-      console.error('SSO token generation error:', err);
-
-      if (err.response?.status === 401) {
-        navigate('/login');
-      } else {
-        alert("Error generating SSO token for E-Lock.");
-      }
+      return;
     }
-    return;
-  }
-
-  // Handle external links
-  if (isExternal && path && path.startsWith('http')) {
-    window.open(path, '_blank');
-    return;
-  }
-
-  // Handle internal navigation
-  if (path && path.startsWith('/')) {
-    navigate(path);
-    return;
-  }
-
-  // If path is '#' or invalid, do nothing
-};
-
-
+    if (isExternal && path && path.startsWith('http')) {
+      window.open(path, '_blank');
+      return;
+    }
+    if (path && path.startsWith('/')) {
+      navigate(path);
+      return;
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      // Log logout activity 
-    
-
       const logoutData = {};
-      if (dashboardData?.user?.id) {
-        logoutData.user_id = dashboardData.user.id;
-      }
-
-      await axios.post(
-        `${process.env.REACT_APP_API_STRING}/users/logout`,
-        logoutData,
-        { withCredentials: true }
-      );
-      
+      if (dashboardData?.user?.id) logoutData.user_id = dashboardData.user.id;
+      await axios.post(`${process.env.REACT_APP_API_STRING}/users/logout`, logoutData, { withCredentials: true });
       localStorage.removeItem("exim_user");
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("sso_token");
       navigate("/login", { replace: true });
     } catch (error) {
-      console.error("Logout error:", error);
-      // Still clear local storage and redirect even if API call fails
       localStorage.removeItem("exim_user");
       navigate("/login", { replace: true });
     }
   };
 
   const handleModuleRequest = async () => {
-    if (!selectedModule || !requestReason.trim()) {
-      return;
-    }
-
+    if (!selectedModule || !requestReason.trim()) return;
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_API_STRING}/users/request-module-access`,
-        {
-          moduleKey: selectedModule.key,
-          reason: requestReason
-        },
+        { moduleKey: selectedModule.key, reason: requestReason },
         { withCredentials: true }
       );
-
       if (response.data.success) {
         setModuleRequestDialog(false);
         setSelectedModule(null);
         setRequestReason("");
-        fetchDashboardData(); // Refresh data
+        fetchDashboardData();
       }
-    } catch (error) {
-      console.error("Module request error:", error);
-    }
+    } catch (error) { }
   };
 
   const getStatusColor = (status) => {
@@ -440,18 +335,11 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
     }
   };
 
-  const handleUserMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
+  const handleUserMenuOpen = (event) => { setAnchorEl(event.currentTarget); };
+  const handleUserMenuClose = () => { setAnchorEl(null); };
 
-  const handleUserMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  // Get greeting and user info
   const hours = currentDateTime.getHours();
   let greeting = "Hi";
-  
   const userName = dashboardData?.user?.name || "User";
   const userInitial = userName ? userName.charAt(0).toUpperCase() : "U";
 
@@ -464,7 +352,6 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
       </ThemeProvider>
     );
   }
-
   if (error) {
     return (
       <ThemeProvider theme={modernTheme}>
@@ -478,7 +365,6 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
   return (
     <ThemeProvider theme={modernTheme}>
       <Box sx={{ flexGrow: 1 }}>
-        {/* Custom Header Bar */}
         <HeaderBar position="fixed">
           <Toolbar>
             <Box
@@ -486,17 +372,14 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
               src={require('../../src/assets/images/logo.webp')}
               alt="EXIM User Portal"
               sx={{
-                height: 40,          // Ensure the logo fits well in a compact header
-                width: 'auto',       // Let the logo size proportionally
+                height: 40,
+                width: 'auto',
                 display: 'block',
-                mr: 2,               // Space after logo
-                objectFit: 'contain' // Keeps aspect ratio, prevents distortion
+                mr: 2,
+                objectFit: 'contain'
               }}
             />
-            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-              
-            </Box>
-
+            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}></Box>
             <DateTimeContainer>
               <AccessTimeIcon />
               <Box>
@@ -508,21 +391,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
                 </Typography>
               </Box>
             </DateTimeContainer>
-
-            {/* <IconButton
-              size="large"
-              color="inherit"
-              onClick={(e) => setNotificationAnchor(e.currentTarget)}
-            >
-              <Badge badgeContent={dashboardData?.notifications?.length || 0} color="warning">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton> */}
-
             <UserMenu onClick={handleUserMenuOpen}>
-              {/* <Avatar sx={{ width: 32, height: 32, bgcolor: '#1976d2', mr: 1 }}>
-                {userInitial}
-              </Avatar> */}
               <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
                 {userName}
               </Typography>
@@ -531,18 +400,13 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
           </Toolbar>
         </HeaderBar>
 
-        {/* User Menu */}
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
           onClose={handleUserMenuClose}
           PaperProps={{
             elevation: 3,
-            sx: {
-              mt: 1.5,
-              minWidth: 180,
-              borderRadius: 2,
-            },
+            sx: { mt: 1.5, minWidth: 180, borderRadius: 2 },
           }}
         >
           <MenuItem onClick={() => navigate('/user/profile')}>
@@ -561,7 +425,6 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
           </MenuItem>
         </Menu>
 
-        {/* Notifications Menu */}
         <Menu
           anchorEl={notificationAnchor}
           open={Boolean(notificationAnchor)}
@@ -571,60 +434,86 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
             dashboardData.notifications.map((notification, index) => (
               <MenuItem key={index} onClick={() => setNotificationAnchor(null)}>
                 <Box>
-                  <Typography variant="body2" fontWeight="bold">
-                    {notification.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {notification.message}
-                  </Typography>
+                  <Typography variant="body2" fontWeight="bold">{notification.title}</Typography>
+                  <Typography variant="caption" color="text.secondary">{notification.message}</Typography>
                 </Box>
               </MenuItem>
             ))
           ) : (
             <MenuItem>
-              <Typography variant="body2" color="text.secondary">
-                No new notifications
-              </Typography>
+              <Typography variant="body2" color="text.secondary">No new notifications</Typography>
             </MenuItem>
           )}
         </Menu>
 
-        {/* Main Content */}
         <Box
           component="main"
           sx={{
             flexGrow: 1,
             backgroundColor: "#F9FAFB",
             minHeight: "100vh",
-            paddingTop: '80px', // Account for fixed header
+            paddingTop: '80px',
             padding: "20px",
           }}
         >
           <Container maxWidth="xl" sx={{ mt: 7, px: { xs: 2, sm: 3, md: 4 } }}>
-            {/* Welcome Banner */}
             <WelcomeBanner elevation={0}>
               <Box sx={{ position: 'relative', zIndex: 1 }}>
                 <Typography variant="h4" fontWeight="600" gutterBottom>
                   {greeting}, {userName}!
                 </Typography>
                 <Box display="flex" alignItems="center" gap={2} sx={{ mt: 2 }}>
-                  <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                    Status:
+                  <Typography variant="body1" sx={{ opacity: 0.9 }}>Status:</Typography>
+                  <Chip label={dashboardData?.user?.status?.toUpperCase()} color={getStatusColor(dashboardData?.user?.status)} size="small" sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }} />
+                  <Typography variant="body2" sx={{ mr: 2, fontWeight: 400, fontSize: "0.875rem", color: "#000000ff" }}>
+                    {userIeCode ? `IE Code: ${userIeCode}` : ""}
                   </Typography>
-                  <Chip 
-                    label={dashboardData?.user?.status?.toUpperCase()} 
-                    color={getStatusColor(dashboardData?.user?.status)}
-                    size="small"
-                    sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                  />
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    IE Code: {dashboardData?.user?.ie_code_no}
+                  <Typography variant="body2" sx={{ fontWeight: 400, fontSize: "0.875rem", color: "#000000ff" }}>
+                    {userImporterName ? `Importer: ${userImporterName}` : ""}
                   </Typography>
                 </Box>
               </Box>
             </WelcomeBanner>
 
-            {/* Status Alert */}
+            {/* ALERT FOR EXPIRED OR SOON EXPIRING DOCUMENTS */}
+          {docAlertOpen && (expiringDocs.length > 0 || expiredDocs.length > 0) && (
+  <Alert
+    severity="warning"
+    sx={{ mb: 3, cursor: "pointer" }}
+    onClick={() => navigate('/user/profile')}
+    action={
+      <IconButton
+        aria-label="close"
+        color="inherit"
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation(); // prevent alert click from navigating
+          setDocAlertOpen(false);
+        }}
+      >
+        <CloseIcon fontSize="small" />
+      </IconButton>
+    }
+  >
+    {expiredDocs.length > 0 && (
+      <span>
+        The following documents have <strong>expired</strong>:{" "}
+        {expiredDocs.map(doc => `${doc.title} (expired on ${new Date(doc.expirationDate).toLocaleDateString()})`).join(", ")}
+        <br />
+      </span>
+    )}
+    {expiringDocs.length > 0 && (
+      <span>
+        The following documents are <strong>expiring soon</strong>:{" "}
+        {expiringDocs
+          .filter(doc => !expiredDocs.includes(doc))
+          .map(doc => `${doc.title} (expires on ${new Date(doc.expirationDate).toLocaleDateString()})`)
+          .join(", ")}
+      </span>
+    )}
+  </Alert>
+)}
+
             {dashboardData?.user?.status === "pending" && (
               <Alert severity="warning" sx={{ mb: 4 }}>
                 Your account is pending verification. Please contact support for activation.
@@ -632,12 +521,11 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
               </Alert>
             )}
 
-            {/* Import Management Section */}
+            
+
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#2c3e50' }}>
               Available Modules
             </Typography>
-
-            {/* Single Grid Layout for all modules */}
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: {
@@ -649,14 +537,12 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
               mb: 4
             }}>
               {modules.map((module, index) => (
-                <StyledCard 
+                <StyledCard
                   key={index}
                   onClick={() => handleCardClick(module.path, module.isExternal, module.isLocked, module.name)}
                   sx={{
-                    ...(module.category === "beta" ? { 
-                      "&:before": {
-                        backgroundColor: "#ff9800"
-                      }
+                    ...(module.category === "beta" ? {
+                      "&:before": { backgroundColor: "#ff9800" }
                     } : {}),
                     ...(module.category === "coming-soon" ? {
                       opacity: 0.7,
@@ -665,9 +551,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
                         transform: "none",
                         boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
                       },
-                      "&:before": {
-                        backgroundColor: "#9e9e9e"
-                      }
+                      "&:before": { backgroundColor: "#9e9e9e" }
                     } : {}),
                     ...(module.isLocked ? {
                       opacity: 0.6,
@@ -677,15 +561,13 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
                         transform: "none",
                         boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
                       },
-                      "&:before": {
-                        backgroundColor: "#f44336"
-                      }
+                      "&:before": { backgroundColor: "#f44336" }
                     } : {})
                   }}
                 >
-                  <CardContent sx={{ 
-                    height: "100%", 
-                    display: "flex", 
+                  <CardContent sx={{
+                    height: "100%",
+                    display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
@@ -694,12 +576,12 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
                     position: "relative"
                   }}>
                     {module.isLocked && (
-                      <Box sx={{ 
-                        position: "absolute", 
-                        top: 12, 
-                        right: 12, 
-                        backgroundColor: "error.main", 
-                        borderRadius: "50%", 
+                      <Box sx={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        backgroundColor: "error.main",
+                        borderRadius: "50%",
                         p: 0.5,
                         minWidth: 28,
                         minHeight: 28,
@@ -710,66 +592,38 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
                         <LockOutlinedIcon sx={{ fontSize: 18, color: "white" }} />
                       </Box>
                     )}
-                    
                     <IconContainer sx={{
                       width: "48px",
                       height: "48px",
-                      ...(module.category === "beta" ? 
-                        { backgroundColor: "rgba(255, 152, 0, 0.1)" } : 
-                      module.category === "coming-soon" ? 
-                        { backgroundColor: "rgba(158, 158, 158, 0.1)" } : 
-                        {}),
+                      ...(module.category === "beta"
+                        ? { backgroundColor: "rgba(255, 152, 0, 0.1)" }
+                        : module.category === "coming-soon"
+                          ? { backgroundColor: "rgba(158, 158, 158, 0.1)" }
+                          : {}),
                       ...(module.isLocked ? { backgroundColor: "rgba(244, 67, 54, 0.1)" } : {})
                     }}>
-                      {module.category === "beta" ?
-                        React.cloneElement(module.icon, { 
-                          sx: { 
-                            fontSize: "24px",
-                            color: module.isLocked ? "#f44336" : "#ff9800"
-                          } 
-                        }) :
-                       module.category === "coming-soon" ?
-                        React.cloneElement(module.icon, { 
-                          sx: { 
-                            fontSize: "24px",
-                            color: module.isLocked ? "#f44336" : "#9e9e9e"
-                          } 
-                        }) :
-                        React.cloneElement(module.icon, { 
-                          sx: { 
-                            fontSize: "24px",
-                            color: module.isLocked ? "#f44336" : undefined
-                          } 
-                        })
+                      {module.category === "beta"
+                        ? React.cloneElement(module.icon, { sx: { fontSize: "24px", color: module.isLocked ? "#f44336" : "#ff9800" } })
+                        : module.category === "coming-soon"
+                          ? React.cloneElement(module.icon, { sx: { fontSize: "24px", color: module.isLocked ? "#f44336" : "#9e9e9e" } })
+                          : React.cloneElement(module.icon, { sx: { fontSize: "24px", color: module.isLocked ? "#f44336" : undefined } })
                       }
                     </IconContainer>
-                    
-                    <Typography 
-                      variant="h6" 
-                      fontWeight="500" 
-                      sx={{ 
-                        color: module.isLocked ? "#666" : '#2c3e50', 
-                        fontSize: '16px',
-                        lineHeight: 1.3,
-                        mb: 1
-                      }}
-                    >
+                    <Typography variant="h6" fontWeight="500" sx={{
+                      color: module.isLocked ? "#666" : '#2c3e50',
+                      fontSize: '16px',
+                      lineHeight: 1.3,
+                      mb: 1
+                    }}>
                       {module.name}
                     </Typography>
-                    
-                    <Typography 
-                      variant="body2" 
+                    <Typography
+                      variant="body2"
                       color="text.secondary"
-                      sx={{ 
-                        maxWidth: "90%", 
-                        mx: "auto", 
-                        lineHeight: 1.4,
-                        fontSize: "13px"
-                      }}
+                      sx={{ maxWidth: "90%", mx: "auto", lineHeight: 1.4, fontSize: "13px" }}
                     >
                       {module.isLocked ? "Contact Admin for Access" : module.description}
                     </Typography>
-                    
                     {module.isLocked && (
                       <Chip
                         size="small"
@@ -785,9 +639,8 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
           </Container>
         </Box>
 
-        {/* Module Request Dialog */}
-        <Dialog 
-          open={moduleRequestDialog} 
+        <Dialog
+          open={moduleRequestDialog}
           onClose={() => setModuleRequestDialog(false)}
           maxWidth="sm"
           fullWidth
@@ -797,7 +650,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
           </DialogTitle>
           <DialogContent>
             <Typography variant="body2" color="text.secondary" paragraph>
-              Please provide a reason for requesting access to this module. 
+              Please provide a reason for requesting access to this module.
               Your admin will review this request.
             </Typography>
             <TextField
@@ -814,7 +667,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
             <Button onClick={() => setModuleRequestDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleModuleRequest}
               variant="contained"
               disabled={!requestReason.trim()}

@@ -400,6 +400,7 @@ export const sanitizeUserData = (user) => {
     role: user.role || "user",
     isActive: user.isActive,
     lastLogin: user.lastLogin,
+    documents: user.documents
   };
 
   // Additional fields if they exist in the user object
@@ -421,7 +422,8 @@ export const sanitizeUserData = (user) => {
     "modules",
     "assignedModules",
     "isAdmin",  // Added isAdmin field
-    "emailVerified"
+    "emailVerified",
+    "documents"
     
   ];
 
