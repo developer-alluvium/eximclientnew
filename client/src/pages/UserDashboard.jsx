@@ -173,7 +173,10 @@ const [docAlertOpen, setDocAlertOpen] = useState(true);
   const allModules = [
     { name: "Import DSR", description: "View and manage import daily status reports and track shipments", path: "/importdsr", icon: <AssessmentOutlinedIcon />, category: "core" },
     { name: "CostIQ", description: "Calculate shipping costs per kilogram for better pricing decisions", path: "/netpage", icon: <CalculateOutlinedIcon />, category: "core" },
-    { name: "E-Lock", description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.", path: "http://localhost:3005/", icon: <LockOutlinedIcon />, category: "core", isExternal: true },
+    { name: "E-Lock", description: "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.", 
+          // path: "http://localhost:3005/", 
+          path: "http://elock.s3-website.ap-south-1.amazonaws.com/",
+          icon: <LockOutlinedIcon />, category: "core", isExternal: true },
     { name: "SnapCheck", description: "Beta Version - Quality control and inspection management system", path: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/", icon: <CameraAltOutlinedIcon />, category: "beta", isExternal: true },
     { name: "QR Locker", description: "Beta Version - Digital locker management with QR code integration", path: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/", icon: <QrCodeScannerOutlinedIcon />, category: "beta", isExternal: true },
     { name: "Task Flow AI", description: "Task management system with organizational hierarchy", path:"http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/", icon: <SecurityOutlinedIcon />, category: "core", isExternal: true },
@@ -274,7 +277,8 @@ const [docAlertOpen, setDocAlertOpen] = useState(true);
         const ssoToken = res.data?.data?.token;
         if (ssoToken) {
           localStorage.setItem('sso_token', ssoToken);
-          const elockUrl = "http://localhost:3005/";
+          // const elockUrl = "http://localhost:3005/";
+          const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
           window.location.href = `${elockUrl}?token=${ssoToken}`;
         } else alert("Failed to generate SSO token for E-Lock.");
       } catch (err) {
