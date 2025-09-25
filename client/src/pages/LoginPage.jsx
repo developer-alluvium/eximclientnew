@@ -30,100 +30,106 @@ function LoginPage() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState(null);
   const [resetPasswordError, setResetPasswordError] = useState(null);
-  
+
   // State to toggle between User and SuperAdmin login
   const [isSuperAdminLogin, setIsSuperAdminLogin] = useState(false);
 
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
 
-  // Updated useEffect to check for both user and superadmin sessions
-  useEffect(() => {
-    const superAdminToken = localStorage.getItem("superadmin_token");
-    const userToken = localStorage.getItem("access_token");
+  // // Updated useEffect to check for both user and superadmin sessions
+  // useEffect(() => {
+  //   const superAdminToken = localStorage.getItem("superadmin_token");
+  //   const userToken = localStorage.getItem("access_token");
 
-    if (superAdminToken) {
-      navigate("/superadmin-dashboard", { replace: true });
-    } else if (userToken) {
-      // For regular users, we keep the original navigation to home
-      navigate("/", { replace: true });
+  //   if (superAdminToken) {
+  //     navigate("/superadmin-dashboard", { replace: true });
+  //   } else if (userToken) {
+  //     // For regular users, we keep the original navigation to home
+  //     navigate("/", { replace: true });
+  //   }
+  // }, [navigate]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    if (!email || !password) {
+      setError("Email and password are required.");
+      setLoading(false);
+      return;
     }
-  }, [navigate]);
 
-const handleSubmit = async (event) => {
-  event.preventDefault();
-  setError(null);
-  setLoading(true);
+    const endpoint = isSuperAdminLogin
+      ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
+      : `${process.env.REACT_APP_API_STRING}/users/login`;
 
-  if (!email || !password) {
-    setError("Email and password are required.");
-    setLoading(false);
-    return;
-  }
+    const payload = { email, password };
 
-  const endpoint = isSuperAdminLogin
-    ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
-    : `${process.env.REACT_APP_API_STRING}/users/login`;
+    try {
+      const res = await axios.post(endpoint, payload, {
+        withCredentials: true,
+      });
 
-  const payload = { email, password };
+      if (res.data.success) {
+        if (isSuperAdminLogin) {
+          // Handle SuperAdmin successful login
+          localStorage.setItem("superadmin_token", res.data.token);
+          localStorage.setItem("user_access_token", res.data.token);
+          localStorage.setItem(
+            "superadmin_user",
+            JSON.stringify(res.data.superAdmin)
+          );
+          navigate("/superadmin-dashboard", { replace: true });
+        } else {
+          // Handle User successful login
+          const userData = res.data.data.user;
+          const { accessToken, refreshToken } = res.data;
 
-  try {
-    const res = await axios.post(endpoint, payload, { withCredentials: true });
+          // CHECK IF USER IS ACTIVE
+          if (!userData.isActive) {
+            setError(
+              "Your account is not active. Please contact a SuperAdmin or higher authority for access."
+            );
+            setLoading(false);
+            return;
+          }
 
-    if (res.data.success) {
-      if (isSuperAdminLogin) {
-        // Handle SuperAdmin successful login
-        localStorage.setItem("superadmin_token", res.data.token);
-        localStorage.setItem("user_access_token", res.data.token);
-        localStorage.setItem("superadmin_user", JSON.stringify(res.data.superAdmin));
-        navigate("/superadmin-dashboard", { replace: true });
-      } else {
-        // Handle User successful login
-        const userData = res.data.data.user;
-        const { accessToken, refreshToken } = res.data;
+          localStorage.setItem("exim_user", JSON.stringify(userData));
+          localStorage.setItem("access_token", accessToken);
+          localStorage.setItem("refresh_token", refreshToken);
 
-        // CHECK IF USER IS ACTIVE
-        if (!userData.isActive) {
-          setError("Your account is not active. Please contact a SuperAdmin or higher authority for access.");
-          setLoading(false);
-          return;
+          setUser(userData);
+          navigate("/", { replace: true });
         }
-
-        localStorage.setItem("exim_user", JSON.stringify(userData));
-        localStorage.setItem("access_token", accessToken);
-        localStorage.setItem("refresh_token", refreshToken);
-        
-        setUser(userData);
-        navigate("/", { replace: true });
-
-       
       }
-    }
-  } catch (err) {
-    let errorMessage = "Login failed. Please try again.";
-    if (err.response) {
-      switch (err.response.status) {
-        case 401:
-          errorMessage = "Invalid email or password.";
-          break;
-        case 423:
-          errorMessage = "Account is temporarily locked. Please try again later.";
-          break;
-        case 403:
-          errorMessage = err.response.data.message || "Account pending verification.";
-          break;
-        default:
-          errorMessage = err.response.data.message || "An unexpected error occurred.";
-          break;
+    } catch (err) {
+      let errorMessage = "Login failed. Please try again.";
+      if (err.response) {
+        switch (err.response.status) {
+          case 401:
+            errorMessage = "Invalid email or password.";
+            break;
+          case 423:
+            errorMessage =
+              "Account is temporarily locked. Please try again later.";
+            break;
+          case 403:
+            errorMessage =
+              err.response.data.message || "Account pending verification.";
+            break;
+          default:
+            errorMessage =
+              err.response.data.message || "An unexpected error occurred.";
+            break;
+        }
       }
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setError(errorMessage);
-
-
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   const handleForgotPassword = async (event) => {
     event.preventDefault();
     setResetPasswordError(null);
@@ -142,7 +148,9 @@ const handleSubmit = async (event) => {
         setForgotPasswordEmail("");
       }
     } catch (error) {
-       setResetPasswordError(error.response?.data?.message || "An error occurred.");
+      setResetPasswordError(
+        error.response?.data?.message || "An error occurred."
+      );
     } finally {
       setIsResettingPassword(false);
     }
@@ -156,17 +164,47 @@ const handleSubmit = async (event) => {
   };
 
   return (
-    <Container fluid className="login-container" style={{ height: "100vh", overflow: "hidden" }}>
+    <Container
+      fluid
+      className="login-container"
+      style={{ height: "100vh", overflow: "hidden" }}
+    >
       <Row className="login-row m-0" style={{ height: "100%" }}>
         <Col md={6} className="login-left-col p-0"></Col>
-        <Col md={6} className="login-right-col" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "auto" }}>
-          <div className="login-right-col-inner-container" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "1rem" }}>
+        <Col
+          md={6}
+          className="login-right-col"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100vh",
+            overflow: "auto",
+          }}
+        >
+          <div
+            className="login-right-col-inner-container"
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              padding: "1rem",
+            }}
+          >
             <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-              <img src={require("../assets/images/logo.webp")} alt="logo" style={{ maxHeight: "80px" }}/>
+              <img
+                src={require("../assets/images/logo.webp")}
+                alt="logo"
+                style={{ maxHeight: "80px" }}
+              />
             </div>
 
             <Box sx={{ maxWidth: 400, margin: "auto", width: "100%" }}>
-              <Typography component="h1" variant="h5" sx={{ mb: 2, textAlign: "center" }}>
+              <Typography
+                component="h1"
+                variant="h5"
+                sx={{ mb: 2, textAlign: "center" }}
+              >
                 {isSuperAdminLogin ? "SuperAdmin Login" : "User Login"}
               </Typography>
 
@@ -206,97 +244,166 @@ const handleSubmit = async (event) => {
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                          <IconButton
+                            onClick={() => setShowPassword(!showPassword)}
+                            edge="end"
+                          >
                             {showPassword ? <VisibilityOff /> : <Visibility />}
                           </IconButton>
                         </InputAdornment>
                       ),
                     }}
                   />
-                  
-                  <FormControlLabel
-                      control={
-                        <Switch
-                          checked={isSuperAdminLogin}
-                          onChange={(e) => setIsSuperAdminLogin(e.target.checked)}
-                          name="superAdminToggle"
-                        />
-                      }
-                      label="Log in as SuperAdmin"
-                      sx={{ mb: 1, color: 'text.secondary', display: 'flex', justifyContent: 'center' }}
-                    />
 
-                  <Button type="submit" fullWidth variant="contained" color="primary" sx={{ mt: 2, mb: 2 }} disabled={loading}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={isSuperAdminLogin}
+                        onChange={(e) => setIsSuperAdminLogin(e.target.checked)}
+                        name="superAdminToggle"
+                      />
+                    }
+                    label="Log in as SuperAdmin"
+                    sx={{
+                      mb: 1,
+                      color: "text.secondary",
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  />
+
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    sx={{ mt: 2, mb: 2 }}
+                    disabled={loading}
+                  >
                     {loading ? "Signing In..." : "Sign In"}
                   </Button>
-                  
-               
+
                   {!isSuperAdminLogin && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                        <Typography
-                            variant="body2"
-                            sx={{ cursor: "pointer", color: "primary.main" }}
-                            onClick={() => setForgotPassword(true)} // Toggle the forgot password view
-                        >
-                            Forgot Password?
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mt: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ cursor: "pointer", color: "primary.main" }}
+                        onClick={() => setForgotPassword(true)} // Toggle the forgot password view
+                      >
+                        Forgot Password?
+                      </Typography>
+                      <Link
+                        to="/user/register"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <Typography variant="body2" color="primary">
+                          Register
                         </Typography>
-                        <Link to="/user/register" style={{ textDecoration: 'none' }}>
-                            <Typography variant="body2" color="primary">
-                                Register
-                            </Typography>
-                        </Link>
+                      </Link>
                     </Box>
                   )}
                 </form>
               )}
 
               {/* Forgot Password Form */}
-               {forgotPassword && (
-                 <Box sx={{ mt: 2 }}>
-                    {resetPasswordSuccess ? (
-                      <Box sx={{ textAlign: "center" }}>
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                          {resetPasswordSuccess}
+              {forgotPassword && (
+                <Box sx={{ mt: 2 }}>
+                  {resetPasswordSuccess ? (
+                    <Box sx={{ textAlign: "center" }}>
+                      <Alert severity="success" sx={{ mb: 2 }}>
+                        {resetPasswordSuccess}
+                      </Alert>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleBackToLogin}
+                        fullWidth
+                        sx={{ mt: 2 }}
+                      >
+                        Back to Login
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Typography variant="h6" align="center" sx={{ mb: 2 }}>
+                        Forgot Your Password?
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        align="center"
+                        color="text.secondary"
+                        sx={{ mb: 2 }}
+                      >
+                        Enter your email address below and we'll send you a link
+                        to reset your password.
+                      </Typography>
+                      {resetPasswordError && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                          {resetPasswordError}
                         </Alert>
-                        <Button variant="contained" color="primary" onClick={handleBackToLogin} fullWidth sx={{ mt: 2 }}>
+                      )}
+                      <form onSubmit={handleForgotPassword}>
+                        <TextField
+                          fullWidth
+                          label="Email Address"
+                          variant="outlined"
+                          margin="normal"
+                          value={forgotPasswordEmail}
+                          onChange={(e) =>
+                            setForgotPasswordEmail(e.target.value)
+                          }
+                          required
+                        />
+                        <Button
+                          type="submit"
+                          fullWidth
+                          variant="contained"
+                          color="primary"
+                          sx={{ mt: 2, mb: 1 }}
+                          disabled={isResettingPassword}
+                        >
+                          {isResettingPassword
+                            ? "Sending..."
+                            : "Send Reset Link"}
+                        </Button>
+                        <Button
+                          fullWidth
+                          variant="text"
+                          color="primary"
+                          onClick={handleBackToLogin}
+                        >
                           Back to Login
                         </Button>
-                      </Box>
-                    ) : (
-                      <Box>
-                        <Typography variant="h6" align="center" sx={{ mb: 2 }}>Forgot Your Password?</Typography>
-                        <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-                          Enter your email address below and we'll send you a link to reset your password.
-                        </Typography>
-                        {resetPasswordError && <Alert severity="error" sx={{ mb: 2 }}>{resetPasswordError}</Alert>}
-                        <form onSubmit={handleForgotPassword}>
-                          <TextField
-                            fullWidth
-                            label="Email Address"
-                            variant="outlined"
-                            margin="normal"
-                            value={forgotPasswordEmail}
-                            onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                            required
-                          />
-                          <Button type="submit" fullWidth variant="contained" color="primary" sx={{ mt: 2, mb: 1 }} disabled={isResettingPassword}>
-                            {isResettingPassword ? "Sending..." : "Send Reset Link"}
-                          </Button>
-                          <Button fullWidth variant="text" color="primary" onClick={handleBackToLogin}>
-                            Back to Login
-                          </Button>
-                        </form>
-                      </Box>
-                    )}
-                  </Box>
+                      </form>
+                    </Box>
+                  )}
+                </Box>
               )}
             </Box>
           </div>
           {/* Footer remains the same */}
           <div className="login-footer">
-             <p>Version: {process.env.REACT_APP_VERSION}</p>
-             <img src={require("../assets/images/alluvium-logo.webp")} alt="Alluvium Logo"/>
-             <p>Powered By: <a href="https://www.alluvium.in/" target="_blank" rel="noreferrer">AIVision | EXIM </a></p>
+            <p>Version: {process.env.REACT_APP_VERSION}</p>
+            <img
+              src={require("../assets/images/alluvium-logo.webp")}
+              alt="Alluvium Logo"
+            />
+            <p>
+              Powered By:{" "}
+              <a
+                href="https://www.alluvium.in/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                AIVision | EXIM{" "}
+              </a>
+            </p>
           </div>
         </Col>
       </Row>

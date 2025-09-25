@@ -24,22 +24,29 @@ const REFRESH_TOKEN_EXPIRES = process.env.JWT_REFRESH_EXPIRATION || "7d";
  */
 export const generateToken = (user) => {
   // Determine if the user is a SuperAdmin
-  const isSuperAdmin = user.constructor.modelName === 'SuperAdmin';
+  const isSuperAdmin = user.constructor.modelName === "SuperAdmin";
 
   return jwt.sign(
     {
       id: user._id,
-      ie_code_assignments: !isSuperAdmin ? (user.ie_code_assignments || [{
-        ie_code_no: user.ie_code_no,
-        importer_name: user.assignedImporterName,
-        assigned_at: user.ieCodeAssignedAt || new Date(),
-        is_primary: true
-      }]) : undefined,
+      ie_code_assignments: !isSuperAdmin
+        ? user.ie_code_assignments || [
+            {
+              ie_code_no: user.ie_code_no,
+              importer_name: user.assignedImporterName,
+              assigned_at: user.ieCodeAssignedAt || new Date(),
+              is_primary: true,
+            },
+          ]
+        : undefined,
       primary_ie_code: !isSuperAdmin ? user.ie_code_no : undefined,
       name: user.name,
-      role: isSuperAdmin ? 'superadmin' : (user.role || "customer"),
-      userType: isSuperAdmin ? 'superadmin' : 'user',
-      has_multiple_ie_codes: !isSuperAdmin && Array.isArray(user.ie_code_assignments) && user.ie_code_assignments.length > 0
+      role: isSuperAdmin ? "superadmin" : user.role || "customer",
+      userType: isSuperAdmin ? "superadmin" : "user",
+      has_multiple_ie_codes:
+        !isSuperAdmin &&
+        Array.isArray(user.ie_code_assignments) &&
+        user.ie_code_assignments.length > 0,
     },
     ACCESS_TOKEN_SECRET,
     {
@@ -58,15 +65,19 @@ export const generateRefreshToken = (user) => {
   return jwt.sign(
     {
       id: user._id,
-      ie_code_assignments: user.ie_code_assignments || [{
-        ie_code_no: user.ie_code_no,
-        importer_name: user.assignedImporterName,
-        assigned_at: user.ieCodeAssignedAt || new Date(),
-        is_primary: true
-      }],
+      ie_code_assignments: user.ie_code_assignments || [
+        {
+          ie_code_no: user.ie_code_no,
+          importer_name: user.assignedImporterName,
+          assigned_at: user.ieCodeAssignedAt || new Date(),
+          is_primary: true,
+        },
+      ],
       primary_ie_code: user.ie_code_no,
       role: user.role,
-      has_multiple_ie_codes: Array.isArray(user.ie_code_assignments) && user.ie_code_assignments.length > 0
+      has_multiple_ie_codes:
+        Array.isArray(user.ie_code_assignments) &&
+        user.ie_code_assignments.length > 0,
     },
     REFRESH_TOKEN_SECRET,
     {
@@ -85,14 +96,18 @@ export const generateSSOToken = (user) => {
     {
       sub: user._id || user.id, // Standard JWT subject field
       ie_code_no: user.primary_ie_code || user.ie_code_no, // Primary IE code for backward compatibility
-      ie_code_assignments: user.ie_code_assignments || [{
-        ie_code_no: user.ie_code_no,
-        importer_name: user.assignedImporterName,
-        assigned_at: user.ieCodeAssignedAt || new Date(),
-        is_primary: true
-      }],
+      ie_code_assignments: user.ie_code_assignments || [
+        {
+          ie_code_no: user.ie_code_no,
+          importer_name: user.assignedImporterName,
+          assigned_at: user.ieCodeAssignedAt || new Date(),
+          is_primary: true,
+        },
+      ],
       name: user.name,
-      has_multiple_ie_codes: Array.isArray(user.ie_code_assignments) && user.ie_code_assignments.length > 0
+      has_multiple_ie_codes:
+        Array.isArray(user.ie_code_assignments) &&
+        user.ie_code_assignments.length > 0,
       // exp and iat are automatically added by jwt.sign()
     },
     ACCESS_TOKEN_SECRET,
@@ -173,11 +188,12 @@ export const authenticate = async (req, res, next) => {
       (req.cookies && req.cookies.customer_admin_access_token) ||
       (req.cookies && req.cookies.user_access_token) ||
       (req.headers.authorization && req.headers.authorization.split(" ")[1]) ||
-      (req.headers.authorization && req.headers.authorization.replace("Bearer ", ""));
+      (req.headers.authorization &&
+        req.headers.authorization.replace("Bearer ", ""));
 
     if (!token) {
       // Log only specific routes or in debug mode to reduce log noise
-      if (process.env.NODE_ENV === 'development' && process.env.DEBUG_AUTH) {
+      if (process.env.NODE_ENV === "development" && process.env.DEBUG_AUTH) {
         console.log("No token provided for protected route:", req.path);
         console.log("Cookies:", req.cookies);
         console.log("Authorization header:", req.headers.authorization);
@@ -193,31 +209,29 @@ export const authenticate = async (req, res, next) => {
 
     // Try to find the user in different models based on their role
     let user = null;
-    let userType = decoded.role || decoded.userType || 'user';
+    let userType = decoded.role;
 
-    console.log('Token decoded:', { 
-      id: decoded.id,
-      role: decoded.role,
-      userType: decoded.userType 
-    });
+  
 
     // First try SuperAdmin model for superadmin role
-    if (userType === 'superadmin') {
+    if (userType === "superadmin") {
       user = await SuperAdminModel.findById(decoded.id);
-      if (user) userType = 'superadmin';
-    } 
-    
+      if (user) userType = "superadmin";
+    }
+
     // If not found or not superadmin, try EximclientUser model
     if (!user) {
       user = await EximclientUser.findById(decoded.id);
       if (user) {
         // For EximclientUser, determine if they're admin or regular user
-        userType = user.role === 'admin' ? 'admin' : 'user';
+        userType = user.role === "admin" ? "admin" : "user";
       }
     }
 
     if (!user) {
-      console.log(`User with ID ${decoded.id} not found in ${userType} collection`);
+      console.log(
+        `User with ID ${decoded.id} not found in ${userType} collection`
+      );
       return res.status(401).json({
         success: false,
         message: "Authentication failed. User not found.",
@@ -225,7 +239,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     // Check if user is active (for non-superadmin users)
-    if (userType !== 'superadmin' && !user.isActive) {
+    if (userType !== "superadmin" && !user.isActive) {
       console.log(`User account is inactive: ${decoded.id}`);
       return res.status(401).json({
         success: false,
@@ -236,16 +250,21 @@ export const authenticate = async (req, res, next) => {
     // Store sanitized user information in request object
     req.user = {
       id: user._id,
-      ie_code_assignments: userType !== 'superadmin' ? (user.ie_code_assignments || [{
-        ie_code_no: user.ie_code_no,
-        importer_name: user.assignedImporterName
-      }]) : [],
+      ie_code_assignments:
+        userType !== "superadmin"
+          ? user.ie_code_assignments || [
+              {
+                ie_code_no: user.ie_code_no,
+                importer_name: user.assignedImporterName,
+              },
+            ]
+          : [],
       name: user.name,
       role: userType, // Use the determined userType as role
       isActive: user.isActive,
       assignedModules: user.assignedModules || [],
       email: user.email,
-      _id: user._id // Include both id and _id for compatibility
+      _id: user._id, // Include both id and _id for compatibility
     };
 
     next();
@@ -386,21 +405,29 @@ export const sanitizeUserData = (user) => {
     id: user._id,
     name: user.name,
     email: user.email,
-    role: user.role || 'user',
+    role: user.role || "user",
     isActive: user.isActive || false,
-    ie_code_assignments: user.ie_code_assignments || (user.ie_code_no ? [{
-      ie_code_no: user.ie_code_no,
-      importer_name: user.assignedImporterName,
-      assigned_at: user.ieCodeAssignedAt || new Date(),
-      is_primary: true
-    }] : []),
+    ie_code_assignments:
+      user.ie_code_assignments ||
+      (user.ie_code_no
+        ? [
+            {
+              ie_code_no: user.ie_code_no,
+              importer_name: user.assignedImporterName,
+              assigned_at: user.ieCodeAssignedAt || new Date(),
+              is_primary: true,
+            },
+          ]
+        : []),
     primary_ie_code: user.ie_code_no, // Primary IE code for compatibility
     ie_code_no: user.ie_code_no, // Keep for backward compatibility
-    has_multiple_ie_codes: Array.isArray(user.ie_code_assignments) && user.ie_code_assignments.length > 0,
+    has_multiple_ie_codes:
+      Array.isArray(user.ie_code_assignments) &&
+      user.ie_code_assignments.length > 0,
     role: user.role || "user",
     isActive: user.isActive,
     lastLogin: user.lastLogin,
-    documents: user.documents
+    documents: user.documents,
   };
 
   // Additional fields if they exist in the user object
@@ -421,10 +448,9 @@ export const sanitizeUserData = (user) => {
     "gandhidhamTabVisible",
     "modules",
     "assignedModules",
-    "isAdmin",  // Added isAdmin field
+    "isAdmin", // Added isAdmin field
     "emailVerified",
-    "documents"
-    
+    "documents",
   ];
 
   additionalFields.forEach((field) => {
@@ -434,8 +460,10 @@ export const sanitizeUserData = (user) => {
   });
 
   // Add tab visibility fields
-  if (user.jobsTabVisible !== undefined) sanitized.jobsTabVisible = user.jobsTabVisible;
-  if (user.gandhidhamTabVisible !== undefined) sanitized.gandhidhamTabVisible = user.gandhidhamTabVisible;
+  if (user.jobsTabVisible !== undefined)
+    sanitized.jobsTabVisible = user.jobsTabVisible;
+  if (user.gandhidhamTabVisible !== undefined)
+    sanitized.gandhidhamTabVisible = user.gandhidhamTabVisible;
 
   return sanitized;
 };
@@ -446,7 +474,7 @@ export const sanitizeUserData = (user) => {
  * @param {String} userType - Type of user (user, admin, superadmin)
  * @returns {String} JWT token
  */
-export const generateUserToken = (user, userType = 'user') => {
+export const generateUserToken = (user, userType = "user") => {
   const payload = {
     id: user._id,
     email: user.email,
@@ -457,12 +485,11 @@ export const generateUserToken = (user, userType = 'user') => {
   };
 
   // Add specific fields based on user type
-  if (userType === 'user' || userType === 'admin') {
+  if (userType === "user" || userType === "admin") {
     payload.ie_code_no = user.ie_code_no;
-    
   }
-  
-  if (userType === 'user') {
+
+  if (userType === "user") {
     payload.status = user.status;
     payload.adminId = user.adminId;
   }
@@ -480,7 +507,7 @@ export const authenticateUser = async (req, res, next) => {
   try {
     // Get token from cookie or Authorization header
     const token =
-      (req.cookies && req.cookies.user_access_token) || 
+      (req.cookies && req.cookies.user_access_token) ||
       (req.headers.authorization && req.headers.authorization.split(" ")[1]);
 
     if (!token) {
@@ -492,17 +519,20 @@ export const authenticateUser = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
-    
+
     // Get user based on type
     let user;
     switch (decoded.userType) {
-      case 'user':
-        user = await EximclientUser.findById(decoded.id).populate('adminId', 'name email ie_code_no');
+      case "user":
+        user = await EximclientUser.findById(decoded.id).populate(
+          "adminId",
+          "name email ie_code_no"
+        );
         break;
-      case 'admin':
+      case "admin":
         user = await AdminModel.findById(decoded.id);
         break;
-      case 'superadmin':
+      case "superadmin":
         user = await SuperAdminModel.findById(decoded.id);
         break;
       default:
@@ -528,17 +558,18 @@ export const authenticateUser = async (req, res, next) => {
     }
 
     // For users, check if they're verified
-    if (decoded.userType === 'user' && user.status === 'pending') {
+    if (decoded.userType === "user" && user.status === "pending") {
       return res.status(403).json({
         success: false,
-        message: "Account pending verification. Please wait for admin approval.",
+        message:
+          "Account pending verification. Please wait for admin approval.",
       });
     }
 
     // Attach user to request
     req.user = user;
     req.userType = decoded.userType;
-    
+
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError") {
@@ -547,7 +578,7 @@ export const authenticateUser = async (req, res, next) => {
         message: "Invalid token.",
       });
     }
-    
+
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
@@ -590,24 +621,24 @@ export const authenticateUser = async (req, res, next) => {
 // Helper function to check if a user has access to a specific IE code
 export const hasIECodeAccess = (user, ieCodeNo) => {
   if (!user || !ieCodeNo) return false;
-  
+
   // For superadmin role, always allow access
-  if (user.role === 'superadmin') return true;
-  
+  if (user.role === "superadmin") return true;
+
   // Check in ie_code_assignments array
   if (user.ie_code_assignments?.length > 0) {
     return user.ie_code_assignments.some(
-      assignment => assignment.ie_code_no === ieCodeNo.toUpperCase()
+      (assignment) => assignment.ie_code_no === ieCodeNo.toUpperCase()
     );
   }
-  
+
   // Fallback for legacy data
   return user.ie_code_no === ieCodeNo.toUpperCase();
 };
 
 export const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || (Object.keys(req.user).length === 0)) {
+    if (!req.user || Object.keys(req.user).length === 0) {
       return res.status(401).json({
         success: false,
         message: "Authentication required.",
@@ -617,10 +648,10 @@ export const authorize = (...roles) => {
     const userPermission = req.user.role || req.userType;
 
     if (!userPermission) {
-        return res.status(403).json({
-            success: false,
-            message: "Permission property not found on user object.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Permission property not found on user object.",
+      });
     }
 
     // THIS IS THE FIX: Only check for roles if the 'roles' array is not empty.
@@ -648,13 +679,14 @@ export const checkIECodeAccess = async (req, res, next) => {
     }
 
     // SuperAdmin has access to all IE codes
-    if (req.userType === 'superadmin') {
+    if (req.userType === "superadmin") {
       return next();
     }
 
     // Get IE code from request (params, body, or query)
-    const targetIECode = req.params.ie_code_no || req.body.ie_code_no || req.query.ie_code_no;
-    
+    const targetIECode =
+      req.params.ie_code_no || req.body.ie_code_no || req.query.ie_code_no;
+
     if (!targetIECode) {
       return res.status(400).json({
         success: false,
@@ -663,9 +695,10 @@ export const checkIECodeAccess = async (req, res, next) => {
     }
 
     // Check if user has access to this IE code
-    const hasAccess = req.user.ie_code_assignments?.some(
-      assignment => assignment.ie_code_no === targetIECode.toUpperCase()
-    ) || req.user.ie_code_no === targetIECode.toUpperCase(); // Fallback for legacy data
+    const hasAccess =
+      req.user.ie_code_assignments?.some(
+        (assignment) => assignment.ie_code_no === targetIECode.toUpperCase()
+      ) || req.user.ie_code_no === targetIECode.toUpperCase(); // Fallback for legacy data
 
     if (!hasAccess) {
       return res.status(403).json({
@@ -687,7 +720,13 @@ export const checkIECodeAccess = async (req, res, next) => {
 /**
  * Send authentication response for new user system
  */
-export const sendUserAuthResponse = (user, userType, statusCode, res, includeTokens = false) => {
+export const sendUserAuthResponse = (
+  user,
+  userType,
+  statusCode,
+  res,
+  includeTokens = false
+) => {
   const accessToken = generateUserToken(user, userType);
   const refreshToken = generateRefreshToken(user);
 

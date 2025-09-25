@@ -15,7 +15,7 @@ router.use(authorize('superadmin'));
 
 // Single user IE code management
 router.post('/users/:userId/ie-codes', assignAdditionalIeCode);
-router.delete('/users/:userId/ie-codes/:ieCodeNo', removeIeCodeFromUser);
+router.delete('/users/:userId/ie-codes/remove-ie-codes', removeIeCodeFromUser);
 router.get('/users/:userId/ie-codes', listUserIeCodes);
 
 // Bulk IE code management

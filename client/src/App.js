@@ -26,9 +26,9 @@ import ModuleAccessManagement from "./components/SuperAdmin/ModuleAccessManageme
 import SuperAdminCustomerDetail from "./pages/SuperAdminCustomerDetail.jsx";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage.jsx";
 import ImportVideoPage from "./pages/ImportVideoPage";
-import UserManagement from "./pages/UserManagement/UserManagement.jsx"
+import UserManagement from "./pages/UserManagement/UserManagement.jsx";
 import EmailVerification from "./pages/EmailVerification.jsx";
-import ResetPasswordPage from "./pages/ResetPasswordPage.jsx"
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 
 // Protected route component for backward compatibility
@@ -40,12 +40,13 @@ const LegacyProtectedRoute = ({ children }) => {
   const isAuthenticated = localStorage.getItem("exim_user") !== null;
 
   // Don't interfere with SuperAdmin routes - but still call useEffect
-  const shouldBypass = location.pathname.startsWith('/superadmin-dashboard') || 
-                      location.pathname.startsWith('/module-access-management') ||
-                      location.pathname === '/login' ||
-                      location.pathname === '/user/login' ||
-                      location.pathname === '/admin/login' ||
-                      location.pathname === '/superadmin/login';
+  const shouldBypass =
+    location.pathname.startsWith("/superadmin-dashboard") ||
+    location.pathname.startsWith("/module-access-management") ||
+    location.pathname === "/login" ||
+    location.pathname === "/user/login" ||
+    location.pathname === "/admin/login" ||
+    location.pathname === "/superadmin/login";
 
   useEffect(() => {
     if (!shouldBypass && !isAuthenticated && location.pathname !== "/login") {
@@ -81,72 +82,146 @@ function App() {
               <Routes>
                 {/* Main login route - keep only one */}
                 <Route path="/login" element={<LoginPage />} />
-                
+
                 {/* Specific login routes */}
                 <Route path="/user/login" element={<UserLoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
-                
+
                 {/* User system routes */}
-                <Route path="/user/register" element={<UserRegistrationPage />} />
-                <Route path="/verify-email/:token" element={<EmailVerification />} />
-                <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-                <Route path="/user/dashboard" element={
-                  localStorage.getItem("exim_user") ? <UserDashboard /> : <LoginPage />
-                } />
-                
+                <Route
+                  path="/user/register"
+                  element={<UserRegistrationPage />}
+                />
+                <Route
+                  path="/verify-email/:token"
+                  element={<EmailVerification />}
+                />
+                <Route
+                  path="/reset-password/:token"
+                  element={<ResetPasswordPage />}
+                />
+                <Route
+                  path="/user/dashboard"
+                  element={
+                    localStorage.getItem("exim_user") ? (
+                      <UserDashboard />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
+
                 {/* Admin routes */}
-                <Route path="/customer-admin/dashboard" element={
-                  localStorage.getItem("exim_admin") ? <CustomerAdminDashboard /> : <AdminLoginPage />
-                } />
-                
+                <Route
+                  path="/customer-admin/dashboard"
+                  element={
+                    localStorage.getItem("exim_admin") ? (
+                      <CustomerAdminDashboard />
+                    ) : (
+                      <AdminLoginPage />
+                    )
+                  }
+                />
+
                 {/* SuperAdmin routes */}
-                <Route path="/superadmin-dashboard" element={
-                  localStorage.getItem("superadmin_user") ? <SuperAdminLayout /> : <SuperAdminLoginPage />
-                }>
+                <Route
+                  path="/superadmin-dashboard"
+                  element={
+                    localStorage.getItem("superadmin_user") ? (
+                      <SuperAdminLayout />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                >
                   <Route index element={<SuperAdminDashboard />} />
-                  <Route path="customer/:customerId" element={<SuperAdminCustomerDetail />} />
+                  <Route
+                    path="customer/:customerId"
+                    element={<SuperAdminCustomerDetail />}
+                  />
                 </Route>
-                <Route path="/module-access-management" element={
-                  localStorage.getItem("superadmin_user") ? <ModuleAccessManagement /> : <SuperAdminLoginPage />
-                } />
+                <Route
+                  path="/module-access-management"
+                  element={
+                    localStorage.getItem("superadmin_user") ? (
+                      <ModuleAccessManagement />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
 
                 {/* Legacy customer routes */}
-                <Route path="/" element={
-                  localStorage.getItem("exim_user") ? <UserDashboard /> : <LoginPage />
-                } />
-                <Route path="/netpage" element={
-                  localStorage.getItem("exim_user") ? <NetPage /> : <LoginPage />
-                } />
+                <Route
+                  path="/"
+                  element={
+                    localStorage.getItem("exim_user") ? (
+                      <UserDashboard />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
+                <Route
+                  path="/netpage"
+                  element={
+                    localStorage.getItem("exim_user") ? (
+                      <NetPage />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
                 <Route
                   path="/importdsr"
                   element={
-                    localStorage.getItem("exim_user") ? <AppbarComponent /> : <LoginPage />
+                    localStorage.getItem("exim_user") ? (
+                      <AppbarComponent />
+                    ) : (
+                      <LoginPage />
+                    )
                   }
                 />
-                <Route path="/trademasterguide" element={
-                  localStorage.getItem("exim_user") ? <ImportVideoPage /> : <LoginPage />
-                } />
-                
-                <Route path="/user/profile" element = {
-                  localStorage.getItem("exim_user") ? <UserProfile /> : <LoginPage />
-                } />
+                <Route
+                  path="/trademasterguide"
+                  element={
+                    localStorage.getItem("exim_user") ? (
+                      <ImportVideoPage />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
+
+                <Route
+                  path="/user/profile"
+                  element={
+                    localStorage.getItem("exim_user") ? (
+                      <UserProfile />
+                    ) : (
+                      <LoginPage />
+                    )
+                  }
+                />
                 {/* User Management route - check for admin role */}
-                <Route path="/user-management" element={
-                  (() => {
+                <Route
+                  path="/user-management"
+                  element={(() => {
                     const user = localStorage.getItem("exim_user");
                     if (!user) return <LoginPage />;
-                    
+
                     try {
                       const userData = JSON.parse(user);
-                      const isAdmin = userData.role === 'admin' || userData.role === 'superadmin';
+                      const isAdmin =
+                        userData.role === "admin" ||
+                        userData.role === "superadmin";
                       return isAdmin ? <UserManagement /> : <LoginPage />;
                     } catch (error) {
-                      console.error('Error parsing user data:', error);
+                      console.error("Error parsing user data:", error);
                       return <LoginPage />;
                     }
-                  })()
-                } />
+                  })()}
+                />
               </Routes>
             </BrowserRouter>
           </ImportersProvider>
