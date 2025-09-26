@@ -164,12 +164,8 @@ function LoginPage() {
   };
 
   return (
-    <Container
-      fluid
-      className="login-container"
-      style={{ height: "100vh", overflow: "hidden" }}
-    >
-      <Row className="login-row m-0" style={{ height: "100%" }}>
+    <Container fluid className="login-container">
+      <Row className="login-row m-0" style={{ height: "100vh" }}>
         <Col md={6} className="login-left-col p-0"></Col>
         <Col
           md={6}
@@ -178,7 +174,6 @@ function LoginPage() {
             display: "flex",
             flexDirection: "column",
             height: "100vh",
-            overflow: "auto",
           }}
         >
           <div
@@ -388,22 +383,54 @@ function LoginPage() {
             </Box>
           </div>
           {/* Footer remains the same */}
-          <div className="login-footer">
-            <p>Version: {process.env.REACT_APP_VERSION}</p>
-            <img
-              src={require("../assets/images/alluvium-logo.webp")}
-              alt="Alluvium Logo"
-            />
-            <p>
+          <div
+            className="login-footer"
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "1rem 2rem",
+
+              boxSizing: "border-box",
+              fontSize: "1rem",
+            }}
+          >
+            {/* Left: Version */}
+            <div style={{ flex: 1, textAlign: "left", color: "#141414ff" }}>
+              Version: {process.env.REACT_APP_VERSION}
+            </div>
+
+            {/* Center: Logo */}
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <img
+                src={require("../assets/images/output-onlinegiftools.gif")}
+                alt="Novusha  Logo"
+                style={{
+                  height: "150px",
+                  maxWidth: "175px",
+                  objectFit: "contain",
+                }}
+              />
+            </div>
+
+            {/* Right: Powered by */}
+            <div style={{ flex: 1, textAlign: "right", color: "#000000ff" }}>
               Powered By:{" "}
               <a
-                href="https://www.alluvium.in/"
+                href="https://www.novusha.com/"
                 target="_blank"
                 rel="noreferrer"
+                style={{
+                  color: "#000000ff",
+                  textDecoration: "none",
+                  fontWeight: 400,
+                }}
               >
-                AIVision | EXIM{" "}
+                Novusha Consulting
+                <br></br>Service India LLP. | EXIM
               </a>
-            </p>
+            </div>
           </div>
         </Col>
       </Row>

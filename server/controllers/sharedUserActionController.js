@@ -9,22 +9,25 @@ import { logActivity } from "../utils/activityLogger.js";
  * Utility function to check if actor can manage target user based on IE code assignments
  */
 const canManageUser = (actor, targetUser) => {
-  if (actor.role === 'superadmin') return true;
-  
-  if (actor.role === 'admin') {
+  if (actor.role === "superadmin") return true;
+
+  if (actor.role === "admin") {
     // Get actor's assigned IE codes
-    const actorIeCodes = actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no];
-    
+    const actorIeCodes = actor.ie_code_assignments?.map(
+      (a) => a.ie_code_no
+    ) || [actor.ie_code_no];
+
     // Get target user's assigned IE codes
-    const targetIeCodes = targetUser.ie_code_assignments?.map(a => a.ie_code_no) || [targetUser.ie_code_no];
-    
+    const targetIeCodes = targetUser.ie_code_assignments?.map(
+      (a) => a.ie_code_no
+    ) || [targetUser.ie_code_no];
+
     // Check if there's any overlap between actor's and target's IE codes
-    return targetIeCodes.some(code => actorIeCodes.includes(code));
+    return targetIeCodes.some((code) => actorIeCodes.includes(code));
   }
 
   return false;
 };
-
 
 /**
  * Generic function to promote a user to an admin.
@@ -35,55 +38,66 @@ export const promoteUserToAdmin = async (req, res) => {
     // 1. Identify the actor (who is making the request)
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
     const user = await EximclientUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
-    
+
     // 2. Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Forbidden: You can only manage users within your assigned IE Codes." 
+      return res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
     // Get the primary IE code for customer lookup (use first assignment or legacy field)
-    const primaryIeCode = user.ie_code_assignments?.[0]?.ie_code_no || user.ie_code_no;
-    
+    const primaryIeCode =
+      user.ie_code_assignments?.[0]?.ie_code_no || user.ie_code_no;
+
     const customer = await CustomerModel.findOne({ ie_code_no: primaryIeCode });
     if (!customer) {
-      return res.status(400).json({ success: false, message: `No customer found with IE code ${primaryIeCode}.` });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `No customer found with IE code ${primaryIeCode}.`,
+        });
     }
 
-    if (customer.role === 'admin') {
-      return res.status(400).json({ success: false, message: "This customer is already an admin." });
+    if (user.role === "admin") {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "This customer is already an adminnn.",
+        });
     }
 
     // Update records
-    user.role = 'admin';
+    user.role = "admin";
     await user.save();
 
-    customer.role = 'admin';
-    customer.roleGrantedBy = actor.id;
-    customer.roleGrantedAt = new Date();
-    await customer.save();
-
-    
-
+   
     res.json({
       success: true,
       message: "User promoted to admin successfully.",
       data: { user, customer },
     });
-
   } catch (error) {
     console.error("Promote user to admin error:", error);
-    res.status(500).json({ success: false, message: "Failed to promote user to admin." });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to promote user to admin." });
   }
 };
 
@@ -95,55 +109,67 @@ export const demoteUserFromAdmin = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
     const user = await EximclientUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
-    
+
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Forbidden: You can only manage users within your assigned IE Codes." 
+      return res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
-    if (user.role !== 'admin') {
-      return res.status(400).json({ success: false, message: "User is not currently an admin." });
+    if (user.role !== "admin") {
+      return res
+        .status(400)
+        .json({ success: false, message: "User is not currently an admin." });
     }
 
     // Get the primary IE code for customer lookup
-    const primaryIeCode = user.ie_code_assignments?.[0]?.ie_code_no || user.ie_code_no;
-    
+    const primaryIeCode =
+      user.ie_code_assignments?.[0]?.ie_code_no || user.ie_code_no;
+
     const customer = await CustomerModel.findOne({ ie_code_no: primaryIeCode });
     if (!customer) {
-      return res.status(400).json({ success: false, message: "No customer found with this IE code." });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "No customer found with this IE code.",
+        });
     }
 
     // Update records
-    user.role = 'user'; // Changed from 'customer' to 'user' to match schema
+    user.role = "user"; // Changed from 'customer' to 'user' to match schema
     await user.save();
 
-    customer.role = 'customer';
+    customer.role = "customer";
     customer.roleGrantedBy = null;
     customer.roleGrantedAt = null;
     await customer.save();
 
-
-
     res.json({
       success: true,
       message: "User demoted from admin successfully.",
-      data: { user, customer }
+      data: { user, customer },
     });
-
   } catch (error) {
     console.error("Demote user from admin error:", error);
-    res.status(500).json({ success: false, message: "Failed to demote user from admin." });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to demote user from admin." });
   }
 };
 
@@ -155,28 +181,33 @@ export const updateUserStatus = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
-    console.log('req.superAdmin',  req.superAdmin);
-    console.log('actor', actor);
-    
+    console.log("req.superAdmin", req.superAdmin);
+    console.log("actor", actor);
+
     const { userId } = req.params;
     const { status, reason } = req.body; // Changed from isActive to status for consistency
 
     const user = await EximclientUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
-    
+
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Forbidden: You can only manage users within your assigned IE Codes." 
+      return res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
-    const isActive = status === 'active';
+    const isActive = status === "active";
 
     // Update user status
     user.isActive = isActive;
@@ -186,17 +217,15 @@ export const updateUserStatus = async (req, res) => {
     }
     await user.save();
 
-   
- 
-
     res.json({
       success: true,
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      message: `User ${isActive ? "activated" : "deactivated"} successfully.`,
     });
-
   } catch (error) {
     console.error("Update user status error:", error);
-    res.status(500).json({ success: false, message: "Failed to update user status." });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update user status." });
   }
 };
 
@@ -210,21 +239,28 @@ export const getCustomerTabVisibility = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
-    const user = await EximclientUser.findById(userId).select("jobsTabVisible gandhidhamTabVisible ie_code_assignments ie_code_no");
+    const user = await EximclientUser.findById(userId).select(
+      "jobsTabVisible gandhidhamTabVisible ie_code_assignments ie_code_no"
+    );
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: You can only view users within your assigned IE Codes."
+        message:
+          "Forbidden: You can only view users within your assigned IE Codes.",
       });
     }
 
@@ -233,11 +269,16 @@ export const getCustomerTabVisibility = async (req, res) => {
       data: {
         jobsTabVisible: user.jobsTabVisible,
         gandhidhamTabVisible: user.gandhidhamTabVisible,
-      }
+      },
     });
   } catch (error) {
     console.error("Error fetching customer tab visibility:", error);
-    res.status(500).json({ success: false, message: "Error fetching customer tab visibility" });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error fetching customer tab visibility",
+      });
   }
 };
 
@@ -249,7 +290,9 @@ export const updateCustomerTabVisibility = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
@@ -257,20 +300,23 @@ export const updateCustomerTabVisibility = async (req, res) => {
 
     const user = await EximclientUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: You can only manage users within your assigned IE Codes."
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
     const previousSettings = {
       jobsTabVisible: user.jobsTabVisible,
-      gandhidhamTabVisible: user.gandhidhamTabVisible
+      gandhidhamTabVisible: user.gandhidhamTabVisible,
     };
 
     if (typeof jobsTabVisible === "boolean") {
@@ -282,18 +328,22 @@ export const updateCustomerTabVisibility = async (req, res) => {
 
     await user.save();
 
-  
     res.json({
       success: true,
       message: "User tab visibility updated successfully.",
       data: {
         jobsTabVisible: user.jobsTabVisible,
         gandhidhamTabVisible: user.gandhidhamTabVisible,
-      }
+      },
     });
   } catch (error) {
     console.error("Error updating user tab visibility:", error);
-    res.status(500).json({ success: false, message: "Error updating customer tab visibility" });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error updating customer tab visibility",
+      });
   }
 };
 
@@ -315,12 +365,12 @@ export const getAvailableColumns = async (req, res) => {
       { id: "movement_timeline", name: "Movement Timeline" },
       { id: "esanchit_documents", name: "eSanchit Documents" },
       { id: "doPlanning", name: "DO Planning" },
-      { id: "delivery_planning", name: "Delivery Planning" }
+      { id: "delivery_planning", name: "Delivery Planning" },
     ];
 
     res.status(200).json({
       success: true,
-      data: availableColumns
+      data: availableColumns,
     });
   } catch (error) {
     console.error("Error fetching available columns:", error);
@@ -340,11 +390,15 @@ export const getUserColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
-    const user = await EximclientUser.findById(userId).select('name email ie_code_assignments ie_code_no allowedColumns role');
+    const user = await EximclientUser.findById(userId).select(
+      "name email ie_code_assignments ie_code_no allowedColumns role"
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -355,9 +409,10 @@ export const getUserColumnPermissions = async (req, res) => {
 
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Forbidden: You can only manage users within your assigned IE Codes." 
+      return res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
@@ -371,11 +426,10 @@ export const getUserColumnPermissions = async (req, res) => {
           ie_code_assignments: user.ie_code_assignments,
           ie_code_no: user.ie_code_no, // Legacy field
           role: user.role,
-          allowedColumns: user.allowedColumns || []
-        }
+          allowedColumns: user.allowedColumns || [],
+        },
       },
     });
-
   } catch (error) {
     console.error("Error fetching user column permissions:", error);
     res.status(500).json({
@@ -394,7 +448,9 @@ export const updateUserColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
@@ -417,9 +473,10 @@ export const updateUserColumnPermissions = async (req, res) => {
 
     // Security check using multiple IE codes
     if (!canManageUser(actor, user)) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Forbidden: You can only manage users within your assigned IE Codes." 
+      return res.status(403).json({
+        success: false,
+        message:
+          "Forbidden: You can only manage users within your assigned IE Codes.",
       });
     }
 
@@ -430,9 +487,11 @@ export const updateUserColumnPermissions = async (req, res) => {
     user.allowedColumns = allowedColumns;
     await user.save();
 
-
-
-    console.log(`Column permissions updated for user ${user.name} by ${actor.role || 'superadmin'}`);
+    console.log(
+      `Column permissions updated for user ${user.name} by ${
+        actor.role || "superadmin"
+      }`
+    );
 
     res.status(200).json({
       success: true,
@@ -442,10 +501,9 @@ export const updateUserColumnPermissions = async (req, res) => {
         name: user.name,
         email: user.email,
         ie_code_assignments: user.ie_code_assignments,
-        allowedColumns: user.allowedColumns
+        allowedColumns: user.allowedColumns,
       },
     });
-
   } catch (error) {
     console.error("Error updating user column permissions:", error);
     res.status(500).json({
@@ -463,11 +521,15 @@ export const getCustomerColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { customerId } = req.params;
-    const customer = await CustomerModel.findById(customerId).select('name ie_code_no allowedColumns');
+    const customer = await CustomerModel.findById(customerId).select(
+      "name ie_code_no allowedColumns"
+    );
 
     if (!customer) {
       return res.status(404).json({
@@ -477,12 +539,15 @@ export const getCustomerColumnPermissions = async (req, res) => {
     }
 
     // Security check for customers (simplified - single IE code check)
-    if (actor.role === 'admin') {
-      const actorIeCodes = actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no];
+    if (actor.role === "admin") {
+      const actorIeCodes = actor.ie_code_assignments?.map(
+        (a) => a.ie_code_no
+      ) || [actor.ie_code_no];
       if (!actorIeCodes.includes(customer.ie_code_no)) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Forbidden: You can only manage customers within your assigned IE Codes." 
+        return res.status(403).json({
+          success: false,
+          message:
+            "Forbidden: You can only manage customers within your assigned IE Codes.",
         });
       }
     }
@@ -494,11 +559,10 @@ export const getCustomerColumnPermissions = async (req, res) => {
           id: customer._id,
           name: customer.name,
           ie_code_no: customer.ie_code_no,
-          allowedColumns: customer.allowedColumns || []
-        }
+          allowedColumns: customer.allowedColumns || [],
+        },
       },
     });
-
   } catch (error) {
     console.error("Error fetching customer column permissions:", error);
     res.status(500).json({
@@ -516,7 +580,9 @@ export const updateCustomerColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { customerId } = req.params;
@@ -538,12 +604,15 @@ export const updateCustomerColumnPermissions = async (req, res) => {
     }
 
     // Security check for customers (simplified - single IE code check)
-    if (actor.role === 'admin') {
-      const actorIeCodes = actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no];
+    if (actor.role === "admin") {
+      const actorIeCodes = actor.ie_code_assignments?.map(
+        (a) => a.ie_code_no
+      ) || [actor.ie_code_no];
       if (!actorIeCodes.includes(customer.ie_code_no)) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Forbidden: You can only manage customers within your assigned IE Codes." 
+        return res.status(403).json({
+          success: false,
+          message:
+            "Forbidden: You can only manage customers within your assigned IE Codes.",
         });
       }
     }
@@ -555,8 +624,11 @@ export const updateCustomerColumnPermissions = async (req, res) => {
     customer.allowedColumns = allowedColumns;
     await customer.save();
 
-  
-    console.log(`Column permissions updated for customer ${customer.name} (${customer.ie_code_no}) by ${actor.role || 'superadmin'}`);
+    console.log(
+      `Column permissions updated for customer ${customer.name} (${
+        customer.ie_code_no
+      }) by ${actor.role || "superadmin"}`
+    );
 
     res.status(200).json({
       success: true,
@@ -565,10 +637,9 @@ export const updateCustomerColumnPermissions = async (req, res) => {
         id: customer._id,
         name: customer.name,
         ie_code_no: customer.ie_code_no,
-        allowedColumns: customer.allowedColumns
+        allowedColumns: customer.allowedColumns,
       },
     });
-
   } catch (error) {
     console.error("Error updating customer column permissions:", error);
     res.status(500).json({
@@ -587,7 +658,9 @@ export const bulkUpdateUserColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userIds, allowedColumns } = req.body;
@@ -608,32 +681,33 @@ export const bulkUpdateUserColumnPermissions = async (req, res) => {
 
     // Build query with IE code restrictions for admins
     let query = { _id: { $in: userIds } };
-    
-    if (actor.role === 'admin') {
-      const actorIeCodes = actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no];
+
+    if (actor.role === "admin") {
+      const actorIeCodes = actor.ie_code_assignments?.map(
+        (a) => a.ie_code_no
+      ) || [actor.ie_code_no];
       query.$or = [
-        { 'ie_code_assignments.ie_code_no': { $in: actorIeCodes } },
-        { ie_code_no: { $in: actorIeCodes } } // Legacy field support
+        { "ie_code_assignments.ie_code_no": { $in: actorIeCodes } },
+        { ie_code_no: { $in: actorIeCodes } }, // Legacy field support
       ];
     }
 
-    const result = await EximclientUser.updateMany(
-      query,
-      { allowedColumns }
+    const result = await EximclientUser.updateMany(query, { allowedColumns });
+
+    console.log(
+      `Bulk column permissions updated for ${result.modifiedCount} users by ${
+        actor.role || "superadmin"
+      }`
     );
-
-
-    console.log(`Bulk column permissions updated for ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
 
     res.status(200).json({
       success: true,
       message: `Column permissions updated for ${result.modifiedCount} users`,
       data: {
         modifiedCount: result.modifiedCount,
-        allowedColumns
+        allowedColumns,
       },
     });
-
   } catch (error) {
     console.error("Error in bulk user column permissions update:", error);
     res.status(500).json({
@@ -651,7 +725,9 @@ export const bulkUpdateCustomerColumnPermissions = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { customerIds, allowedColumns } = req.body;
@@ -672,28 +748,29 @@ export const bulkUpdateCustomerColumnPermissions = async (req, res) => {
 
     // Security Check for Admins - can only update customers within their IE Codes
     let query = { _id: { $in: customerIds } };
-    if (actor.role === 'admin') {
-      const actorIeCodes = actor.ie_code_assignments?.map(a => a.ie_code_no) || [actor.ie_code_no];
+    if (actor.role === "admin") {
+      const actorIeCodes = actor.ie_code_assignments?.map(
+        (a) => a.ie_code_no
+      ) || [actor.ie_code_no];
       query.ie_code_no = { $in: actorIeCodes };
     }
 
-    const result = await CustomerModel.updateMany(
-      query,
-      { allowedColumns }
-    );
+    const result = await CustomerModel.updateMany(query, { allowedColumns });
 
- 
-    console.log(`Bulk column permissions updated for ${result.modifiedCount} customers by ${actor.role || 'superadmin'}`);
+    console.log(
+      `Bulk column permissions updated for ${
+        result.modifiedCount
+      } customers by ${actor.role || "superadmin"}`
+    );
 
     res.status(200).json({
       success: true,
       message: `Column permissions updated for ${result.modifiedCount} customers`,
       data: {
         modifiedCount: result.modifiedCount,
-        allowedColumns
+        allowedColumns,
       },
     });
-
   } catch (error) {
     console.error("Error in bulk customer column permissions update:", error);
     res.status(500).json({

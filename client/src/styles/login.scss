@@ -36,7 +36,6 @@
   flex: 1;
   height: 100vh;
   max-height: 100vh;
-  overflow-y: auto;
 }
 
 .login-right-col-inner-container {
@@ -75,7 +74,7 @@
     width: 90%;
     padding: 0.75rem;
   }
-  
+
   .login-footer {
     padding: 0.5rem;
     min-height: 50px;
@@ -115,7 +114,7 @@
       width: 50px !important;
       max-width: 60px !important;
     }
-    
+
     p {
       font-size: 0.75rem;
       margin: 0.1rem 0;
@@ -149,17 +148,17 @@
   .login-footer {
     min-height: 40px;
     padding: 0.25rem;
-    
+
     img {
       width: 40px !important;
       max-width: 45px !important;
     }
-    
+
     p {
       font-size: 0.65rem;
     }
   }
-  
+
   .login-right-col-inner-container {
     padding: 0.25rem;
   }

@@ -15,7 +15,7 @@ import {
   getContainerSummary,
   getContainerDetails,
   getJobNumbersByMultipleIECodes,
-  getBeNumbersByMultipleIECodes
+  getBeNumbersByMultipleIECodes,
 } from "../controllers/jobController.js";
 import {
   getJobsByStatusAndImporter,
@@ -26,19 +26,22 @@ import {
 import { getJobsOverview } from "../controllers/jobOverviewController.js";
 import {
   getJobsByIECode,
-  getJobsMultiStatus
+  getJobsMultiStatus,
 } from "../controllers/optimizedJobController.js";
 
-import { getJobsByStatusAndImporterGandhidham, getImporterJobCountsGandhidham } from "../controllers/gandhidhamController.js";
+import {
+  getJobsByStatusAndImporterGandhidham,
+  getImporterJobCountsGandhidham,
+  getExportersGandhidham,
+} from "../controllers/gandhidhamController.js";
 
 const router = express.Router();
 
 router.get("/api/get-importer-jobs/:importerURL/:year", getImporterJobCounts);
 router.get("/api/get-job/:year/:jobNo", getJobByNumber);
-router.get('/api/get-job-numbers/multiple', getJobNumbersByMultipleIECodes);
-router.get('/api/get-be-numbers/multiple', getBeNumbersByMultipleIECodes);
+router.get("/api/get-job-numbers/multiple", getJobNumbersByMultipleIECodes);
+router.get("/api/get-be-numbers/multiple", getBeNumbersByMultipleIECodes);
 router.get("/api/get-job-numbers/:ie_code_no", getJobNumbersByIECode); // Supports ?year= query param
-
 
 // Optimized routes for IE code based filtering
 router.get("/api/optimized/:year/jobs/:ieCode/:status", getJobsByIECode);
@@ -60,17 +63,20 @@ router.get(
   getJobsByStatusAndImporterGandhidham
 );
 
-router.get("/api/gandhidham/get-importer-jobs/:importerURL/:year", getImporterJobCountsGandhidham);
+router.get(
+  "/api/gandhidham/get-importer-jobs/:importerURL/:year",
+  getImporterJobCountsGandhidham
+);
 
 router.patch("/api/jobs/:id", updateJob);
 
-router.patch('/api/jobs/container/:id', updateContainerTransporter);
-
+router.patch("/api/jobs/container/:id", updateContainerTransporter);
 
 // Route to get jobs overview
 router.get("/api/get-jobs-overview/:year", getJobsOverview);
 router.get("/api/get-years", getYears);
 router.get("/api/get-exporters", getExporters);
+router.get("/api/gandhidham/get-exporters", getExportersGandhidham);
 router.get("/api/get-hs-codes", getHsCodes);
 router.get("/api/get-suppliers", getSuppliers);
 router.get("/api/get-duties/:job_no", getduty);

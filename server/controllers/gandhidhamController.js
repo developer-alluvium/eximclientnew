@@ -3,11 +3,13 @@
 import mongoose from "mongoose";
 import JobModel from "../models/jobModel.js";
 
-
 // Connect to Gandhidham DB using a separate mongoose connection
-const gandhidhamConnection = mongoose.createConnection(process.env.Gandhidham_URI, {
-  useUnifiedTopology: true,
-});
+const gandhidhamConnection = mongoose.createConnection(
+  process.env.Gandhidham_URI,
+  {
+    useUnifiedTopology: true,
+  }
+);
 
 const GandhidhamJobModel = gandhidhamConnection.model("Job", JobModel.schema);
 const escapeRegex = (string) => {
@@ -15,16 +17,16 @@ const escapeRegex = (string) => {
 };
 
 const buildSearchQuery = (search) => ({
-/*************  ✨ Windsurf Command ⭐  *************/
-/**
- * Generates a MongoDB search query based on the search string.
- * The query uses regex matching against several fields, with
- * case-insensitive matching.
- *
- * @param {string} search - The search string
- * @returns {object} MongoDB search query
- */
-/*******  630b8e0a-3077-48f7-a741-5349a88f6397  *******/  $or: [
+  /*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Generates a MongoDB search query based on the search string.
+   * The query uses regex matching against several fields, with
+   * case-insensitive matching.
+   *
+   * @param {string} search - The search string
+   * @returns {object} MongoDB search query
+   */
+  /*******  630b8e0a-3077-48f7-a741-5349a88f6397  *******/ $or: [
     { job_no: { $regex: escapeRegex(search), $options: "i" } },
     { type_of_b_e: { $regex: escapeRegex(search), $options: "i" } },
     { supplier_exporter: { $regex: escapeRegex(search), $options: "i" } },
@@ -39,7 +41,7 @@ const buildSearchQuery = (search) => ({
     { be_date: { $regex: escapeRegex(search), $options: "i" } },
     { loading_port: { $regex: escapeRegex(search), $options: "i" } },
     { port_of_reporting: { $regex: escapeRegex(search), $options: "i" } },
-    
+
     {
       "container_nos.container_number": {
         $regex: escapeRegex(search),
@@ -106,33 +108,42 @@ const additionalFieldsByStatus = {
 const getSelectedFields = (status) =>
   `${defaultFields} ${additionalFieldsByStatus[status] || ""}`.trim();
 
-
 export async function getJobsByStatusAndImporterGandhidham(req, res) {
- try {
+  try {
     const { year, status, detailedStatus, customHouse } = req.params;
-    const { page = 1, limit = 100, search = "", exporter = "", ieCodes = "", importers = "" } = req.query;
+    const {
+      page = 1,
+      limit = 100,
+      search = "",
+      exporter = "",
+      ieCodes = "",
+      importers = "",
+    } = req.query;
     const skip = (page - 1) * limit;
 
     // Handle IE codes from multiple sources
     let ieCodeArray = [];
-    
+
     if (ieCodes) {
       // If ieCodes are provided in query (existing functionality)
-      ieCodeArray = ieCodes.split(',').map(code => code.trim().toUpperCase());
+      ieCodeArray = ieCodes.split(",").map((code) => code.trim().toUpperCase());
     } else if (req.user) {
       // Extract IE codes from authenticated user (new functionality)
       ieCodeArray = extractIECodes(req.user);
     }
 
     if (ieCodeArray.length === 0) {
-      return res.status(400).json({ 
-        message: "No IE Codes found. Please ensure you have assigned IE codes or provide them in the request." 
+      return res.status(400).json({
+        message:
+          "No IE Codes found. Please ensure you have assigned IE codes or provide them in the request.",
       });
     }
 
-    console.log('IE Codes being used for query:', ieCodeArray);
+    console.log("IE Codes being used for query:", ieCodeArray);
 
-    const importerArray = importers ? importers.split(';').map(imp => imp.trim()) : [];
+    const importerArray = importers
+      ? importers.split(";").map((imp) => imp.trim())
+      : [];
 
     const query = {
       year,
@@ -142,7 +153,11 @@ export async function getJobsByStatusAndImporterGandhidham(req, res) {
 
     if (importerArray.length > 0) {
       query.$and.push({
-        importer: { $in: importerArray.map(imp => new RegExp(`^${escapeRegex(imp)}$`, 'i')) },
+        importer: {
+          $in: importerArray.map(
+            (imp) => new RegExp(`^${escapeRegex(imp)}$`, "i")
+          ),
+        },
       });
     }
 
@@ -218,23 +233,25 @@ export async function getJobsByStatusAndImporterGandhidham(req, res) {
       delete query.$and;
     }
 
-    console.log('Final query:', JSON.stringify(query, null, 2));
+    console.log("Final query:", JSON.stringify(query, null, 2));
 
     const jobs = await GandhidhamJobModel.find(query).select(
       getSelectedFields(detailedStatus === "all" ? "all" : detailedStatus)
     );
 
-    console.log(`Found ${jobs.length} jobs for IE codes: ${ieCodeArray.join(', ')}`);
+    // console.log(
+    //   `Found ${jobs.length} jobs for IE codes: ${ieCodeArray.join(", ")}`
+    // );
 
     // Rest of your sorting and pagination logic remains the same
-    const rankedJobs = jobs.filter(job => statusRank[job.detailed_status]);
-    const unrankedJobs = jobs.filter(job => !statusRank[job.detailed_status]);
+    const rankedJobs = jobs.filter((job) => statusRank[job.detailed_status]);
+    const unrankedJobs = jobs.filter((job) => !statusRank[job.detailed_status]);
 
     const sortedRankedJobs = Object.entries(statusRank).reduce(
       (acc, [status, { field }]) => [
         ...acc,
         ...rankedJobs
-          .filter(job => job.detailed_status === status)
+          .filter((job) => job.detailed_status === status)
           .sort(
             (a, b) =>
               parseDate(a.container_nos?.[0]?.[field] || a[field]) -
@@ -255,14 +272,11 @@ export async function getJobsByStatusAndImporterGandhidham(req, res) {
       totalPages: Math.ceil(allJobs.length / limit),
       ieCodesUsed: ieCodeArray, // Include this for debugging
     });
-
   } catch (error) {
     console.error("Error fetching jobs by IE codes:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
-
-
 
 // Utility function to format importer name
 function formatImporter(importer) {
@@ -276,10 +290,9 @@ function formatImporter(importer) {
 export async function getImporterJobCountsGandhidham(req, res) {
   try {
     const { year, importerURL } = req.params;
-        const formattedImporter = formatImporter(importerURL);
+    const formattedImporter = formatImporter(importerURL);
 
     // Format importer if needed (reuse formatImporter if available)
-    
 
     // Aggregation to count jobs efficiently in Gandhidham DB
     const jobCounts = await GandhidhamJobModel.aggregate([
@@ -320,6 +333,104 @@ export async function getImporterJobCountsGandhidham(req, res) {
     res.json(responseArray);
   } catch (error) {
     console.error("Error fetching Gandhidham job counts by importer:", error);
-    res.status(500).json({ error: "Error fetching Gandhidham job counts by importer" });
+    res
+      .status(500)
+      .json({ error: "Error fetching Gandhidham job counts by importer" });
+  }
+}
+
+export async function getExportersGandhidham(req, res) {
+  try {
+    const { importer, year, status } = req.query;
+
+    if (!importer) {
+      return res.status(400).json({
+        success: false,
+        message: "Importer parameter is required",
+      });
+    }
+
+    // Base match including importer and supplier_exporter must exist and be non-empty
+    const matchQuery = {
+      importer: { $regex: importer, $options: "i" },
+      supplier_exporter: { $exists: true, $ne: null, $ne: "" },
+    };
+
+    // Add year filter if provided
+    if (year) {
+      matchQuery.year = year;
+    }
+
+    // Add status filters if provided and not "all"
+    if (status && status.toLowerCase() !== "all") {
+      const statusLower = status.toLowerCase();
+      if (statusLower === "pending") {
+        matchQuery.$and = [
+          { status: { $regex: "^pending$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $in: [null, ""] } },
+              { status: { $regex: "^pending$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "completed") {
+        matchQuery.$and = [
+          { status: { $regex: "^completed$", $options: "i" } },
+          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
+          {
+            $or: [
+              { bill_date: { $nin: [null, ""] } },
+              { status: { $regex: "^completed$", $options: "i" } },
+            ],
+          },
+        ];
+      } else if (statusLower === "cancelled") {
+        matchQuery.$and = [
+          {
+            $or: [
+              { status: { $regex: "^cancelled$", $options: "i" } },
+              { be_no: { $regex: "^cancelled$", $options: "i" } },
+            ],
+          },
+        ];
+      }
+    }
+
+    const pipeline = [
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: "$supplier_exporter",
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          exporter: "$_id",
+        },
+      },
+      { $sort: { exporter: 1 } },
+    ];
+
+    const result = await GandhidhamJobModel.aggregate(pipeline);
+
+    const exporters = result.map((item) => item.exporter);
+
+    // Return clean array of distinct exporters
+    res.status(200).json({
+      message: "Exporters fetched successfully",
+      success: true,
+      count: exporters.length,
+      exporters,
+    });
+  } catch (error) {
+    console.error("Error fetching exporters:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exporters",
+      error: error.message,
+    });
   }
 }

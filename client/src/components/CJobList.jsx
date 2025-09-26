@@ -35,7 +35,6 @@ import { useNavigate } from "react-router-dom";
 import { useImportersContext } from "../context/importersContext";
 import SaveIcon from "@mui/icons-material/Save";
 
-
 function CJobList(props) {
   const [years, setYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState("");
@@ -43,15 +42,21 @@ function CJobList(props) {
   const [custom_house, setCustomHouse] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-   const [selectedExporter, setSelectedExporter] = useState("all");
+  const [selectedExporter, setSelectedExporter] = useState("all");
   const [exporters, setExporters] = useState([]);
-  const { columns, containerModalOpen, handleModalClose, selectedContainer, transporterModal } = useCustomerJobList(detailedStatus);
+  const {
+    columns,
+    containerModalOpen,
+    handleModalClose,
+    selectedContainer,
+    transporterModal,
+  } = useCustomerJobList(detailedStatus);
   const { importers } = useImportersContext();
   const [username, setUsername] = useState(null);
   const [selectedImporter, setSelectedImporter] = useState(null);
   const [userImporterName, setUserImporterName] = useState(null);
   const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
-    
+
   // Ref for table container scroll handling
   const tableContainerRef = useRef(null);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -65,20 +70,17 @@ function CJobList(props) {
 
   const [columnOrder, setColumnOrder] = useState([]);
   const [allowedColumns, setAllowedColumns] = useState([]);
-  const [userRole, setUserRole] = useState('user');
+  const [userRole, setUserRole] = useState("user");
   const [isColumnOrderLoaded, setIsColumnOrderLoaded] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [tableKey, setTableKey] = useState(0); // Force table re-render on resize
-    const icdCodeOptions = [
-    "ICD SACHANA",
-    "ICD SANAND", 
-    "ICD KHODIYAR",
-  ];
+  const icdCodeOptions = ["ICD SACHANA", "ICD SANAND", "ICD KHODIYAR"];
+
 
   // Responsive hooks
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   // Function to get background color based on status
   const getStatusColor = (statusValue) => {
@@ -115,66 +117,71 @@ function CJobList(props) {
   // Get username and importer name from localStorage
   useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
-
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
-        
-        // Handle both old and new user data structures
-        const userId = parsedUser?.id 
-        const userName = parsedUser?.assignedImporterName
-        const role = parsedUser?.role || 'customer'
-        
-     
-        // Set userId only once
+        const userId = parsedUser?.id;
+        const role = parsedUser?.role || "customer";
+
+        let importerName = parsedUser?.assignedImporterName;
+        if (!importerName && parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+          importerName = parsedUser.ie_code_assignments[0].importer_name;
+        }
+
         setCurrentUserId(userId);
         setUserRole(role);
-        
-        if (userName) {
-          setUsername(userName);
-          setUserImporterName(userName);
-          setSelectedImporter(userName);
+
+        if (importerName) {
+          setUsername(importerName);
+          setUserImporterName(importerName);
+          setSelectedImporter(importerName);
         }
+
+        setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
+
+        console.log("Importer name set from useEffect:", importerName);
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }
     }
   }, []);
-     // Add effect to fetch exporters when selectedImporter changes
-  useEffect(() => {
-    const fetchExporters = async () => {
-      if (!selectedImporter || selectedImporter === "all") {
 
-        return;
-      }
-   
-      
-      try {
-        const res = await axios.get(
-          `${process.env.REACT_APP_API_STRING}/get-exporters`,
-          {
-            params: { 
-              importer: selectedImporter,
-              // year: selectedYear,
-              // status: props.status 
-            }
-          }
-        );
-        
+  // Add effect to fetch exporters when selectedImporter changes
+useEffect(() => {
+  async function fetchExporters() {
+    if (!selectedImporter || selectedImporter === "all") {
+      setExporters([]);
+      setSelectedExporter("all");
+      return;
+    }
 
-        
-        // Filter out null/undefined exporters and remove duplicates
-        const uniqueExporters = [...new Set(res.data.filter(exporter => exporter && exporter.trim() !== ''))];
-   
-        setExporters(uniqueExporters);
-      } catch (error) {
-        console.error("Error fetching exporters:", error);
-        setExporters([]);
-      }
-    };
+    try {
+      const baseApiUrl = process.env.REACT_APP_API_STRING || "";
+      const exportersUrl = props.gandhidham
+        ? `${baseApiUrl}/gandhidham/get-exporters`
+        : `${baseApiUrl}/get-exporters`;
 
-    fetchExporters();
-  }, [selectedImporter, selectedYear, props.status]);
+      const res = await axios.get(exportersUrl, {
+        params: {
+          importer: selectedImporter,
+          year: selectedYear,
+          status: props.status || "all",
+        },
+      });
+
+      const uniqueExporters = [...new Set(res.data.exporters || [])].filter(
+        (exp) => exp && exp.trim() !== ""
+      );
+
+      setExporters(uniqueExporters);
+    } catch (error) {
+      console.error("Error fetching exporters:", error);
+      setExporters([]);
+    }
+  }
+  fetchExporters();
+}, [selectedImporter, selectedYear, props.status, props.gandhidham]);
+
 
   // Reset exporter selection when importer or year changes
   useEffect(() => {
@@ -183,138 +190,139 @@ function CJobList(props) {
 
   // Force table re-render when screen size changes significantly
   useEffect(() => {
-    setTableKey(prev => prev + 1);
+    setTableKey((prev) => prev + 1);
   }, []);
 
-
   // Track if column order has been fetched
-  
-// Fixed useEffect hook - replace the problematic section around lines 170-295
-useEffect(() => {
-  if (hasAttemptedFetch || !currentUserId) {
-    return;
-  }
-  
-  const fetchColumnOrder = async () => {
-    setHasAttemptedFetch(true);
-    
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      console.error("Authentication token not found.");
-      setIsColumnOrderLoaded(true);
+
+  // Fixed useEffect hook - replace the problematic section around lines 170-295
+  useEffect(() => {
+    if (hasAttemptedFetch || !currentUserId) {
       return;
     }
-    
-    try {
-      const res = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/column-order`,
-        {
-          params: { userId: currentUserId },
-          headers: {
-            Authorization: `Bearer ${token}`
+
+    const fetchColumnOrder = async () => {
+      setHasAttemptedFetch(true);
+
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.error("Authentication token not found.");
+        setIsColumnOrderLoaded(true);
+        return;
+      }
+
+      try {
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_STRING}/column-order`,
+          {
+            params: { userId: currentUserId },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           }
+        );
+
+        // Set allowed columns based on user role and backend response
+        if (userRole === "superadmin") {
+          setAllowedColumns(columns.map((col) => col.accessorKey));
+        } else {
+          const userAllowedColumns =
+            res.data.allowedColumns && res.data.allowedColumns.length > 0
+              ? res.data.allowedColumns
+              : columns.map((col) => col.accessorKey);
+          setAllowedColumns(userAllowedColumns);
+        }
+
+        if (res.data.columnOrder?.length) {
+          setColumnOrder(res.data.columnOrder);
+        } else {
+          const allowedCols =
+            userRole === "superadmin"
+              ? columns.map((col) => col.accessorKey)
+              : res.data.allowedColumns && res.data.allowedColumns.length > 0
+              ? res.data.allowedColumns
+              : columns.map((col) => col.accessorKey);
+          setColumnOrder(allowedCols);
+        }
+
+        // Check if user info was returned and update localStorage if there's a mismatch
+        //   if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
+        //     const userDataFromStorage = localStorage.getItem("exim_user");
+        //     if (userDataFromStorage) {
+        //       try {
+        //         const parsedUser = JSON.parse(userDataFromStorage);
+
+        //         if (parsedUser.data && parsedUser.data.user) {
+        //           parsedUser.data.user.id = res.data.userInfo.id;
+        //           parsedUser.data.user.name = res.data.userInfo.name;
+        //           parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
+        //         } else {
+        //           parsedUser.id = res.data.userInfo.id;
+        //           parsedUser.name = res.data.userInfo.name;
+        //           parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
+        //         }
+
+        //         localStorage.setItem("exim_user", JSON.stringify(parsedUser));
+
+        //         setCurrentUserId(res.data.userInfo.id);
+        //         setUsername(res.data.userInfo.name);
+        //         setUserImporterName(res.data.userInfo.name);
+        //         setSelectedImporter(res.data.userInfo.name);
+
+        //       } catch (e) {
+        //         console.error("Error updating user data in storage:", e);
+        //       }
+        //     }
+        //   }
+        // } catch (err) {
+        //   console.error("Failed to fetch column order", err);
+
+        // if (err.response?.status === 404 && err.response?.data?.suggestion) {
+        //   console.warn("User session appears to be stale. Consider logging out and back in.");
+        // }
+
+        const defaultOrder = columns.map((col) => col.accessorKey);
+        setColumnOrder(defaultOrder);
+      } finally {
+        setIsColumnOrderLoaded(true);
+      }
+    };
+
+    fetchColumnOrder();
+  }, [currentUserId, hasAttemptedFetch, userRole, columns]);
+
+  // Fixed saveColumnOrderToBackend function
+  const saveColumnOrderToBackend = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      console.warn("No token found. Cannot save column layout.");
+      return;
+    }
+
+    if (!currentUserId) {
+      console.warn("No user ID found. Cannot save column layout.");
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`,
+        {
+          columnOrder: columnOrder,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
-
-      // Set allowed columns based on user role and backend response
-      if (userRole === 'superadmin') {
-        setAllowedColumns(columns.map(col => col.accessorKey));
-      } else {
-        const userAllowedColumns = res.data.allowedColumns && res.data.allowedColumns.length > 0 
-          ? res.data.allowedColumns 
-          : columns.map(col => col.accessorKey);
-        setAllowedColumns(userAllowedColumns);
-      }
-
-      if (res.data.columnOrder?.length) {
-        setColumnOrder(res.data.columnOrder);
-      } else {
-        const allowedCols = userRole === 'superadmin' 
-          ? columns.map(col => col.accessorKey)
-          : (res.data.allowedColumns && res.data.allowedColumns.length > 0 
-              ? res.data.allowedColumns 
-              : columns.map(col => col.accessorKey));
-        setColumnOrder(allowedCols);
-      }
-      
-      // Check if user info was returned and update localStorage if there's a mismatch
-    //   if (res.data.userInfo && res.data.userInfo.id !== currentUserId) {
-    //     const userDataFromStorage = localStorage.getItem("exim_user");
-    //     if (userDataFromStorage) {
-    //       try {
-    //         const parsedUser = JSON.parse(userDataFromStorage);
-            
-    //         if (parsedUser.data && parsedUser.data.user) {
-    //           parsedUser.data.user.id = res.data.userInfo.id;
-    //           parsedUser.data.user.name = res.data.userInfo.name;
-    //           parsedUser.data.user.ie_code_no = res.data.userInfo.ie_code_no;
-    //         } else {
-    //           parsedUser.id = res.data.userInfo.id;
-    //           parsedUser.name = res.data.userInfo.name;
-    //           parsedUser.ie_code_no = res.data.userInfo.ie_code_no;
-    //         }
-            
-    //         localStorage.setItem("exim_user", JSON.stringify(parsedUser));
-            
-    //         setCurrentUserId(res.data.userInfo.id);
-    //         setUsername(res.data.userInfo.name);
-    //         setUserImporterName(res.data.userInfo.name);
-    //         setSelectedImporter(res.data.userInfo.name);
-            
-    //       } catch (e) {
-    //         console.error("Error updating user data in storage:", e);
-    //       }
-    //     }
-    //   }
-    // } catch (err) {
-    //   console.error("Failed to fetch column order", err);
-      
-      // if (err.response?.status === 404 && err.response?.data?.suggestion) {
-      //   console.warn("User session appears to be stale. Consider logging out and back in.");
-      // }
-      
-      const defaultOrder = columns.map((col) => col.accessorKey);
-      setColumnOrder(defaultOrder);
-    } finally {
-      setIsColumnOrderLoaded(true);
+      setUnsavedChanges(false);
+      console.log("Column order saved successfully");
+    } catch (err) {
+      console.error("Failed to save column order", err);
     }
   };
 
-  fetchColumnOrder();
-}, [currentUserId, hasAttemptedFetch, userRole, columns]);
-
-// Fixed saveColumnOrderToBackend function
-const saveColumnOrderToBackend = async () => {
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    console.warn("No token found. Cannot save column layout.");
-    return;
-  }
-  
-  if (!currentUserId) {
-    console.warn("No user ID found. Cannot save column layout.");
-    return;
-  }
-  
-  try {
-    await axios.post(
-      `${process.env.REACT_APP_API_STRING}/user-management/users/columns/order`, 
-      {
-        columnOrder: columnOrder
-      }, 
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-    setUnsavedChanges(false);
-    console.log("Column order saved successfully");
-  } catch (err) {
-    console.error("Failed to save column order", err);
-  }
-};
-  
   // Track dependencies for job fetching
   useEffect(() => {
     if (selectedImporter) {
@@ -327,26 +335,25 @@ const saveColumnOrderToBackend = async () => {
     selectedYear,
     props.status,
     debouncedSearchQuery,
-selectedExporter  ]);
-const {
-  rows,
-  total,
-  totalPages,
-  currentPage,
-  handlePageChange,
-  fetchJobsData,
-} = useFetchJobsData(
-  detailedStatus,
-  selectedYear,
-  props.status,
-  debouncedSearchQuery,
-  selectedImporter,
-  selectedExporter,
-  custom_house,            // <-- Place custom_house here
-  props.gandhidham   // <-- Place gandhidham after
-);
-
-
+    selectedExporter,
+  ]);
+  const {
+    rows,
+    total,
+    totalPages,
+    currentPage,
+    handlePageChange,
+    fetchJobsData,
+  } = useFetchJobsData(
+    detailedStatus,
+    selectedYear,
+    props.status,
+    debouncedSearchQuery,
+    selectedImporter,
+    selectedExporter,
+    custom_house, // <-- Place custom_house here
+    props.gandhidham // <-- Place gandhidham after
+  );
 
   useEffect(() => {
     async function getYears() {
@@ -392,96 +399,97 @@ const {
 
   // Load IE code assignments from localStorage
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem('exim_user');
+    const userDataFromStorage = localStorage.getItem("exim_user");
     if (userDataFromStorage) {
       const userData = JSON.parse(userDataFromStorage);
       setIeCodeAssignments(userData?.ie_code_assignments || []);
     }
   }, []);
-  
+
   // Table scroll handlers
   const mouseDownHandler = (e) => {
     // Only activate on left mouse button (mousedown event) or on touch devices
-    if (e.button !== 0 && e.type !== 'touchstart') return;
-    
+    if (e.button !== 0 && e.type !== "touchstart") return;
+
     // Stop event propagation to prevent any other handlers
     e.stopPropagation();
-    
+
     const table = tableContainerRef.current;
     if (!table) return;
-    
+
     // Get the current scroll position and mouse/touch position
     const startPosition = {
       left: table.scrollLeft,
-      x: e.clientX || (e.touches ? e.touches[0].clientX : 0)
+      x: e.clientX || (e.touches ? e.touches[0].clientX : 0),
     };
-    
+
     setIsScrolling(true);
     setScrollPosition(startPosition);
-    
+
     // Prevent text selection during dragging
-    document.body.style.userSelect = 'none';
+    document.body.style.userSelect = "none";
   };
-  
+
   const mouseMoveHandler = (e) => {
     if (!isScrolling) return;
-    
+
     // Prevent default behavior like text selection
     e.preventDefault();
-    
+
     const table = tableContainerRef.current;
     if (!table) return;
-    
+
     // Calculate how far the mouse has moved
     const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
     const dx = clientX - scrollPosition.x;
     const speed = 1.5; // Increase this value to make scrolling faster
-    const newScrollLeft = scrollPosition.left - (dx * speed);
-    
+    const newScrollLeft = scrollPosition.left - dx * speed;
+
     // Use requestAnimationFrame for smoother scrolling
     requestAnimationFrame(() => {
       // Update scroll position with easing
       table.scrollLeft = newScrollLeft;
-      
+
       // Update the scroll position state with the new mouse position
       setScrollPosition({
         left: newScrollLeft,
-        x: clientX
+        x: clientX,
       });
     });
   };
-  
+
   const mouseUpHandler = () => {
     setIsScrolling(false);
-    document.body.style.userSelect = '';
+    document.body.style.userSelect = "";
   };
-  
+
   // Add/remove event listeners
   useEffect(() => {
-    document.addEventListener('mousemove', mouseMoveHandler);
-    document.addEventListener('mouseup', mouseUpHandler);
-    document.addEventListener('touchmove', mouseMoveHandler);
-    document.addEventListener('touchend', mouseUpHandler);
-    
+    document.addEventListener("mousemove", mouseMoveHandler);
+    document.addEventListener("mouseup", mouseUpHandler);
+    document.addEventListener("touchmove", mouseMoveHandler);
+    document.addEventListener("touchend", mouseUpHandler);
+
     return () => {
-      document.removeEventListener('mousemove', mouseMoveHandler);
-      document.removeEventListener('mouseup', mouseUpHandler);
-      document.removeEventListener('touchmove', mouseMoveHandler);
-      document.removeEventListener('touchend', mouseUpHandler);
+      document.removeEventListener("mousemove", mouseMoveHandler);
+      document.removeEventListener("mouseup", mouseUpHandler);
+      document.removeEventListener("touchmove", mouseMoveHandler);
+      document.removeEventListener("touchend", mouseUpHandler);
     };
   }, [isScrolling, scrollPosition]);
   const table = useMaterialReactTable({
     // Filter columns based on user role and permissions
     // SuperAdmin can see all columns, regular users can only see their allowed columns
-    columns: columns.filter(col => 
-      userRole === 'superadmin' || allowedColumns.includes(col.accessorKey)
+    columns: columns.filter(
+      (col) =>
+        userRole === "superadmin" || allowedColumns.includes(col.accessorKey)
     ),
     data: rows.map((row, index) => ({ ...row, id: row._id || `row-${index}` })),
     enableColumnResizing: true,
     state: {
       // Also filter column order to match allowed columns
-      columnOrder: columnOrder.filter(colKey => 
-        userRole === 'superadmin' || allowedColumns.includes(colKey)
+      columnOrder: columnOrder.filter(
+        (colKey) => userRole === "superadmin" || allowedColumns.includes(colKey)
       ),
     },
     onColumnOrderChange: (newOrder) => {
@@ -498,8 +506,8 @@ const {
     enableClickToPause: true,
     muiTableOptions: {
       sx: {
-        tableLayout: 'fixed',
-      }
+        tableLayout: "fixed",
+      },
     },
     initialState: {
       density: "compact",
@@ -508,14 +516,14 @@ const {
     enableGlobalFilter: false,
     enableGrouping: false, // Disable grouping to prevent event interference
     enableColumnFilters: false,
-     enableColumnResizing: true,
+    enableColumnResizing: true,
     enableColumnOrdering: true,
     enableColumnActions: false, // Enable for all users
     enableStickyHeader: true,
     enablePinning: true,
     enableRowActions: false,
     muiTableBodyCellProps: {
-      sx: { cursor: 'default' }
+      sx: { cursor: "default" },
     },
     muiTableContainerProps: {
       ref: tableContainerRef,
@@ -529,8 +537,12 @@ const {
           mouseDownHandler(e);
         }
       },
-      sx: { 
-        maxHeight: { xs: "calc(100vh - 350px)", sm: "calc(100vh - 300px)", md: "590px" },
+      sx: {
+        maxHeight: {
+          xs: "calc(100vh - 350px)",
+          sm: "calc(100vh - 300px)",
+          md: "590px",
+        },
         overflowY: "auto",
         overflowX: "auto",
         cursor: isScrolling ? "grabbing" : "grab",
@@ -543,9 +555,9 @@ const {
     },
     muiTableBodyRowProps: ({ row }) => ({
       className: getTableRowsClassname(row),
-      sx: { 
+      sx: {
         textAlign: "center",
-        backgroundColor: getStatusColor(row.original.detailed_status)
+        backgroundColor: getStatusColor(row.original.detailed_status),
       },
       onClick: (e) => e.stopPropagation(),
     }),
@@ -569,25 +581,27 @@ const {
       >
         <Typography
           variant="body1"
-          sx={{ 
-            fontWeight: "bold", 
+          sx={{
+            fontWeight: "bold",
             fontSize: { xs: "1.1rem", sm: "1.3rem", md: "1.5rem" },
             textAlign: "left",
-            flexShrink: 0
+            flexShrink: 0,
           }}
         >
           {props.status} Jobs: {total}
         </Typography>
-        
-        <div style={{
-          display: "flex",
-          // flexDirection: isMobile ? "row" : "row",
-          flexDirection: "row",
-          alignItems: "flex-start",
-          gap: isMobile ? "8px" : "12px",
-          width: isMobile ? "100%" : "auto",
-          flexWrap: "wrap"
-        }}>
+
+        <div
+          style={{
+            display: "flex",
+            // flexDirection: isMobile ? "row" : "row",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: isMobile ? "8px" : "12px",
+            width: isMobile ? "100%" : "auto",
+            flexWrap: "wrap",
+          }}
+        >
           <TextField
             select
             defaultValue={years[0]}
@@ -596,13 +610,13 @@ const {
             onChange={(e) => {
               setSelectedYear(e.target.value);
             }}
-            sx={{ 
+            sx={{
               width: { xs: "80px", sm: "80px" },
               minWidth: "80px",
-              '& .MuiInputBase-input': {
-                fontSize: '0.75rem',
-                padding: '6px 8px'
-              }
+              "& .MuiInputBase-input": {
+                fontSize: "0.75rem",
+                padding: "6px 8px",
+              },
             }}
           >
             {years.map((year, index) => (
@@ -612,47 +626,61 @@ const {
             ))}
           </TextField>
 
-         {ieCodeAssignments && ieCodeAssignments.length > 1 && (
-  <Autocomplete
-    size="small"
-    options={["All Importers", ...(ieCodeAssignments?.map(assignment => assignment.importer_name) || [])]}
-    value={selectedImporter || "All Importers"}
-    onChange={(event, newValue) => {
-      setSelectedImporter(newValue === "All Importers" ? null : newValue);
-    }}
-    sx={{ 
-      width: { xs: "200px", sm: "250px", md: "300px" },
-      minWidth: "200px",
-      '& .MuiInputBase-input': {
-        fontSize: '0.75rem',
-        padding: '6px 8px'
-      }
-    }}
-    renderInput={(params) => <TextField {...params} placeholder="Select Importer" />}
-    isOptionEqualToValue={(option, value) => {
-      if (value === "All Importers" && option === "All Importers") return true;
-      if (value !== "All Importers" && option !== "All Importers" && option === value) return true;
-      return false;
-    }}
-  />
-)}
+          {ieCodeAssignments && ieCodeAssignments.length > 1 && (
+            <Autocomplete
+              size="small"
+              options={[
+                "All Importers",
+                ...(ieCodeAssignments?.map(
+                  (assignment) => assignment.importer_name
+                ) || []),
+              ]}
+              value={selectedImporter || "All Importers"}
+              onChange={(event, newValue) => {
+                setSelectedImporter(
+                  newValue === "All Importers" ? null : newValue
+                );
+              }}
+              sx={{
+                width: { xs: "200px", sm: "250px", md: "300px" },
+                minWidth: "200px",
+                "& .MuiInputBase-input": {
+                  fontSize: "0.75rem",
+                  padding: "6px 8px",
+                },
+              }}
+              renderInput={(params) => (
+                <TextField {...params} placeholder="Select Importer" />
+              )}
+              isOptionEqualToValue={(option, value) => {
+                if (value === "All Importers" && option === "All Importers")
+                  return true;
+                if (
+                  value !== "All Importers" &&
+                  option !== "All Importers" &&
+                  option === value
+                )
+                  return true;
+                return false;
+              }}
+            />
+          )}
 
-
-<TextField
-  select
-  label="Select ICD"
-  value={custom_house}
-  onChange={e => setCustomHouse(e.target.value)}
-  size="small"
-  sx={{ minWidth: "140px", fontSize: '0.75rem' }}
->
-  <MenuItem value="all">Select ICD</MenuItem>
-  {icdCodeOptions.map((port) => (
-    <MenuItem key={port} value={port}>
-      {port}
-    </MenuItem>
-  ))}
-</TextField>
+          <TextField
+            select
+            label="Select ICD"
+            value={custom_house}
+            onChange={(e) => setCustomHouse(e.target.value)}
+            size="small"
+            sx={{ minWidth: "140px", fontSize: "0.75rem" }}
+          >
+            <MenuItem value="all">Select ICD</MenuItem>
+            {icdCodeOptions.map((port) => (
+              <MenuItem key={port} value={port}>
+                {port}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             select
             size="small"
@@ -660,13 +688,13 @@ const {
             onChange={(e) => {
               setDetailedStatus(e.target.value);
             }}
-            sx={{ 
+            sx={{
               width: { xs: "180px", sm: "200px", md: "220px" },
               minWidth: "180px",
-              '& .MuiInputBase-input': {
-                fontSize: '0.75rem',
-                padding: '6px 8px'
-              }
+              "& .MuiInputBase-input": {
+                fontSize: "0.75rem",
+                padding: "6px 8px",
+              },
             }}
           >
             {detailedStatusOptions.map((option, index) => (
@@ -677,7 +705,7 @@ const {
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  fontSize: '0.75rem'
+                  fontSize: "0.75rem",
                 }}
               >
                 {option.value !== "all" && (
@@ -690,7 +718,7 @@ const {
                       backgroundColor: getStatusColor(option.value),
                       border: "1px solid #666",
                       marginRight: "6px",
-                      flexShrink: 0
+                      flexShrink: 0,
                     }}
                   />
                 )}
@@ -702,9 +730,12 @@ const {
           <Autocomplete
             size="small"
             options={["All Exporters", ...exporters]}
-            value={selectedExporter === "all" ? "All Exporters" : selectedExporter}
+            value={
+              selectedExporter === "all" ? "All Exporters" : selectedExporter
+            }
             onChange={(event, newValue) => {
-              const value = newValue === "All Exporters" ? "all" : newValue || "all";
+              const value =
+                newValue === "All Exporters" ? "all" : newValue || "all";
               setSelectedExporter(value);
             }}
             renderInput={(params) => (
@@ -712,26 +743,32 @@ const {
                 {...params}
                 label="Select Exporter"
                 variant="outlined"
-                sx={{ 
+                sx={{
                   width: { xs: "180px", sm: "200px", md: "220px" },
                   minWidth: "180px",
-                  '& .MuiInputBase-input': {
-                    fontSize: '0.75rem',
-                    padding: '6px 8px'
+                  "& .MuiInputBase-input": {
+                    fontSize: "0.75rem",
+                    padding: "6px 8px",
                   },
-                  '& .MuiInputLabel-root': {
-                    fontSize: '0.75rem'
-                  }
+                  "& .MuiInputLabel-root": {
+                    fontSize: "0.75rem",
+                  },
                 }}
               />
             )}
-            sx={{ 
+            sx={{
               width: { xs: "180px", sm: "200px", md: "220px" },
-              minWidth: "180px"
+              minWidth: "180px",
             }}
             isOptionEqualToValue={(option, value) => {
-              if (value === "All Exporters" && option === "All Exporters") return true;
-              if (value !== "All Exporters" && option !== "All Exporters" && option === value) return true;
+              if (value === "All Exporters" && option === "All Exporters")
+                return true;
+              if (
+                value !== "All Exporters" &&
+                option !== "All Exporters" &&
+                option === value
+              )
+                return true;
               return false;
             }}
           />
@@ -758,13 +795,13 @@ const {
                 </InputAdornment>
               ),
             }}
-            sx={{ 
+            sx={{
               width: { xs: "200px", sm: "220px", md: "250px" },
               minWidth: "200px",
-              '& .MuiInputBase-input': {
-                fontSize: '0.75rem',
-                padding: '6px 8px'
-              }
+              "& .MuiInputBase-input": {
+                fontSize: "0.75rem",
+                padding: "6px 8px",
+              },
             }}
           />
 
@@ -775,11 +812,11 @@ const {
               color="primary"
               size="small"
               onClick={saveColumnOrderToBackend}
-              sx={{ 
+              sx={{
                 minWidth: { xs: "100%", sm: "auto" },
                 height: "32px",
-                fontSize: '0.75rem',
-                padding: '4px 8px'
+                fontSize: "0.75rem",
+                padding: "4px 8px",
               }}
             >
               Save Layout
@@ -791,57 +828,58 @@ const {
   });
 
   return (
-    <div 
-      className={`table-container ${isScrolling ? 'dragging' : ''}`}
+    <div
+      className={`table-container ${isScrolling ? "dragging" : ""}`}
       style={{
         height: "100%",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         width: "100%",
-        marginTop:"-16px"
-       
+        marginTop: "-16px",
       }}
     >
       {/* Show a notification to users if their column visibility is restricted */}
-      {userRole !== 'superadmin' && 
-       allowedColumns.length > 0 && 
-       allowedColumns.length < columns.length 
-      
-      }
+      {userRole !== "superadmin" &&
+        allowedColumns.length > 0 &&
+        allowedColumns.length < columns.length}
 
-      <div style={{ 
-        flex: 1, 
-        minHeight: 0,
-        overflow: "hidden"
-      }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         <MaterialReactTable key={tableKey} table={table} />
       </div>
 
-      <div style={{ 
-        flexShrink: 0, 
-        padding: "16px 0",
-        borderTop: "1px solid #e0e0e0",
-        backgroundColor: "white"
-      }}>
+      <div
+        style={{
+          flexShrink: 0,
+          padding: "16px 0",
+          borderTop: "1px solid #e0e0e0",
+          backgroundColor: "white",
+        }}
+      >
         <Pagination
           count={totalPages}
           page={currentPage}
-          onChange={( page) => {
+          onChange={(page) => {
             handlePageChange(page);
           }}
           color="primary"
           size={isMobile ? "small" : "medium"}
           siblingCount={isMobile ? 0 : 1}
           boundaryCount={isMobile ? 1 : 2}
-          sx={{ 
-            display: "flex", 
+          sx={{
+            display: "flex",
             justifyContent: "center",
             "& .MuiPaginationItem-root": {
               fontSize: { xs: "0.75rem", sm: "0.875rem" },
               minWidth: { xs: "24px", sm: "32px" },
               height: { xs: "24px", sm: "32px" },
-            }
+            },
           }}
         />
       </div>

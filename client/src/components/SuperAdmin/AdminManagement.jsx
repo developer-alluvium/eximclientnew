@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useMemo,} from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -1209,24 +1209,24 @@ const AdminManagement = ({ onRefresh }) => {
       </Card>
 
       <IeCodeDialog
-  open={ieCodeDialog}
-  onClose={() => {
-    setIeCodeDialog(false);
-    setSelectedIeCodes([]);
-    setIeCodeReason("");
-    setIsRemovingIeCode(false);
-  }}
-  selectedEntity={selectedEntity}
-  isRemovingIeCode={isRemovingIeCode}
-  setIsRemovingIeCode={setIsRemovingIeCode}
-  selectedIeCodes={selectedIeCodes}
-  setSelectedIeCodes={setSelectedIeCodes}
-  ieCodeReason={ieCodeReason}
-  setIeCodeReason={setIeCodeReason}
-  loading={loading}
-  handleIeCodeOperation={handleIeCodeOperation}
-  filteredIeCodes={filteredIeCodes}
-/>
+        open={ieCodeDialog}
+        onClose={() => {
+          setIeCodeDialog(false);
+          setSelectedIeCodes([]);
+          setIeCodeReason("");
+          setIsRemovingIeCode(false);
+        }}
+        selectedEntity={selectedEntity}
+        isRemovingIeCode={isRemovingIeCode}
+        setIsRemovingIeCode={setIsRemovingIeCode}
+        selectedIeCodes={selectedIeCodes}
+        setSelectedIeCodes={setSelectedIeCodes}
+        ieCodeReason={ieCodeReason}
+        setIeCodeReason={setIeCodeReason}
+        loading={loading}
+        handleIeCodeOperation={handleIeCodeOperation}
+        filteredIeCodes={filteredIeCodes}
+      />
 
       {/* All existing dialogs remain the same... */}
       {/* Admin Action Dialog */}
@@ -1257,54 +1257,7 @@ const AdminManagement = ({ onRefresh }) => {
           </Typography>
 
           {/* IE Code Selection for User Promotion */}
-          {adminAction === "promote" && selectedEntity?.type === "user" && (
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <InputLabel>Select IE Codes to Assign</InputLabel>
-              <Select
-                multiple
-                value={selectedIeCodes}
-                onChange={(e) => setSelectedIeCodes(e.target.value)}
-                label="Select IE Codes to Assign"
-              >
-                {availableIeCodes.map((ieCode) => (
-                  <MenuItem key={ieCode.iecNo} value={ieCode.iecNo}>
-                    <Box sx={{ py: 1 }}>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        color="primary"
-                      >
-                        {ieCode.iecNo}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 0.5 }}>
-                        {ieCode.importerName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Status: {ieCode.status} | Approval: {ieCode.approval}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-                {availableIeCodes.length === 0 && (
-                  <MenuItem disabled>
-                    <Typography variant="body2" color="text.secondary">
-                      No available IE codes
-                    </Typography>
-                  </MenuItem>
-                )}
-              </Select>
-              {availableIeCodes.length === 0 && (
-                <Typography
-                  variant="caption"
-                  color="warning.main"
-                  sx={{ mt: 1 }}
-                >
-                  Note: Only IE codes that are not already assigned to admins
-                  are shown.
-                </Typography>
-              )}
-            </FormControl>
-          )}
+          {adminAction === "promote" && selectedEntity?.type === "user" && null}
         </DialogContent>
         <DialogActions>
           <Button

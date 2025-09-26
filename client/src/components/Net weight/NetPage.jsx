@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useContext , useCallback} from "react";
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import { useState, useEffect, useRef, useContext, useCallback } from "react";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 import {
   Box,
   Container,
@@ -22,9 +22,10 @@ import {
   DialogActions,
   TextField,
   Paper,
-  Avatar
-} from "@mui/material";import axios from "axios";
-import { ThemeProvider, styled, alpha } from '@mui/material/styles';
+  Avatar,
+} from "@mui/material";
+import axios from "axios";
+import { ThemeProvider, styled, alpha } from "@mui/material/styles";
 
 import {
   Lock as LockIcon,
@@ -33,13 +34,13 @@ import {
   Logout as LogoutIcon,
   AccountCircle as AccountCircleIcon,
   AccessTime as AccessTimeIcon,
-  ManageAccounts as ManageAccountsIcon
+  ManageAccounts as ManageAccountsIcon,
 } from "@mui/icons-material";
 import ImportAnalytics from "./ImportAnalytics";
 import { SimpleHeader } from "./SharedComponents";
 import ChargesSummary from "./ChargesSummary";
 import ChargesTable from "./ChargesTable"; // Add this import
-import Calculator from "./Calculator"; 
+import Calculator from "./Calculator";
 import JobDetailsPanel from "./JobDetailsPanel";
 import BackButton from "../BackButton";
 import Header from "../Header"; // Import the Header component
@@ -56,46 +57,43 @@ const NetPage = () => {
     setTabValue(newValue);
   };
 
-
   const HeaderBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: "#fff",
-  color: theme.palette.text.primary,
-  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
-  position: "fixed",
-  zIndex: theme.zIndex.drawer + 1,
-}));
+    backgroundColor: "#fff",
+    color: theme.palette.text.primary,
+    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+    position: "fixed",
+    zIndex: theme.zIndex.drawer + 1,
+  }));
 
-const DateTimeContainer = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  padding: theme.spacing(0.7, 2.5),
-  borderRadius: "24px",
-  backgroundColor: alpha(theme.palette.grey[100], 0.8),
-  marginRight: theme.spacing(2),
-  "& svg": {
-    marginRight: theme.spacing(1),
-    color: theme.palette.warning.main,
-  }
-}));
-
-const UserMenu = styled(Box)(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  cursor: "pointer",
-  padding: theme.spacing(0.6, 1.2),
-  borderRadius: "24px",
-  transition: "background-color 0.2s ease",
-  "&:hover": {
+  const DateTimeContainer = styled(Box)(({ theme }) => ({
+    display: "flex",
+    alignItems: "center",
+    padding: theme.spacing(0.7, 2.5),
+    borderRadius: "24px",
     backgroundColor: alpha(theme.palette.grey[100], 0.8),
-  }
-}));
+    marginRight: theme.spacing(2),
+    "& svg": {
+      marginRight: theme.spacing(1),
+      color: theme.palette.warning.main,
+    },
+  }));
 
+  const UserMenu = styled(Box)(({ theme }) => ({
+    display: "flex",
+    alignItems: "center",
+    cursor: "pointer",
+    padding: theme.spacing(0.6, 1.2),
+    borderRadius: "24px",
+    transition: "background-color 0.2s ease",
+    "&:hover": {
+      backgroundColor: alpha(theme.palette.grey[100], 0.8),
+    },
+  }));
 
   // Always check localStorage for tab visibility
 
-    const userDataFromStorage = localStorage.getItem("exim_user");
+  const userDataFromStorage = localStorage.getItem("exim_user");
   const getTabVisibility = () => {
-  
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
@@ -123,9 +121,9 @@ const UserMenu = styled(Box)(({ theme }) => ({
   const [anchorEl, setAnchorEl] = useState(null);
   const [userName, setUserName] = useState("User");
   const [userInitial, setUserInitial] = useState("U");
-    const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
+  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
   const open = Boolean(anchorEl);
-  
+
   const userMenuRef = useRef(null);
   // Create refs for the input fields
   const inputRefs = {
@@ -135,7 +133,7 @@ const UserMenu = styled(Box)(({ theme }) => ({
     cfs: useRef(null),
     transport: useRef(null),
     Labour: useRef(null),
-   weight: useRef(null) 
+    weight: useRef(null),
   };
 
   // State for storing API response
@@ -145,16 +143,16 @@ const UserMenu = styled(Box)(({ theme }) => ({
   const [saveError, setSaveError] = useState(null);
 
   // Format date and time for header
-  const formattedDate = currentDateTime.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  const formattedDate = currentDateTime.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
-  
-  const formattedTime = currentDateTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
+
+  const formattedTime = currentDateTime.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   // Update time every minute
@@ -162,11 +160,11 @@ const UserMenu = styled(Box)(({ theme }) => ({
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
     }, 60000);
-    
+
     return () => clearInterval(timer);
   }, []);
 
- useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setAnchorEl(null);
@@ -174,9 +172,9 @@ const UserMenu = styled(Box)(({ theme }) => ({
     };
 
     if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener("mousedown", handleClickOutside);
       };
     }
   }, [open]);
@@ -194,7 +192,6 @@ const UserMenu = styled(Box)(({ theme }) => ({
   const handleLogout = async () => {
     try {
       // Log logout activity before calling logout API
-     
 
       // Call logout API with user ID for logout time tracking
       const logoutData = {};
@@ -212,11 +209,11 @@ const UserMenu = styled(Box)(({ theme }) => ({
           },
         }
       );
-      
+
       localStorage.removeItem("exim_user");
-            localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('sso_token');
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("sso_token");
       setUser(null);
       navigate("/login");
     } catch (error) {
@@ -235,7 +232,7 @@ const UserMenu = styled(Box)(({ theme }) => ({
     Labour: "",
     //miscellaneous: "",
     weight: "",
-    custom_fields:[],
+    custom_fields: [],
   });
 
   // Separate state for displayed results to prevent continuous recalculation
@@ -256,7 +253,7 @@ const UserMenu = styled(Box)(({ theme }) => ({
     }));
 
     // Auto-calculate when duty or weight changes
-    if ((id === 'duty' || id === 'weight') && jobNo && value) {
+    if ((id === "duty" || id === "weight") && jobNo && value) {
       await triggerAutoCalculation(id, value);
     }
 
@@ -271,115 +268,121 @@ const UserMenu = styled(Box)(({ theme }) => ({
   };
 
   // Function to trigger auto-calculation via API when duty or weight changes
- // Function to trigger auto-calculation via API when duty or weight changes
-const triggerAutoCalculation = async (fieldId, fieldValue) => {
-  try {
-    const currentWeight = fieldId === 'weight' ? fieldValue : calculatorData.weight;
-    const currentDuty = fieldId === 'duty' ? fieldValue : calculatorData.duty;
-    
-    // Only trigger if we have both duty and weight
-    if (!currentDuty || !currentWeight || parseFloat(currentDuty) <= 0 || parseFloat(currentWeight) <= 0) {
-      return;
-    }
+  // Function to trigger auto-calculation via API when duty or weight changes
+  const triggerAutoCalculation = async (fieldId, fieldValue) => {
+    try {
+      const currentWeight =
+        fieldId === "weight" ? fieldValue : calculatorData.weight;
+      const currentDuty = fieldId === "duty" ? fieldValue : calculatorData.duty;
 
-    // Get user's IE codes
-    const userIeCodes = getUserIeCodes();
-    if (userIeCodes.length === 0) {
-      console.warn('No IE codes found for auto-calculation');
-      return;
-    }
-
-    const response = await fetch(
-      `${process.env.REACT_APP_API_STRING}/update-job-duty-weight/${jobNo}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          year: selectedYear,
-          total_duty: currentDuty,
-          job_net_weight: currentWeight,
-          ie_code_nos: userIeCodes.join(',') // Updated to use multiple IE codes
-        }),
+      // Only trigger if we have both duty and weight
+      if (
+        !currentDuty ||
+        !currentWeight ||
+        parseFloat(currentDuty) <= 0 ||
+        parseFloat(currentWeight) <= 0
+      ) {
+        return;
       }
-    );
 
-    if (response.ok) {
-      const responseData = await response.json();
-      if (responseData.success && responseData.data.per_kg_cost) {
-        const newPerKgCost = responseData.data.per_kg_cost;
-        
-        // Update calculation results with the new per kg cost
-        setCalculationResults(prev => ({
-          ...prev,
-          perKgCost: newPerKgCost
-        }));
-        
-        // Update jobData if it exists
-        if (jobData?.net_weight_calculator) {
-          setJobData(prev => ({
+      // Get user's IE codes
+      const userIeCodes = getUserIeCodes();
+      if (userIeCodes.length === 0) {
+        console.warn("No IE codes found for auto-calculation");
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_STRING}/update-job-duty-weight/${jobNo}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            year: selectedYear,
+            total_duty: currentDuty,
+            job_net_weight: currentWeight,
+            ie_code_nos: userIeCodes.join(","), // Updated to use multiple IE codes
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success && responseData.data.per_kg_cost) {
+          const newPerKgCost = responseData.data.per_kg_cost;
+
+          // Update calculation results with the new per kg cost
+          setCalculationResults((prev) => ({
             ...prev,
-            net_weight_calculator: {
-              ...prev.net_weight_calculator,
-              per_kg_cost: newPerKgCost
-            }
+            perKgCost: newPerKgCost,
           }));
+
+          // Update jobData if it exists
+          if (jobData?.net_weight_calculator) {
+            setJobData((prev) => ({
+              ...prev,
+              net_weight_calculator: {
+                ...prev.net_weight_calculator,
+                per_kg_cost: newPerKgCost,
+              },
+            }));
+          }
         }
       }
+    } catch (error) {
+      console.error("Error triggering auto-calculation:", error);
     }
-  } catch (error) {
-    console.error("Error triggering auto-calculation:", error);
-  }
-};
+  };
 
-const saveCalculatorData = async () => {
-  if (!jobNo || !selectedYear) {
-    // Don't save if no job is selected
-    return;
-  }
+  const saveCalculatorData = async () => {
+    if (!jobNo || !selectedYear) {
+      // Don't save if no job is selected
+      return;
+    }
 
-  try {
-    setSaveError(null);
-    
-    // Get user's IE codes
-    const userIeCodes = getUserIeCodes();
-    const ieCodesParam = userIeCodes.length > 0 ? `&ie_code_nos=${userIeCodes.join(',')}` : '';
-    
-    const response = await fetch(
-      `${process.env.REACT_APP_API_STRING}/store-calculator-data/${jobNo}?year=${selectedYear}${ieCodesParam}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          shipping: calculatorData.shipping,
-          customclearancecharges: calculatorData.customclearancecharges,
-          detention: calculatorData.detention,
-          cfs: calculatorData.cfs,
-          transport: calculatorData.transport,
-          Labour: calculatorData.Labour,
-          miscellaneous: calculatorData.miscellaneous,
-          weight: calculatorData.weight,
-          totalCost: calculationResults.totalCost,
-          custom_fields: calculatorData.custom_fields,
-        }),
+    try {
+      setSaveError(null);
+
+      // Get user's IE codes
+      const userIeCodes = getUserIeCodes();
+      const ieCodesParam =
+        userIeCodes.length > 0 ? `&ie_code_nos=${userIeCodes.join(",")}` : "";
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_STRING}/store-calculator-data/${jobNo}?year=${selectedYear}${ieCodesParam}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            shipping: calculatorData.shipping,
+            customclearancecharges: calculatorData.customclearancecharges,
+            detention: calculatorData.detention,
+            cfs: calculatorData.cfs,
+            transport: calculatorData.transport,
+            Labour: calculatorData.Labour,
+            miscellaneous: calculatorData.miscellaneous,
+            weight: calculatorData.weight,
+            totalCost: calculationResults.totalCost,
+            custom_fields: calculatorData.custom_fields,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save calculator data");
       }
-    );
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to save calculator data");
+      console.log("Calculator data saved successfully");
+    } catch (error) {
+      console.error("Error saving calculator data:", error);
+      setSaveError(error.message);
     }
-
-    console.log("Calculator data saved successfully");
-  } catch (error) {
-    console.error("Error saving calculator data:", error);
-    setSaveError(error.message);
-  }
-};
-
+  };
 
   useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
@@ -387,7 +390,7 @@ const saveCalculatorData = async () => {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
         // Set tab visibility according to localStorage values
-      
+
         // Set user name and initial for header
         const name = parsedUser?.name;
         setUserName(name);
@@ -402,13 +405,17 @@ const saveCalculatorData = async () => {
   const calculateCost = async () => {
     const duty = parseFloat(calculatorData.duty) || 0;
     const shipping = parseFloat(calculatorData.shipping) || 0;
-    const customclearancecharges = parseFloat(calculatorData.customclearancecharges) || 0;
+    const customclearancecharges =
+      parseFloat(calculatorData.customclearancecharges) || 0;
     const detention = parseFloat(calculatorData.detention) || 0;
     const cfs = parseFloat(calculatorData.cfs) || 0;
     const transport = parseFloat(calculatorData.transport) || 0;
     const Labour = parseFloat(calculatorData.Labour) || 0;
-    const customFieldsTotal = calculatorData.custom_fields?.reduce((sum, field) => 
-      sum + (parseFloat(field.value) || 0), 0) || 0;
+    const customFieldsTotal =
+      calculatorData.custom_fields?.reduce(
+        (sum, field) => sum + (parseFloat(field.value) || 0),
+        0
+      ) || 0;
     const weight = parseFloat(calculatorData.weight) || 0;
 
     const totalINR =
@@ -447,8 +454,8 @@ const saveCalculatorData = async () => {
           custom_fields: calculatorData.custom_fields || [],
           per_kg_cost: perKG,
           total_cost: totalString,
-          weight: calculatorData.weight
-        }
+          weight: calculatorData.weight,
+        },
       };
       setJobData(updatedJobData);
     }
@@ -489,12 +496,13 @@ const saveCalculatorData = async () => {
     if (jobData) {
       // Use total_duty directly from API response instead of recalculating
       const dutyAmount = jobData.total_duty || "0.00";
-      
+
       setCalculatorData({
         jobReference: jobNo,
         duty: dutyAmount.toString(),
         shipping: jobData.net_weight_calculator?.shipping || "0.00",
-        customclearancecharges: jobData.net_weight_calculator?.custom_clearance_charges || "0.00",
+        customclearancecharges:
+          jobData.net_weight_calculator?.custom_clearance_charges || "0.00",
         detention: jobData.net_weight_calculator?.detention || "0.00",
         cfs: jobData.net_weight_calculator?.cfs || "0.00",
         transport: jobData.net_weight_calculator?.transport || "0.00",
@@ -511,157 +519,191 @@ const saveCalculatorData = async () => {
       const userData = localStorage.getItem("exim_user");
       if (!userData) return [];
       const parsed = JSON.parse(userData);
-      return parsed?.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      return parsed?.ie_code_assignments?.map((a) => a.ie_code_no) || [];
     } catch {
       return [];
     }
   }, []);
 
-// Updated fetchJobData function
-const fetchJobData = async () => {
-  if (!jobNo) return;
+  // Updated fetchJobData function
+  const fetchJobData = async () => {
+    if (!jobNo) return;
 
-  setLoading(true);
-  setApiError(null);
+    setLoading(true);
+    setApiError(null);
 
-  try {
-    // Get user's IE codes
-    const userIeCodes = getUserIeCodes();
-    
-    if (userIeCodes.length === 0) {
-      throw new Error("No IE codes found for user");
-    }
+    try {
+      // Get user's IE codes
+      const userIeCodes = getUserIeCodes();
 
-    // For NetPage, use ALL IE codes (no importer filtering)
-    const response = await fetch(
-      `${process.env.REACT_APP_API_STRING}/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(',')}`
-    );
-
-    if (!response.ok) {
-      throw new Error("Job not found");
-    }
-
-    const data = await response.json();
-    if (data.success) {
-      // Store the job data from API response
-      const jobDataFromApi = data.data.job_data;
-      
-      // Format the data to match the component's expected structure
-      const formattedJobData = {
-        ...jobDataFromApi,
-        hs_code: data.data.hs_code,
-        basic_duty_sch: data.data.basic_duty_sch,
-        basic_duty_ntfn: data.data.basic_duty_ntfn,
-        igst: data.data.igst,
-        sws_10_percent: data.data.sws_10_percent,
-        total_duty: jobDataFromApi.total_duty
-      };
-      
-      setJobData(formattedJobData);
-      setDutyRates(data.data);
-      setApiError(null);
-
-      // Automatically call update-per-kg-cost API after successful job lookup
-      try {
-        const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
-        const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
-        const calculatedPerKgCost = netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
-
-        // Updated API call with multiple IE codes support
-        const perKgCostResponse = await fetch(
-          `${process.env.REACT_APP_API_STRING}/update-per-kg-cost?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              jobNo: jobNo,
-              perKgCost: calculatedPerKgCost,
-            }),
-          }
-        );
-
-        if (perKgCostResponse.ok) {
-          const perKgCostData = await perKgCostResponse.json();
-          console.log('Per kg cost data updated:', perKgCostData);
-          
-          setCalculationResults(prev => ({
-            ...prev,
-            perKgCost: calculatedPerKgCost
-          }));
-        }
-      } catch (perKgError) {
-        console.warn('Failed to update per kg cost:', perKgError.message);
+      if (userIeCodes.length === 0) {
+        throw new Error("No IE codes found for user");
       }
 
-      // Automatically call store-calculator-data API
-      try {
-        const calculatorPayload = {
-          shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
-          customclearancecharges: jobDataFromApi.net_weight_calculator?.custom_clearance_charges || "0.00",
-          detention: jobDataFromApi.net_weight_calculator?.detention || "0.00",
-          cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
-          transport: jobDataFromApi.net_weight_calculator?.transport || "0.00",
-          Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
-          miscellaneous: jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
-          weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
-          totalCost: "0.00",
-          custom_fields: jobDataFromApi.net_weight_calculator?.custom_fields || [],
-          duty: jobDataFromApi.total_duty || "0.00"
+      // For NetPage, use ALL IE codes (no importer filtering)
+      const response = await fetch(
+        `${
+          process.env.REACT_APP_API_STRING
+        }/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(",")}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Job not found");
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Store the job data from API response
+        const jobDataFromApi = data.data.job_data;
+
+        // Format the data to match the component's expected structure
+        const formattedJobData = {
+          ...jobDataFromApi,
+          hs_code: data.data.hs_code,
+          basic_duty_sch: data.data.basic_duty_sch,
+          basic_duty_ntfn: data.data.basic_duty_ntfn,
+          igst: data.data.igst,
+          sws_10_percent: data.data.sws_10_percent,
+          total_duty: jobDataFromApi.total_duty,
         };
 
-        // Updated API call with multiple IE codes support
-        const storeCalculatorResponse = await fetch(
-          `${process.env.REACT_APP_API_STRING}/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(',')}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(calculatorPayload),
-          }
-        );
+        setJobData(formattedJobData);
+        setDutyRates(data.data);
+        setApiError(null);
 
-        if (storeCalculatorResponse.ok) {
-          const calculatorData = await storeCalculatorResponse.json();
-          console.log('Calculator data stored and total cost calculated:', calculatorData);
-          
-          if (calculatorData.success) {
-            const duty = parseFloat(jobDataFromApi.total_duty) || 0;
-            const shipping = parseFloat(calculatorPayload.shipping) || 0;
-            const customclearancecharges = parseFloat(calculatorPayload.customclearancecharges) || 0;
-            const detention = parseFloat(calculatorPayload.detention) || 0;
-            const cfs = parseFloat(calculatorPayload.cfs) || 0;
-            const transport = parseFloat(calculatorPayload.transport) || 0;
-            const Labour = parseFloat(calculatorPayload.Labour) || 0;
-            const customFieldsTotal = calculatorPayload.custom_fields?.reduce((sum, field) => 
-              sum + (parseFloat(field.value) || 0), 0) || 0;
+        // Automatically call update-per-kg-cost API after successful job lookup
+        try {
+          const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
+          const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
+          const calculatedPerKgCost =
+            netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
 
-            const totalCost = (duty + shipping + customclearancecharges + detention + cfs + transport + Labour + customFieldsTotal).toFixed(2);
-            
-            setCalculationResults(prev => ({
+          // Updated API call with multiple IE codes support
+          const perKgCostResponse = await fetch(
+            `${
+              process.env.REACT_APP_API_STRING
+            }/update-per-kg-cost?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
+              ","
+            )}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                jobNo: jobNo,
+                perKgCost: calculatedPerKgCost,
+              }),
+            }
+          );
+
+          if (perKgCostResponse.ok) {
+            const perKgCostData = await perKgCostResponse.json();
+            console.log("Per kg cost data updated:", perKgCostData);
+
+            setCalculationResults((prev) => ({
               ...prev,
-              totalCost: totalCost
+              perKgCost: calculatedPerKgCost,
             }));
           }
+        } catch (perKgError) {
+          console.warn("Failed to update per kg cost:", perKgError.message);
         }
-      } catch (calculatorError) {
-        console.warn('Failed to store calculator data:', calculatorError.message);
-      }
-      
-    } else {
-      throw new Error(data.message || "Job not found");
-    }
-  } catch (error) {
-    setApiError(error.message);
-    setJobData(null);
-    setDutyRates(null);
-  } finally {
-    setLoading(false);
-  }
-};
 
+        // Automatically call store-calculator-data API
+        try {
+          const calculatorPayload = {
+            shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
+            customclearancecharges:
+              jobDataFromApi.net_weight_calculator?.custom_clearance_charges ||
+              "0.00",
+            detention:
+              jobDataFromApi.net_weight_calculator?.detention || "0.00",
+            cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
+            transport:
+              jobDataFromApi.net_weight_calculator?.transport || "0.00",
+            Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
+            miscellaneous:
+              jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
+            weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
+            totalCost: "0.00",
+            custom_fields:
+              jobDataFromApi.net_weight_calculator?.custom_fields || [],
+            duty: jobDataFromApi.total_duty || "0.00",
+          };
+
+          // Updated API call with multiple IE codes support
+          const storeCalculatorResponse = await fetch(
+            `${
+              process.env.REACT_APP_API_STRING
+            }/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
+              ","
+            )}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(calculatorPayload),
+            }
+          );
+
+          if (storeCalculatorResponse.ok) {
+            const calculatorData = await storeCalculatorResponse.json();
+            console.log(
+              "Calculator data stored and total cost calculated:",
+              calculatorData
+            );
+
+            if (calculatorData.success) {
+              const duty = parseFloat(jobDataFromApi.total_duty) || 0;
+              const shipping = parseFloat(calculatorPayload.shipping) || 0;
+              const customclearancecharges =
+                parseFloat(calculatorPayload.customclearancecharges) || 0;
+              const detention = parseFloat(calculatorPayload.detention) || 0;
+              const cfs = parseFloat(calculatorPayload.cfs) || 0;
+              const transport = parseFloat(calculatorPayload.transport) || 0;
+              const Labour = parseFloat(calculatorPayload.Labour) || 0;
+              const customFieldsTotal =
+                calculatorPayload.custom_fields?.reduce(
+                  (sum, field) => sum + (parseFloat(field.value) || 0),
+                  0
+                ) || 0;
+
+              const totalCost = (
+                duty +
+                shipping +
+                customclearancecharges +
+                detention +
+                cfs +
+                transport +
+                Labour +
+                customFieldsTotal
+              ).toFixed(2);
+
+              setCalculationResults((prev) => ({
+                ...prev,
+                totalCost: totalCost,
+              }));
+            }
+          }
+        } catch (calculatorError) {
+          console.warn(
+            "Failed to store calculator data:",
+            calculatorError.message
+          );
+        }
+      } else {
+        throw new Error(data.message || "Job not found");
+      }
+    } catch (error) {
+      setApiError(error.message);
+      setJobData(null);
+      setDutyRates(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Search job when user submits
   const handleSearch = (e) => {
@@ -731,7 +773,7 @@ const fetchJobData = async () => {
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
-      
+
       {/* Add Header Component */}
       {/* <Header
         formattedDate={formattedDate}
@@ -745,45 +787,50 @@ const fetchJobData = async () => {
         handleLogout={handleLogout}
       />
        */}
-                  <HeaderBar position="fixed">
+      <HeaderBar position="fixed">
         <Toolbar>
-  
-   <Box
-  component="img"
-  src={require('../../assets/images/logo.webp')}
-  alt="EXIM User Portal"
-  sx={{
-    height: 40,          // Ensure the logo fits well in a compact header
-    width: 'auto',       // Let the logo size proportionally
-    display: 'block',
-    mr: 2,               // Space after logo
-    objectFit: 'contain' // Keeps aspect ratio, prevents distortion
-  }}
-/>
-<Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-  
-</Box>
+          <Box
+            component="img"
+            src={require("../../assets/images/logo.webp")}
+            alt="EXIM User Portal"
+            sx={{
+              height: 40, // Ensure the logo fits well in a compact header
+              width: "auto", // Let the logo size proportionally
+              display: "block",
+              mr: 2, // Space after logo
+              objectFit: "contain", // Keeps aspect ratio, prevents distortion
+            }}
+          />
+          <Box
+            sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}
+          ></Box>
 
           <DateTimeContainer>
             <AccessTimeIcon />
             <Box>
-              <Typography variant="body2" sx={{ fontSize: '0.875rem', lineHeight: 1.2 }}>
+              <Typography
+                variant="body2"
+                sx={{ fontSize: "0.875rem", lineHeight: 1.2 }}
+              >
                 {formattedTime}
               </Typography>
-              <Typography variant="caption" sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
+              <Typography
+                variant="caption"
+                sx={{ fontSize: "0.75rem", opacity: 0.8 }}
+              >
                 {formattedDate}
               </Typography>
             </Box>
           </DateTimeContainer>
 
-          <Box sx={{ position: 'relative' }} ref={userMenuRef}>
+          <Box sx={{ position: "relative" }} ref={userMenuRef}>
             <UserMenu onClick={handleUserMenuOpen}>
               <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
                 {userName}
               </Typography>
               <AccountCircleIcon />
             </UserMenu>
-            
+
             {open && (
               <Box
                 sx={{
@@ -796,7 +843,7 @@ const fetchJobData = async () => {
                   boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
                   zIndex: 1000,
                   py: 1,
-                  border: "1px solid #e0e0e0"
+                  border: "1px solid #e0e0e0",
                 }}
               >
                 <Box
@@ -806,9 +853,9 @@ const fetchJobData = async () => {
                     display: "flex",
                     alignItems: "center",
                     cursor: "pointer",
-                    '&:hover': {
-                      backgroundColor: "#f5f5f5"
-                    }
+                    "&:hover": {
+                      backgroundColor: "#f5f5f5",
+                    },
                   }}
                   onClick={() => {
                     navigate("/user/profile");
@@ -819,7 +866,7 @@ const fetchJobData = async () => {
                   <Typography variant="body2">Profile</Typography>
                 </Box>
 
-                {JSON.parse(userDataFromStorage || '{}')?.role === "admin" && (
+                {JSON.parse(userDataFromStorage || "{}")?.role === "admin" && (
                   <Box
                     sx={{
                       px: 2,
@@ -827,9 +874,9 @@ const fetchJobData = async () => {
                       display: "flex",
                       alignItems: "center",
                       cursor: "pointer",
-                      '&:hover': {
-                        backgroundColor: "#f5f5f5"
-                      }
+                      "&:hover": {
+                        backgroundColor: "#f5f5f5",
+                      },
                     }}
                     onClick={() => {
                       navigate("/user-management");
@@ -848,9 +895,9 @@ const fetchJobData = async () => {
                     display: "flex",
                     alignItems: "center",
                     cursor: "pointer",
-                    '&:hover': {
-                      backgroundColor: "#f5f5f5"
-                    }
+                    "&:hover": {
+                      backgroundColor: "#f5f5f5",
+                    },
                   }}
                   onClick={handleLogout}
                 >
@@ -863,7 +910,6 @@ const fetchJobData = async () => {
         </Toolbar>
       </HeaderBar>
 
-                      
       <Box
         component="main"
         sx={{
@@ -879,7 +925,6 @@ const fetchJobData = async () => {
           style={{
             maxWidth: "1600px",
             margin: "0 auto",
-            
           }}
         >
           <div
@@ -888,7 +933,6 @@ const fetchJobData = async () => {
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "24px",
-        
             }}
           >
             <h1
@@ -903,12 +947,15 @@ const fetchJobData = async () => {
             </h1>
           </div>
           <BackButton />
-          
 
           {/* Tabs for Jobs/Gandhidham - show according to localStorage values */}
           {(showJobsTab || showGandhidhamTab) && (
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-              <Tabs value={tabValue} onChange={handleTabChange} aria-label="job tabs">
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
+                aria-label="job tabs"
+              >
                 {showJobsTab && <Tab label="Jobs" />}
                 {showGandhidhamTab && <Tab label="Gandhidham" />}
               </Tabs>
@@ -917,10 +964,14 @@ const fetchJobData = async () => {
 
           {/* Job Excel Table - positioned between BackButton and existing content */}
           {(showJobsTab || showGandhidhamTab) && (
-            <JobExcelTable 
-              userId={userId} 
-              selectedYear={selectedYear} 
-              gandhidham={showGandhidhamTab && !showJobsTab ? true : tabValue === (showJobsTab ? 1 : 0)}
+            <JobExcelTable
+              userId={userId}
+              selectedYear={selectedYear}
+              gandhidham={
+                showGandhidhamTab && !showJobsTab
+                  ? true
+                  : tabValue === (showJobsTab ? 1 : 0)
+              }
               key={`${tabValue}-${selectedYear}`} // Add this key to force re-render
             />
           )}
@@ -949,7 +1000,7 @@ const fetchJobData = async () => {
             />
 
             {/* RIGHT: Calculator Panel */}
-            <Calculator 
+            <Calculator
               calculatorData={calculatorData}
               handleInputChange={handleInputChange}
               inputRefs={inputRefs}
@@ -972,7 +1023,7 @@ const fetchJobData = async () => {
                 />
               </div>
             )} */}
-                 {/* {jobData && (
+            {/* {jobData && (
               <div style={{ marginBottom: "24px" }}>
                 <ChargesTable
                   jobNo={jobNo}

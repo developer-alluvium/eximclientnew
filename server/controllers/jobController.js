@@ -123,27 +123,27 @@ export const getYears = async (req, res) => {
 export const getExporters = async (req, res) => {
   try {
     const { importer, year, status } = req.query;
-    
+
     if (!importer) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Importer parameter is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Importer parameter is required",
       });
     }
 
-    // Build match query similar to getContainerDetails approach
+    // Base match including importer and supplier_exporter must exist and be non-empty
     const matchQuery = {
-      importer: { $regex: `^${importer}$`, $options: "i" },
-      supplier_exporter: { $exists: true, $ne: null, $ne: "" }
+      importer: { $regex: importer, $options: "i" },
+      supplier_exporter: { $exists: true, $ne: null, $ne: "" },
     };
 
     // Add year filter if provided
-    if (year && year !== 'all') {
+    if (year) {
       matchQuery.year = year;
     }
 
-    // Add status filter if provided
-    if (status && status !== 'all') {
+    // Add status filters if provided and not "all"
+    if (status && status.toLowerCase() !== "all") {
       const statusLower = status.toLowerCase();
       if (statusLower === "pending") {
         matchQuery.$and = [
@@ -179,123 +179,39 @@ export const getExporters = async (req, res) => {
       }
     }
 
-    console.log('Match Query:', JSON.stringify(matchQuery, null, 2));
-
-    // Pipeline to get exporters that work exclusively with the specified importer
     const pipeline = [
-      {
-        $match: {
-          supplier_exporter: { $exists: true, $ne: null, $ne: "" }
-        }
-      },
+      { $match: matchQuery },
       {
         $group: {
-          _id: { $trim: { input: "$supplier_exporter" } },
-          uniqueImporters: {
-            $addToSet: "$importer"
-          },
-          jobCount: { $sum: 1 },
-          latestJobDate: { $max: "$job_date" }
-        }
+          _id: "$supplier_exporter",
+        },
       },
-      // This is the correct code
-{
-  $match: {
-    _id: { 
-      $exists: true, 
-      $ne: null, 
-      $ne: "", 
-      $not: { $regex: "^\\s*$" } 
-    },
-    // Apply the regex directly to the array field
-    uniqueImporters: { $regex: `^${importer}$`, $options: "i" }
-  }
-},
       {
         $project: {
           _id: 0,
           exporter: "$_id",
-          jobCount: 1,
-          latestJobDate: 1,
-          uniqueImporters: 1,
-          isExclusive: {
-            $eq: [{ $size: "$uniqueImporters" }, 1]
-          }
-        }
+        },
       },
-      {
-        $sort: {
-          exporter: 1
-        }
-      }
+      { $sort: { exporter: 1 } },
     ];
 
-    // Apply additional filters to the pipeline if needed
-    if (year && year !== 'all') {
-      pipeline.unshift({
-        $match: { year: year }
-      });
-    }
-
-    if (status && status !== 'all') {
-      const statusFilter = {};
-      const statusLower = status.toLowerCase();
-      
-      if (statusLower === "pending") {
-        statusFilter.$and = [
-          { status: { $regex: "^pending$", $options: "i" } },
-          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
-          {
-            $or: [
-              { bill_date: { $in: [null, ""] } },
-              { status: { $regex: "^pending$", $options: "i" } },
-            ],
-          },
-        ];
-      } else if (statusLower === "completed") {
-        statusFilter.$and = [
-          { status: { $regex: "^completed$", $options: "i" } },
-          { be_no: { $not: { $regex: "^cancelled$", $options: "i" } } },
-          {
-            $or: [
-              { bill_date: { $nin: [null, ""] } },
-              { status: { $regex: "^completed$", $options: "i" } },
-            ],
-          },
-        ];
-      } else if (statusLower === "cancelled") {
-        statusFilter.$and = [
-          {
-            $or: [
-              { status: { $regex: "^cancelled$", $options: "i" } },
-              { be_no: { $regex: "^cancelled$", $options: "i" } },
-            ],
-          },
-        ];
-      }
-      
-      if (Object.keys(statusFilter).length > 0) {
-        pipeline.unshift({
-          $match: statusFilter
-        });
-      }
-    }
-
     const result = await JobModel.aggregate(pipeline);
-    
-    console.log(`Found ${result.length} exporters for importer: ${importer}`);
-    console.log('Sample result:', result.slice(0, 3)); // Log first 3 results for debugging
-    
-    // Extract just the exporter names for the dropdown
-    const exporters = result.map(item => item.exporter);
 
-    res.status(200).json(exporters);
+    const exporters = result.map((item) => item.exporter);
+
+    // Return clean array of distinct exporters
+    res.status(200).json({
+      message: "Exporters fetched successfully",
+      success: true,
+      count: exporters.length,
+      exporters,
+    });
   } catch (error) {
-    console.error('Error fetching exporters:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch exporters',
-      error: error.message 
+    console.error("Error fetching exporters:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exporters",
+      error: error.message,
     });
   }
 };
@@ -303,12 +219,12 @@ export const getExporters = async (req, res) => {
 //* Get exporters that work exclusively with only one importer (for DSR filtering)
 export const getExclusiveExporters = async (req, res) => {
   try {
-    const { importer, year, status, exclusive = 'true' } = req.query;
-    
+    const { importer, year, status, exclusive = "true" } = req.query;
+
     if (!importer) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Importer parameter is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Importer parameter is required",
       });
     }
 
@@ -316,18 +232,18 @@ export const getExclusiveExporters = async (req, res) => {
     const pipeline = [
       {
         $match: {
-          supplier_exporter: { $exists: true, $ne: null, $ne: "" }
-        }
-      }
+          supplier_exporter: { $exists: true, $ne: null, $ne: "" },
+        },
+      },
     ];
 
     // Add year filter if provided
-    if (year && year !== 'all') {
+    if (year && year !== "all") {
       pipeline[0].$match.year = year;
     }
 
     // Add status filter if provided
-    if (status && status !== 'all') {
+    if (status && status !== "all") {
       const statusLower = status.toLowerCase();
       if (statusLower === "pending") {
         pipeline[0].$match.$and = [
@@ -364,29 +280,27 @@ export const getExclusiveExporters = async (req, res) => {
     }
 
     // Add the core pipeline stages
-    pipeline.push(
-      {
-        $group: {
-          _id: { $trim: { input: "$supplier_exporter" } },
-          uniqueImporters: {
-            $addToSet: "$importer"
-          },
-          jobCount: { $sum: 1 },
-          latestJobDate: { $max: "$job_date" }
-        }
-      }
-    );
+    pipeline.push({
+      $group: {
+        _id: { $trim: { input: "$supplier_exporter" } },
+        uniqueImporters: {
+          $addToSet: "$importer",
+        },
+        jobCount: { $sum: 1 },
+        latestJobDate: { $max: "$job_date" },
+      },
+    });
 
     // Different filtering based on exclusive parameter
-    if (exclusive === 'true') {
+    if (exclusive === "true") {
       // Truly exclusive exporters (work with only one importer)
       pipeline.push({
         $match: {
-          _id: { 
-            $exists: true, 
-            $ne: null, 
-            $ne: "", 
-            $not: { $regex: "^\\s*$" } 
+          _id: {
+            $exists: true,
+            $ne: null,
+            $ne: "",
+            $not: { $regex: "^\\s*$" },
           },
           uniqueImporters: { $size: 1 }, // Exactly one importer
           $expr: {
@@ -394,32 +308,44 @@ export const getExclusiveExporters = async (req, res) => {
               $map: {
                 input: "$uniqueImporters",
                 as: "imp",
-                in: { $regexMatch: { input: "$$imp", regex: `^${importer}$`, options: "i" } }
-              }
-            }
-          }
-        }
+                in: {
+                  $regexMatch: {
+                    input: "$$imp",
+                    regex: `^${importer}$`,
+                    options: "i",
+                  },
+                },
+              },
+            },
+          },
+        },
       });
     } else {
       // All exporters that work with the specified importer (may also work with others)
       pipeline.push({
         $match: {
-          _id: { 
-            $exists: true, 
-            $ne: null, 
-            $ne: "", 
-            $not: { $regex: "^\\s*$" } 
+          _id: {
+            $exists: true,
+            $ne: null,
+            $ne: "",
+            $not: { $regex: "^\\s*$" },
           },
           $expr: {
             $anyElementTrue: {
               $map: {
                 input: "$uniqueImporters",
                 as: "imp",
-                in: { $regexMatch: { input: "$$imp", regex: `^${importer}$`, options: "i" } }
-              }
-            }
-          }
-        }
+                in: {
+                  $regexMatch: {
+                    input: "$$imp",
+                    regex: `^${importer}$`,
+                    options: "i",
+                  },
+                },
+              },
+            },
+          },
+        },
       });
     }
 
@@ -432,38 +358,44 @@ export const getExclusiveExporters = async (req, res) => {
           latestJobDate: 1,
           uniqueImporters: 1,
           importerCount: { $size: "$uniqueImporters" },
-          isExclusive: { $eq: [{ $size: "$uniqueImporters" }, 1] }
-        }
+          isExclusive: { $eq: [{ $size: "$uniqueImporters" }, 1] },
+        },
       },
       {
         $sort: {
-          supplier_exporter: 1
-        }
+          supplier_exporter: 1,
+        },
       }
     );
 
     const result = await JobModel.aggregate(pipeline);
-    
-    console.log(`Found ${result.length} ${exclusive === 'true' ? 'exclusive' : 'all'} exporters for importer: ${importer}`);
-    console.log('Sample results:', result.slice(0, 3));
-    
+
+    console.log(
+      `Found ${result.length} ${
+        exclusive === "true" ? "exclusive" : "all"
+      } exporters for importer: ${importer}`
+    );
+    console.log("Sample results:", result.slice(0, 3));
+
     // Extract just the exporter names for the dropdown
-    const exporters = result.map(item => item.supplier_exporter);
+    const exporters = result.map((item) => item.supplier_exporter);
 
     res.status(200).json({
       success: true,
       data: exporters,
       total_count: exporters.length,
-      filter_type: exclusive === 'true' ? 'exclusive' : 'all',
-      message: `Found ${exporters.length} ${exclusive === 'true' ? 'exclusive' : ''} exporter(s) for ${importer}`,
-      debug_info: result.slice(0, 5) // Include detailed info for first 5 results
+      filter_type: exclusive === "true" ? "exclusive" : "all",
+      message: `Found ${exporters.length} ${
+        exclusive === "true" ? "exclusive" : ""
+      } exporter(s) for ${importer}`,
+      debug_info: result.slice(0, 5), // Include detailed info for first 5 results
     });
   } catch (error) {
-    console.error('Error fetching exclusive exporters:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch exclusive exporters',
-      error: error.message 
+    console.error("Error fetching exclusive exporters:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exclusive exporters",
+      error: error.message,
     });
   }
 };
@@ -472,26 +404,26 @@ export const getExclusiveExporters = async (req, res) => {
 export const getHsCodes = async (req, res) => {
   try {
     const { importer, year, status } = req.query;
-    
+
     if (!importer) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Importer parameter is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Importer parameter is required",
       });
     }
 
     // Build match query
     const matchQuery = {
-      importer: { $regex: `^${importer}$`, $options: "i" }
+      importer: { $regex: `^${importer}$`, $options: "i" },
     };
 
     // Add year filter if provided
-    if (year && year !== 'all') {
+    if (year && year !== "all") {
       matchQuery.year = year;
     }
 
     // Add status filter if provided
-    if (status && status !== 'all') {
+    if (status && status !== "all") {
       const statusLower = status.toLowerCase();
       if (statusLower === "pending") {
         matchQuery.$and = [
@@ -526,48 +458,48 @@ export const getHsCodes = async (req, res) => {
     }
 
     // Get distinct HS codes using aggregation
-    const hsCodes = await JobModel.distinct('cth_no', matchQuery);
-    
+    const hsCodes = await JobModel.distinct("cth_no", matchQuery);
+
     // Filter out null/empty values and remove duplicates
-    const filteredHsCodes = hsCodes.filter(hsCode => 
-      hsCode && hsCode.trim() !== ''
+    const filteredHsCodes = hsCodes.filter(
+      (hsCode) => hsCode && hsCode.trim() !== ""
     );
 
     res.status(200).json(filteredHsCodes);
   } catch (error) {
-    console.error('Error fetching HS codes:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch HS codes',
-      error: error.message 
+    console.error("Error fetching HS codes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch HS codes",
+      error: error.message,
     });
   }
 };
 
-//* Get distinct suppliers for a specific importer  
+//* Get distinct suppliers for a specific importer
 export const getSuppliers = async (req, res) => {
   try {
     const { importer, year, status } = req.query;
-    
+
     if (!importer) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Importer parameter is required" 
+      return res.status(400).json({
+        success: false,
+        message: "Importer parameter is required",
       });
     }
 
     // Build match query
     const matchQuery = {
-      importer: { $regex: `^${importer}$`, $options: "i" }
+      importer: { $regex: `^${importer}$`, $options: "i" },
     };
 
     // Add year filter if provided
-    if (year && year !== 'all') {
+    if (year && year !== "all") {
       matchQuery.year = year;
     }
 
     // Add status filter if provided
-    if (status && status !== 'all') {
+    if (status && status !== "all") {
       const statusLower = status.toLowerCase();
       if (statusLower === "pending") {
         matchQuery.$and = [
@@ -602,20 +534,20 @@ export const getSuppliers = async (req, res) => {
     }
 
     // Get distinct suppliers using aggregation
-    const suppliers = await JobModel.distinct('supplier_exporter', matchQuery);
-    
+    const suppliers = await JobModel.distinct("supplier_exporter", matchQuery);
+
     // Filter out null/empty values and remove duplicates
-    const filteredSuppliers = suppliers.filter(supplier => 
-      supplier && supplier.trim() !== ''
+    const filteredSuppliers = suppliers.filter(
+      (supplier) => supplier && supplier.trim() !== ""
     );
 
     res.status(200).json(filteredSuppliers);
   } catch (error) {
-    console.error('Error fetching suppliers:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch suppliers',
-      error: error.message 
+    console.error("Error fetching suppliers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch suppliers",
+      error: error.message,
     });
   }
 };
@@ -639,7 +571,9 @@ export const getduty = async (req, res) => {
     // Find the job by job_no
     const job = await JobModel.findOne({
       job_no: jobNo,
-    }).select("job_no total_duty job_net_weight net_weight net_weight_calculator");
+    }).select(
+      "job_no total_duty job_net_weight net_weight net_weight_calculator"
+    );
 
     if (!job) {
       return res.status(404).json({
@@ -680,7 +614,10 @@ export const lookup = async (req, res) => {
     // Parse comma-separated IE codes if provided
     let ieCodeArray = [];
     if (userIeCodes) {
-      ieCodeArray = userIeCodes.split(',').map(code => code.trim()).filter(code => code);
+      ieCodeArray = userIeCodes
+        .split(",")
+        .map((code) => code.trim())
+        .filter((code) => code);
     }
 
     if (ieCodeArray.length === 0) {
@@ -692,12 +629,9 @@ export const lookup = async (req, res) => {
 
     // Find the job by EITHER job_no OR be_no and check if its IE code is in the allowed list
     const job = await JobModel.findOne({
-      $or: [
-        { job_no: jobNo },
-        { be_no: jobNo }
-      ],
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
       year: year,
-      ie_code_no: { $in: ieCodeArray } // Use $in to match any of the provided IE codes
+      ie_code_no: { $in: ieCodeArray }, // Use $in to match any of the provided IE codes
     }).select(
       "cth_no total_duty total_inv_value assbl_value assessable_ammount exrate clearanceValue unit_price awb_bl_date job_net_weight loading_port shipping_line_airline port_of_reporting net_weight_calculator ie_code_no hs_code be_no job_no"
     );
@@ -733,10 +667,10 @@ export const lookup = async (req, res) => {
 
     // Logic to handle both assbl_value and assessable_ammount
     let finalAssessableValue = "0.00";
-    
+
     const assblValue = parseFloat(job.assbl_value) || 0;
     const assessableAmount = parseFloat(job.assessable_ammount) || 0;
-    
+
     if (assblValue > 0 && assessableAmount > 0) {
       // If both values are present, choose the larger one
       finalAssessableValue = Math.max(assblValue, assessableAmount).toFixed(2);
@@ -802,15 +736,18 @@ export const lookup = async (req, res) => {
   }
 };
 
-
 // Updated updatePerKgCost API with IE code filtering
 export const updatePerKgCost = async (req, res) => {
   try {
     const { jobNo, perKgCost, ie_code_no } = req.body;
     const year = req.query.year; // Get year from query params
-    
+
     // Support multiple IE codes from different sources
-    const userIeCodes = req.query.ie_code_nos || req.query.ie_code_no || req.headers['x-ie-code'] || ie_code_no;
+    const userIeCodes =
+      req.query.ie_code_nos ||
+      req.query.ie_code_no ||
+      req.headers["x-ie-code"] ||
+      ie_code_no;
 
     if (!jobNo || !year) {
       return res.status(400).json({
@@ -822,20 +759,20 @@ export const updatePerKgCost = async (req, res) => {
     // Parse IE codes (handle both single and multiple)
     let ieCodeArray = [];
     if (userIeCodes) {
-      if (typeof userIeCodes === 'string') {
-        ieCodeArray = userIeCodes.split(',').map(code => code.trim()).filter(code => code);
+      if (typeof userIeCodes === "string") {
+        ieCodeArray = userIeCodes
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => code);
       } else {
         ieCodeArray = [userIeCodes];
       }
     }
 
     // Build the query with $or for job_no and be_no
-    const query = { 
-      $or: [
-        { job_no: jobNo },
-        { be_no: jobNo }
-      ],
-      year: year
+    const query = {
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
+      year: year,
     };
 
     // Add IE code filtering if provided
@@ -849,7 +786,7 @@ export const updatePerKgCost = async (req, res) => {
       query,
       {
         $set: {
-          'net_weight_calculator.per_kg_cost': perKgCost,
+          "net_weight_calculator.per_kg_cost": perKgCost,
         },
       },
       {
@@ -861,20 +798,21 @@ export const updatePerKgCost = async (req, res) => {
     if (!updatedJob) {
       return res.status(404).json({
         success: false,
-        message: ieCodeArray.length > 0 
-          ? "Job not found or you are not authorized to update this job" 
-          : "Job not found",
+        message:
+          ieCodeArray.length > 0
+            ? "Job not found or you are not authorized to update this job"
+            : "Job not found",
       });
     }
 
     return res.status(200).json({
       success: true,
       message: "Per kg cost updated successfully",
-      data: { 
+      data: {
         per_kg_cost: updatedJob.net_weight_calculator?.per_kg_cost || "0.00",
         job_no: updatedJob.job_no,
         be_no: updatedJob.be_no,
-        ie_code_no: updatedJob.ie_code_no
+        ie_code_no: updatedJob.ie_code_no,
       },
     });
   } catch (error) {
@@ -892,10 +830,14 @@ export const storeCalculatorData = async (req, res) => {
   try {
     const { jobNo } = req.params;
     const { year } = req.query;
-    
+
     // Support multiple IE codes from different sources
-    const userIeCodes = req.query.ie_code_nos || req.query.ie_code_no || req.headers['x-ie-code'] || req.body.ie_code_no;
-    
+    const userIeCodes =
+      req.query.ie_code_nos ||
+      req.query.ie_code_no ||
+      req.headers["x-ie-code"] ||
+      req.body.ie_code_no;
+
     if (!jobNo || !year) {
       return res.status(400).json({
         success: false,
@@ -906,29 +848,29 @@ export const storeCalculatorData = async (req, res) => {
     // Parse IE codes (handle both single and multiple)
     let ieCodeArray = [];
     if (userIeCodes) {
-      if (typeof userIeCodes === 'string') {
-        ieCodeArray = userIeCodes.split(',').map(code => code.trim()).filter(code => code);
+      if (typeof userIeCodes === "string") {
+        ieCodeArray = userIeCodes
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => code);
       } else {
         ieCodeArray = [userIeCodes];
       }
     }
-    
+
     // Build the query with $or for job_no and be_no
-    const query = { 
-      $or: [
-        { job_no: jobNo },
-        { be_no: jobNo }
-      ],
-      year: year
+    const query = {
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
+      year: year,
     };
-    
+
     // Add IE code filtering if provided
     if (ieCodeArray.length > 0) {
       query.ie_code_no = { $in: ieCodeArray };
     }
 
     console.log("Store Calculator Data Query:", JSON.stringify(query, null, 2));
-    
+
     // Extract calculator data from request body
     const {
       shipping,
@@ -956,9 +898,9 @@ export const storeCalculatorData = async (req, res) => {
       miscellaneous: miscellaneous || "0.00",
       weight: weight || "0.00",
       total_cost: totalCost || "0.00",
-      per_kg_cost: req.body.perKgCost || "0.00"
+      per_kg_cost: req.body.perKgCost || "0.00",
     };
-    
+
     // Add custom fields if they exist
     if (custom_fields && Array.isArray(custom_fields)) {
       calculatorData.custom_fields = custom_fields;
@@ -969,21 +911,22 @@ export const storeCalculatorData = async (req, res) => {
       query,
       {
         $set: {
-          'net_weight_calculator': calculatorData
-        }
+          net_weight_calculator: calculatorData,
+        },
       },
       {
         new: true,
         runValidators: true,
       }
     );
-    
+
     if (!updatedJob) {
       return res.status(404).json({
         success: false,
-        message: ieCodeArray.length > 0 
-          ? "Job not found or you are not authorized to update this job"
-          : "Job not found",
+        message:
+          ieCodeArray.length > 0
+            ? "Job not found or you are not authorized to update this job"
+            : "Job not found",
       });
     }
 
@@ -994,10 +937,9 @@ export const storeCalculatorData = async (req, res) => {
         net_weight_calculator: updatedJob.net_weight_calculator,
         job_no: updatedJob.job_no,
         be_no: updatedJob.be_no,
-        ie_code_no: updatedJob.ie_code_no
-      }
+        ie_code_no: updatedJob.ie_code_no,
+      },
     });
-    
   } catch (error) {
     console.error("Error storing calculator data:", error);
     return res.status(500).json({
@@ -1008,13 +950,11 @@ export const storeCalculatorData = async (req, res) => {
   }
 };
 
-
-
 export async function getJobNumbersByMultipleIECodes(req, res) {
   try {
     const { ieCodes, year, search } = req.query; // All from query parameters
 
-    console.log('Multiple IE Codes Request:', { ieCodes, year, search }); // Debug log
+    console.log("Multiple IE Codes Request:", { ieCodes, year, search }); // Debug log
 
     if (!ieCodes) {
       return res.status(400).json({
@@ -1024,10 +964,13 @@ export async function getJobNumbersByMultipleIECodes(req, res) {
     }
 
     // Parse comma-separated IE codes
-    const ieCodeArray = ieCodes.split(',').map(code => code.trim()).filter(code => code);
-    
-    console.log('Parsed IE Codes:', ieCodeArray); // Debug log
-    
+    const ieCodeArray = ieCodes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    console.log("Parsed IE Codes:", ieCodeArray); // Debug log
+
     if (ieCodeArray.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1036,10 +979,10 @@ export async function getJobNumbersByMultipleIECodes(req, res) {
     }
 
     // Build query object
-    const query = { 
-      ie_code_no: { $in: ieCodeArray }
+    const query = {
+      ie_code_no: { $in: ieCodeArray },
     };
-    
+
     // Add year filter if provided
     if (year) {
       query.year = year;
@@ -1047,56 +990,54 @@ export async function getJobNumbersByMultipleIECodes(req, res) {
 
     // Add search filter for job number or exporter name if provided
     if (search) {
-      const searchRegex = { $regex: search, $options: 'i' };
-      query.$or = [
-        { job_no: searchRegex },
-        { supplier_exporter: searchRegex }
-      ];
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [{ job_no: searchRegex }, { supplier_exporter: searchRegex }];
     }
 
-    console.log('MongoDB Query:', JSON.stringify(query, null, 2)); // Debug log
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2)); // Debug log
 
     // Find all jobs with the given ie_code_no array
-    const jobs = await JobModel.find(
-      query,
-      { 
-        job_no: 1, 
-        year: 1, 
-        job_date: 1, 
-        supplier_exporter: 1, 
-        ie_code_no: 1, 
-        importer: 1, 
-        _id: 0 
-      }
-    ).sort({ year: -1, job_no: 1 });
+    const jobs = await JobModel.find(query, {
+      job_no: 1,
+      year: 1,
+      job_date: 1,
+      supplier_exporter: 1,
+      ie_code_no: 1,
+      importer: 1,
+      _id: 0,
+    }).sort({ year: -1, job_no: 1 });
 
     console.log(`Found ${jobs.length} jobs`); // Debug log
 
     if (!jobs || jobs.length === 0) {
       return res.status(404).json({
         success: false,
-        message: search 
-          ? `No jobs found for IE codes: ${ieCodeArray.join(', ')} matching search: ${search}`
-          : `No jobs found for IE codes: ${ieCodeArray.join(', ')}`,
+        message: search
+          ? `No jobs found for IE codes: ${ieCodeArray.join(
+              ", "
+            )} matching search: ${search}`
+          : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
       });
     }
 
     // Format response
-    const jobNumbers = jobs.map(job => ({
+    const jobNumbers = jobs.map((job) => ({
       job_no: job.job_no,
       year: job.year,
       job_date: job.job_date,
       supplier_exporter: job.supplier_exporter || "N/A",
       ie_code_no: job.ie_code_no,
-      importer: job.importer || "N/A"
+      importer: job.importer || "N/A",
     }));
 
     res.status(200).json({
       success: true,
-      message: `Found ${jobs.length} job(s) for IE codes: ${ieCodeArray.join(', ')}`,
+      message: `Found ${jobs.length} job(s) for IE codes: ${ieCodeArray.join(
+        ", "
+      )}`,
       data: jobNumbers,
       total_count: jobs.length,
-      ie_codes_searched: ieCodeArray
+      ie_codes_searched: ieCodeArray,
     });
   } catch (error) {
     console.error("Error fetching job numbers by multiple IE codes:", error);
@@ -1112,7 +1053,11 @@ export async function getBeNumbersByMultipleIECodes(req, res) {
   try {
     const { ieCodes, year, search } = req.query; // All from query parameters
 
-    console.log('Multiple IE Codes Request for BE Numbers:', { ieCodes, year, search }); // Debug log
+    console.log("Multiple IE Codes Request for BE Numbers:", {
+      ieCodes,
+      year,
+      search,
+    }); // Debug log
 
     if (!ieCodes) {
       return res.status(400).json({
@@ -1122,10 +1067,13 @@ export async function getBeNumbersByMultipleIECodes(req, res) {
     }
 
     // Parse comma-separated IE codes
-    const ieCodeArray = ieCodes.split(',').map(code => code.trim()).filter(code => code);
-    
-    console.log('Parsed IE Codes:', ieCodeArray); // Debug log
-    
+    const ieCodeArray = ieCodes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    console.log("Parsed IE Codes:", ieCodeArray); // Debug log
+
     if (ieCodeArray.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1134,11 +1082,11 @@ export async function getBeNumbersByMultipleIECodes(req, res) {
     }
 
     // Build query object
-    const query = { 
+    const query = {
       ie_code_no: { $in: ieCodeArray },
-      be_no: { $exists: true, $ne: null } // Only get jobs that have BE numbers
+      be_no: { $exists: true, $ne: null }, // Only get jobs that have BE numbers
     };
-    
+
     // Add year filter if provided
     if (year) {
       query.year = year;
@@ -1146,56 +1094,57 @@ export async function getBeNumbersByMultipleIECodes(req, res) {
 
     // Add search filter for BE number or exporter name if provided
     if (search) {
-      const searchRegex = { $regex: search, $options: 'i' };
-      query.$or = [
-        { be_no: searchRegex },
-        { supplier_exporter: searchRegex }
-      ];
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [{ be_no: searchRegex }, { supplier_exporter: searchRegex }];
     }
 
-    console.log('MongoDB Query for BE Numbers:', JSON.stringify(query, null, 2)); // Debug log
+    console.log(
+      "MongoDB Query for BE Numbers:",
+      JSON.stringify(query, null, 2)
+    ); // Debug log
 
     // Find all jobs with the given ie_code_no array that have BE numbers
-    const jobs = await JobModel.find(
-      query,
-      { 
-        be_no: 1, 
-        year: 1, 
-        job_date: 1, 
-        supplier_exporter: 1, 
-        ie_code_no: 1, 
-        importer: 1, 
-        _id: 0 
-      }
-    ).sort({ year: -1, be_no: 1 });
+    const jobs = await JobModel.find(query, {
+      be_no: 1,
+      year: 1,
+      job_date: 1,
+      supplier_exporter: 1,
+      ie_code_no: 1,
+      importer: 1,
+      _id: 0,
+    }).sort({ year: -1, be_no: 1 });
 
     console.log(`Found ${jobs.length} jobs with BE numbers`); // Debug log
 
     if (!jobs || jobs.length === 0) {
       return res.status(404).json({
         success: false,
-        message: search 
-          ? `No jobs found for IE codes: ${ieCodeArray.join(', ')} matching search: ${search}`
-          : `No jobs found for IE codes: ${ieCodeArray.join(', ')}`,
+        message: search
+          ? `No jobs found for IE codes: ${ieCodeArray.join(
+              ", "
+            )} matching search: ${search}`
+          : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
       });
     }
 
     // Format response with be_no instead of job_no
-    const beNumbers = jobs.map(job => ({
+    const beNumbers = jobs.map((job) => ({
       be_no: job.be_no,
       year: job.year,
       job_date: job.job_date,
       supplier_exporter: job.supplier_exporter || "N/A",
       ie_code_no: job.ie_code_no,
-      importer: job.importer || "N/A"
+      importer: job.importer || "N/A",
     }));
 
     res.status(200).json({
       success: true,
-      message: `Found ${jobs.length} job(s) with BE numbers for IE codes: ${ieCodeArray.join(', ')}`,
+      message: `Found ${
+        jobs.length
+      } job(s) with BE numbers for IE codes: ${ieCodeArray.join(", ")}`,
       data: beNumbers,
       total_count: jobs.length,
-      ie_codes_searched: ieCodeArray
+      ie_codes_searched: ieCodeArray,
     });
   } catch (error) {
     console.error("Error fetching BE numbers by multiple IE codes:", error);
@@ -1222,7 +1171,7 @@ export async function getJobNumbersByIECode(req, res) {
 
     // Build query object
     const query = { ie_code_no: ie_code_no };
-    
+
     // Add year filter if provided
     if (year) {
       query.year = year;
@@ -1230,34 +1179,34 @@ export async function getJobNumbersByIECode(req, res) {
 
     // Add search filter for job number or exporter name if provided
     if (search) {
-      const searchRegex = { $regex: search, $options: 'i' };
-      query.$or = [
-        { job_no: searchRegex },
-        { supplier_exporter: searchRegex }
-      ];
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [{ job_no: searchRegex }, { supplier_exporter: searchRegex }];
     }
 
     // Find all jobs with the given ie_code_no and select job_no, year, job_date, and supplier_exporter
-    const jobs = await JobModel.find(
-      query,
-      { job_no: 1, year: 1, job_date: 1, supplier_exporter: 1, _id: 0 }
-    ).sort({ year: -1, job_no: 1 }); // Sort by year desc, job_no asc
+    const jobs = await JobModel.find(query, {
+      job_no: 1,
+      year: 1,
+      job_date: 1,
+      supplier_exporter: 1,
+      _id: 0,
+    }).sort({ year: -1, job_no: 1 }); // Sort by year desc, job_no asc
 
     if (!jobs || jobs.length === 0) {
       return res.status(404).json({
         success: false,
-        message: search 
+        message: search
           ? `No jobs found for IE code: ${ie_code_no} matching search: ${search}`
           : `No jobs found for IE code: ${ie_code_no}`,
       });
     }
 
     // Format response
-    const jobNumbers = jobs.map(job => ({
+    const jobNumbers = jobs.map((job) => ({
       job_no: job.job_no,
       year: job.year,
       job_date: job.job_date,
-      supplier_exporter: job.supplier_exporter || "N/A"
+      supplier_exporter: job.supplier_exporter || "N/A",
     }));
 
     res.status(200).json({
@@ -1281,7 +1230,7 @@ export const updateJobDutyAndWeight = async (req, res) => {
   try {
     const { jobNo } = req.params;
     const { year, total_duty, job_net_weight, ie_code_no } = req.body;
-    
+
     if (!jobNo || !year) {
       return res.status(400).json({
         success: false,
@@ -1290,12 +1239,12 @@ export const updateJobDutyAndWeight = async (req, res) => {
     }
 
     // Build the query
-    const query = { 
+    const query = {
       job_no: jobNo,
       be_no: jobNo,
-      year: year
+      year: year,
     };
-    
+
     if (ie_code_no) {
       query.ie_code_no = ie_code_no;
     }
@@ -1306,9 +1255,13 @@ export const updateJobDutyAndWeight = async (req, res) => {
       query,
       {
         $set: {
-          ...(total_duty !== undefined && { total_duty: total_duty.toString() }),
-          ...(job_net_weight !== undefined && { job_net_weight: job_net_weight.toString() })
-        }
+          ...(total_duty !== undefined && {
+            total_duty: total_duty.toString(),
+          }),
+          ...(job_net_weight !== undefined && {
+            job_net_weight: job_net_weight.toString(),
+          }),
+        },
       },
       {
         new: true,
@@ -1319,7 +1272,7 @@ export const updateJobDutyAndWeight = async (req, res) => {
     if (!updatedJob) {
       return res.status(404).json({
         success: false,
-        message: ie_code_no 
+        message: ie_code_no
           ? "Job not found or you are not authorized to update this job"
           : "Job not found",
       });
@@ -1327,13 +1280,14 @@ export const updateJobDutyAndWeight = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Job updated successfully. Per kg cost calculated automatically.",
+      message:
+        "Job updated successfully. Per kg cost calculated automatically.",
       data: {
         job_no: updatedJob.job_no,
         total_duty: updatedJob.total_duty,
         job_net_weight: updatedJob.job_net_weight,
-        per_kg_cost: updatedJob.net_weight_calculator?.per_kg_cost || "0.00"
-      }
+        per_kg_cost: updatedJob.net_weight_calculator?.per_kg_cost || "0.00",
+      },
     });
   } catch (error) {
     console.error("Error updating job duty and weight:", error);
@@ -1348,7 +1302,7 @@ export const updateJobDutyAndWeight = async (req, res) => {
 // Shipping Container Data Analysis API
 export const getContainerSummary = async (req, res) => {
   try {
-    const { year, groupBy = 'status', ie_codes } = req.query;
+    const { year, groupBy = "status", ie_codes } = req.query;
 
     if (!year) {
       return res.status(400).json({
@@ -1365,14 +1319,18 @@ export const getContainerSummary = async (req, res) => {
     }
 
     // Parse comma-separated IE codes from query param
-    const userIeCodes = ie_codes.split(',').map(code => code.trim()).filter(code => code);
+    const userIeCodes = ie_codes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
 
     // Validate groupBy parameter
-    const validGroupByOptions = ['status', 'size', 'month', 'port'];
+    const validGroupByOptions = ["status", "size", "month", "port"];
     if (!validGroupByOptions.includes(groupBy)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid groupBy parameter. Valid options: status, size, month, port",
+        message:
+          "Invalid groupBy parameter. Valid options: status, size, month, port",
       });
     }
 
@@ -1383,53 +1341,55 @@ export const getContainerSummary = async (req, res) => {
       $or: [
         { bill_no: { $exists: false } },
         { bill_no: null },
-        { bill_no: "" }
-      ]
+        { bill_no: "" },
+      ],
     };
 
     // Base pipeline - enhanced to support different groupBy options
     const pipeline = [
       {
-        $match: matchQuery
+        $match: matchQuery,
       },
       {
         $unwind: {
           path: "$container_nos",
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       {
         $match: {
-          "container_nos.size": { $in: ["20", "40"] }
-        }
-      }
+          "container_nos.size": { $in: ["20", "40"] },
+        },
+      },
     ];
 
     // Add additional fields for grouping if needed
-    if (groupBy === 'month' || groupBy === 'port') {
+    if (groupBy === "month" || groupBy === "port") {
       pipeline.push({
         $addFields: {
           "container_nos.arrival_month": {
             $cond: [
-              { $and: [
-                { $ne: ["$container_nos.arrival_date", null] },
-                { $ne: ["$container_nos.arrival_date", ""] }
-              ]},
-              { 
-                $dateToString: { 
-                  format: "%Y-%m", 
-                  date: { 
-                    $dateFromString: { 
-                      dateString: "$container_nos.arrival_date",
-                      onError: null 
-                    } 
-                  } 
-                } 
+              {
+                $and: [
+                  { $ne: ["$container_nos.arrival_date", null] },
+                  { $ne: ["$container_nos.arrival_date", ""] },
+                ],
               },
-              "Not Arrived"
-            ]
-          }
-        }
+              {
+                $dateToString: {
+                  format: "%Y-%m",
+                  date: {
+                    $dateFromString: {
+                      dateString: "$container_nos.arrival_date",
+                      onError: null,
+                    },
+                  },
+                },
+              },
+              "Not Arrived",
+            ],
+          },
+        },
       });
     }
 
@@ -1442,19 +1402,20 @@ export const getContainerSummary = async (req, res) => {
             size: "$container_nos.size",
             arrival_date: "$container_nos.arrival_date",
             delivery_date: "$container_nos.delivery_date",
-            emptyContainerOffLoadDate: "$container_nos.emptyContainerOffLoadDate",
+            emptyContainerOffLoadDate:
+              "$container_nos.emptyContainerOffLoadDate",
             container_rail_out_date: "$container_nos.container_rail_out_date",
             delivery_planning: "$container_nos.delivery_planning",
             port_of_reporting: "$port_of_reporting",
             arrival_month: "$container_nos.arrival_month",
-            ie_code_no: "$ie_code_no" // Include IE code for tracking
-          }
-        }
-      }
+            ie_code_no: "$ie_code_no", // Include IE code for tracking
+          },
+        },
+      },
     });
 
     const result = await JobModel.aggregate(pipeline);
-    
+
     // Initialize counters
     let count20Arrived = 0;
     let count40Arrived = 0;
@@ -1464,12 +1425,14 @@ export const getContainerSummary = async (req, res) => {
     // Process container data if results exist (business logic unchanged)
     if (result.length > 0 && result[0].containers) {
       result[0].containers.forEach((container) => {
-        const isFullyCompleted = container.emptyContainerOffLoadDate && 
-          container.emptyContainerOffLoadDate.trim() !== "" && 
+        const isFullyCompleted =
+          container.emptyContainerOffLoadDate &&
+          container.emptyContainerOffLoadDate.trim() !== "" &&
           container.emptyContainerOffLoadDate !== null;
-          
-        const hasArrivedAtPort = container.arrival_date && 
-          container.arrival_date.trim() !== "" && 
+
+        const hasArrivedAtPort =
+          container.arrival_date &&
+          container.arrival_date.trim() !== "" &&
           container.arrival_date !== null;
 
         if (isFullyCompleted) {
@@ -1502,9 +1465,9 @@ export const getContainerSummary = async (req, res) => {
       "40_arrived": count40Arrived,
       "20_transit": count20Transit,
       "40_transit": count40Transit,
-      "total_arrived": totalArrived,
-      "total_transit": totalTransit,
-      "grand_total": grandTotal
+      total_arrived: totalArrived,
+      total_transit: totalTransit,
+      grand_total: grandTotal,
     };
 
     return res.status(200).json({
@@ -1514,9 +1477,8 @@ export const getContainerSummary = async (req, res) => {
       group_by: groupBy,
       ie_codes_used: userIeCodes,
       last_updated: new Date().toISOString(),
-      message: `Container summary for year ${year} generated successfully`
+      message: `Container summary for year ${year} generated successfully`,
     });
-
   } catch (error) {
     console.error("Error generating container summary:", error);
     return res.status(500).json({
@@ -1546,14 +1508,14 @@ export const getContainerDetails = async (req, res) => {
       });
     }
 
-    if (!status || !['arrived', 'transit'].includes(status)) {
+    if (!status || !["arrived", "transit"].includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Status parameter is required (arrived or transit)",
       });
     }
 
-    if (size && !['20', '40'].includes(size)) {
+    if (size && !["20", "40"].includes(size)) {
       return res.status(400).json({
         success: false,
         message: "Size parameter must be either '20' or '40'",
@@ -1561,7 +1523,10 @@ export const getContainerDetails = async (req, res) => {
     }
 
     // Parse comma-separated IE codes from query param
-    const userIeCodes = ie_codes.split(',').map(code => code.trim()).filter(code => code);
+    const userIeCodes = ie_codes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
 
     // Build match query - support multiple IE codes
     const matchQuery = {
@@ -1570,25 +1535,25 @@ export const getContainerDetails = async (req, res) => {
       $or: [
         { bill_no: { $exists: false } },
         { bill_no: null },
-        { bill_no: "" }
-      ]
+        { bill_no: "" },
+      ],
     };
 
     // Use aggregation pipeline to get detailed container information
     const pipeline = [
       {
-        $match: matchQuery
+        $match: matchQuery,
       },
       {
         $unwind: {
           path: "$container_nos",
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       {
         $match: {
-          "container_nos.size": { $in: size ? [size] : ["20", "40"] }
-        }
+          "container_nos.size": { $in: size ? [size] : ["20", "40"] },
+        },
       },
       {
         $project: {
@@ -1608,48 +1573,52 @@ export const getContainerDetails = async (req, res) => {
             size: "$container_nos.size",
             arrival_date: "$container_nos.arrival_date",
             delivery_date: "$container_nos.delivery_date",
-            emptyContainerOffLoadDate: "$container_nos.emptyContainerOffLoadDate",
+            emptyContainerOffLoadDate:
+              "$container_nos.emptyContainerOffLoadDate",
             container_rail_out_date: "$container_nos.container_rail_out_date",
             detention_from: "$container_nos.detention_from",
             transporter: "$container_nos.transporter",
             vehicle_no: "$container_nos.vehicle_no",
             delivery_address: "$container_nos.delivery_address",
             delivery_planning: "$container_nos.delivery_planning",
-            net_weight_as_per_PL_document: "$container_nos.net_weight_as_per_PL_document"
-          }
-        }
-      }
+            net_weight_as_per_PL_document:
+              "$container_nos.net_weight_as_per_PL_document",
+          },
+        },
+      },
     ];
 
     const result = await JobModel.aggregate(pipeline);
-    
+
     // Filter containers based on status and business logic (unchanged)
-    const filteredContainers = result.filter(item => {
+    const filteredContainers = result.filter((item) => {
       const container = item.container;
-      
-      const isFullyCompleted = container.emptyContainerOffLoadDate && 
-        container.emptyContainerOffLoadDate.trim() !== "" && 
+
+      const isFullyCompleted =
+        container.emptyContainerOffLoadDate &&
+        container.emptyContainerOffLoadDate.trim() !== "" &&
         container.emptyContainerOffLoadDate !== null;
-        
+
       if (isFullyCompleted) {
         return false;
       }
-      
-      const hasArrivedAtPort = container.arrival_date && 
-        container.arrival_date.trim() !== "" && 
+
+      const hasArrivedAtPort =
+        container.arrival_date &&
+        container.arrival_date.trim() !== "" &&
         container.arrival_date !== null;
 
-      if (status === 'arrived') {
+      if (status === "arrived") {
         return hasArrivedAtPort;
-      } else if (status === 'transit') {
+      } else if (status === "transit") {
         return !hasArrivedAtPort;
       }
-      
+
       return false;
     });
 
     // Format the response with additional computed fields (unchanged)
-    const formattedContainers = filteredContainers.map(item => ({
+    const formattedContainers = filteredContainers.map((item) => ({
       job_no: item.job_no,
       job_date: item.job_date,
       importer: item.importer,
@@ -1672,15 +1641,22 @@ export const getContainerDetails = async (req, res) => {
       vehicle_no: item.container.vehicle_no,
       delivery_address: item.container.delivery_address,
       delivery_planning: item.container.delivery_planning,
-      net_weight_as_per_PL_document: item.container.net_weight_as_per_PL_document,
+      net_weight_as_per_PL_document:
+        item.container.net_weight_as_per_PL_document,
       container_status: status,
-      days_since_arrival: item.container.arrival_date ? 
-        Math.floor((new Date() - new Date(item.container.arrival_date)) / (1000 * 60 * 60 * 24)) : null
+      days_since_arrival: item.container.arrival_date
+        ? Math.floor(
+            (new Date() - new Date(item.container.arrival_date)) /
+              (1000 * 60 * 60 * 24)
+          )
+        : null,
     }));
 
     // Sort containers (unchanged logic)
-    if (status === 'arrived') {
-      formattedContainers.sort((a, b) => new Date(b.arrival_date) - new Date(a.arrival_date));
+    if (status === "arrived") {
+      formattedContainers.sort(
+        (a, b) => new Date(b.arrival_date) - new Date(a.arrival_date)
+      );
     } else {
       formattedContainers.sort((a, b) => a.job_no.localeCompare(b.job_no));
     }
@@ -1692,13 +1668,12 @@ export const getContainerDetails = async (req, res) => {
       filters: {
         year: year,
         status: status,
-        size: size || 'all',
-        ie_codes: userIeCodes
+        size: size || "all",
+        ie_codes: userIeCodes,
       },
       last_updated: new Date().toISOString(),
-      message: `Found ${formattedContainers.length} container(s) with status '${status}' for year ${year}`
+      message: `Found ${formattedContainers.length} container(s) with status '${status}' for year ${year}`,
     });
-
   } catch (error) {
     console.error("Error generating container details:", error);
     return res.status(500).json({

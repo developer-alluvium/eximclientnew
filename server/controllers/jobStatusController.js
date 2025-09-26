@@ -305,7 +305,7 @@ export async function getJobsByMultipleIECodes(req, res) {
       getSelectedFields(detailedStatus === "all" ? "all" : detailedStatus)
     );
 
-    console.log(`Found ${jobs.length} jobs for IE codes: ${ieCodeArray.join(', ')}`);
+    // console.log(`Found ${jobs.length} jobs for IE codes: ${ieCodeArray.join(', ')}`);
 
     // Rest of your sorting and pagination logic remains the same
     const rankedJobs = jobs.filter(job => statusRank[job.detailed_status]);
