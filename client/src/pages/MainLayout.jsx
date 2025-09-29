@@ -210,7 +210,7 @@ const MainLayout = ({ children }) => {
         formattedDate={formattedDate}
         handleLogout={handleLogout}
       />
-      <main style={{ marginTop: 40, padding: 16 }}>{children}</main>
+      <main style={{ marginTop: 64, padding: 16 }}>{children}</main>
     </>
   );
 };

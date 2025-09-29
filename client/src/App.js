@@ -32,39 +32,64 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import MainLayout from "./pages/MainLayout.jsx";
 
-// Protected route component for backward compatibility
-const LegacyProtectedRoute = ({ children }) => {
-  const navigate = useNavigate();
+// Layout wrapper component to conditionally show header
+const LayoutWrapper = ({ children }) => {
   const location = useLocation();
-
-  // Check if user is authenticated
-  const isAuthenticated = localStorage.getItem("exim_user") !== null;
-
-  // Don't interfere with SuperAdmin routes - but still call useEffect
-  const shouldBypass =
-    location.pathname.startsWith("/superadmin-dashboard") ||
-    location.pathname.startsWith("/module-access-management") ||
-    location.pathname === "/login" ||
-    location.pathname === "/user/login" ||
-    location.pathname === "/admin/login" ||
-    location.pathname === "/superadmin/login";
-
-  useEffect(() => {
-    if (!shouldBypass && !isAuthenticated && location.pathname !== "/login") {
-      // Redirect to login page if not authenticated
-      navigate("/login", { replace: true });
-    }
-  }, [shouldBypass, isAuthenticated, navigate, location.pathname]);
-
-  // Early return after hooks
-  if (shouldBypass) {
-    return children;
+  
+  // Pages that should not show the header
+  const noHeaderPages = [
+    "/login",
+    "/user/login", 
+    "/admin/login",
+    "/superadmin/login",
+    "/user/register",
+    "/verify-email",
+    "/reset-password"
+  ];
+  
+  const shouldShowHeader = !noHeaderPages.some(page => 
+    location.pathname.startsWith(page)
+  );
+  
+  if (shouldShowHeader) {
+    return <MainLayout>{children}</MainLayout>;
   }
-
-  return isAuthenticated ? children : null;
+  
+  return <>{children}</>;
 };
 
-// Route-aware session manager
+// Protected Route component
+const ProtectedRoute = ({ children, requiredAuth }) => {
+  const navigate = useNavigate();
+  
+  React.useEffect(() => {
+    const checkAuth = () => {
+      switch (requiredAuth) {
+        case 'superadmin':
+          if (!localStorage.getItem("superadmin_user")) {
+            navigate("/login", { replace: true });
+          }
+          break;
+        case 'admin':
+          if (!localStorage.getItem("exim_admin")) {
+            navigate("/admin/login", { replace: true });
+          }
+          break;
+        case 'user':
+          if (!localStorage.getItem("exim_user")) {
+            navigate("/login", { replace: true });
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    
+    checkAuth();
+  }, [navigate, requiredAuth]);
+  
+  return children;
+};
 
 function App() {
   const [user, setUser] = React.useState(() => {
@@ -76,22 +101,21 @@ function App() {
 
   return (
     <BrowserRouter>
-      <MainLayout>
-        <UserContext.Provider value={{ user, setUser }}>
-          <SelectedYearContext.Provider
-            value={{ selectedYear, setSelectedYear }}
-          >
-            <TabValueProvider>
-              <ImportersProvider>
+      <UserContext.Provider value={{ user, setUser }}>
+        <SelectedYearContext.Provider
+          value={{ selectedYear, setSelectedYear }}
+        >
+          <TabValueProvider>
+            <ImportersProvider>
+              <LayoutWrapper>
                 <Routes>
-                  {/* Main login route - keep only one */}
+                  {/* Login routes - no header */}
                   <Route path="/login" element={<LoginPage />} />
-
-                  {/* Specific login routes */}
                   <Route path="/user/login" element={<UserLoginPage />} />
                   <Route path="/admin/login" element={<AdminLoginPage />} />
+                  <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
 
-                  {/* User system routes */}
+                  {/* User system routes - no header */}
                   <Route
                     path="/user/register"
                     element={<UserRegistrationPage />}
@@ -104,14 +128,14 @@ function App() {
                     path="/reset-password/:token"
                     element={<ResetPasswordPage />}
                   />
+
+                  {/* Protected routes - with header */}
                   <Route
                     path="/user/dashboard"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <UserDashboard />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
 
@@ -119,11 +143,9 @@ function App() {
                   <Route
                     path="/customer-admin/dashboard"
                     element={
-                      localStorage.getItem("exim_admin") ? (
+                      <ProtectedRoute requiredAuth="admin">
                         <CustomerAdminDashboard />
-                      ) : (
-                        <AdminLoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
 
@@ -131,11 +153,9 @@ function App() {
                   <Route
                     path="/superadmin-dashboard"
                     element={
-                      localStorage.getItem("superadmin_user") ? (
+                      <ProtectedRoute requiredAuth="superadmin">
                         <SuperAdminLayout />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   >
                     <Route index element={<SuperAdminDashboard />} />
@@ -144,14 +164,13 @@ function App() {
                       element={<SuperAdminCustomerDetail />}
                     />
                   </Route>
+                  
                   <Route
                     path="/module-access-management"
                     element={
-                      localStorage.getItem("superadmin_user") ? (
+                      <ProtectedRoute requiredAuth="superadmin">
                         <ModuleAccessManagement />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
 
@@ -159,54 +178,45 @@ function App() {
                   <Route
                     path="/"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <UserDashboard />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
                   <Route
                     path="/netpage"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <NetPage />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
                   <Route
                     path="/importdsr"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <AppbarComponent />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
                   <Route
                     path="/trademasterguide"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <ImportVideoPage />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
 
                   <Route
                     path="/user/profile"
                     element={
-                      localStorage.getItem("exim_user") ? (
+                      <ProtectedRoute requiredAuth="user">
                         <UserProfile />
-                      ) : (
-                        <LoginPage />
-                      )
+                      </ProtectedRoute>
                     }
                   />
+                  
                   {/* User Management route - check for admin role */}
                   <Route
                     path="/user-management"
@@ -227,11 +237,11 @@ function App() {
                     })()}
                   />
                 </Routes>
-              </ImportersProvider>
-            </TabValueProvider>
-          </SelectedYearContext.Provider>
-        </UserContext.Provider>
-      </MainLayout>
+              </LayoutWrapper>
+            </ImportersProvider>
+          </TabValueProvider>
+        </SelectedYearContext.Provider>
+      </UserContext.Provider>
     </BrowserRouter>
   );
 }
