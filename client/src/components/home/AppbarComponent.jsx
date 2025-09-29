@@ -7,12 +7,14 @@ import { useNavigate } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Box, Typography } from "@mui/material";
 import CImportDSR from "../CImportDSR";
+import { useImportersContext } from "../../context/importersContext";
 
 const drawerWidth = 60;
 
 function AppbarComponent(props) {
   const navigate = useNavigate();
 
+  const { selectedImporter } = useImportersContext();
   // Get user data from localStorage
   const userData = localStorage.getItem("exim_user")
     ? JSON.parse(localStorage.getItem("exim_user"))
@@ -20,7 +22,14 @@ function AppbarComponent(props) {
 
   // Extract name (handle both old and new user data structures)
   const userName =
-    userData.name || userData?.data?.user?.name || userData.username || userData.email || "User";
+    userData.name ||
+    userData?.data?.user?.name ||
+    userData.username ||
+    userData.email ||
+    "User";
+
+  const userImporterName =
+    userData?.ie_code_assignments?.[0]?.importer_name || "";
 
   return (
     <>
@@ -69,7 +78,7 @@ function AppbarComponent(props) {
           {/* Centered User Name */}
           <Box sx={{ flexGrow: 1, display: "flex", justifyContent: "center" }}>
             <Typography variant="h6" sx={{ fontWeight: "bold", color: "#000" }}>
-               {userName}
+              {selectedImporter || userImporterName}
             </Typography>
           </Box>
 
@@ -83,10 +92,22 @@ function AppbarComponent(props) {
             </Typography>
           </Box>
         </Toolbar>
-              
       </AppBar>
-      <CImportDSR />
 
+      {/* Centered User Name */}
+      {/* <Box
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          justifyContent: "center",
+          marginTop: "30px",
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#000" }}>
+          {selectedImporter || userImporterName || "hii"}
+        </Typography>
+      </Box> */}
+      <CImportDSR />
     </>
   );
 }

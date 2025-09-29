@@ -53,7 +53,7 @@ function CJobList(props) {
   } = useCustomerJobList(detailedStatus);
   const { importers } = useImportersContext();
   const [username, setUsername] = useState(null);
-  const [selectedImporter, setSelectedImporter] = useState(null);
+  const { selectedImporter, setSelectedImporter } = useImportersContext();
   const [userImporterName, setUserImporterName] = useState(null);
   const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
 
@@ -76,7 +76,6 @@ function CJobList(props) {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [tableKey, setTableKey] = useState(0); // Force table re-render on resize
   const icdCodeOptions = ["ICD SACHANA", "ICD SANAND", "ICD KHODIYAR"];
-
 
   // Responsive hooks
   const theme = useTheme();
@@ -124,7 +123,11 @@ function CJobList(props) {
         const role = parsedUser?.role || "customer";
 
         let importerName = parsedUser?.assignedImporterName;
-        if (!importerName && parsedUser?.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
+        if (
+          !importerName &&
+          parsedUser?.ie_code_assignments &&
+          parsedUser.ie_code_assignments.length > 0
+        ) {
           importerName = parsedUser.ie_code_assignments[0].importer_name;
         }
 
@@ -147,41 +150,40 @@ function CJobList(props) {
   }, []);
 
   // Add effect to fetch exporters when selectedImporter changes
-useEffect(() => {
-  async function fetchExporters() {
-    if (!selectedImporter || selectedImporter === "all") {
-      setExporters([]);
-      setSelectedExporter("all");
-      return;
+  useEffect(() => {
+    async function fetchExporters() {
+      if (!selectedImporter || selectedImporter === "all") {
+        setExporters([]);
+        setSelectedExporter("all");
+        return;
+      }
+
+      try {
+        const baseApiUrl = process.env.REACT_APP_API_STRING || "";
+        const exportersUrl = props.gandhidham
+          ? `${baseApiUrl}/gandhidham/get-exporters`
+          : `${baseApiUrl}/get-exporters`;
+
+        const res = await axios.get(exportersUrl, {
+          params: {
+            importer: selectedImporter,
+            year: selectedYear,
+            status: props.status || "all",
+          },
+        });
+
+        const uniqueExporters = [...new Set(res.data.exporters || [])].filter(
+          (exp) => exp && exp.trim() !== ""
+        );
+
+        setExporters(uniqueExporters);
+      } catch (error) {
+        console.error("Error fetching exporters:", error);
+        setExporters([]);
+      }
     }
-
-    try {
-      const baseApiUrl = process.env.REACT_APP_API_STRING || "";
-      const exportersUrl = props.gandhidham
-        ? `${baseApiUrl}/gandhidham/get-exporters`
-        : `${baseApiUrl}/get-exporters`;
-
-      const res = await axios.get(exportersUrl, {
-        params: {
-          importer: selectedImporter,
-          year: selectedYear,
-          status: props.status || "all",
-        },
-      });
-
-      const uniqueExporters = [...new Set(res.data.exporters || [])].filter(
-        (exp) => exp && exp.trim() !== ""
-      );
-
-      setExporters(uniqueExporters);
-    } catch (error) {
-      console.error("Error fetching exporters:", error);
-      setExporters([]);
-    }
-  }
-  fetchExporters();
-}, [selectedImporter, selectedYear, props.status, props.gandhidham]);
-
+    fetchExporters();
+  }, [selectedImporter, selectedYear, props.status, props.gandhidham]);
 
   // Reset exporter selection when importer or year changes
   useEffect(() => {

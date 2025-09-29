@@ -1,29 +1,7 @@
 import { useState, useEffect, useRef, useContext, useCallback } from "react";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
-import {
-  Box,
-  Container,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Chip,
-  Alert,
-  IconButton,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem,
-  Badge,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Paper,
-  Avatar,
-} from "@mui/material";
+import { Box, Typography, AppBar, Toolbar, TextField } from "@mui/material";
 import axios from "axios";
 import { ThemeProvider, styled, alpha } from "@mui/material/styles";
 
@@ -52,6 +30,39 @@ import { useNavigate } from "react-router-dom";
 
 const NetPage = () => {
   // Tabs for Jobs/Gandhidham
+
+  const userDataFromStorage = localStorage.getItem("exim_user");
+  const getTabVisibility = () => {
+    if (userDataFromStorage) {
+      try {
+        const parsedUser = JSON.parse(userDataFromStorage);
+        return {
+          showJobsTab: !!parsedUser?.jobsTabVisible,
+          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
+        };
+      } catch {
+        return { showJobsTab: true, showGandhidhamTab: true };
+      }
+    }
+    return { showJobsTab: true, showGandhidhamTab: true };
+  };
+
+  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
+  const { user, setUser } = useContext(UserContext);
+  const navigate = useNavigate();
+  const years = ["25-26", "24-25"];
+  const [loading, setLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(years[0]);
+  const [jobNo, setJobNo] = useState("");
+  const [userId, setUserId] = useState(null);
+  // Add states for header functionality
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [userName, setUserName] = useState("User");
+  const [userInitial, setUserInitial] = useState("U");
+  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
+  const open = Boolean(anchorEl);
+
   const [tabValue, setTabValue] = useState(0);
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -92,37 +103,10 @@ const NetPage = () => {
 
   // Always check localStorage for tab visibility
 
-  const userDataFromStorage = localStorage.getItem("exim_user");
-  const getTabVisibility = () => {
-    if (userDataFromStorage) {
-      try {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        return {
-          showJobsTab: !!parsedUser?.jobsTabVisible,
-          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
-        };
-      } catch {
-        return { showJobsTab: true, showGandhidhamTab: true };
-      }
-    }
-    return { showJobsTab: true, showGandhidhamTab: true };
-  };
-
-  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
-  const { user, setUser } = useContext(UserContext);
-  const navigate = useNavigate();
-  const years = ["25-26", "24-25"];
-  const [loading, setLoading] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(years[0]);
-  const [jobNo, setJobNo] = useState("");
-  const [userId, setUserId] = useState(null);
-  // Add states for header functionality
-  const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [userName, setUserName] = useState("User");
-  const [userInitial, setUserInitial] = useState("U");
-  const [ieCodeAssignments, setIeCodeAssignments] = useState([]);
-  const open = Boolean(anchorEl);
+  // Determine Gandhidham mode: true only if user is on Gandhidham tab
+  const isGandhidhamMode =
+    showGandhidhamTab &&
+    ((!showJobsTab && tabValue === 0) || (showJobsTab && tabValue === 1));
 
   const userMenuRef = useRef(null);
   // Create refs for the input fields
@@ -526,7 +510,7 @@ const NetPage = () => {
   }, []);
 
   // Updated fetchJobData function
-  const fetchJobData = async () => {
+  const fetchJobData = async (gandhidham = false) => {
     if (!jobNo) return;
 
     setLoading(true);
@@ -535,28 +519,45 @@ const NetPage = () => {
     try {
       // Get user's IE codes
       const userIeCodes = getUserIeCodes();
-
       if (userIeCodes.length === 0) {
         throw new Error("No IE codes found for user");
       }
 
-      // For NetPage, use ALL IE codes (no importer filtering)
-      const response = await fetch(
-        `${
-          process.env.REACT_APP_API_STRING
-        }/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(",")}`
-      );
+      // Conditionally set URLs based on gandhidham
+      let lookupUrl = `${
+        process.env.REACT_APP_API_STRING
+      }/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(",")}`;
+      let updateKgUrl = `${process.env.REACT_APP_API_STRING}/update-per-kg-cost?year=${selectedYear}`;
+      let storeCalculatorUrl = `${
+        process.env.REACT_APP_API_STRING
+      }/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
+        ","
+      )}`;
 
+      if (gandhidham) {
+        lookupUrl = `${
+          process.env.REACT_APP_API_STRING
+        }/gandhidham/lookup/${jobNo}/${selectedYear}?ie_code_nos=${userIeCodes.join(
+          ","
+        )}`;
+        updateKgUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/update-per-kg-cost?year=${selectedYear}`;
+        storeCalculatorUrl = `${
+          process.env.REACT_APP_API_STRING
+        }/gandhidham/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
+          ","
+        )}`;
+      }
+
+      // Fetch job lookup data
+      const response = await fetch(lookupUrl);
       if (!response.ok) {
         throw new Error("Job not found");
       }
-
       const data = await response.json();
+
       if (data.success) {
-        // Store the job data from API response
         const jobDataFromApi = data.data.job_data;
 
-        // Format the data to match the component's expected structure
         const formattedJobData = {
           ...jobDataFromApi,
           hs_code: data.data.hs_code,
@@ -571,127 +572,98 @@ const NetPage = () => {
         setDutyRates(data.data);
         setApiError(null);
 
-        // Automatically call update-per-kg-cost API after successful job lookup
-        try {
-          const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
-          const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
-          const calculatedPerKgCost =
-            netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
+        // Calculate per kg cost
+        const totalDuty = parseFloat(jobDataFromApi.total_duty) || 0;
+        const netWeight = parseFloat(jobDataFromApi.job_net_weight) || 0;
+        const calculatedPerKgCost =
+          netWeight > 0 ? (totalDuty / netWeight).toFixed(2) : "0.00";
 
-          // Updated API call with multiple IE codes support
-          const perKgCostResponse = await fetch(
-            `${
-              process.env.REACT_APP_API_STRING
-            }/update-per-kg-cost?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
-              ","
-            )}`,
-            {
-              method: "PATCH",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                jobNo: jobNo,
-                perKgCost: calculatedPerKgCost,
-              }),
-            }
+        // Update per kg cost
+        const perKgCostResponse = await fetch(updateKgUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jobNo: jobNo,
+            perKgCost: calculatedPerKgCost,
+          }),
+        });
+        if (perKgCostResponse.ok) {
+          const perKgCostData = await perKgCostResponse.json();
+          console.log("Per kg cost data updated:", perKgCostData);
+
+          setCalculationResults((prev) => ({
+            ...prev,
+            perKgCost: calculatedPerKgCost,
+          }));
+        }
+
+        // Store calculator data
+        const calculatorPayload = {
+          shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
+          customclearancecharges:
+            jobDataFromApi.net_weight_calculator?.custom_clearance_charges ||
+            "0.00",
+          detention: jobDataFromApi.net_weight_calculator?.detention || "0.00",
+          cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
+          transport: jobDataFromApi.net_weight_calculator?.transport || "0.00",
+          Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
+          miscellaneous:
+            jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
+          weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
+          totalCost: "0.00",
+          custom_fields:
+            jobDataFromApi.net_weight_calculator?.custom_fields || [],
+          duty: jobDataFromApi.total_duty || "0.00",
+        };
+
+        const storeCalculatorResponse = await fetch(storeCalculatorUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(calculatorPayload),
+        });
+
+        if (storeCalculatorResponse.ok) {
+          const calculatorData = await storeCalculatorResponse.json();
+          console.log(
+            "Calculator data stored and total cost calculated:",
+            calculatorData
           );
 
-          if (perKgCostResponse.ok) {
-            const perKgCostData = await perKgCostResponse.json();
-            console.log("Per kg cost data updated:", perKgCostData);
+          if (calculatorData.success) {
+            const duty = parseFloat(jobDataFromApi.total_duty) || 0;
+            const shipping = parseFloat(calculatorPayload.shipping) || 0;
+            const customclearancecharges =
+              parseFloat(calculatorPayload.customclearancecharges) || 0;
+            const detention = parseFloat(calculatorPayload.detention) || 0;
+            const cfs = parseFloat(calculatorPayload.cfs) || 0;
+            const transport = parseFloat(calculatorPayload.transport) || 0;
+            const Labour = parseFloat(calculatorPayload.Labour) || 0;
+            const customFieldsTotal =
+              calculatorPayload.custom_fields?.reduce(
+                (sum, field) => sum + (parseFloat(field.value) || 0),
+                0
+              ) || 0;
+
+            const totalCost = (
+              duty +
+              shipping +
+              customclearancecharges +
+              detention +
+              cfs +
+              transport +
+              Labour +
+              customFieldsTotal
+            ).toFixed(2);
 
             setCalculationResults((prev) => ({
               ...prev,
-              perKgCost: calculatedPerKgCost,
+              totalCost: totalCost,
             }));
           }
-        } catch (perKgError) {
-          console.warn("Failed to update per kg cost:", perKgError.message);
-        }
-
-        // Automatically call store-calculator-data API
-        try {
-          const calculatorPayload = {
-            shipping: jobDataFromApi.net_weight_calculator?.shipping || "0.00",
-            customclearancecharges:
-              jobDataFromApi.net_weight_calculator?.custom_clearance_charges ||
-              "0.00",
-            detention:
-              jobDataFromApi.net_weight_calculator?.detention || "0.00",
-            cfs: jobDataFromApi.net_weight_calculator?.cfs || "0.00",
-            transport:
-              jobDataFromApi.net_weight_calculator?.transport || "0.00",
-            Labour: jobDataFromApi.net_weight_calculator?.Labour || "0.00",
-            miscellaneous:
-              jobDataFromApi.net_weight_calculator?.miscellaneous || "0.00",
-            weight: jobDataFromApi.job_net_weight?.toString() || "0.00",
-            totalCost: "0.00",
-            custom_fields:
-              jobDataFromApi.net_weight_calculator?.custom_fields || [],
-            duty: jobDataFromApi.total_duty || "0.00",
-          };
-
-          // Updated API call with multiple IE codes support
-          const storeCalculatorResponse = await fetch(
-            `${
-              process.env.REACT_APP_API_STRING
-            }/store-calculator-data/${jobNo}?year=${selectedYear}&ie_code_nos=${userIeCodes.join(
-              ","
-            )}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(calculatorPayload),
-            }
-          );
-
-          if (storeCalculatorResponse.ok) {
-            const calculatorData = await storeCalculatorResponse.json();
-            console.log(
-              "Calculator data stored and total cost calculated:",
-              calculatorData
-            );
-
-            if (calculatorData.success) {
-              const duty = parseFloat(jobDataFromApi.total_duty) || 0;
-              const shipping = parseFloat(calculatorPayload.shipping) || 0;
-              const customclearancecharges =
-                parseFloat(calculatorPayload.customclearancecharges) || 0;
-              const detention = parseFloat(calculatorPayload.detention) || 0;
-              const cfs = parseFloat(calculatorPayload.cfs) || 0;
-              const transport = parseFloat(calculatorPayload.transport) || 0;
-              const Labour = parseFloat(calculatorPayload.Labour) || 0;
-              const customFieldsTotal =
-                calculatorPayload.custom_fields?.reduce(
-                  (sum, field) => sum + (parseFloat(field.value) || 0),
-                  0
-                ) || 0;
-
-              const totalCost = (
-                duty +
-                shipping +
-                customclearancecharges +
-                detention +
-                cfs +
-                transport +
-                Labour +
-                customFieldsTotal
-              ).toFixed(2);
-
-              setCalculationResults((prev) => ({
-                ...prev,
-                totalCost: totalCost,
-              }));
-            }
-          }
-        } catch (calculatorError) {
-          console.warn(
-            "Failed to store calculator data:",
-            calculatorError.message
-          );
         }
       } else {
         throw new Error(data.message || "Job not found");
@@ -774,148 +746,12 @@ const NetPage = () => {
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
 
-      {/* Add Header Component */}
-      {/* <Header
-        formattedDate={formattedDate}
-        formattedTime={formattedTime}
-        userName={userName}
-        userInitial={userInitial}
-        anchorEl={anchorEl}
-        open={open}
-        handleUserMenuOpen={handleUserMenuOpen}
-        handleUserMenuClose={handleUserMenuClose}
-        handleLogout={handleLogout}
-      />
-       */}
-      <HeaderBar position="fixed">
-        <Toolbar>
-          <Box
-            component="img"
-            src={require("../../assets/images/logo.webp")}
-            alt="EXIM User Portal"
-            sx={{
-              height: 40, // Ensure the logo fits well in a compact header
-              width: "auto", // Let the logo size proportionally
-              display: "block",
-              mr: 2, // Space after logo
-              objectFit: "contain", // Keeps aspect ratio, prevents distortion
-            }}
-          />
-          <Box
-            sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}
-          ></Box>
-
-          <DateTimeContainer>
-            <AccessTimeIcon />
-            <Box>
-              <Typography
-                variant="body2"
-                sx={{ fontSize: "0.875rem", lineHeight: 1.2 }}
-              >
-                {formattedTime}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ fontSize: "0.75rem", opacity: 0.8 }}
-              >
-                {formattedDate}
-              </Typography>
-            </Box>
-          </DateTimeContainer>
-
-          <Box sx={{ position: "relative" }} ref={userMenuRef}>
-            <UserMenu onClick={handleUserMenuOpen}>
-              <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
-                {userName}
-              </Typography>
-              <AccountCircleIcon />
-            </UserMenu>
-
-            {open && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: "60px",
-                  right: "0",
-                  width: "15rem",
-                  backgroundColor: "white",
-                  borderRadius: "8px",
-                  boxShadow: "0px 4px 12px rgba(0,0,0,0.15)",
-                  zIndex: 1000,
-                  py: 1,
-                  border: "1px solid #e0e0e0",
-                }}
-              >
-                <Box
-                  sx={{
-                    px: 2,
-                    py: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    "&:hover": {
-                      backgroundColor: "#f5f5f5",
-                    },
-                  }}
-                  onClick={() => {
-                    navigate("/user/profile");
-                    handleUserMenuClose();
-                  }}
-                >
-                  <PersonIcon sx={{ mr: 1, fontSize: 20 }} />
-                  <Typography variant="body2">Profile</Typography>
-                </Box>
-
-                {JSON.parse(userDataFromStorage || "{}")?.role === "admin" && (
-                  <Box
-                    sx={{
-                      px: 2,
-                      py: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      cursor: "pointer",
-                      "&:hover": {
-                        backgroundColor: "#f5f5f5",
-                      },
-                    }}
-                    onClick={() => {
-                      navigate("/user-management");
-                      handleUserMenuClose();
-                    }}
-                  >
-                    <ManageAccountsIcon sx={{ mr: 1, fontSize: 20 }} />
-                    <Typography variant="body2">Users Management</Typography>
-                  </Box>
-                )}
-
-                <Box
-                  sx={{
-                    px: 2,
-                    py: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    "&:hover": {
-                      backgroundColor: "#f5f5f5",
-                    },
-                  }}
-                  onClick={handleLogout}
-                >
-                  <LogoutIcon sx={{ mr: 1, fontSize: 20 }} />
-                  <Typography variant="body2">Logout</Typography>
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </Toolbar>
-      </HeaderBar>
-
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           padding: "24px",
-          marginTop: "64px", // Add space for fixed header
+          marginTop: "10px", // Add space for fixed header
           minHeight: "100vh",
           //  backgroundColor: "red", // Uncomment if you want a light background
           backgroundColor: "#F3F4F6",
@@ -967,15 +803,10 @@ const NetPage = () => {
             <JobExcelTable
               userId={userId}
               selectedYear={selectedYear}
-              gandhidham={
-                showGandhidhamTab && !showJobsTab
-                  ? true
-                  : tabValue === (showJobsTab ? 1 : 0)
-              }
-              key={`${tabValue}-${selectedYear}`} // Add this key to force re-render
+              gandhidham={isGandhidhamMode}
+              key={`${tabValue}-${selectedYear}`}
             />
           )}
-
           <div
             style={{
               display: "grid",
@@ -997,6 +828,7 @@ const NetPage = () => {
               jobData={jobData}
               dutyRates={dutyRates}
               userId={userId}
+              gandhidham={isGandhidhamMode}
             />
 
             {/* RIGHT: Calculator Panel */}

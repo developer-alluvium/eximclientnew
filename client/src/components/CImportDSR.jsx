@@ -1,7 +1,7 @@
 import * as React from "react";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
-import Box from "@mui/material/Box";
+import { Box, Typography } from "@mui/material";
 import "../styles/import-dsr.scss";
 import { MenuItem, TextField } from "@mui/material";
 import axios from "axios";
@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import AppbarComponent from "./home/AppbarComponent";
 import BackButton from "./BackButton";
 import { logActivity } from "../utils/activityLogger";
+import { useImportersContext } from "../context/importersContext";
 
 function CImportDSR() {
   const { a11yProps, CustomTabPanel } = useTabs();
@@ -29,15 +30,15 @@ function CImportDSR() {
   const [lastJobsDate, setLastJobsDate] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { selectedImporter } = useImportersContext();
   const [snackbar, setSnackbar] = React.useState({
     open: false,
     message: "",
     severity: "success",
   });
-  
+
   const inputRef = React.useRef();
   const navigate = useNavigate();
-  
 
   const handleChange = (event, newValue) => {
     setTabValue(newValue);
@@ -48,7 +49,6 @@ function CImportDSR() {
     setLoading(true);
     try {
       // Log logout activity before calling logout API
-   
 
       // Call logout API with user ID for logout time tracking
       try {
@@ -56,14 +56,14 @@ function CImportDSR() {
         if (user?.id) {
           logoutData.user_id = user.id;
         }
-        
+
         await axios.post(
           `${process.env.REACT_APP_API_STRING}/logout`,
           logoutData,
           { withCredentials: true }
         );
       } catch (logoutError) {
-        console.error('Error calling logout API:', logoutError);
+        console.error("Error calling logout API:", logoutError);
       }
 
       // Clear user data and navigate
@@ -79,7 +79,6 @@ function CImportDSR() {
         message: "Logged out successfully",
         severity: "success",
       });
-
     } catch (error) {
       console.error("Logout error:", error);
       setSnackbar({
@@ -100,7 +99,10 @@ function CImportDSR() {
   };
 
   // Get tab visibility from localStorage
-  const [tabVisibility, setTabVisibility] = React.useState({ jobsTabVisible: true, gandhidhamTabVisible: false });
+  const [tabVisibility, setTabVisibility] = React.useState({
+    jobsTabVisible: true,
+    gandhidhamTabVisible: false,
+  });
 
   React.useEffect(() => {
     const userDataFromStorage = localStorage.getItem("exim_user");
@@ -108,8 +110,14 @@ function CImportDSR() {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
         setTabVisibility({
-          jobsTabVisible: parsedUser.jobsTabVisible !== undefined ? parsedUser.jobsTabVisible : true,
-          gandhidhamTabVisible: parsedUser.gandhidhamTabVisible !== undefined ? parsedUser.gandhidhamTabVisible : false,
+          jobsTabVisible:
+            parsedUser.jobsTabVisible !== undefined
+              ? parsedUser.jobsTabVisible
+              : true,
+          gandhidhamTabVisible:
+            parsedUser.gandhidhamTabVisible !== undefined
+              ? parsedUser.gandhidhamTabVisible
+              : false,
         });
       } catch (e) {
         setTabVisibility({ jobsTabVisible: true, gandhidhamTabVisible: false });
@@ -119,42 +127,51 @@ function CImportDSR() {
 
   // Tabs config
   const visibleTabs = [];
-  if (tabVisibility.jobsTabVisible) visibleTabs.push({ label: "Jobs", key: "jobs" });
-  if (tabVisibility.gandhidhamTabVisible) visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
+  if (tabVisibility.jobsTabVisible)
+    visibleTabs.push({ label: "Jobs", key: "jobs" });
+  if (tabVisibility.gandhidhamTabVisible)
+    visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
 
   return (
-    <Box sx={{ 
-      display: "flex", 
-      marginTop: "70px",
-      minHeight: "calc(100vh - 70px)",
-      width: "100%",
-      overflow: "hidden"
-    }}>
+    <Box
+      sx={{
+        display: "flex",
+        marginTop: "1px",
+        minHeight: "calc(100vh - 70px)",
+        width: "100%",
+        overflow: "hidden",
+        cborderColor: "red",
+      }}
+    >
       <SelectedYearContext.Provider value={{ selectedYear, setSelectedYear }}>
-        <Box sx={{ 
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          minHeight: "100%",
-          overflow: "hidden",
-        }}>
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: "100%",
+            overflow: "hidden",
+          }}
+        >
           <Box
             sx={{
               borderBottom: 1,
               borderColor: "divider",
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent: "flex-start",
               alignItems: "center",
               padding: { xs: "8px", sm: "0 16px" },
               flexWrap: { xs: "wrap", sm: "nowrap" },
               gap: { xs: 1, sm: 0 },
             }}
           >
-            <Box sx={{ 
-              display: "flex", 
-              alignItems: "center", 
-              minWidth: 0,
-            }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                minWidth: 0,
+              }}
+            >
               <BackButton />
               <Tabs
                 value={tabValue}
@@ -166,7 +183,7 @@ function CImportDSR() {
                     minHeight: { xs: "36px", sm: "36px" },
                     fontSize: { xs: "0.875rem", sm: "1rem" },
                     padding: { xs: "6px 12px", sm: "12px 16px" },
-                  }
+                  },
                 }}
               >
                 {visibleTabs.map((tab, idx) => (
@@ -174,28 +191,24 @@ function CImportDSR() {
                 ))}
               </Tabs>
             </Box>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<LogoutTwoToneIcon />}
-              onClick={handleLogout}
-              disabled={loading}
+            <Box
               sx={{
-                marginRight: { xs: 0, sm: 2 },
-                minWidth: { xs: "auto", sm: "auto" },
-                fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                padding: { xs: "4px 8px", sm: "6px 16px" },
-                "& .MuiButton-startIcon": {
-                  marginRight: { xs: "4px", sm: "8px" },
-                },
-                "&:hover": {
-                  backgroundColor: "red",
-                  color: "white",
-                },
+                position: "absolute", // Add this
+                left: "50%", // Add this
+                transform: "translateX(-50%)", // Add this
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
               }}
             >
-              {loading ? <CircularProgress size={20} /> : "Logout"}
-            </Button>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: "bold", color: "#000" }}
+              >
+                {selectedImporter || "hii"}
+              </Typography>
+            </Box>
           </Box>
 
           {visibleTabs.map((tab, idx) => (
@@ -204,6 +217,7 @@ function CImportDSR() {
             </CustomTabPanel>
           ))}
         </Box>
+
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}

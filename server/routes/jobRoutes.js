@@ -33,6 +33,12 @@ import {
   getJobsByStatusAndImporterGandhidham,
   getImporterJobCountsGandhidham,
   getExportersGandhidham,
+  getBeNumbersByMultipleIECodesGandhidham,
+  getJobNumbersByMultipleIECodesGandhidham,
+  lookupGandhidam,
+  updatePerKgCostGandhidham,
+  storeCalculatorDataGandhidham,
+  updateJobDutyAndWeightGandhidham,
 } from "../controllers/gandhidhamController.js";
 
 const router = express.Router();
@@ -41,6 +47,11 @@ router.get("/api/get-importer-jobs/:importerURL/:year", getImporterJobCounts);
 router.get("/api/get-job/:year/:jobNo", getJobByNumber);
 router.get("/api/get-job-numbers/multiple", getJobNumbersByMultipleIECodes);
 router.get("/api/get-be-numbers/multiple", getBeNumbersByMultipleIECodes);
+router.get(
+  "/api/gandhidham/get-be-numbers/multiple",
+  getBeNumbersByMultipleIECodesGandhidham
+);
+router.get("/api/gandhidham/get-job-numbers/multiple", getJobNumbersByMultipleIECodesGandhidham);
 router.get("/api/get-job-numbers/:ie_code_no", getJobNumbersByIECode); // Supports ?year= query param
 
 // Optimized routes for IE code based filtering
@@ -81,13 +92,23 @@ router.get("/api/get-hs-codes", getHsCodes);
 router.get("/api/get-suppliers", getSuppliers);
 router.get("/api/get-duties/:job_no", getduty);
 router.patch("/api/update-per-kg-cost", updatePerKgCost);
+router.patch("/api/gandhidham/update-per-kg-cost", updatePerKgCostGandhidham);
 router.patch("/api/update-job-duty-weight/:jobNo", updateJobDutyAndWeight);
+router.patch(
+  "/api/gandhidham/update-job-duty-weight/:jobNo",
+  updateJobDutyAndWeightGandhidham
+);
 // router.get("/api/lookup/:hsCode?/:jobNo/:year", lookup);
 
 router.get("/api/lookup/:hsCode/:jobNo/:year", lookup);
 router.get("/api/lookup/:jobNo/:year", lookup);
+router.get("/api/gandhidham/lookup/:jobNo/:year", lookupGandhidam);
 
 router.post("/api/store-calculator-data/:jobNo", storeCalculatorData);
+router.post(
+  "/api/gandhidham/store-calculator-data/:jobNo",
+  storeCalculatorDataGandhidham
+);
 
 // Container Summary Analysis API
 router.get("/api/container-summary", getContainerSummary);

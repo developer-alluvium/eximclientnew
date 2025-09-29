@@ -434,3 +434,632 @@ export async function getExportersGandhidham(req, res) {
     });
   }
 }
+
+export async function getJobNumbersByMultipleIECodesGandhidham(req, res) {
+  try {
+    const { ieCodes, year, search } = req.query; // All from query parameters
+
+    console.log("Multiple IE Codes Request:", { ieCodes, year, search }); // Debug log
+
+    if (!ieCodes) {
+      return res.status(400).json({
+        success: false,
+        message: "ieCodes parameter is required in query string",
+      });
+    }
+
+    // Parse comma-separated IE codes
+    const ieCodeArray = ieCodes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    console.log("Parsed IE Codes:", ieCodeArray); // Debug log
+
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid IE codes are required",
+      });
+    }
+
+    // Build query object
+    const query = {
+      ie_code_no: { $in: ieCodeArray },
+    };
+
+    // Add year filter if provided
+    if (year) {
+      query.year = year;
+    }
+
+    // Add search filter for job number or exporter name if provided
+    if (search) {
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [{ job_no: searchRegex }, { supplier_exporter: searchRegex }];
+    }
+
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2)); // Debug log
+
+    // Find all jobs with the given ie_code_no array
+    const jobs = await GandhidhamJobModel.find(query, {
+      job_no: 1,
+      year: 1,
+      job_date: 1,
+      supplier_exporter: 1,
+      ie_code_no: 1,
+      importer: 1,
+      _id: 0,
+    }).sort({ year: -1, job_no: 1 });
+
+    console.log(`Found ${jobs.length} jobs`); // Debug log
+
+    if (!jobs || jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: search
+          ? `No jobs found for IE codes: ${ieCodeArray.join(
+              ", "
+            )} matching search: ${search}`
+          : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
+      });
+    }
+
+    // Format response
+    const jobNumbers = jobs.map((job) => ({
+      job_no: job.job_no,
+      year: job.year,
+      job_date: job.job_date,
+      supplier_exporter: job.supplier_exporter || "N/A",
+      ie_code_no: job.ie_code_no,
+      importer: job.importer || "N/A",
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${jobs.length} job(s) for IE codes: ${ieCodeArray.join(
+        ", "
+      )}`,
+      data: jobNumbers,
+      total_count: jobs.length,
+      ie_codes_searched: ieCodeArray,
+    });
+  } catch (error) {
+    console.error("Error fetching job numbers by multiple IE codes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching job numbers",
+      error: error.message,
+    });
+  }
+}
+
+export async function getBeNumbersByMultipleIECodesGandhidham(req, res) {
+  try {
+    const { ieCodes, year, search } = req.query; // All from query parameters
+
+    console.log("Multiple IE Codes Request for BE Numbers:", {
+      ieCodes,
+      year,
+      search,
+    }); // Debug log
+
+    if (!ieCodes) {
+      return res.status(400).json({
+        success: false,
+        message: "ieCodes parameter is required in query string",
+      });
+    }
+
+    // Parse comma-separated IE codes
+    const ieCodeArray = ieCodes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    console.log("Parsed IE Codes:", ieCodeArray); // Debug log
+
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid IE codes are required",
+      });
+    }
+
+    // Build query object
+    const query = {
+      ie_code_no: { $in: ieCodeArray },
+      be_no: { $exists: true, $ne: null }, // Only get jobs that have BE numbers
+    };
+
+    // Add year filter if provided
+    if (year) {
+      query.year = year;
+    }
+
+    // Add search filter for BE number or exporter name if provided
+    if (search) {
+      const searchRegex = { $regex: search, $options: "i" };
+      query.$or = [{ be_no: searchRegex }, { supplier_exporter: searchRegex }];
+    }
+
+    console.log(
+      "MongoDB Query for BE Numbers:",
+      JSON.stringify(query, null, 2)
+    ); // Debug log
+
+    // Find all jobs with the given ie_code_no array that have BE numbers
+    const jobs = await GandhidhamJobModel.find(query, {
+      be_no: 1,
+      year: 1,
+      job_date: 1,
+      supplier_exporter: 1,
+      ie_code_no: 1,
+      importer: 1,
+      _id: 0,
+    }).sort({ year: -1, be_no: 1 });
+
+    console.log(`Found ${jobs.length} jobs with BE numbers`); // Debug log
+
+    if (!jobs || jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: search
+          ? `No jobs found for IE codes: ${ieCodeArray.join(
+              ", "
+            )} matching search: ${search}`
+          : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
+      });
+    }
+
+    // Format response with be_no instead of job_no
+    const beNumbers = jobs.map((job) => ({
+      be_no: job.be_no,
+      year: job.year,
+      job_date: job.job_date,
+      supplier_exporter: job.supplier_exporter || "N/A",
+      ie_code_no: job.ie_code_no,
+      importer: job.importer || "N/A",
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${
+        jobs.length
+      } job(s) with BE numbers for IE codes: ${ieCodeArray.join(", ")}`,
+      data: beNumbers,
+      total_count: jobs.length,
+      ie_codes_searched: ieCodeArray,
+    });
+  } catch (error) {
+    console.error("Error fetching BE numbers by multiple IE codes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching BE numbers",
+      error: error.message,
+    });
+  }
+}
+
+export const lookupGandhidam = async (req, res) => {
+  try {
+    const { hsCode, jobNo, year } = req.params;
+    const userIeCodes = req.query.ie_code_nos; // Changed to support multiple IE codes
+
+    console.log("Query parameters:", req.query);
+    console.log("User IE Codes:", userIeCodes);
+
+    // Parse comma-separated IE codes if provided
+    let ieCodeArray = [];
+    if (userIeCodes) {
+      ieCodeArray = userIeCodes
+        .split(",")
+        .map((code) => code.trim())
+        .filter((code) => code);
+    }
+
+    if (ieCodeArray.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "IE codes are required",
+      });
+    }
+
+    // Find the job by EITHER job_no OR be_no and check if its IE code is in the allowed list
+    const job = await GandhidhamJobModel.findOne({
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
+      year: year,
+      ie_code_no: { $in: ieCodeArray }, // Use $in to match any of the provided IE codes
+    }).select(
+      "cth_no total_duty total_inv_value assbl_value assessable_ammount exrate clearanceValue unit_price awb_bl_date job_net_weight loading_port shipping_line_airline port_of_reporting net_weight_calculator ie_code_no hs_code be_no job_no"
+    );
+
+    console.log("Database IE Code:", job?.ie_code_no);
+    console.log("Allowed IE Codes:", ieCodeArray);
+    console.log("Found job by:", job?.job_no === jobNo ? "job_no" : "be_no");
+
+    // If no job found with matching IE codes, return job not found
+    if (!job) {
+      console.log("Job not found or IE code not authorized");
+      return res.status(404).json({
+        success: false,
+        message: "Job not found or not authorized for this IE code",
+      });
+    }
+
+    // Use HS code from job data (cth_no) or the passed hsCode parameter
+    const hsCodeToLookup = job.hs_code || job.cth_no || hsCode;
+
+    // Get CTH data only if job exists and IE codes match
+    const cthEntry = await CthModel.findOne({
+      hs_code: hsCodeToLookup,
+    }).select("hs_code basic_duty_sch basic_duty_ntfn igst sws_10_percent");
+
+    if (!cthEntry) {
+      console.log("CTH entry not found for HS code:", hsCodeToLookup);
+      return res.status(404).json({
+        success: false,
+        message: "HS Code data not found",
+      });
+    }
+
+    // Logic to handle both assbl_value and assessable_ammount
+    let finalAssessableValue = "0.00";
+
+    const assblValue = parseFloat(job.assbl_value) || 0;
+    const assessableAmount = parseFloat(job.assessable_ammount) || 0;
+
+    if (assblValue > 0 && assessableAmount > 0) {
+      // If both values are present, choose the larger one
+      finalAssessableValue = Math.max(assblValue, assessableAmount).toFixed(2);
+    } else if (assblValue > 0) {
+      // If only assbl_value is present
+      finalAssessableValue = assblValue.toFixed(2);
+    } else if (assessableAmount > 0) {
+      // If only assessable_ammount is present
+      finalAssessableValue = assessableAmount.toFixed(2);
+    }
+
+    // Prepare response
+    const result = {
+      hs_code: cthEntry.hs_code,
+      basic_duty_sch: cthEntry.basic_duty_sch,
+      basic_duty_ntfn: cthEntry.basic_duty_ntfn,
+      igst: cthEntry.igst,
+      sws_10_percent: cthEntry.sws_10_percent,
+      job_data: {
+        job_no: job.job_no,
+        be_no: job.be_no,
+        total_duty: job.total_duty,
+        total_inv_value: job.total_inv_value,
+        assbl_value: job.assbl_value,
+        assessable_ammount: job.assessable_ammount,
+        final_assessable_value: finalAssessableValue,
+        exrate: job.exrate,
+        clearanceValue: job.clearanceValue,
+        unit_price: job.unit_price,
+        awb_bl_date: job.awb_bl_date,
+        job_net_weight: job.job_net_weight,
+        loading_port: job.loading_port,
+        shipping_line_airline: job.shipping_line_airline,
+        port_of_reporting: job.port_of_reporting,
+        net_weight_calculator: job.net_weight_calculator || {
+          duty: "0.00",
+          shipping: "0.00",
+          custom_clearance_charges: "0.00",
+          detention: "0.00",
+          cfs: "0.00",
+          transport: "0.00",
+          Labour: "0.00",
+          miscellaneous: "0.00",
+          weight: job.job_net_weight || "0.00",
+          total_cost: "0.00",
+          per_kg_cost: "0.00",
+        },
+        ie_code_no: job.ie_code_no,
+        hs_code: job.hs_code,
+      },
+    };
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error looking up job data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Updated updatePerKgCost API with IE code filtering
+export const updatePerKgCostGandhidham = async (req, res) => {
+  try {
+    const { jobNo, perKgCost, ie_code_no } = req.body;
+    const year = req.query.year; // Get year from query params
+
+    // Support multiple IE codes from different sources
+    const userIeCodes =
+      req.query.ie_code_nos ||
+      req.query.ie_code_no ||
+      req.headers["x-ie-code"] ||
+      ie_code_no;
+
+    if (!jobNo || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "Job number and year are required",
+      });
+    }
+
+    // Parse IE codes (handle both single and multiple)
+    let ieCodeArray = [];
+    if (userIeCodes) {
+      if (typeof userIeCodes === "string") {
+        ieCodeArray = userIeCodes
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => code);
+      } else {
+        ieCodeArray = [userIeCodes];
+      }
+    }
+
+    // Build the query with $or for job_no and be_no
+    const query = {
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
+      year: year,
+    };
+
+    // Add IE code filtering if provided
+    if (ieCodeArray.length > 0) {
+      query.ie_code_no = { $in: ieCodeArray };
+    }
+
+    console.log("Update Per Kg Cost Query:", JSON.stringify(query, null, 2));
+
+    const updatedJob = await GandhidhamJobModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          "net_weight_calculator.per_kg_cost": perKgCost,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedJob) {
+      return res.status(404).json({
+        success: false,
+        message:
+          ieCodeArray.length > 0
+            ? "Job not found or you are not authorized to update this job"
+            : "Job not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Per kg cost updated successfully",
+      data: {
+        per_kg_cost: updatedJob.net_weight_calculator?.per_kg_cost || "0.00",
+        job_no: updatedJob.job_no,
+        be_no: updatedJob.be_no,
+        ie_code_no: updatedJob.ie_code_no,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating per kg cost:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update per kg cost",
+      error: error.message,
+    });
+  }
+};
+
+// Add a new API for storing calculator data with IE code filtering
+export const storeCalculatorDataGandhidham = async (req, res) => {
+  try {
+    const { jobNo } = req.params;
+    const { year } = req.query;
+
+    // Support multiple IE codes from different sources
+    const userIeCodes =
+      req.query.ie_code_nos ||
+      req.query.ie_code_no ||
+      req.headers["x-ie-code"] ||
+      req.body.ie_code_no;
+
+    if (!jobNo || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "Job number and year are required",
+      });
+    }
+
+    // Parse IE codes (handle both single and multiple)
+    let ieCodeArray = [];
+    if (userIeCodes) {
+      if (typeof userIeCodes === "string") {
+        ieCodeArray = userIeCodes
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => code);
+      } else {
+        ieCodeArray = [userIeCodes];
+      }
+    }
+
+    // Build the query with $or for job_no and be_no
+    const query = {
+      $or: [{ job_no: jobNo }, { be_no: jobNo }],
+      year: year,
+    };
+
+    // Add IE code filtering if provided
+    if (ieCodeArray.length > 0) {
+      query.ie_code_no = { $in: ieCodeArray };
+    }
+
+    console.log("Store Calculator Data Query:", JSON.stringify(query, null, 2));
+
+    // Extract calculator data from request body
+    const {
+      shipping,
+      customclearancecharges,
+      detention,
+      cfs,
+      transport,
+      Labour,
+      miscellaneous,
+      weight,
+      totalCost,
+      custom_fields,
+    } = req.body;
+
+    // Prepare calculator data object
+    const calculatorData = {
+      duty: req.body.duty || "0.00",
+      shipping: shipping || "0.00",
+      custom_clearance_charges: customclearancecharges || "0.00",
+      customclearancecharges: customclearancecharges || "0.00",
+      detention: detention || "0.00",
+      cfs: cfs || "0.00",
+      transport: transport || "0.00",
+      Labour: Labour || "0.00",
+      miscellaneous: miscellaneous || "0.00",
+      weight: weight || "0.00",
+      total_cost: totalCost || "0.00",
+      per_kg_cost: req.body.perKgCost || "0.00",
+    };
+
+    // Add custom fields if they exist
+    if (custom_fields && Array.isArray(custom_fields)) {
+      calculatorData.custom_fields = custom_fields;
+    }
+
+    // Use findOneAndUpdate to update calculator data
+    const updatedJob = await GandhidhamJobModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          net_weight_calculator: calculatorData,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedJob) {
+      return res.status(404).json({
+        success: false,
+        message:
+          ieCodeArray.length > 0
+            ? "Job not found or you are not authorized to update this job"
+            : "Job not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Calculator data stored successfully",
+      data: {
+        net_weight_calculator: updatedJob.net_weight_calculator,
+        job_no: updatedJob.job_no,
+        be_no: updatedJob.be_no,
+        ie_code_no: updatedJob.ie_code_no,
+      },
+    });
+  } catch (error) {
+    console.error("Error storing calculator data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to store calculator data",
+      error: error.message,
+    });
+  }
+};
+
+export const updateJobDutyAndWeightGandhidham = async (req, res) => {
+  try {
+    const { jobNo } = req.params;
+    const { year, total_duty, job_net_weight, ie_code_no } = req.body;
+
+    if (!jobNo || !year) {
+      return res.status(400).json({
+        success: false,
+        message: "Job number and year are required",
+      });
+    }
+
+    // Build the query
+    const query = {
+      job_no: jobNo,
+      be_no: jobNo,
+      year: year,
+    };
+
+    if (ie_code_no) {
+      query.ie_code_no = ie_code_no;
+    }
+
+    // Update the job with new duty and weight data
+    // The pre-save middleware will automatically calculate per_kg_cost
+    const updatedJob = await GandhidhamJobModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          ...(total_duty !== undefined && {
+            total_duty: total_duty.toString(),
+          }),
+          ...(job_net_weight !== undefined && {
+            job_net_weight: job_net_weight.toString(),
+          }),
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!updatedJob) {
+      return res.status(404).json({
+        success: false,
+        message: ie_code_no
+          ? "Job not found or you are not authorized to update this job"
+          : "Job not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Job updated successfully. Per kg cost calculated automatically.",
+      data: {
+        job_no: updatedJob.job_no,
+        total_duty: updatedJob.total_duty,
+        job_net_weight: updatedJob.job_net_weight,
+        per_kg_cost: updatedJob.net_weight_calculator?.per_kg_cost || "0.00",
+      },
+    });
+  } catch (error) {
+    console.error("Error updating job duty and weight:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update job data",
+      error: error.message,
+    });
+  }
+};
+
+
+
