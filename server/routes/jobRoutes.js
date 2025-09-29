@@ -39,6 +39,8 @@ import {
   updatePerKgCostGandhidham,
   storeCalculatorDataGandhidham,
   updateJobDutyAndWeightGandhidham,
+  getContainerDetailsGandhidham,
+  getContainerSummaryGandhidham
 } from "../controllers/gandhidhamController.js";
 
 const router = express.Router();
@@ -115,5 +117,9 @@ router.get("/api/container-summary", getContainerSummary);
 
 // Container Details API - Get detailed list of containers by status
 router.get("/api/container-details", getContainerDetails);
+
+
+router.get("/api/gandhidham/container-summary", getContainerSummaryGandhidham);
+router.get("/api/gandhidham/container-details", getContainerDetailsGandhidham);
 
 export default router;

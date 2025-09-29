@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -26,65 +26,72 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider
-} from '@mui/material';
-import { styled } from '@mui/material/styles';
-import CloseIcon from '@mui/icons-material/Close';
-import LaunchIcon from '@mui/icons-material/Launch';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+  Divider,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import CloseIcon from "@mui/icons-material/Close";
+import LaunchIcon from "@mui/icons-material/Launch";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import InventoryIcon from "@mui/icons-material/Inventory";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
 // Styled components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  fontWeight: 'bold',
+  fontWeight: "bold",
   backgroundColor: theme.palette.grey[100],
-  border: '1px solid #e0e0e0',
-  textAlign: 'center',
-  fontSize: '0.9rem',
-  padding: '8px 12px',
+  border: "1px solid #e0e0e0",
+  textAlign: "center",
+  fontSize: "0.9rem",
+  padding: "8px 12px",
 }));
 
 const StyledDataCell = styled(TableCell)(({ theme }) => ({
-  border: '1px solid #e0e0e0',
-  textAlign: 'center',
-  fontSize: '0.85rem',
-  padding: '8px 12px',
-  maxWidth: '150px',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
+  border: "1px solid #e0e0e0",
+  textAlign: "center",
+  fontSize: "0.85rem",
+  padding: "8px 12px",
+  maxWidth: "150px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 }));
 
 const ClickableCell = styled(StyledDataCell)(({ theme }) => ({
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-  '&:hover': {
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+  "&:hover": {
     backgroundColor: theme.palette.action.hover,
-    transform: 'scale(1.02)'
-  }
+    transform: "scale(1.02)",
+  },
 }));
 
 const StatusChip = styled(Chip)(({ theme, status }) => ({
-  fontWeight: 'bold',
-  fontSize: '0.75rem',
-  ...(status === 'arrived' && {
-    backgroundColor: '#4caf50',
-    color: 'white',
+  fontWeight: "bold",
+  fontSize: "0.75rem",
+  ...(status === "arrived" && {
+    backgroundColor: "#4caf50",
+    color: "white",
   }),
-  ...(status === 'transit' && {
-    backgroundColor: '#ff9800',
-    color: 'white',
+  ...(status === "transit" && {
+    backgroundColor: "#ff9800",
+    color: "white",
   }),
 }));
 
-const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
+const ContainerDetailsModal = ({
+  open,
+  onClose,
+  status,
+  size,
+  year,
+  gandhidham = false,
+}) => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedContainer, setSelectedContainer] = useState(null);
-  const [groupBy, setGroupBy] = useState('none');
+  const [groupBy, setGroupBy] = useState("none");
   const [groupedContainers, setGroupedContainers] = useState({});
 
   // Get user IE codes from localStorage - supporting multiple IE codes
@@ -93,15 +100,21 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
       const userData = localStorage.getItem("exim_user");
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        
+
         // Check for multiple IE code assignments first
-        if (parsedUser.ie_code_assignments && parsedUser.ie_code_assignments.length > 0) {
-          return parsedUser.ie_code_assignments.map(assignment => assignment.ie_code_no);
+        if (
+          parsedUser.ie_code_assignments &&
+          parsedUser.ie_code_assignments.length > 0
+        ) {
+          return parsedUser.ie_code_assignments.map(
+            (assignment) => assignment.ie_code_no
+          );
         }
-        
+
         // Fallback to single IE code
-        return parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no ? 
-          [parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no] : [];
+        return parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no
+          ? [parsedUser.data?.user?.ie_code_no || parsedUser.ie_code_no]
+          : [];
       }
     } catch (error) {
       console.error("Error getting user IE codes:", error);
@@ -109,13 +122,21 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     return [];
   };
 
+  // Get the appropriate API endpoint based on gandhidham mode
+  const getApiEndpoint = () => {
+    const baseUrl = process.env.REACT_APP_API_STRING;
+    return gandhidham
+      ? `${baseUrl}/gandhidham/container-details`
+      : `${baseUrl}/container-details`;
+  };
+
   // Fetch container details with multiple IE codes support
   const fetchContainerDetails = async () => {
     if (!status || !year) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const ieCodes = getUserIeCodes();
       if (!ieCodes.length) {
@@ -123,16 +144,20 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
       }
 
       // Create comma-separated string of IE codes
-      const ieCodesParam = ieCodes.join(',');
-      const sizeParam = size ? `&size=${size}` : '';
-      
+      const ieCodesParam = ieCodes.join(",");
+      const sizeParam = size ? `&size=${size}` : "";
+
+      // Use different endpoint based on gandhidham mode
+      const apiEndpoint = getApiEndpoint();
       const response = await fetch(
-        `${process.env.REACT_APP_API_STRING}/container-details?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`
+        `${apiEndpoint}?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch container details");
+        throw new Error(
+          errorData.message || "Failed to fetch container details"
+        );
       }
 
       const data = await response.json();
@@ -152,52 +177,60 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     }
   };
 
-  // Group containers based on selected criteria (unchanged)
+  // Group containers based on selected criteria
   const groupContainers = (containerData, groupByOption) => {
-    if (groupByOption === 'none') {
-      setGroupedContainers({ 'All Containers': containerData });
+    if (groupByOption === "none") {
+      setGroupedContainers({ "All Containers": containerData });
       return;
     }
 
     const grouped = {};
-    
-    containerData.forEach(container => {
-      let groupKey = '';
-      
+
+    containerData.forEach((container) => {
+      let groupKey = "";
+
       switch (groupByOption) {
-        case 'supplier':
-          groupKey = container.supplier_exporter || 'Unknown Supplier';
+        case "supplier":
+          groupKey = container.supplier_exporter || "Unknown Supplier";
           break;
-        case 'port':
-          groupKey = container.port_of_reporting?.replace(/^\(.*?\)\s*/, '') || 'Unknown Port';
+        case "port":
+          groupKey =
+            container.port_of_reporting?.replace(/^\(.*?\)\s*/, "") ||
+            "Unknown Port";
           break;
-        case 'size':
+        case "size":
           groupKey = `${container.container_size}' Containers`;
           break;
-        case 'month':
+        case "month":
           if (container.arrival_date) {
             const date = new Date(container.arrival_date);
-            groupKey = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            groupKey = date.toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric",
+            });
           } else {
-            groupKey = 'No Arrival Date';
+            groupKey = "No Arrival Date";
           }
           break;
-        case 'job_date':
+        case "job_date":
           if (container.job_date) {
             const date = new Date(container.job_date);
-            groupKey = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            groupKey = date.toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric",
+            });
           } else {
-            groupKey = 'Unknown Job Date';
+            groupKey = "Unknown Job Date";
           }
           break;
-        case 'job_no':
-          groupKey = container.job_no || 'Unknown Job No';
+        case "job_no":
+          groupKey = container.job_no || "Unknown Job No";
           break;
-        case 'ie_code':
-          groupKey = `IE Code: ${container.ie_code_no || 'Unknown'}`;
+        case "ie_code":
+          groupKey = `IE Code: ${container.ie_code_no || "Unknown"}`;
           break;
         default:
-          groupKey = 'All Containers';
+          groupKey = "All Containers";
       }
 
       if (!grouped[groupKey]) {
@@ -208,9 +241,13 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
 
     // Sort groups by key and sort containers within each group
     const sortedGrouped = {};
-    Object.keys(grouped).sort().forEach(key => {
-      sortedGrouped[key] = grouped[key].sort((a, b) => a.job_no.localeCompare(b.job_no));
-    });
+    Object.keys(grouped)
+      .sort()
+      .forEach((key) => {
+        sortedGrouped[key] = grouped[key].sort((a, b) =>
+          a.job_no.localeCompare(b.job_no)
+        );
+      });
 
     setGroupedContainers(sortedGrouped);
   };
@@ -222,12 +259,12 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     groupContainers(containers, newGroupBy);
   };
 
-  // Fetch data when modal opens
+  // Fetch data when modal opens or gandhidham mode changes
   useEffect(() => {
     if (open && status && year) {
       fetchContainerDetails();
     }
-  }, [open, status, year, size]);
+  }, [open, status, year, size, gandhidham]);
 
   // Update grouping when containers or groupBy changes
   useEffect(() => {
@@ -241,7 +278,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     setContainers([]);
     setError(null);
     setSelectedContainer(null);
-    setGroupBy('none');
+    setGroupBy("none");
     setGroupedContainers({});
     onClose();
   };
@@ -253,188 +290,262 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   };
 
-  // Handle tracking redirect
+  // Handle tracking redirect - different URLs for Gandhidham
   const handleTrackingRedirect = (containerNumber) => {
     if (containerNumber) {
-      const trackingUrl = `https://www.ldb.co.in/ldb/containersearch/39/${containerNumber}/1726651147706`;
-      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+      const trackingUrl = gandhidham
+        ? `https://www.gandhidhamport.com/tracking/${containerNumber}` // Replace with actual Gandhidham tracking URL
+        : `https://www.ldb.co.in/ldb/containersearch/39/${containerNumber}/1726651147706`;
+      window.open(trackingUrl, "_blank", "noopener,noreferrer");
     }
   };
 
   const getStatusColor = (status) => {
-    return status === 'arrived' ? '#4caf50' : '#ff9800';
+    return status === "arrived" ? "#4caf50" : "#ff9800";
   };
 
   const renderGroupedContainers = () => {
-    return Object.entries(groupedContainers).map(([groupName, groupContainers]) => (
-      <Box key={groupName} sx={{ mb: 4 }}>
-        {/* Group Header */}
-        <Box sx={{ 
-          mb: 2, 
-          p: 2, 
-          backgroundColor: '#f5f5f5', 
-          borderRadius: 2,
-          border: '1px solid #e0e0e0'
-        }}>
-          <Typography variant="h6" sx={{ 
-            fontWeight: 'bold', 
-            color: '#1976d2',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            📦 {groupName}
-            <Chip 
-              label={`${groupContainers.length} container${groupContainers.length > 1 ? 's' : ''}`}
-              size="small"
-              color="primary"
-              variant="outlined"
-            />
-          </Typography>
-        </Box>
+    return Object.entries(groupedContainers).map(
+      ([groupName, groupContainers]) => (
+        <Box key={groupName} sx={{ mb: 4 }}>
+          {/* Group Header */}
+          <Box
+            sx={{
+              mb: 2,
+              p: 2,
+              backgroundColor: gandhidham ? "#fff3e0" : "#f5f5f5",
+              borderRadius: 2,
+              border: "1px solid #e0e0e0",
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: gandhidham ? "#f57c00" : "#1976d2",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              {gandhidham ? "🏭" : "📦"} {groupName}
+              <Chip
+                label={`${groupContainers.length} container${
+                  groupContainers.length > 1 ? "s" : ""
+                }`}
+                size="small"
+                color={gandhidham ? "warning" : "primary"}
+                variant="outlined"
+              />
+            </Typography>
+          </Box>
 
-        {/* Group Table */}
-        <TableContainer 
-          component={Paper} 
-          sx={{ 
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-            mb: 2
-          }}
-        >
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <StyledTableCell>Job No.</StyledTableCell>
-                <StyledTableCell>Container No.</StyledTableCell>
-                <StyledTableCell>Size</StyledTableCell>
-                <StyledTableCell>Net Weight (PL)</StyledTableCell>
-                <StyledTableCell>Supplier</StyledTableCell>
-                <StyledTableCell>Arrival Date</StyledTableCell>
-                <StyledTableCell>Port</StyledTableCell>
-                <StyledTableCell>Tracking</StyledTableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {groupContainers.map((container, index) => (
-                <TableRow 
-                  key={`${container.job_no}-${container.container_number}-${index}`}
-                  sx={{ 
-                    '&:hover': { 
-                      backgroundColor: '#f5f5f5',
-                      cursor: 'pointer'
-                    }
-                  }}
-                  onClick={() => handleContainerClick(container)}
-                >
-                  <StyledDataCell>
-                    <Typography variant="body2" fontWeight="bold" color="primary">
-                      {container.job_no}
-                    </Typography>
-                  </StyledDataCell>
-                  <ClickableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <InventoryIcon sx={{ fontSize: 16, color: 'grey.600' }} />
-                      <Typography variant="body2" fontWeight="500">
-                        {container.container_number || 'N/A'}
+          {/* Group Table */}
+          <TableContainer
+            component={Paper}
+            sx={{
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              borderRadius: "8px",
+              border: "1px solid #e0e0e0",
+              mb: 2,
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <StyledTableCell>Job No.</StyledTableCell>
+                  <StyledTableCell>Container No.</StyledTableCell>
+                  <StyledTableCell>Size</StyledTableCell>
+                  <StyledTableCell>Net Weight (PL)</StyledTableCell>
+                  <StyledTableCell>Supplier</StyledTableCell>
+                  <StyledTableCell>Arrival Date</StyledTableCell>
+                  <StyledTableCell>Port</StyledTableCell>
+                  <StyledTableCell>Tracking</StyledTableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {groupContainers.map((container, index) => (
+                  <TableRow
+                    key={`${container.job_no}-${container.container_number}-${index}`}
+                    sx={{
+                      "&:hover": {
+                        backgroundColor: gandhidham ? "#fff3e0" : "#f5f5f5",
+                        cursor: "pointer",
+                      },
+                    }}
+                    onClick={() => handleContainerClick(container)}
+                  >
+                    <StyledDataCell>
+                      <Typography
+                        variant="body2"
+                        fontWeight="bold"
+                        color={gandhidham ? "warning.main" : "primary"}
+                      >
+                        {container.job_no}
                       </Typography>
-                    </Box>
-                  </ClickableCell>
-                  <StyledDataCell>
-                    <StatusChip 
-                      label={`${container.container_size}'`}
-                      size="small"
-                      sx={{ 
-                        backgroundColor: container.container_size === '20' ? '#2196f3' : '#9c27b0',
-                        color: 'white'
-                      }}
-                    />
-                  </StyledDataCell>
-                  <StyledDataCell>
-                    <Tooltip title={container.net_weight_as_per_PL_document ? `Net Weight: ${container.net_weight_as_per_PL_document}` : 'Net weight not available'} arrow>
-                      <Typography variant="body2" fontWeight="500" sx={{ color: container.net_weight_as_per_PL_document ? 'text.primary' : 'text.secondary' }}>
-                        {container.net_weight_as_per_PL_document || 'N/A'}
-                      </Typography>
-                    </Tooltip>
-                  </StyledDataCell>
-                  <StyledDataCell>
-                    <Tooltip title={container.supplier_exporter || 'N/A'} arrow>
-                      <Typography variant="body2" noWrap>
-                        {container.supplier_exporter?.substring(0, 20)}
-                        {container.supplier_exporter?.length > 20 ? '...' : ''}
-                      </Typography>
-                    </Tooltip>
-                  </StyledDataCell>
-                  <StyledDataCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                      <CalendarTodayIcon sx={{ fontSize: 14, color: 'grey.600' }} />
-                      <Typography variant="body2">
-                        {formatDate(container.arrival_date)}
-                      </Typography>
-                      {status === 'arrived' && container.days_since_arrival !== null && (
-                        <Chip 
-                          label={`${container.days_since_arrival}d`}
-                          size="small"
-                          sx={{ 
-                            fontSize: '0.7rem',
-                            height: '18px',
-                            backgroundColor: container.days_since_arrival > 10 ? '#ffeb3b' : '#e8f5e9'
-                          }}
+                    </StyledDataCell>
+                    <ClickableCell>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <InventoryIcon
+                          sx={{ fontSize: 16, color: "grey.600" }}
                         />
-                      )}
-                    </Box>
-                  </StyledDataCell>
-                  <StyledDataCell>
-                    <Tooltip title={container.port_of_reporting || 'N/A'} arrow>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                        <LocationOnIcon sx={{ fontSize: 14, color: 'grey.600' }} />
-                        <Typography variant="body2" noWrap>
-                          {container.port_of_reporting?.replace(/^\(.*?\)\s*/, '').substring(0, 15) || 'N/A'}
+                        <Typography variant="body2" fontWeight="500">
+                          {container.container_number || "N/A"}
                         </Typography>
                       </Box>
-                    </Tooltip>
-                  </StyledDataCell>
-                  <StyledDataCell>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTrackingRedirect(container.container_number);
-                      }}
-                      sx={{ 
-                        color: 'primary.main',
-                        '&:hover': { backgroundColor: 'primary.light', color: 'white' }
-                      }}
-                    >
-                      <LaunchIcon fontSize="small" />
-                    </IconButton>
-                  </StyledDataCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
-    ));
+                    </ClickableCell>
+                    <StyledDataCell>
+                      <StatusChip
+                        label={`${container.container_size}'`}
+                        size="small"
+                        sx={{
+                          backgroundColor:
+                            container.container_size === "20"
+                              ? "#2196f3"
+                              : "#9c27b0",
+                          color: "white",
+                        }}
+                      />
+                    </StyledDataCell>
+                    <StyledDataCell>
+                      <Tooltip
+                        title={
+                          container.net_weight_as_per_PL_document
+                            ? `Net Weight: ${container.net_weight_as_per_PL_document}`
+                            : "Net weight not available"
+                        }
+                        arrow
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight="500"
+                          sx={{
+                            color: container.net_weight_as_per_PL_document
+                              ? "text.primary"
+                              : "text.secondary",
+                          }}
+                        >
+                          {container.net_weight_as_per_PL_document || "N/A"}
+                        </Typography>
+                      </Tooltip>
+                    </StyledDataCell>
+                    <StyledDataCell>
+                      <Tooltip
+                        title={container.supplier_exporter || "N/A"}
+                        arrow
+                      >
+                        <Typography variant="body2" noWrap>
+                          {container.supplier_exporter?.substring(0, 20)}
+                          {container.supplier_exporter?.length > 20
+                            ? "..."
+                            : ""}
+                        </Typography>
+                      </Tooltip>
+                    </StyledDataCell>
+                    <StyledDataCell>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          justifyContent: "center",
+                        }}
+                      >
+                        <CalendarTodayIcon
+                          sx={{ fontSize: 14, color: "grey.600" }}
+                        />
+                        <Typography variant="body2">
+                          {formatDate(container.arrival_date)}
+                        </Typography>
+                        {status === "arrived" &&
+                          container.days_since_arrival !== null && (
+                            <Chip
+                              label={`${container.days_since_arrival}d`}
+                              size="small"
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: "18px",
+                                backgroundColor:
+                                  container.days_since_arrival > 10
+                                    ? "#ffeb3b"
+                                    : "#e8f5e9",
+                              }}
+                            />
+                          )}
+                      </Box>
+                    </StyledDataCell>
+                    <StyledDataCell>
+                      <Tooltip
+                        title={container.port_of_reporting || "N/A"}
+                        arrow
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            justifyContent: "center",
+                          }}
+                        >
+                          <LocationOnIcon
+                            sx={{ fontSize: 14, color: "grey.600" }}
+                          />
+                          <Typography variant="body2" noWrap>
+                            {container.port_of_reporting
+                              ?.replace(/^\(.*?\)\s*/, "")
+                              .substring(0, 15) || "N/A"}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    </StyledDataCell>
+                    <StyledDataCell>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTrackingRedirect(container.container_number);
+                        }}
+                        sx={{
+                          color: gandhidham ? "warning.main" : "primary.main",
+                          "&:hover": {
+                            backgroundColor: gandhidham
+                              ? "warning.light"
+                              : "primary.light",
+                            color: "white",
+                          },
+                        }}
+                      >
+                        <LaunchIcon fontSize="small" />
+                      </IconButton>
+                    </StyledDataCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      )
+    );
   };
 
   const renderContainerTable = () => (
-    <TableContainer 
-      component={Paper} 
-      sx={{ 
+    <TableContainer
+      component={Paper}
+      sx={{
         maxHeight: 500,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        borderRadius: '8px',
-        border: '1px solid #e0e0e0'
+        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+        borderRadius: "8px",
+        border: "1px solid #e0e0e0",
       }}
     >
       <Table stickyHeader size="small">
@@ -452,79 +563,119 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
         </TableHead>
         <TableBody>
           {containers.map((container, index) => (
-            <TableRow 
+            <TableRow
               key={`${container.job_no}-${container.container_number}-${index}`}
-              sx={{ 
-                '&:hover': { 
-                  backgroundColor: '#f5f5f5',
-                  cursor: 'pointer'
-                }
+              sx={{
+                "&:hover": {
+                  backgroundColor: gandhidham ? "#fff3e0" : "#f5f5f5",
+                  cursor: "pointer",
+                },
               }}
               onClick={() => handleContainerClick(container)}
             >
               <StyledDataCell>
-                <Typography variant="body2" fontWeight="bold" color="primary">
+                <Typography
+                  variant="body2"
+                  fontWeight="bold"
+                  color={gandhidham ? "warning.main" : "primary"}
+                >
                   {container.job_no}
                 </Typography>
               </StyledDataCell>
               <ClickableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <InventoryIcon sx={{ fontSize: 16, color: 'grey.600' }} />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <InventoryIcon sx={{ fontSize: 16, color: "grey.600" }} />
                   <Typography variant="body2" fontWeight="500">
-                    {container.container_number || 'N/A'}
+                    {container.container_number || "N/A"}
                   </Typography>
                 </Box>
               </ClickableCell>
               <StyledDataCell>
-                <StatusChip 
+                <StatusChip
                   label={`${container.container_size}'`}
                   size="small"
-                  sx={{ 
-                    backgroundColor: container.container_size === '20' ? '#2196f3' : '#9c27b0',
-                    color: 'white'
+                  sx={{
+                    backgroundColor:
+                      container.container_size === "20" ? "#2196f3" : "#9c27b0",
+                    color: "white",
                   }}
                 />
               </StyledDataCell>
               <StyledDataCell>
-                <Tooltip title={container.net_weight_as_per_PL_document ? `Net Weight: ${container.net_weight_as_per_PL_document}` : 'Net weight not available'} arrow>
-                  <Typography variant="body2" fontWeight="500" sx={{ color: container.net_weight_as_per_PL_document ? 'text.primary' : 'text.secondary' }}>
-                    {container.net_weight_as_per_PL_document || 'N/A'}
+                <Tooltip
+                  title={
+                    container.net_weight_as_per_PL_document
+                      ? `Net Weight: ${container.net_weight_as_per_PL_document}`
+                      : "Net weight not available"
+                  }
+                  arrow
+                >
+                  <Typography
+                    variant="body2"
+                    fontWeight="500"
+                    sx={{
+                      color: container.net_weight_as_per_PL_document
+                        ? "text.primary"
+                        : "text.secondary",
+                    }}
+                  >
+                    {container.net_weight_as_per_PL_document || "N/A"}
                   </Typography>
                 </Tooltip>
               </StyledDataCell>
               <StyledDataCell>
-                <Tooltip title={container.supplier_exporter || 'N/A'} arrow>
+                <Tooltip title={container.supplier_exporter || "N/A"} arrow>
                   <Typography variant="body2" noWrap>
                     {container.supplier_exporter?.substring(0, 20)}
-                    {container.supplier_exporter?.length > 20 ? '...' : ''}
+                    {container.supplier_exporter?.length > 20 ? "..." : ""}
                   </Typography>
                 </Tooltip>
               </StyledDataCell>
               <StyledDataCell>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                  <CalendarTodayIcon sx={{ fontSize: 14, color: 'grey.600' }} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    justifyContent: "center",
+                  }}
+                >
+                  <CalendarTodayIcon sx={{ fontSize: 14, color: "grey.600" }} />
                   <Typography variant="body2">
                     {formatDate(container.arrival_date)}
                   </Typography>
-                  {status === 'arrived' && container.days_since_arrival !== null && (
-                    <Chip 
-                      label={`${container.days_since_arrival}d`}
-                      size="small"
-                      sx={{ 
-                        fontSize: '0.7rem',
-                        height: '18px',
-                        backgroundColor: container.days_since_arrival > 10 ? '#ffeb3b' : '#e8f5e9'
-                      }}
-                    />
-                  )}
+                  {status === "arrived" &&
+                    container.days_since_arrival !== null && (
+                      <Chip
+                        label={`${container.days_since_arrival}d`}
+                        size="small"
+                        sx={{
+                          fontSize: "0.7rem",
+                          height: "18px",
+                          backgroundColor:
+                            container.days_since_arrival > 10
+                              ? "#ffeb3b"
+                              : "#e8f5e9",
+                        }}
+                      />
+                    )}
                 </Box>
               </StyledDataCell>
               <StyledDataCell>
-                <Tooltip title={container.port_of_reporting || 'N/A'} arrow>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
-                    <LocationOnIcon sx={{ fontSize: 14, color: 'grey.600' }} />
+                <Tooltip title={container.port_of_reporting || "N/A"} arrow>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <LocationOnIcon sx={{ fontSize: 14, color: "grey.600" }} />
                     <Typography variant="body2" noWrap>
-                      {container.port_of_reporting?.replace(/^\(.*?\)\s*/, '').substring(0, 15) || 'N/A'}
+                      {container.port_of_reporting
+                        ?.replace(/^\(.*?\)\s*/, "")
+                        .substring(0, 15) || "N/A"}
                     </Typography>
                   </Box>
                 </Tooltip>
@@ -536,9 +687,14 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
                     e.stopPropagation();
                     handleTrackingRedirect(container.container_number);
                   }}
-                  sx={{ 
-                    color: 'primary.main',
-                    '&:hover': { backgroundColor: 'primary.light', color: 'white' }
+                  sx={{
+                    color: gandhidham ? "warning.main" : "primary.main",
+                    "&:hover": {
+                      backgroundColor: gandhidham
+                        ? "warning.light"
+                        : "primary.light",
+                      color: "white",
+                    },
                   }}
                 >
                   <LaunchIcon fontSize="small" />
@@ -553,66 +709,153 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
 
   const renderContainerDetails = () => {
     if (!selectedContainer) return null;
-    
+
     return (
-      <Card sx={{ mt: 2, border: '2px solid', borderColor: getStatusColor(status), borderRadius: 2 }}>
+      <Card
+        sx={{
+          mt: 2,
+          border: "2px solid",
+          borderColor: gandhidham ? "#f57c00" : getStatusColor(status),
+          borderRadius: 2,
+          backgroundColor: gandhidham ? "#fff3e0" : "background.paper",
+        }}
+      >
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-            <Typography variant="h6" sx={{ color: getStatusColor(status), fontWeight: 'bold' }}>
-              Container Details: {selectedContainer.container_number}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              mb: 2,
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                color: gandhidham ? "#f57c00" : getStatusColor(status),
+                fontWeight: "bold",
+              }}
+            >
+              {gandhidham ? "🏭" : "📦"} Container Details:{" "}
+              {selectedContainer.container_number}
             </Typography>
-            <StatusChip 
-              label={status.toUpperCase()}
-              status={status}
-              size="small"
-            />
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <StatusChip
+                label={status.toUpperCase()}
+                status={status}
+                size="small"
+              />
+              {gandhidham && (
+                <Chip
+                  label="Gandhidham"
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                />
+              )}
+            </Box>
           </Box>
-          
+
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Typography variant="subtitle2" color="text.secondary">Job Information</Typography>
+              <Typography variant="subtitle2" color="text.secondary">
+                Job Information
+              </Typography>
               <Box sx={{ pl: 1, mt: 1 }}>
-                <Typography variant="body2"><strong>Job No:</strong> {selectedContainer.job_no}</Typography>
-                <Typography variant="body2"><strong>Job Date:</strong> {formatDate(selectedContainer.job_date)}</Typography>
-                <Typography variant="body2"><strong>Importer:</strong> {selectedContainer.importer}</Typography>
-                <Typography variant="body2"><strong>Supplier:</strong> {selectedContainer.supplier_exporter}</Typography>
+                <Typography variant="body2">
+                  <strong>Job No:</strong> {selectedContainer.job_no}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Job Date:</strong>{" "}
+                  {formatDate(selectedContainer.job_date)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Importer:</strong> {selectedContainer.importer}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Supplier:</strong>{" "}
+                  {selectedContainer.supplier_exporter}
+                </Typography>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12} md={6}>
-              <Typography variant="subtitle2" color="text.secondary">Shipping Information</Typography>
+              <Typography variant="subtitle2" color="text.secondary">
+                Shipping Information
+              </Typography>
               <Box sx={{ pl: 1, mt: 1 }}>
-                <Typography variant="body2"><strong>AWB/BL No:</strong> {selectedContainer.awb_bl_no}</Typography>
-                <Typography variant="body2"><strong>Vessel Berthing:</strong> {formatDate(selectedContainer.vessel_berthing)}</Typography>
-                <Typography variant="body2"><strong>Discharge Date:</strong> {formatDate(selectedContainer.discharge_date)}</Typography>
-                <Typography variant="body2"><strong>Shipping Line:</strong> {selectedContainer.shipping_line_airline}</Typography>
+                <Typography variant="body2">
+                  <strong>AWB/BL No:</strong> {selectedContainer.awb_bl_no}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Vessel Berthing:</strong>{" "}
+                  {formatDate(selectedContainer.vessel_berthing)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Discharge Date:</strong>{" "}
+                  {formatDate(selectedContainer.discharge_date)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Shipping Line:</strong>{" "}
+                  {selectedContainer.shipping_line_airline}
+                </Typography>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12}>
-              <Typography variant="subtitle2" color="text.secondary">Container Information</Typography>
+              <Typography variant="subtitle2" color="text.secondary">
+                Container Information
+              </Typography>
               <Box sx={{ pl: 1, mt: 1 }}>
-                <Typography variant="body2"><strong>Container Size:</strong> {selectedContainer.container_size}'</Typography>
-                <Typography variant="body2"><strong>Net Weight (PL):</strong> {selectedContainer.net_weight_as_per_PL_document || 'N/A'}</Typography>
-                <Typography variant="body2"><strong>Arrival Date:</strong> {formatDate(selectedContainer.arrival_date)}</Typography>
-                <Typography variant="body2"><strong>Delivery Date:</strong> {formatDate(selectedContainer.delivery_date)}</Typography>
-                <Typography variant="body2"><strong>Detention From:</strong> {formatDate(selectedContainer.detention_from)}</Typography>
+                <Typography variant="body2">
+                  <strong>Container Size:</strong>{" "}
+                  {selectedContainer.container_size}'
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Net Weight (PL):</strong>{" "}
+                  {selectedContainer.net_weight_as_per_PL_document || "N/A"}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Arrival Date:</strong>{" "}
+                  {formatDate(selectedContainer.arrival_date)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Delivery Date:</strong>{" "}
+                  {formatDate(selectedContainer.delivery_date)}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Detention From:</strong>{" "}
+                  {formatDate(selectedContainer.detention_from)}
+                </Typography>
                 {selectedContainer.transporter && (
-                  <Typography variant="body2"><strong>Transporter:</strong> {selectedContainer.transporter}</Typography>
+                  <Typography variant="body2">
+                    <strong>Transporter:</strong>{" "}
+                    {selectedContainer.transporter}
+                  </Typography>
                 )}
                 {selectedContainer.vehicle_no && (
-                  <Typography variant="body2"><strong>Vehicle No:</strong> {selectedContainer.vehicle_no}</Typography>
+                  <Typography variant="body2">
+                    <strong>Vehicle No:</strong> {selectedContainer.vehicle_no}
+                  </Typography>
+                )}
+                {gandhidham && (
+                  <Typography variant="body2">
+                    <strong>Port:</strong> Gandhidham Port
+                  </Typography>
                 )}
               </Box>
             </Grid>
           </Grid>
-          
-          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+
+          <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
             <Button
               variant="outlined"
               size="small"
               startIcon={<LaunchIcon />}
-              onClick={() => handleTrackingRedirect(selectedContainer.container_number)}
+              onClick={() =>
+                handleTrackingRedirect(selectedContainer.container_number)
+              }
+              color={gandhidham ? "warning" : "primary"}
             >
               Track Container
             </Button>
@@ -620,6 +863,7 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
               variant="outlined"
               size="small"
               onClick={() => setSelectedContainer(null)}
+              color={gandhidham ? "warning" : "primary"}
             >
               Back to List
             </Button>
@@ -629,35 +873,48 @@ const ContainerDetailsModal = ({ open, onClose, status, size, year }) => {
     );
   };
 
-return (
-    <Dialog 
-      open={open} 
+  return (
+    <Dialog
+      open={open}
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: '12px',
-          padding: '8px',
-          maxHeight: '90vh'
-        }
+          borderRadius: "12px",
+          padding: "8px",
+          maxHeight: "90vh",
+        },
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontWeight: 'bold', 
-        fontSize: '1.3rem',
-        color: getStatusColor(status),
-        pb: 1
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontWeight: "bold",
+          fontSize: "1.3rem",
+          color: gandhidham ? "#f57c00" : getStatusColor(status),
+          pb: 1,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <LocalShippingIcon />
           <span>
-            {status === 'arrived' ? '📦' : '🚢'} {status.charAt(0).toUpperCase() + status.slice(1)} Containers
+            {status === "arrived" ? "📦" : "🚢"}{" "}
+            {gandhidham ? "Gandhidham " : ""}
+            {status.charAt(0).toUpperCase() + status.slice(1)} Containers
             {size && ` (${size}')`}
           </span>
+          {gandhidham && (
+            <Chip
+              label="Gandhidham Port"
+              size="small"
+              color="warning"
+              variant="outlined"
+              sx={{ ml: 1 }}
+            />
+          )}
         </Box>
         <IconButton onClick={handleClose} size="small">
           <CloseIcon />
@@ -666,30 +923,43 @@ return (
 
       <DialogContent sx={{ pb: 1 }}>
         {/* Summary Info */}
-        <Box sx={{ mb: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 2 }}>
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            backgroundColor: gandhidham ? "#fff3e0" : "#f8f9fa",
+            borderRadius: 2,
+            border: gandhidham ? "1px solid #ffcc02" : "1px solid #e9ecef",
+          }}
+        >
           <Typography variant="body2" color="text.secondary">
-            Showing {status} containers for year {year}
+            Showing {gandhidham ? "Gandhidham " : ""}
+            {status} containers for year {year}
             {size && ` with size ${size}'`}
-            {containers.length > 0 && ` (${containers.length} container${containers.length > 1 ? 's' : ''})`}
+            {containers.length > 0 &&
+              ` (${containers.length} container${
+                containers.length > 1 ? "s" : ""
+              })`}
           </Typography>
         </Box>
 
-        {/* Group By Controls - Added IE Code option */}
+        {/* Group By Controls */}
         {!loading && !error && containers.length > 0 && !selectedContainer && (
           <Box sx={{ mb: 3 }}>
             <FormControl sx={{ minWidth: 250 }}>
-              <InputLabel sx={{ fontWeight: 'bold', color: '#333' }}>
+              <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
                 Group By
               </InputLabel>
               <Select
                 value={groupBy}
                 onChange={handleGroupByChange}
                 label="Group By"
+                color={gandhidham ? "warning" : "primary"}
                 sx={{
-                  '& .MuiSelect-select': {
-                    fontSize: '0.9rem',
-                    fontWeight: '500'
-                  }
+                  "& .MuiSelect-select": {
+                    fontSize: "0.9rem",
+                    fontWeight: "500",
+                  },
                 }}
               >
                 <MenuItem value="none">No Grouping</MenuItem>
@@ -708,9 +978,11 @@ return (
 
         {/* Loading State */}
         {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-            <Typography sx={{ ml: 2 }}>Loading container details...</Typography>
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress color={gandhidham ? "warning" : "primary"} />
+            <Typography sx={{ ml: 2 }}>
+              Loading {gandhidham ? "Gandhidham " : ""}container details...
+            </Typography>
           </Box>
         )}
 
@@ -724,36 +996,41 @@ return (
         {/* Container List or Details */}
         {!loading && !error && containers.length > 0 && (
           <>
-            {!selectedContainer ? (
-              groupBy === 'none' ? renderContainerTable() : renderGroupedContainers()
-            ) : (
-              renderContainerDetails()
-            )}
+            {!selectedContainer
+              ? groupBy === "none"
+                ? renderContainerTable()
+                : renderGroupedContainers()
+              : renderContainerDetails()}
           </>
         )}
 
         {/* No Data State */}
         {!loading && !error && containers.length === 0 && (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Box sx={{ textAlign: "center", py: 4 }}>
             <Typography variant="h6" color="text.secondary" gutterBottom>
               No containers found
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              No {status} containers found for the selected criteria.
+              No {gandhidham ? "Gandhidham " : ""}
+              {status} containers found for the selected criteria.
             </Typography>
           </Box>
         )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button 
+        <Button
           onClick={handleClose}
           variant="contained"
-          sx={{ 
-            backgroundColor: getStatusColor(status),
-            '&:hover': { 
-              backgroundColor: status === 'arrived' ? '#45a049' : '#f57c00'
-            }
+          sx={{
+            backgroundColor: gandhidham ? "#f57c00" : getStatusColor(status),
+            "&:hover": {
+              backgroundColor: gandhidham
+                ? "#ef6c00"
+                : status === "arrived"
+                ? "#45a049"
+                : "#f57c00",
+            },
           }}
         >
           Close

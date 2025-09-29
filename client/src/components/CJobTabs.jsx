@@ -154,6 +154,7 @@ function CJobTabs({ gandhidham = false }) {
       <ContainerSummaryModal 
         open={containerSummaryOpen}
         onClose={handleContainerSummaryClose}
+         gandhidham={gandhidham} 
       />
     </Box>
   );

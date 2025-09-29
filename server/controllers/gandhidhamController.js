@@ -1061,5 +1061,385 @@ export const updateJobDutyAndWeightGandhidham = async (req, res) => {
   }
 };
 
+export const getContainerDetailsGandhidham = async (req, res) => {
+  try {
+    const { year, status, size, ie_codes } = req.query;
 
+    if (!year) {
+      return res.status(400).json({
+        success: false,
+        message: "Year parameter is required (25-26 or 24-25)",
+      });
+    }
 
+    if (!ie_codes) {
+      return res.status(400).json({
+        success: false,
+        message: "IE codes are required for authorization",
+      });
+    }
+
+    if (!status || !["arrived", "transit"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status parameter is required (arrived or transit)",
+      });
+    }
+
+    if (size && !["20", "40"].includes(size)) {
+      return res.status(400).json({
+        success: false,
+        message: "Size parameter must be either '20' or '40'",
+      });
+    }
+
+    // Parse comma-separated IE codes from query param
+    const userIeCodes = ie_codes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    // Build match query - support multiple IE codes
+    const matchQuery = {
+      year: year,
+      ie_code_no: { $in: userIeCodes }, // Changed to support multiple IE codes
+      $or: [
+        { bill_no: { $exists: false } },
+        { bill_no: null },
+        { bill_no: "" },
+      ],
+    };
+
+    // Use aggregation pipeline to get detailed container information
+    const pipeline = [
+      {
+        $match: matchQuery,
+      },
+      {
+        $unwind: {
+          path: "$container_nos",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+      {
+        $match: {
+          "container_nos.size": { $in: size ? [size] : ["20", "40"] },
+        },
+      },
+      {
+        $project: {
+          job_no: 1,
+          job_date: 1,
+          importer: 1,
+          supplier_exporter: 1,
+          awb_bl_no: 1,
+          vessel_berthing: 1,
+          discharge_date: 1,
+          loading_port: 1,
+          port_of_reporting: 1,
+          shipping_line_airline: 1,
+          ie_code_no: 1, // Include IE code for tracking
+          container: {
+            container_number: "$container_nos.container_number",
+            size: "$container_nos.size",
+            arrival_date: "$container_nos.arrival_date",
+            delivery_date: "$container_nos.delivery_date",
+            emptyContainerOffLoadDate:
+              "$container_nos.emptyContainerOffLoadDate",
+            container_rail_out_date: "$container_nos.container_rail_out_date",
+            detention_from: "$container_nos.detention_from",
+            transporter: "$container_nos.transporter",
+            vehicle_no: "$container_nos.vehicle_no",
+            delivery_address: "$container_nos.delivery_address",
+            delivery_planning: "$container_nos.delivery_planning",
+            net_weight_as_per_PL_document:
+              "$container_nos.net_weight_as_per_PL_document",
+          },
+        },
+      },
+    ];
+
+    const result = await GandhidhamJobModel.aggregate(pipeline);
+
+    // Filter containers based on status and business logic (unchanged)
+    const filteredContainers = result.filter((item) => {
+      const container = item.container;
+
+      const isFullyCompleted =
+        container.emptyContainerOffLoadDate &&
+        container.emptyContainerOffLoadDate.trim() !== "" &&
+        container.emptyContainerOffLoadDate !== null;
+
+      if (isFullyCompleted) {
+        return false;
+      }
+
+      const hasArrivedAtPort =
+        container.arrival_date &&
+        container.arrival_date.trim() !== "" &&
+        container.arrival_date !== null;
+
+      if (status === "arrived") {
+        return hasArrivedAtPort;
+      } else if (status === "transit") {
+        return !hasArrivedAtPort;
+      }
+
+      return false;
+    });
+
+    // Format the response with additional computed fields (unchanged)
+    const formattedContainers = filteredContainers.map((item) => ({
+      job_no: item.job_no,
+      job_date: item.job_date,
+      importer: item.importer,
+      supplier_exporter: item.supplier_exporter,
+      awb_bl_no: item.awb_bl_no,
+      vessel_berthing: item.vessel_berthing,
+      discharge_date: item.discharge_date,
+      loading_port: item.loading_port,
+      port_of_reporting: item.port_of_reporting,
+      shipping_line_airline: item.shipping_line_airline,
+      ie_code_no: item.ie_code_no, // Include IE code info
+      container_number: item.container.container_number,
+      container_size: item.container.size,
+      arrival_date: item.container.arrival_date,
+      delivery_date: item.container.delivery_date,
+      emptyContainerOffLoadDate: item.container.emptyContainerOffLoadDate,
+      container_rail_out_date: item.container.container_rail_out_date,
+      detention_from: item.container.detention_from,
+      transporter: item.container.transporter,
+      vehicle_no: item.container.vehicle_no,
+      delivery_address: item.container.delivery_address,
+      delivery_planning: item.container.delivery_planning,
+      net_weight_as_per_PL_document:
+        item.container.net_weight_as_per_PL_document,
+      container_status: status,
+      days_since_arrival: item.container.arrival_date
+        ? Math.floor(
+            (new Date() - new Date(item.container.arrival_date)) /
+              (1000 * 60 * 60 * 24)
+          )
+        : null,
+    }));
+
+    // Sort containers (unchanged logic)
+    if (status === "arrived") {
+      formattedContainers.sort(
+        (a, b) => new Date(b.arrival_date) - new Date(a.arrival_date)
+      );
+    } else {
+      formattedContainers.sort((a, b) => a.job_no.localeCompare(b.job_no));
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: formattedContainers,
+      total_count: formattedContainers.length,
+      filters: {
+        year: year,
+        status: status,
+        size: size || "all",
+        ie_codes: userIeCodes,
+      },
+      last_updated: new Date().toISOString(),
+      message: `Found ${formattedContainers.length} container(s) with status '${status}' for year ${year}`,
+    });
+  } catch (error) {
+    console.error("Error generating container details:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate container details",
+      error: error.message,
+    });
+  }
+};
+
+export const getContainerSummaryGandhidham = async (req, res) => {
+  try {
+    const { year, groupBy = "status", ie_codes } = req.query;
+
+    if (!year) {
+      return res.status(400).json({
+        success: false,
+        message: "Year parameter is required (25-26 or 24-25)",
+      });
+    }
+
+    if (!ie_codes) {
+      return res.status(400).json({
+        success: false,
+        message: "IE codes are required for authorization",
+      });
+    }
+
+    // Parse comma-separated IE codes from query param
+    const userIeCodes = ie_codes
+      .split(",")
+      .map((code) => code.trim())
+      .filter((code) => code);
+
+    // Validate groupBy parameter
+    const validGroupByOptions = ["status", "size", "month", "port"];
+    if (!validGroupByOptions.includes(groupBy)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid groupBy parameter. Valid options: status, size, month, port",
+      });
+    }
+
+    // Build match query - support multiple IE codes
+    const matchQuery = {
+      year: year,
+      ie_code_no: { $in: userIeCodes }, // Changed to support multiple IE codes
+      $or: [
+        { bill_no: { $exists: false } },
+        { bill_no: null },
+        { bill_no: "" },
+      ],
+    };
+
+    // Base pipeline - enhanced to support different groupBy options
+    const pipeline = [
+      {
+        $match: matchQuery,
+      },
+      {
+        $unwind: {
+          path: "$container_nos",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+      {
+        $match: {
+          "container_nos.size": { $in: ["20", "40"] },
+        },
+      },
+    ];
+
+    // Add additional fields for grouping if needed
+    if (groupBy === "month" || groupBy === "port") {
+      pipeline.push({
+        $addFields: {
+          "container_nos.arrival_month": {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$container_nos.arrival_date", null] },
+                  { $ne: ["$container_nos.arrival_date", ""] },
+                ],
+              },
+              {
+                $dateToString: {
+                  format: "%Y-%m",
+                  date: {
+                    $dateFromString: {
+                      dateString: "$container_nos.arrival_date",
+                      onError: null,
+                    },
+                  },
+                },
+              },
+              "Not Arrived",
+            ],
+          },
+        },
+      });
+    }
+
+    // Group containers data
+    pipeline.push({
+      $group: {
+        _id: null,
+        containers: {
+          $push: {
+            size: "$container_nos.size",
+            arrival_date: "$container_nos.arrival_date",
+            delivery_date: "$container_nos.delivery_date",
+            emptyContainerOffLoadDate:
+              "$container_nos.emptyContainerOffLoadDate",
+            container_rail_out_date: "$container_nos.container_rail_out_date",
+            delivery_planning: "$container_nos.delivery_planning",
+            port_of_reporting: "$port_of_reporting",
+            arrival_month: "$container_nos.arrival_month",
+            ie_code_no: "$ie_code_no", // Include IE code for tracking
+          },
+        },
+      },
+    });
+
+    const result = await GandhidhamJobModel.aggregate(pipeline);
+
+    // Initialize counters
+    let count20Arrived = 0;
+    let count40Arrived = 0;
+    let count20Transit = 0;
+    let count40Transit = 0;
+
+    // Process container data if results exist (business logic unchanged)
+    if (result.length > 0 && result[0].containers) {
+      result[0].containers.forEach((container) => {
+        const isFullyCompleted =
+          container.emptyContainerOffLoadDate &&
+          container.emptyContainerOffLoadDate.trim() !== "" &&
+          container.emptyContainerOffLoadDate !== null;
+
+        const hasArrivedAtPort =
+          container.arrival_date &&
+          container.arrival_date.trim() !== "" &&
+          container.arrival_date !== null;
+
+        if (isFullyCompleted) {
+          return;
+        }
+
+        if (container.size === "20") {
+          if (hasArrivedAtPort) {
+            count20Arrived++;
+          } else {
+            count20Transit++;
+          }
+        } else if (container.size === "40") {
+          if (hasArrivedAtPort) {
+            count40Arrived++;
+          } else {
+            count40Transit++;
+          }
+        }
+      });
+    }
+
+    // Calculate totals
+    const totalArrived = count20Arrived + count40Arrived;
+    const totalTransit = count20Transit + count40Transit;
+    const grandTotal = totalArrived + totalTransit;
+
+    const summary = {
+      "20_arrived": count20Arrived,
+      "40_arrived": count40Arrived,
+      "20_transit": count20Transit,
+      "40_transit": count40Transit,
+      total_arrived: totalArrived,
+      total_transit: totalTransit,
+      grand_total: grandTotal,
+    };
+
+    return res.status(200).json({
+      success: true,
+      summary: summary,
+      year_filter: year,
+      group_by: groupBy,
+      ie_codes_used: userIeCodes,
+      last_updated: new Date().toISOString(),
+      message: `Container summary for year ${year} generated successfully`,
+    });
+  } catch (error) {
+    console.error("Error generating container summary:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate container summary",
+      error: error.message,
+    });
+  }
+};
