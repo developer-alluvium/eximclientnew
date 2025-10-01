@@ -232,6 +232,13 @@ function UserDashboard() {
       icon: <VideocamOutlinedIcon />,
       category: "core",
     },
+    {
+      name:"Export DSR", 
+      description:"", 
+      path: "/exportdsr",
+      icon: <AssessmentOutlinedIcon />,
+      category: "core"
+    }
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-US", {
