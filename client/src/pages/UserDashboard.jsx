@@ -194,7 +194,7 @@ function UserDashboard() {
       description:
         "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
       // path: "http://localhost:3005/",
-      path: "http://elock.s3-website.ap-south-1.amazonaws.com/",
+      path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
       icon: <LockOutlinedIcon />,
       category: "core",
       isExternal: true,
