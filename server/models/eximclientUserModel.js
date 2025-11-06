@@ -69,8 +69,8 @@ const eximclientUserSchema = new mongoose.Schema(
     ie_code_assignments: [ieCodeAssignmentSchema],
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer", // Changed from Admin to Customer
-      required: false, // Make optional since SuperAdmin will assign
+      ref: "Customer",
+      required: false,
     },
     status: {
       type: String,
@@ -90,6 +90,19 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    
+    // AEO Certificate Reminder Settings - MOVED TO MAIN SCHEMA
+    aeo_reminder_days: {
+      type: Number,
+      default: 90,
+      min: 1,
+      max: 365
+    },
+    aeo_reminder_enabled: {
+      type: Boolean,
+      default: true
+    },
+    
     assignedModules: {
       type: [String],
       default: [],
@@ -128,7 +141,7 @@ const eximclientUserSchema = new mongoose.Schema(
     },
     verifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer", // Changed from Admin to Customer
+      ref: "Customer",
       default: null,
     },
     assignedIeCode: {
@@ -159,54 +172,50 @@ const eximclientUserSchema = new mongoose.Schema(
       default: null
     },
     passwordResetToken: {
-    type: String,
-    default: null,
-  },
-  passwordResetExpires: {
-    type: Date,
-    default: null,
-  },
-pendingEmail: {
-  type: String,
-  trim: true,
-  lowercase: true,
-  default: null,
-},
-
-documents: [{
-  title: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  url: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  uploadDate: {
-    type: Date,
-    default: Date.now
-  },
-  expirationDate: {
-    type: Date,
-    default: null
-  },
-  reminderDays: {
-    type: Number,
-    default: null
-  },
-  reminderSent: {
-    type: Boolean,
-    default: false
-  }
-}],
-
-
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
+    pendingEmail: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+    documents: [{
+      title: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      url: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      uploadDate: {
+        type: Date,
+        default: Date.now
+      },
+      expirationDate: {
+        type: Date,
+        default: null
+      },
+      reminderDays: {
+        type: Number,
+        default: null
+      },
+      reminderSent: {
+        type: Boolean,
+        default: false
+      }
+    }],
   },
   { 
     timestamps: true,
-   
   }
 );
 
@@ -236,7 +245,6 @@ eximclientUserSchema.methods.comparePassword = async function (candidatePassword
 
 // Increment login attempts
 eximclientUserSchema.methods.incLoginAttempts = function() {
-  // If we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({
       $set: {
@@ -249,9 +257,8 @@ eximclientUserSchema.methods.incLoginAttempts = function() {
   }
   
   const updates = { $inc: { loginAttempts: 1 } };
-  // Lock account after 5 attempts for 2 hours
   if (this.loginAttempts + 1 >= 5 && !this.isLocked) {
-    updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 }; // 2 hours
+    updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 };
   }
   
   return this.updateOne(updates);
@@ -268,37 +275,22 @@ eximclientUserSchema.methods.resetLoginAttempts = function() {
 };
 
 // Generate email verification token
-// eximclientUserSchema.methods.generateVerificationToken = function() {
-//   const token = Math.random().toString(36).substr(2, 15) + Math.random().toString(36).substr(2, 15);
-//   this.emailVerificationToken = token;
-//   return token;
-// };
-
-// Generate email verification token
 eximclientUserSchema.methods.generateVerificationToken = function() {
   const token = crypto.randomBytes(32).toString('hex');
   this.emailVerificationToken = token;
-  this.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  return token; // Important: return the token
+  this.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+  return token;
 };
-
-// Add this method inside your eximclientUserSchema definition
 
 // Generate password reset token
 eximclientUserSchema.methods.generatePasswordResetToken = function() {
   const resetToken = crypto.randomBytes(32).toString('hex');
-
-  // Store the hashed token in the database for security
   this.passwordResetToken = crypto
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
-  
-  // Set token to expire in 10 minutes
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; 
-
-  // Return the unhashed token to be sent via email
-  return resetToken; 
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+  return resetToken;
 };
 
 // Index for better performance
@@ -309,5 +301,4 @@ eximclientUserSchema.index({ status: 1 });
 eximclientUserSchema.index({ emailVerificationToken: 1 });
 
 const EximclientUser = mongoose.model("EximclientUser", eximclientUserSchema);
-
 export default EximclientUser;

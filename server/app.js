@@ -18,6 +18,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import customerAdminRoutes from "./routes/customerAdminRoutes.js";
 import userManagementRoutes from "./routes/userManagementRoutes.js";
 import superAdminIeCodeRoutes from "./routes/superAdminIeCodeRoutes.js";
+import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
+import aeoReminderRoutes from "./routes/aeoReminderRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -40,14 +42,18 @@ app.use(
       "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
       "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
       "http://localhost:3005",
-      "http://eximdev.s3-website.ap-south-1.amazonaws.com"
+      "http://eximdev.s3-website.ap-south-1.amazonaws.com",
     ], // Your React app's URL
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", 'user-id',
-        'username',
-        'user-role',
-        'x-username'],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "user-id",
+      "username",
+      "user-role",
+      "x-username",
+    ],
   })
 );
 
@@ -79,13 +85,14 @@ app.use(superAdminRoutes);
 app.use(dashboardRoutes);
 app.use(moduleRoutes);
 app.use(activityRoutes);
-app.use(userProfileRoutes)
+app.use(userProfileRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/customer-admin", customerAdminRoutes);
 app.use("/api/user-management", userManagementRoutes);
 app.use("/api/superadmin", superAdminIeCodeRoutes);
-
+app.use(aeoIntegrationRoutes);
+app.use(aeoReminderRoutes);
 // Root route
 app.get("/", (req, res) => {
   res.send("Hello - API is running");

@@ -30,6 +30,9 @@ import {
   AccountCircle as AccountCircleIcon,
   AccessTime as AccessTimeIcon,
   ManageAccounts as ManageAccountsIcon,
+  DescriptionOutlined as DocumentIcon,
+  SecurityOutlined as CertificateIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +47,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import AEOReminderSettings from "../components/AEOReminderSettings";
 
 import { ThemeProvider, styled, alpha } from "@mui/material/styles";
 import { modernTheme } from "../styles/modernTheme";
@@ -170,8 +174,93 @@ function UserDashboard() {
   const [requestReason, setRequestReason] = useState("");
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [alertOpen, setAlertOpen] = useState(true);
-  const navigate = useNavigate();
   const [docAlertOpen, setDocAlertOpen] = useState(true);
+  const [aeoAlertOpen, setAeoAlertOpen] = useState(true);
+  const [aeoCertificates, setAeoCertificates] = useState([]);
+  const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
+
+  const renderAeoReminderAlert = () => {
+    const userReminderDays = parsedUser?.aeo_reminder_days || 90;
+    const isEnabled = parsedUser?.aeo_reminder_enabled !== false;
+
+    if (!isEnabled) {
+      return (
+        <Alert
+          severity="info"
+          sx={{ mb: 1, cursor: "pointer" }}
+          onClick={() => setReminderSettingsOpen(true)}
+          action={
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                setReminderSettingsOpen(true);
+              }}
+            >
+              <SettingsIcon fontSize="small" />
+            </IconButton>
+          }
+        >
+          <Typography variant="body2">
+            AEO certificate reminders are currently disabled.
+            <Button
+              color="inherit"
+              size="small"
+              sx={{ ml: 1, textTransform: "none" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setReminderSettingsOpen(true);
+              }}
+            >
+              Enable reminders
+            </Button>
+          </Typography>
+        </Alert>
+      );
+    }
+
+    if (
+      expiringAeoCertificates.length > 0 ||
+      expiredAeoCertificates.length > 0
+    ) {
+      return (
+        <Alert
+          severity="warning"
+          sx={{ mb: 1, cursor: "pointer" }}
+          onClick={() => setReminderSettingsOpen(true)}
+          action={
+            <Box>
+              <Chip
+                label={`${userReminderDays} days`}
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{ mr: 1 }}
+              />
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReminderSettingsOpen(true);
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          }
+        >
+          <Typography variant="body2">
+            AEO certificate reminders are active ({userReminderDays} days before
+            expiry). You will be notified about expiring certificates.
+          </Typography>
+        </Alert>
+      );
+    }
+
+    return null;
+  };
+  const navigate = useNavigate();
+
   const allModules = [
     {
       name: "Import DSR",
@@ -193,7 +282,6 @@ function UserDashboard() {
       name: "E-Lock",
       description:
         "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      // path: "http://localhost:3005/",
       path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
       icon: <LockOutlinedIcon />,
       category: "core",
@@ -233,12 +321,12 @@ function UserDashboard() {
       category: "core",
     },
     {
-      name:"Export DSR", 
-      description:"", 
+      name: "Export DSR",
+      description: "",
       path: "/exportdsr",
       icon: <AssessmentOutlinedIcon />,
-      category: "core"
-    }
+      category: "core",
+    },
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-US", {
@@ -254,9 +342,32 @@ function UserDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchAEOCertificateData();
     const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch AEO Certificate data from backend
+  const fetchAEOCertificateData = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_STRING}/aeo/kyc-summary`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        setAeoCertificates(data.kyc_summaries || []);
+      }
+    } catch (error) {
+      console.error("Error fetching AEO certificate data:", error);
+    }
+  };
 
   const modules = useMemo(() => {
     const filteredModules = filterModulesByAccess(allModules);
@@ -305,11 +416,12 @@ function UserDashboard() {
   const userImporterName =
     parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
 
-  // --- DOCUMENT EXPIRY CHECK LOGIC STARTS HERE ---
+  // --- DOCUMENT EXPIRY CHECK LOGIC ---
   const expiringDocs = useMemo(() => {
     if (!parsedUser?.documents) return [];
     const today = new Date();
     return parsedUser.documents.filter((doc) => {
+      if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
         (expirationDate - today) / (1000 * 60 * 60 * 24)
@@ -322,6 +434,7 @@ function UserDashboard() {
     if (!parsedUser?.documents) return [];
     const today = new Date();
     return parsedUser.documents.filter((doc) => {
+      if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
         (expirationDate - today) / (1000 * 60 * 60 * 24)
@@ -329,7 +442,31 @@ function UserDashboard() {
       return daysUntilExpiration <= 0;
     });
   }, [parsedUser?.documents]);
-  // --- DOCUMENT EXPIRY CHECK LOGIC ENDS HERE ---
+
+  // --- AEO CERTIFICATE EXPIRY CHECK LOGIC ---
+  const expiringAeoCertificates = useMemo(() => {
+    const today = new Date();
+    return aeoCertificates.filter((cert) => {
+      if (!cert.certificate_validity_date) return false;
+      const validityDate = new Date(cert.certificate_validity_date);
+      const daysUntilExpiry = Math.ceil(
+        (validityDate - today) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilExpiry > 0 && daysUntilExpiry <= 90;
+    });
+  }, [aeoCertificates]);
+
+  const expiredAeoCertificates = useMemo(() => {
+    const today = new Date();
+    return aeoCertificates.filter((cert) => {
+      if (!cert.certificate_validity_date) return false;
+      const validityDate = new Date(cert.certificate_validity_date);
+      const daysUntilExpiry = Math.ceil(
+        (validityDate - today) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilExpiry <= 0;
+    });
+  }, [aeoCertificates]);
 
   const handleCardClick = async (
     path,
@@ -375,7 +512,6 @@ function UserDashboard() {
         const ssoToken = res.data?.data?.token;
         if (ssoToken) {
           localStorage.setItem("sso_token", ssoToken);
-          // const elockUrl = "http://localhost:3005/";
           const elockUrl =
             "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
           window.location.href = `${elockUrl}?token=${ssoToken}`;
@@ -653,12 +789,68 @@ function UserDashboard() {
               </Box>
             </WelcomeBanner>
 
-            {/* ALERT FOR EXPIRED OR SOON EXPIRING DOCUMENTS */}
-            {docAlertOpen &&
-              (expiringDocs.length > 0 || expiredDocs.length > 0) && (
+            {/* ALERTS SECTION */}
+            <Box sx={{ mb: 3 }}>
+              {/* Document Alerts */}
+              {docAlertOpen &&
+                (expiringDocs.length > 0 || expiredDocs.length > 0) && (
+                  <Alert
+                    severity="warning"
+                    sx={{ mb: 1, cursor: "pointer" }}
+                    onClick={() => navigate("/user/profile")}
+                    action={
+                      <IconButton
+                        aria-label="close"
+                        color="inherit"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDocAlertOpen(false);
+                        }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    }
+                    icon={<DocumentIcon />}
+                  >
+                    <Box>
+                      {expiredDocs.length > 0 && (
+                        <Box sx={{ mb: 0.5 }}>
+                          <strong>Expired Documents:</strong>{" "}
+                          {expiredDocs
+                            .map(
+                              (doc) =>
+                                `${doc.title} (${new Date(
+                                  doc.expirationDate
+                                ).toLocaleDateString()})`
+                            )
+                            .join(", ")}
+                        </Box>
+                      )}
+                      {expiringDocs.length > 0 && (
+                        <Box>
+                          <strong>Expiring Soon:</strong>{" "}
+                          {expiringDocs
+                            .filter((doc) => !expiredDocs.includes(doc))
+                            .map((doc) => {
+                              const daysLeft = Math.ceil(
+                                (new Date(doc.expirationDate) - new Date()) /
+                                  (1000 * 60 * 60 * 24)
+                              );
+                              return `${doc.title} (${daysLeft} days)`;
+                            })
+                            .join(", ")}
+                        </Box>
+                      )}
+                    </Box>
+                  </Alert>
+                )}
+
+              {/* AEO Certificate Alerts */}
+              {aeoAlertOpen && (expiringAeoCertificates.length > 0 || expiredAeoCertificates.length > 0) && (
                 <Alert
-                  severity="warning"
-                  sx={{ mb: 3, cursor: "pointer" }}
+                  severity="error"
+                  sx={{ cursor: "pointer" }}
                   onClick={() => navigate("/user/profile")}
                   action={
                     <IconButton
@@ -666,45 +858,39 @@ function UserDashboard() {
                       color="inherit"
                       size="small"
                       onClick={(e) => {
-                        e.stopPropagation(); // prevent alert click from navigating
-                        setDocAlertOpen(false);
+                        e.stopPropagation();
+                        setAeoAlertOpen(false);
                       }}
                     >
                       <CloseIcon fontSize="small" />
                     </IconButton>
                   }
+                  icon={<CertificateIcon />}
                 >
-                  {expiredDocs.length > 0 && (
-                    <span>
-                      The following documents have <strong>expired</strong>:{" "}
-                      {expiredDocs
-                        .map(
-                          (doc) =>
-                            `${doc.title} (expired on ${new Date(
-                              doc.expirationDate
-                            ).toLocaleDateString()})`
-                        )
-                        .join(", ")}
-                      <br />
-                    </span>
-                  )}
-                  {expiringDocs.length > 0 && (
-                    <span>
-                      The following documents are <strong>expiring soon</strong>
-                      :{" "}
-                      {expiringDocs
-                        .filter((doc) => !expiredDocs.includes(doc))
-                        .map(
-                          (doc) =>
-                            `${doc.title} (expires on ${new Date(
-                              doc.expirationDate
-                            ).toLocaleDateString()})`
-                        )
-                        .join(", ")}
-                    </span>
-                  )}
+                  <Box>
+                    {expiredAeoCertificates.length > 0 && (
+                      <Box sx={{ mb: 0.5 }}>
+                        <strong>Expired AEO Certificates:</strong> {expiredAeoCertificates
+                          .map(cert => `${cert.importer_name} (${cert.ie_code_no}) - ${new Date(cert.certificate_validity_date).toLocaleDateString()}`)
+                          .join(", ")}
+                      </Box>
+                    )}
+                    {expiringAeoCertificates.length > 0 && (
+                      <Box>
+                        <strong>Expiring Soon AEO Certificates:</strong> {expiringAeoCertificates
+                          .filter(cert => !expiredAeoCertificates.includes(cert))
+                          .map(cert => {
+                            const daysLeft = Math.ceil((new Date(cert.certificate_validity_date) - new Date()) / (1000 * 60 * 60 * 24));
+                            return `${cert.importer_name} (${cert.ie_code_no}) - ${daysLeft} days`;
+                          })
+                          .join(", ")}
+                      </Box>
+                    )}
+                  </Box>
                 </Alert>
               )}
+             
+            </Box>
 
             {dashboardData?.user?.status === "pending" && (
               <Alert severity="warning" sx={{ mb: 4 }}>
@@ -881,6 +1067,11 @@ function UserDashboard() {
             </Box>
           </Container>
         </Box>
+        <AEOReminderSettings
+          open={reminderSettingsOpen}
+          onClose={() => setReminderSettingsOpen(false)}
+          user={parsedUser}
+        />
 
         <Dialog
           open={moduleRequestDialog}
