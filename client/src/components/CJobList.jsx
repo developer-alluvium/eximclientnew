@@ -123,26 +123,21 @@ function CJobList(props) {
         const role = parsedUser?.role || "customer";
 
         let importerName = parsedUser?.assignedImporterName;
-        if (
-          !importerName &&
-          parsedUser?.ie_code_assignments &&
-          parsedUser.ie_code_assignments.length > 0
-        ) {
-          importerName = parsedUser.ie_code_assignments[0].importer_name;
-        }
 
         setCurrentUserId(userId);
         setUserRole(role);
 
-        if (importerName) {
-          setUsername(importerName);
-          setUserImporterName(importerName);
-          setSelectedImporter(importerName);
+        // Only set the importer name if there's a single assignment or explicit assignedImporterName
+        if (importerName || (parsedUser?.ie_code_assignments?.length === 1)) {
+          const nameToSet = importerName || parsedUser.ie_code_assignments[0].importer_name;
+          setUsername(nameToSet);
+          setUserImporterName(nameToSet);
+          setSelectedImporter(nameToSet);
         }
 
         setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
 
-        console.log("Importer name set from useEffect:", importerName);
+        console.log("Importer assignments loaded:", parsedUser?.ie_code_assignments?.length || 0);
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }

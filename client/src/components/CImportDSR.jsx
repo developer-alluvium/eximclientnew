@@ -206,7 +206,7 @@ function CImportDSR() {
                 variant="h6"
                 sx={{ fontWeight: "bold", color: "#000" }}
               >
-                {selectedImporter || "hii"}
+                {selectedImporter || ""}
               </Typography>
             </Box>
           </Box>
