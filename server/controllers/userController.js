@@ -6,10 +6,9 @@ import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
 import { logActivity } from "../utils/activityLogger.js";
 import crypto from "crypto";
-import {sendVerificationEmail} from "../services/emailService.js";
+import { sendVerificationEmail } from "../services/emailService.js";
 import { sendPasswordResetEmail } from "../services/emailService.js";
 import jwt from "jsonwebtoken";
-
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
@@ -19,17 +18,14 @@ const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 
 export const registerUser = async (req, res) => {
   try {
-    const { 
-      name, 
-      email, 
-      password,
-    } = req.body;
+    const { name, email, password } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "All required fields must be provided (name, email, password)."
+        message:
+          "All required fields must be provided (name, email, password).",
       });
     }
 
@@ -38,7 +34,7 @@ export const registerUser = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid email address."
+        message: "Please enter a valid email address.",
       });
     }
 
@@ -46,16 +42,19 @@ export const registerUser = async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters long."
+        message: "Password must be at least 8 characters long.",
       });
     }
 
     // Check if email already exists
-    const existingUser = await EximclientUser.findOne({ email: email.toLowerCase() });
+    const existingUser = await EximclientUser.findOne({
+      email: email.toLowerCase(),
+    });
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: "Email already registered. Please use a different email or login."
+        message:
+          "Email already registered. Please use a different email or login.",
       });
     }
 
@@ -64,9 +63,9 @@ export const registerUser = async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase(),
       password,
-      status: 'pending',
+      status: "pending",
       isActive: false,
-      emailVerified: false, 
+      emailVerified: false,
       registrationIp: req.ip || req.connection.remoteAddress,
     });
 
@@ -78,48 +77,50 @@ export const registerUser = async (req, res) => {
 
     // Send verification email after saving
     try {
-      await sendVerificationEmail(user.email, user.name, emailVerificationToken);
+      await sendVerificationEmail(
+        user.email,
+        user.name,
+        emailVerificationToken
+      );
       console.log(`Verification email sent to ${user.email}`);
     } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
+      console.error("Failed to send verification email:", emailError);
       // Optionally handle by deleting the user or retrying
     }
 
     // Log activity
-   
+
     res.status(201).json({
       success: true,
-      message: "Registration successful! Please check your email to verify your account before logging in.",
+      message:
+        "Registration successful! Please check your email to verify your account before logging in.",
       data: {
         userId: user._id,
         email: user.email,
         status: user.status,
-        emailVerified: user.emailVerified
-      }
+        emailVerified: user.emailVerified,
+      },
     });
-
   } catch (error) {
     console.error("Registration error:", error);
-    
+
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Email already exists. Please use a different email."
+        message: "Email already exists. Please use a different email.",
       });
     }
 
     res.status(500).json({
       success: false,
-      message: "Registration failed. Please try again later."
+      message: "Registration failed. Please try again later.",
     });
   }
 };
 
-
-
 // routes/controllers/userController.js
 /**
- * Verify Email 
+ * Verify Email
  */
 export const verifyEmail = async (req, res) => {
   try {
@@ -128,14 +129,14 @@ export const verifyEmail = async (req, res) => {
     if (!token) {
       return res.status(400).json({
         success: false,
-        message: "Verification token is required"
+        message: "Verification token is required",
       });
     }
 
     // Find user with this verification token
     const user = await EximclientUser.findOne({
       emailVerificationToken: token,
-      emailVerificationTokenExpires: { $gt: Date.now() } // Check if token hasn't expired
+      emailVerificationTokenExpires: { $gt: Date.now() }, // Check if token hasn't expired
     });
 
     if (!user) {
@@ -150,7 +151,7 @@ export const verifyEmail = async (req, res) => {
     user.emailVerificationToken = undefined; // Clear the token
     user.emailVerificationTokenExpires = undefined; // Clear the expiration
     user.isActive = true;
-    user.status = 'active';
+    user.status = "active";
 
     await user.save();
 
@@ -158,16 +159,15 @@ export const verifyEmail = async (req, res) => {
     // This tells the frontend that everything worked.
     res.status(200).json({
       success: true,
-      message: "Email verified successfully."
+      message: "Email verified successfully.",
     });
-
   } catch (error) {
     console.error("Email verification error:", error);
-    
+
     // Send a generic server error response in case of other issues
     res.status(500).json({
-        success: false,
-        message: "An error occurred during email verification."
+      success: false,
+      message: "An error occurred during email verification.",
     });
   }
 };
@@ -177,7 +177,9 @@ export const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
     }
 
     const user = await EximclientUser.findOne({ email });
@@ -185,7 +187,13 @@ export const requestPasswordReset = async (req, res) => {
     // Important: Don't reveal if a user exists or not for security reasons.
     // Always send a success-like response.
     if (!user) {
-      return res.status(200).json({ success: true, message: "If an account with that email exists, a password reset link has been sent." });
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message:
+            "If an account with that email exists, a password reset link has been sent.",
+        });
     }
 
     // Generate the reset token (this is the unhashed version)
@@ -195,22 +203,32 @@ export const requestPasswordReset = async (req, res) => {
     // Send the email
     await sendPasswordResetEmail(user.email, user.name, resetToken);
 
-    res.status(200).json({ success: true, message: "If an account with that email exists, a password reset link has been sent." });
-
+    res
+      .status(200)
+      .json({
+        success: true,
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
+      });
   } catch (error) {
     console.error("Request password reset error:", error);
     // In case of error, clear the token to allow the user to try again
     const user = await EximclientUser.findOne({ email: req.body.email });
     if (user) {
-        user.passwordResetToken = undefined;
-        user.passwordResetExpires = undefined;
-        await user.save({ validateBeforeSave: false });
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save({ validateBeforeSave: false });
     }
-    res.status(500).json({ success: false, message: "Failed to send password reset email." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to send password reset email.",
+      });
   }
 };
-/** 
- * Forgot Password 
+/**
+ * Forgot Password
  */
 // This is your provided controller, renamed and modified for the SECOND step.
 // It now uses the token from the URL to reset the password.
@@ -220,23 +238,27 @@ export const resetPassword = async (req, res) => {
     const { newPassword } = req.body;
 
     if (!token || !newPassword) {
-      return res.status(400).json({ success: false, message: "Token and new password are required" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Token and new password are required",
+        });
     }
 
     // 1. Hash the incoming token to match the one in the DB
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
     // 2. Find user with the valid, unexpired hashed token
     const user = await EximclientUser.findOne({
       passwordResetToken: hashedToken, // Use the hashed token for lookup
-      passwordResetExpires: { $gt: Date.now() }
+      passwordResetExpires: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: "Invalid or expired reset token" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
     }
 
     // Update password (hashed through pre-save hook)
@@ -248,13 +270,19 @@ export const resetPassword = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ success: true, message: "Password has been reset successfully. Please log in." });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Password has been reset successfully. Please log in.",
+      });
   } catch (error) {
     console.error("Password reset error:", error);
-    res.status(500).json({ success: false, message: "Failed to reset password" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to reset password" });
   }
 };
-
 
 /**
  * User Login
@@ -268,30 +296,36 @@ export const loginUser = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required."
+        message: "Email and password are required.",
       });
     }
 
     console.log("Finding user by email or IE code:", email);
     // Find user by email or IE code and select necessary fields
-    const user = await EximclientUser.findOne({ 
+    const user = await EximclientUser.findOne({
       $or: [
         { email: email.toLowerCase() },
-        { ie_code_no: email.toUpperCase() }
-      ]
+        { ie_code_no: email.toUpperCase() },
+      ],
     })
-    .select('name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified ie_code_assignments documents' )
-    .populate('adminId', 'name ie_code_no'); // Populating customer as admin
+      .select(
+        "name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified ie_code_assignments documents"
+      )
+      .populate("adminId", "name ie_code_no"); // Populating customer as admin
 
     if (!user) {
       console.log("User not found for email:", email);
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password."
+        message: "Invalid email or password.",
       });
     }
 
-    console.log("User found:", { id: user._id, email: user.email, status: user.status });
+    console.log("User found:", {
+      id: user._id,
+      email: user.email,
+      status: user.status,
+    });
 
     // // Check if account is locked
     // if (user.isLocked) {
@@ -305,15 +339,15 @@ export const loginUser = async (req, res) => {
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
     console.log("Password verification result:", isPasswordValid);
-    
+
     if (!isPasswordValid) {
       console.log("Password invalid, incrementing login attempts");
       // Increment login attempts
       // await user.loginAttempts();
-      
+
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password."
+        message: "Invalid email or password.",
       });
     }
 
@@ -334,17 +368,15 @@ export const loginUser = async (req, res) => {
 
     console.log("Starting activity logging");
 
-
     console.log("Sending auth response");
     // Send auth response
-    sendUserAuthResponse(user, 'user', 200, res, true);
+    sendUserAuthResponse(user, "user", 200, res, true);
     console.log("Auth response sent successfully");
-
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({
       success: false,
-      message: "Login failed. Please try again later."
+      message: "Login failed. Please try again later.",
     });
   }
 };
@@ -355,20 +387,20 @@ export const loginUser = async (req, res) => {
 export const getUserProfile = async (req, res) => {
   try {
     const user = await EximclientUser.findById(req.user._id)
-      .populate('adminId', 'name ie_code_no') // Populating customer as admin
-      .select('-password');
+      .populate("adminId", "name ie_code_no") // Populating customer as admin
+      .select("-password");
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
     // Get user's module access
-    const moduleAccess = await ModuleAccess.find({ 
+    const moduleAccess = await ModuleAccess.find({
       userId: user._id,
-      isEnabled: true 
+      isEnabled: true,
     });
 
     res.json({
@@ -376,15 +408,14 @@ export const getUserProfile = async (req, res) => {
       data: {
         user,
         moduleAccess,
-        availableModules: getAvailableModules()
-      }
+        availableModules: getAvailableModules(),
+      },
     });
-
   } catch (error) {
     console.error("Get profile error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch user profile."
+      message: "Failed to fetch user profile.",
     });
   }
 };
@@ -397,8 +428,8 @@ export const getUserDashboard = async (req, res) => {
     const user = req.user;
 
     // Get user's module access
-    const moduleAccess = await ModuleAccess.find({ 
-      userId: user._id 
+    const moduleAccess = await ModuleAccess.find({
+      userId: user._id,
     });
 
     // Get available modules
@@ -411,40 +442,43 @@ export const getUserDashboard = async (req, res) => {
         email: user.email,
         status: user.status,
         ie_code_no: user.ie_code_no,
-        lastLogin: user.lastLogin
+        lastLogin: user.lastLogin,
       },
-      modules: availableModules.map(module => {
-        const access = moduleAccess.find(ma => ma.moduleKey === module.key);
+      modules: availableModules.map((module) => {
+        const access = moduleAccess.find((ma) => ma.moduleKey === module.key);
         return {
           ...module,
           isEnabled: access ? access.isEnabled : false,
           canAccess: access ? access.canAccessNow() : false,
           lastAccessed: access ? access.lastAccessed : null,
-          permissions: access ? access.permissions : {
-            canView: false,
-            canEdit: false,
-            canDelete: false,
-            canExport: false
-          }
+          permissions: access
+            ? access.permissions
+            : {
+                canView: false,
+                canEdit: false,
+                canDelete: false,
+                canExport: false,
+              },
         };
       }),
       notifications: await Notification.find({
         recipient: user._id,
-        recipientModel: 'EximclientUser',
-        isRead: false
-      }).sort({ createdAt: -1 }).limit(5)
+        recipientModel: "EximclientUser",
+        isRead: false,
+      })
+        .sort({ createdAt: -1 })
+        .limit(5),
     };
 
     res.json({
       success: true,
-      data: dashboardData
+      data: dashboardData,
     });
-
   } catch (error) {
     console.error("Get dashboard error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch dashboard data."
+      message: "Failed to fetch dashboard data.",
     });
   }
 };
@@ -459,24 +493,21 @@ export const logoutUser = async (req, res) => {
     if (user) {
       user.lastLogout = new Date();
       await user.save();
-
-      
     }
 
     // Clear cookies
-    res.clearCookie('user_access_token');
-    res.clearCookie('user_refresh_token');
+    res.clearCookie("user_access_token");
+    res.clearCookie("user_refresh_token");
 
     res.json({
       success: true,
-      message: "Logged out successfully."
+      message: "Logged out successfully.",
     });
-
   } catch (error) {
     console.error("Logout error:", error);
     res.status(500).json({
       success: false,
-      message: "Logout failed."
+      message: "Logout failed.",
     });
   }
 };
@@ -492,30 +523,30 @@ export const requestModuleAccess = async (req, res) => {
     if (!moduleKey) {
       return res.status(400).json({
         success: false,
-        message: "Module key is required."
+        message: "Module key is required.",
       });
     }
 
     // Check if module exists
     const availableModules = getAvailableModules();
-    const module = availableModules.find(m => m.key === moduleKey);
+    const module = availableModules.find((m) => m.key === moduleKey);
     if (!module) {
       return res.status(404).json({
         success: false,
-        message: "Invalid module key."
+        message: "Invalid module key.",
       });
     }
 
     // Check if access already exists
     const existingAccess = await ModuleAccess.findOne({
       userId: user._id,
-      moduleKey
+      moduleKey,
     });
 
     if (existingAccess) {
       return res.status(409).json({
         success: false,
-        message: "Module access already requested or granted."
+        message: "Module access already requested or granted.",
       });
     }
 
@@ -526,47 +557,46 @@ export const requestModuleAccess = async (req, res) => {
       moduleName: module.name,
       moduleKey,
       isEnabled: false,
-      notes: reason || 'User requested access'
+      notes: reason || "User requested access",
     });
 
     await moduleAccess.save();
 
     // Notify admin
     await Notification.createNotification({
-      type: 'module_access_request',
+      type: "module_access_request",
       recipient: user.adminId,
-      recipientModel: 'Admin',
+      recipientModel: "Admin",
       sender: user._id,
-      senderModel: 'EximclientUser',
-      title: 'Module Access Request',
-      message: `User ${user.name} has requested access to ${module.name}. Reason: ${reason || 'Not specified'}`,
+      senderModel: "EximclientUser",
+      title: "Module Access Request",
+      message: `User ${user.name} has requested access to ${
+        module.name
+      }. Reason: ${reason || "Not specified"}`,
       data: {
         userId: user._id,
         moduleKey,
         moduleName: module.name,
-        reason
+        reason,
       },
-      priority: 'medium',
-      actionRequired: true
+      priority: "medium",
+      actionRequired: true,
     });
 
     res.status(201).json({
       success: true,
-      message: "Module access requested successfully. Admin will review your request.",
-      data: moduleAccess
+      message:
+        "Module access requested successfully. Admin will review your request.",
+      data: moduleAccess,
     });
-
   } catch (error) {
     console.error("Request module access error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to request module access."
+      message: "Failed to request module access.",
     });
   }
 };
-
-
-
 
 export const generateSSOToken = async (req, res) => {
   try {
@@ -577,11 +607,14 @@ export const generateSSOToken = async (req, res) => {
         message: "Authentication required",
       });
     }
-    console.log(`Generating SSO token for user: ${req.user.id} (${req.user.name})`);
+    console.log(
+      `Generating SSO token for user: ${req.user.id} (${req.user.name})`
+    );
 
     // Get requested ie_code_no from query or body or params
     // (Assuming frontend sends as query param ?ie_code_no=xxxx)
-    const requestedIeCode = req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
+    const requestedIeCode =
+      req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
     if (!requestedIeCode) {
       return res.status(400).json({
         success: false,
@@ -591,7 +624,10 @@ export const generateSSOToken = async (req, res) => {
 
     // Extract user's assigned ie codes (array of strings)
     let userIeCodes = [];
-    if (Array.isArray(req.user.ie_code_assignments) && req.user.ie_code_assignments.length > 0) {
+    if (
+      Array.isArray(req.user.ie_code_assignments) &&
+      req.user.ie_code_assignments.length > 0
+    ) {
       userIeCodes = req.user.ie_code_assignments.map((a) => a.ie_code_no);
     } else if (req.user.ie_code_no) {
       userIeCodes = [req.user.ie_code_no];
@@ -605,7 +641,11 @@ export const generateSSOToken = async (req, res) => {
       });
     }
 
-    console.log(`User IE codes: ${userIeCodes.join(", ")}, requested IE code: ${requestedIeCode}`);
+    console.log(
+      `User IE codes: ${userIeCodes.join(
+        ", "
+      )}, requested IE code: ${requestedIeCode}`
+    );
 
     // Generate short-lived SSO token with standard JWT format
     const ssoToken = jwt.sign(
@@ -617,8 +657,6 @@ export const generateSSOToken = async (req, res) => {
       JWT_SECRET,
       { expiresIn: "1d" } // 1 day expiry for security
     );
-
-   
 
     res.status(200).json({
       success: true,
@@ -644,27 +682,27 @@ export const generateSSOToken = async (req, res) => {
 export const getCurrentUser = async (req, res) => {
   try {
     const user = await EximclientUser.findById(req.user._id)
-      .select('-password') // Exclude password
-      .populate('adminId', 'name ie_code_no'); // Populate admin data if needed
+      .select("-password") // Exclude password
+      .populate("adminId", "name ie_code_no"); // Populate admin data if needed
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
     // Get user's module access
-    const moduleAccess = await ModuleAccess.find({ 
+    const moduleAccess = await ModuleAccess.find({
       userId: user._id,
-      isEnabled: true 
+      isEnabled: true,
     });
 
     // Get document expiry information
     const today = new Date();
     const documents = user.documents || [];
-    
-    const expiringDocs = documents.filter(doc => {
+
+    const expiringDocs = documents.filter((doc) => {
       if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
@@ -673,7 +711,7 @@ export const getCurrentUser = async (req, res) => {
       return daysUntilExpiration > 0 && daysUntilExpiration <= 30;
     });
 
-    const expiredDocs = documents.filter(doc => {
+    const expiredDocs = documents.filter((doc) => {
       if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
@@ -701,25 +739,24 @@ export const getCurrentUser = async (req, res) => {
           assignedModules: user.assignedModules,
           jobsTabVisible: user.jobsTabVisible,
           gandhidhamTabVisible: user.gandhidhamTabVisible,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          allowedColumns: user.allowedColumns,
         },
         moduleAccess,
         documentAlerts: {
           expiring: expiringDocs,
-          expired: expiredDocs
-        }
-      }
+          expired: expiredDocs,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Get current user error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch user data."
+      message: "Failed to fetch user data.",
     });
   }
 };
-
 
 /**
  * Get Available Modules
@@ -727,40 +764,40 @@ export const getCurrentUser = async (req, res) => {
 function getAvailableModules() {
   return [
     {
-      key: 'import_dsr',
-      name: 'Import DSR',
-      description: 'Import Daily Status Report management',
-      icon: 'import_export',
-      category: 'imports'
+      key: "import_dsr",
+      name: "Import DSR",
+      description: "Import Daily Status Report management",
+      icon: "import_export",
+      category: "imports",
     },
     {
-      key: 'net_weight',
-      name: 'Net Weight Calculator',
-      description: 'Calculate net weights for shipments',
-      icon: 'scale',
-      category: 'calculations'
+      key: "net_weight",
+      name: "Net Weight Calculator",
+      description: "Calculate net weights for shipments",
+      icon: "scale",
+      category: "calculations",
     },
     {
-      key: 'analytics',
-      name: 'Analytics Dashboard',
-      description: 'View analytics and reports',
-      icon: 'analytics',
-      category: 'reports'
+      key: "analytics",
+      name: "Analytics Dashboard",
+      description: "View analytics and reports",
+      icon: "analytics",
+      category: "reports",
     },
     {
-      key: 'document_management',
-      name: 'Document Management',
-      description: 'Manage import/export documents',
-      icon: 'folder',
-      category: 'documents'
+      key: "document_management",
+      name: "Document Management",
+      description: "Manage import/export documents",
+      icon: "folder",
+      category: "documents",
     },
     {
-      key: 'compliance_tracking',
-      name: 'Compliance Tracking',
-      description: 'Track compliance requirements',
-      icon: 'verified',
-      category: 'compliance'
-    }
+      key: "compliance_tracking",
+      name: "Compliance Tracking",
+      description: "Track compliance requirements",
+      icon: "verified",
+      category: "compliance",
+    },
   ];
 }
 
@@ -771,5 +808,5 @@ export default {
   getUserDashboard,
   logoutUser,
   requestModuleAccess,
-  generateSSOToken
+  generateSSOToken,
 };

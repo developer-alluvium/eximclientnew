@@ -69,6 +69,8 @@ const extractUserImporters = (user) => {
 
 const JobExcelTable = ({ userId, gandhidham }) => {
   const [jobData, setJobData] = useState([]);
+  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -189,7 +191,6 @@ const JobExcelTable = ({ userId, gandhidham }) => {
       setExporters([]);
     }
   };
-
   useEffect(() => {
     fetchExporters();
   }, [selectedImporter, selectedYear, selectedStatus, gandhidham]);

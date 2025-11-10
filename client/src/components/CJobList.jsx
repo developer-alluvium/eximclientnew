@@ -119,7 +119,8 @@ function CJobList(props) {
     if (userDataFromStorage) {
       try {
         const parsedUser = JSON.parse(userDataFromStorage);
-        const userId = parsedUser?.id;
+  
+        const userId = parsedUser?._id;
         const role = parsedUser?.role || "customer";
 
         let importerName = parsedUser?.assignedImporterName;
@@ -128,8 +129,9 @@ function CJobList(props) {
         setUserRole(role);
 
         // Only set the importer name if there's a single assignment or explicit assignedImporterName
-        if (importerName || (parsedUser?.ie_code_assignments?.length === 1)) {
-          const nameToSet = importerName || parsedUser.ie_code_assignments[0].importer_name;
+        if (importerName || parsedUser?.ie_code_assignments?.length === 1) {
+          const nameToSet =
+            importerName || parsedUser.ie_code_assignments[0].importer_name;
           setUsername(nameToSet);
           setUserImporterName(nameToSet);
           setSelectedImporter(nameToSet);
@@ -137,7 +139,7 @@ function CJobList(props) {
 
         setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
 
-        console.log("Importer assignments loaded:", parsedUser?.ie_code_assignments?.length || 0);
+        
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }
@@ -191,7 +193,6 @@ function CJobList(props) {
   }, []);
 
   // Track if column order has been fetched
-
   // Fixed useEffect hook - replace the problematic section around lines 170-295
   useEffect(() => {
     if (hasAttemptedFetch || !currentUserId) {
