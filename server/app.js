@@ -21,6 +21,7 @@ import superAdminIeCodeRoutes from "./routes/superAdminIeCodeRoutes.js";
 import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
 import aeoReminderRoutes from "./routes/aeoReminderRoutes.js";
 
+import icegateProxy from "./routes/icegateProxy.js";
 // Load environment variables
 dotenv.config();
 
@@ -93,6 +94,8 @@ app.use("/api/user-management", userManagementRoutes);
 app.use("/api/superadmin", superAdminIeCodeRoutes);
 app.use(aeoIntegrationRoutes);
 app.use(aeoReminderRoutes);
+app.use(icegateProxy);
+
 // Root route
 app.get("/", (req, res) => {
   res.send("Hello - API is running");

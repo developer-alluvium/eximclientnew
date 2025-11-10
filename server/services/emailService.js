@@ -80,7 +80,7 @@ export const sendVerificationEmail = async (
 export const sendPasswordResetEmail = async (email, name, token) => {
   const transporter = createEmailTransporter();
 
-  const resetUrl = `${process.env.CLIENT_URL}/forgot-password/${token}`;
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
 
   const mailOptions = {
     from: `${process.env.MAIL_FROM_NAME} <${process.env.MAIL_FROM}>`,

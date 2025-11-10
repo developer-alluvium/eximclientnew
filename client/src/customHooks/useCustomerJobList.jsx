@@ -8,7 +8,7 @@ import ChecklistCell from "../components/ChecklistCell"; // Adjust the path as n
 // import NetWeightCell from "../components/Net weight/NetWeightCell"; // Adjust the path as needed
 import DoPlanningToggle from "../components/DoPlanningToggle"; // Adjust the path as needed
 import EditableTransporterCell from "../components/EditableTransporterCell";
-
+import BENumberCell from"../components/BEnumberCell.jsx";
 // Custom hook to manage job columns configuration with centered content
 function useCustomerJobList() {
   const [containerModalOpen, setContainerModalOpen] = useState(false);
@@ -190,112 +190,118 @@ function useCustomerJobList() {
   },
 },
       
-      {
-        accessorKey: "be_no",
-        header: "BE Number & Date",
-        size: 150,
-        Cell: ({ cell }) => {
-          const beNumber = cell?.getValue()?.toString();
-          const rawBeDate = cell.row.original.be_date;
-          const beDate = formatDate(rawBeDate);
-          const { 
-            processed_be_attachment = [], 
-            ooc_copies = [], 
-            gate_pass_copies = [] 
-          } = cell.row.original;
+      // {
+      //   accessorKey: "be_no",
+      //   header: "BE Number & Date",
+      //   size: 150,
+      //   Cell: ({ cell }) => {
+      //     const beNumber = cell?.getValue()?.toString();
+      //     const rawBeDate = cell.row.original.be_date;
+      //     const beDate = formatDate(rawBeDate);
+      //     const { 
+      //       processed_be_attachment = [], 
+      //       ooc_copies = [], 
+      //       gate_pass_copies = [] 
+      //     } = cell.row.original;
 
-          // Combine all documents with labels
-          const allDocuments = [
-            ...processed_be_attachment.map((url, index) => ({
-              url,
-              name: `Processed BE ${index + 1}`,
-              type: 'processed_be'
-            })),
-            ...ooc_copies.map((url, index) => ({
-              url,
-              name: `OOC Copy ${index + 1}`,
-              type: 'ooc'
-            })),
-            ...gate_pass_copies.map((url, index) => ({
-              url,
-              name: `Gate Pass ${index + 1}`,
-              type: 'gate_pass'
-            }))
-          ];
+      //     // Combine all documents with labels
+      //     const allDocuments = [
+      //       ...processed_be_attachment.map((url, index) => ({
+      //         url,
+      //         name: `Processed BE ${index + 1}`,
+      //         type: 'processed_be'
+      //       })),
+      //       ...ooc_copies.map((url, index) => ({
+      //         url,
+      //         name: `OOC Copy ${index + 1}`,
+      //         type: 'ooc'
+      //       })),
+      //       ...gate_pass_copies.map((url, index) => ({
+      //         url,
+      //         name: `Gate Pass ${index + 1}`,
+      //         type: 'gate_pass'
+      //       }))
+      //     ];
 
-          return (
-            <div style={centeredCellStyle}>
-              {beNumber && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <a
-                      href={`https://enquiry.icegate.gov.in/enquiryatices/beTrackIces?BE_NO=${beNumber}&BE_DT=${beDate}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {beNumber}
-                    </a>
-                    <IconButton
-                      size="small"
-                      onClick={(event) => handleCopy(event, beNumber)}
-                      sx={{ padding: "2px" }}
-                    >
-                      <abbr title="Copy BE Number">
-                        <ContentCopyIcon fontSize="inherit" />
-                      </abbr>
-                    </IconButton>
-                  </div>
-                  <span>{beDate}</span>
+      //     return (
+      //       <div style={centeredCellStyle}>
+      //         {beNumber && (
+      //           <div
+      //             style={{
+      //               display: "flex",
+      //               flexDirection: "column",
+      //               gap: "4px",
+      //               alignItems: "center",
+      //             }}
+      //           >
+      //             <div
+      //               style={{
+      //                 display: "flex",
+      //                 alignItems: "center",
+      //                 gap: "4px",
+      //               }}
+      //             >
+      //               <a
+      //                 href={`https://enquiry.icegate.gov.in/enquiryatices/beTrackIces?BE_NO=${beNumber}&BE_DT=${beDate}`}
+      //                 target="_blank"
+      //                 rel="noopener noreferrer"
+      //               >
+      //                 {beNumber}
+      //               </a>
+      //               <IconButton
+      //                 size="small"
+      //                 onClick={(event) => handleCopy(event, beNumber)}
+      //                 sx={{ padding: "2px" }}
+      //               >
+      //                 <abbr title="Copy BE Number">
+      //                   <ContentCopyIcon fontSize="inherit" />
+      //                 </abbr>
+      //               </IconButton>
+      //             </div>
+      //             <span>{beDate}</span>
                   
-                  {/* Documents section - matching esanchit format */}
-                  <div style={{ marginTop: "8px", width: "100%" }}>
-                    {allDocuments.length > 0 ? (
-                      allDocuments.map((doc, index) => (
-                        <div key={index} style={{ marginBottom: "4px" }}>
-                          {doc.url ? (
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ 
-                                fontSize: "0.9rem",
-                                color: "#007bff",
-                                textDecoration: "underline"
-                              }}
-                            >
-                              {doc.name}
-                            </a>
-                          ) : (
-                            <span style={{ fontSize: "0.8em", color: "#999" }}>
-                              {doc.name}
-                            </span>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <span style={{ fontSize: "0.8em", color: "#999" }}>
-                        No documents
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        },
+      //             {/* Documents section - matching esanchit format */}
+      //             <div style={{ marginTop: "8px", width: "100%" }}>
+      //               {allDocuments.length > 0 ? (
+      //                 allDocuments.map((doc, index) => (
+      //                   <div key={index} style={{ marginBottom: "4px" }}>
+      //                     {doc.url ? (
+      //                       <a
+      //                         href={doc.url}
+      //                         target="_blank"
+      //                         rel="noopener noreferrer"
+      //                         style={{ 
+      //                           fontSize: "0.9rem",
+      //                           color: "#007bff",
+      //                           textDecoration: "underline"
+      //                         }}
+      //                       >
+      //                         {doc.name}
+      //                       </a>
+      //                     ) : (
+      //                       <span style={{ fontSize: "0.8em", color: "#999" }}>
+      //                         {doc.name}
+      //                       </span>
+      //                     )}
+      //                   </div>
+      //                 ))
+      //               ) : (
+      //                 <span style={{ fontSize: "0.8em", color: "#999" }}>
+      //                   No documents
+      //                 </span>
+      //               )}
+      //             </div>
+      //           </div>
+      //         )}
+      //       </div>
+      //     );
+      //   },
+      // },
+       {
+        accessorKey: "be_no",
+        header: "BE Number and Date",
+        size: 200,
+        Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} />,
       },
      {
   accessorKey: "checklist",
