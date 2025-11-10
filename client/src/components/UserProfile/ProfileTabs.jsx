@@ -15,7 +15,7 @@ const ProfileTabs = ({
   onRefreshProfile,
   onSetError,
   onSetSuccess,
-  onOpenReminderSettings, 
+  onUpdateReminderSettings, // Updated prop name
 }) => {
   const [tabValue, setTabValue] = useState(0);
 
@@ -29,30 +29,40 @@ const ProfileTabs = ({
     <Paper
       sx={{
         width: "100%",
-        borderRadius: 2,
+        borderRadius: 3,
         border: "1px solid #e0e0e0",
         overflow: "hidden",
-        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
+        background: "linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%)",
       }}
     >
       <Tabs
         value={tabValue}
         onChange={(e, newValue) => setTabValue(newValue)}
+        variant="fullWidth"
         sx={{
-          borderBottom: "1px solid #e0e0e0",
+          borderBottom: "1px solid #e8eaf6",
           px: 3,
+          py: 1,
           "& .MuiTab-root": {
             fontWeight: 600,
-            fontSize: "0.95rem",
+            fontSize: "1rem",
             textTransform: "none",
-            minHeight: 60,
+            minHeight: 56,
+            borderRadius: 2,
+            marginRight: 1,
+            px: 3,
             "&.Mui-selected": {
               color: "#1a237e",
+              background: "rgba(26, 35, 126, 0.04)",
+              boxShadow: "0 2px 8px rgba(26, 35, 126, 0.1)",
+            },
+            "&:hover": {
+              background: "rgba(0, 0, 0, 0.04)",
             },
           },
           "& .MuiTabs-indicator": {
-            backgroundColor: "#1a237e",
-            height: 3,
+            background: "transparent",
           },
         }}
       >
@@ -76,7 +86,7 @@ const ProfileTabs = ({
             onFetchKYCSummary={onFetchKYCSummary}
             onSetError={onSetError}
             onSetSuccess={onSetSuccess}
-            onOpenReminderSettings={onOpenReminderSettings}
+            onUpdateReminderSettings={onUpdateReminderSettings}
           />
         </TabPanel>
 

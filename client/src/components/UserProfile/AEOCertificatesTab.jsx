@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Switch,
 } from "@mui/material";
 import {
   Business as BusinessIcon,
@@ -37,7 +38,7 @@ const AEOCertificatesTab = ({
   onFetchKYCSummary,
   onSetError,
   onSetSuccess,
-  onOpenReminderSettings, // Add this prop
+  onUpdateReminderSettings,
 }) => {
   const [selectedImporter, setSelectedImporter] = useState("");
   const [updateImporterOpen, setUpdateImporterOpen] = useState(false);
@@ -45,9 +46,54 @@ const AEOCertificatesTab = ({
     useState(null);
   const [newImporterName, setNewImporterName] = useState("");
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
+  const [localReminderSettings, setLocalReminderSettings] = useState({
+    reminder_enabled: true,
+    reminder_days: 90,
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const presetDays = [30, 60, 90, 120, 180, 365];
+
+  // Initialize local settings from user data
+  React.useEffect(() => {
+    if (user) {
+      setLocalReminderSettings({
+        reminder_enabled: user.aeo_reminder_enabled ?? true,
+        reminder_days: user.aeo_reminder_days ?? 90,
+      });
+    }
+  }, [user]);
 
   const handleImporterChange = (event) => {
     setSelectedImporter(event.target.value);
+  };
+
+  const handleReminderEnableChange = (enabled) => {
+    setLocalReminderSettings(prev => ({
+      ...prev,
+      reminder_enabled: enabled,
+    }));
+  };
+
+  const handleDaysChange = (event) => {
+    setLocalReminderSettings(prev => ({
+      ...prev,
+      reminder_days: Number(event.target.value),
+    }));
+  };
+
+  const handleSaveReminderSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await onUpdateReminderSettings(localReminderSettings);
+      onSetSuccess("Reminder settings updated successfully");
+      setReminderSettingsOpen(false);
+    } catch (error) {
+      onSetError("Failed to update reminder settings");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const handleUpdateImporterName = async () => {
@@ -104,6 +150,192 @@ const AEOCertificatesTab = ({
     return <Chip label={config.label} color={config.color} size="small" />;
   };
 
+  const getReminderStatusText = () => {
+    if (localReminderSettings.reminder_enabled === false) {
+      return "Reminders disabled";
+    }
+    const days = localReminderSettings.reminder_days;
+    return `Notify ${days} days before expiry`;
+  };
+
+  const ReminderSettingsCard = () => {
+    const stats = kycSummary?.kyc_summaries || [];
+    
+    const today = new Date();
+    const expiringSoon = stats.filter((cert) => {
+      if (!cert.certificate_validity_date || !localReminderSettings.reminder_enabled) return false;
+      const expiryDate = new Date(cert.certificate_validity_date);
+      const daysUntilExpiry = Math.ceil(
+        (expiryDate - today) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilExpiry > 0 && daysUntilExpiry <= localReminderSettings.reminder_days;
+    }).length;
+
+    const expired = stats.filter((cert) => {
+      if (!cert.certificate_validity_date) return false;
+      return new Date(cert.certificate_validity_date) < today;
+    }).length;
+
+    return (
+      <Card
+        sx={{
+          minWidth: 320,
+          border: "1px solid #e0e0e0",
+          borderRadius: 2,
+          transition: "all 0.3s ease",
+          "&:hover": {
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+          },
+          bgcolor: "white",
+        }}
+      >
+        <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
+          {/* Header */}
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                bgcolor: "primary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mr: 2,
+                color: "white",
+              }}
+            >
+              <NotificationsIcon fontSize="small" />
+            </Box>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: "#1a237e" }}>
+                AEO Reminders
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Certificate expiry notifications
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Quick Status */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Status
+              </Typography>
+              <Chip
+                label={localReminderSettings.reminder_enabled ? "Active" : "Disabled"}
+                color={localReminderSettings.reminder_enabled ? "success" : "default"}
+                size="small"
+                variant={localReminderSettings.reminder_enabled ? "filled" : "outlined"}
+              />
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.875rem" }}>
+              {getReminderStatusText()}
+            </Typography>
+          </Box>
+
+          {/* Settings Toggle */}
+          <Box sx={{ mb: 3, border: "1px solid #e8eaf6", borderRadius: 2, p: 2, bgcolor: "#f8f9ff" }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Enable Email Reminders
+              </Typography>
+              <Switch
+                checked={localReminderSettings.reminder_enabled}
+                onChange={(e) => handleReminderEnableChange(e.target.checked)}
+                color="primary"
+                size="small"
+              />
+            </Box>
+            
+            {localReminderSettings.reminder_enabled && (
+              <Box sx={{ mt: 2 }}>
+                <FormControl fullWidth size="small" sx={{ minWidth: 120 }}>
+                  <InputLabel>Notify before expiry</InputLabel>
+                  <Select
+                    value={localReminderSettings.reminder_days}
+                    onChange={handleDaysChange}
+                    label="Notify before expiry"
+                    sx={{ minWidth: 120 }}
+                  >
+                    {presetDays.map((days) => (
+                      <MenuItem key={days} value={days}>
+                        {days} days before expiry
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            )}
+          </Box>
+
+          {/* Stats */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: "#1a237e" }}>
+              📊 Certificate Overview
+            </Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: "center", p: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: "#2e7d32" }}>
+                    {stats.length}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Total
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: "center", p: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: "#1976d2" }}>
+                    {stats.length - expired}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Active
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={4}>
+                <Box sx={{ textAlign: "center", p: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: expiringSoon > 0 ? "#ed6c02" : "#2e7d32" }}>
+                    {expiringSoon}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Alerts
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Action Button */}
+          <Button
+            variant="outlined"
+            size="small"
+            fullWidth
+            onClick={() => setReminderSettingsOpen(true)}
+            startIcon={<SettingsIcon />}
+            disabled={savingSettings}
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              py: 1,
+              borderColor: "#1976d2",
+              color: "#1976d2",
+              "&:hover": {
+                borderColor: "#1565c0",
+                bgcolor: "#e3f2fd",
+              },
+            }}
+          >
+            {savingSettings ? "Saving..." : "Advanced Settings"}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const CertificateCard = ({ kyc }) => {
     const daysUntilExpiry = kyc.certificate_validity_date
       ? Math.ceil(
@@ -157,11 +389,11 @@ const AEOCertificatesTab = ({
           </Box>
 
           {/* Reminder Status Badge */}
-          {daysUntilExpiry !== null && user?.aeo_reminder_enabled !== false && (
+          {daysUntilExpiry !== null && localReminderSettings.reminder_enabled && (
             <Box sx={{ mb: 2 }}>
               <Alert
                 severity={
-                  daysUntilExpiry <= (user?.aeo_reminder_days || 90)
+                  daysUntilExpiry <= (localReminderSettings.reminder_days || 90)
                     ? "info"
                     : "success"
                 }
@@ -173,11 +405,9 @@ const AEOCertificatesTab = ({
                 }}
               >
                 <Typography variant="body2">
-                  {daysUntilExpiry <= (user?.aeo_reminder_days || 90)
-                    ? `🔔 Reminder: Expires in ${daysUntilExpiry} days`
-                    : `✅ Reminder set for ${
-                        user?.aeo_reminder_days || 90
-                      } days before expiry`}
+                  {daysUntilExpiry <= (localReminderSettings.reminder_days || 90)
+                    ? `🔔 Alert: Expires in ${daysUntilExpiry} days`
+                    : `✅ Safe: ${daysUntilExpiry} days remaining`}
                 </Typography>
               </Alert>
             </Box>
@@ -206,11 +436,7 @@ const AEOCertificatesTab = ({
           ) : (
             <Grid container spacing={2}>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   AEO Tier
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -218,11 +444,7 @@ const AEOCertificatesTab = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Certificate No
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -230,11 +452,7 @@ const AEOCertificatesTab = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Issue Date
                 </Typography>
                 <Typography variant="body2">
@@ -242,11 +460,7 @@ const AEOCertificatesTab = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Validity Date
                 </Typography>
                 <Typography variant="body2">
@@ -254,11 +468,7 @@ const AEOCertificatesTab = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Days Until Expiry
                 </Typography>
                 <Typography
@@ -277,11 +487,7 @@ const AEOCertificatesTab = ({
                 </Typography>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Validity Status
                 </Typography>
                 <Box sx={{ mt: 0.5 }}>
@@ -289,21 +495,13 @@ const AEOCertificatesTab = ({
                 </Box>
               </Grid>
               <Grid item xs={6}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   KYC Status
                 </Typography>
                 <Box sx={{ mt: 0.5 }}>{getStatusChip(kyc.kyc_status)}</Box>
               </Grid>
               <Grid item xs={12}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
+                <Typography variant="caption" color="text.secondary" display="block">
                   Last Verified
                 </Typography>
                 <Typography variant="body2">
@@ -317,98 +515,144 @@ const AEOCertificatesTab = ({
     );
   };
 
+  const AdvancedReminderSettings = () => (
+    <Card
+      sx={{
+        mt: 2,
+        border: "1px solid #e0e0e0",
+        borderRadius: 2,
+        bgcolor: "#fafcff",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: "#1a237e" }}>
+          Advanced Reminder Settings
+        </Typography>
+        
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body1" sx={{ fontWeight: 500, mb: 1 }}>
+            Enable Reminders
+          </Typography>
+          <Switch
+            checked={localReminderSettings.reminder_enabled}
+            onChange={(e) => handleReminderEnableChange(e.target.checked)}
+            color="primary"
+          />
+        </Box>
+
+        {localReminderSettings.reminder_enabled && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+              Notification Timing
+            </Typography>
+            <FormControl fullWidth size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Send reminder</InputLabel>
+              <Select
+                value={localReminderSettings.reminder_days}
+                onChange={handleDaysChange}
+                label="Send reminder"
+              >
+                {presetDays.map((days) => (
+                  <MenuItem key={days} value={days}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography>{days}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        days before expiry
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <Alert severity="info" sx={{ mt: 2, borderRadius: 1 }}>
+              <Typography variant="body2">
+                You'll receive an email notification when any AEO certificate is within the selected timeframe of expiry.
+              </Typography>
+            </Alert>
+          </Box>
+        )}
+
+        <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+          <Button
+            onClick={() => setReminderSettingsOpen(false)}
+            disabled={savingSettings}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveReminderSettings}
+            variant="contained"
+            disabled={savingSettings || !localReminderSettings.reminder_enabled}
+            sx={{ 
+              borderRadius: 2,
+              background: "linear-gradient(135deg, #667eea, #764ba2)",
+            }}
+          >
+            {savingSettings ? "Saving..." : "Save Settings"}
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <Box>
-      {/* Header Section with Settings Button */}
-      <Box sx={{ mb: 3 }}>
+      {/* Header Section */}
+      <Box sx={{ mb: 4 }}>
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            mb: 2,
+            mb: 3,
           }}
         >
           <Box>
             <Typography
-              variant="h5"
-              sx={{ fontWeight: 600, color: "#1a237e", mb: 1 }}
+              variant="h4"
+              sx={{ fontWeight: 700, color: "#1a237e", mb: 1 }}
             >
-              AEO Certificate Status
+              AEO Certificates
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Automatic verification from AEO Directory and AEO India portal
+            <Typography variant="body1" color="text.secondary">
+              Automated verification from official AEO directories
             </Typography>
           </Box>
-
-          {/* Reminder Settings Quick Access */}
-          <Card
-            sx={{ minWidth: 280, border: "1px solid #e0e0e0", borderRadius: 2 }}
-          >
-            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  mb: 1,
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Reminder Settings
-                </Typography>
-                <Chip
-                  label={
-                    user?.aeo_reminder_enabled !== false ? "Active" : "Disabled"
-                  }
-                  color={
-                    user?.aeo_reminder_enabled !== false ? "success" : "default"
-                  }
-                  size="small"
-                />
-              </Box>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {user?.aeo_reminder_enabled !== false
-                  ? `Notify ${user?.aeo_reminder_days || 90} days before expiry`
-                  : "Reminders disabled"}
-              </Typography>
-
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<SettingsIcon />}
-                onClick={onOpenReminderSettings}
-                fullWidth
-                sx={{ borderRadius: 1 }}
-              >
-                Configure
-              </Button>
-            </CardContent>
-          </Card>
+          
+          {/* Reminder Settings Card - Moved to top right */}
+          <ReminderSettingsCard />
         </Box>
 
-        {/* Show manual update option if there are failed verifications */}
+        {/* Warning for failed verifications */}
         {kycSummary?.kyc_summaries?.some(
           (k) => !k.has_aeo_data && k.kyc_status === "not_found"
         ) && (
-          <Alert severity="warning" sx={{ mt: 2, mb: 2, borderRadius: 2 }}>
-            <Typography variant="body2">
-              Some importers couldn't be verified automatically. You can update
-              the importer name and try again.
+          <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              Some certificates couldn't be verified automatically
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              Update importer names to match official AEO records for better verification results.
             </Typography>
           </Alert>
         )}
 
-        {/* Importer Selection Dropdown */}
+        {/* Importer Selection */}
         {user?.ie_code_assignments?.length > 1 && (
-          <FormControl fullWidth sx={{ mt: 2, mb: 2, maxWidth: 400 }}>
+          <FormControl fullWidth sx={{ mb: 3, maxWidth: 400 }}>
             <InputLabel>Select Importer</InputLabel>
             <Select
               value={selectedImporter}
               onChange={handleImporterChange}
               label="Select Importer"
             >
+              <MenuItem value="">
+                <em>All Importers</em>
+              </MenuItem>
               {user.ie_code_assignments.map((assignment, index) => (
                 <MenuItem key={index} value={assignment.ie_code_no}>
                   {assignment.importer_name} - {assignment.ie_code_no}
@@ -419,9 +663,12 @@ const AEOCertificatesTab = ({
         )}
       </Box>
 
-      {aeoLoading && <LinearProgress sx={{ mb: 2 }} />}
+      {aeoLoading && <LinearProgress sx={{ mb: 3 }} />}
 
-      {/* Certificate Cards */}
+      {/* Advanced Settings - Inline */}
+      {reminderSettingsOpen && <AdvancedReminderSettings />}
+
+      {/* Certificates Grid */}
       {kycSummary?.kyc_summaries?.length > 0 ? (
         <Grid container spacing={3}>
           {kycSummary.kyc_summaries
@@ -429,22 +676,30 @@ const AEOCertificatesTab = ({
               (kyc) => !selectedImporter || kyc.ie_code_no === selectedImporter
             )
             .map((kyc, index) => (
-              <Grid item xs={12} md={6} key={index}>
+              <Grid item xs={12} md={6} lg={4} key={index}>
                 <CertificateCard kyc={kyc} />
               </Grid>
             ))}
         </Grid>
       ) : (
-        <Box sx={{ textAlign: "center", py: 6 }}>
+        <Box sx={{ textAlign: "center", py: 8 }}>
           <VerifiedIcon
-            sx={{ fontSize: 64, color: "text.secondary", mb: 2, opacity: 0.5 }}
+            sx={{ fontSize: 64, color: "text.secondary", mb: 3, opacity: 0.5 }}
           />
           <Typography variant="h6" color="text.secondary" gutterBottom>
             No AEO Certificates Found
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            AEO data will be automatically fetched when you access your profile
+            Certificates will be automatically fetched and verified when available
           </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={onFetchKYCSummary}
+            disabled={aeoLoading}
+          >
+            Refresh Verification
+          </Button>
         </Box>
       )}
 
@@ -464,8 +719,7 @@ const AEOCertificatesTab = ({
               IE Code: <strong>{selectedImporterForUpdate?.ie_code_no}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Current Name:{" "}
-              <strong>{selectedImporterForUpdate?.importer_name}</strong>
+              Current Name: <strong>{selectedImporterForUpdate?.importer_name}</strong>
             </Typography>
           </Box>
 
@@ -484,16 +738,12 @@ const AEOCertificatesTab = ({
 
           <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="body2">
-              Updating the name will trigger a new AEO verification with the
-              updated name.
+              Updating the name will trigger a new AEO verification with the updated name.
             </Typography>
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setUpdateImporterOpen(false)}
-            disabled={updateLoading}
-          >
+          <Button onClick={() => setUpdateImporterOpen(false)} disabled={updateLoading}>
             Cancel
           </Button>
           <Button

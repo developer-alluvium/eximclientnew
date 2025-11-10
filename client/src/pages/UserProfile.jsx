@@ -19,6 +19,7 @@ import { useAEOIntegration } from "../hooks/useAEOIntegration";
 import ProfileHeader from "../components/UserProfile/ProfileHeader"
 import ProfileTabs from "../components/UserProfile/ProfileTabs";
 import AEOReminderSettingsDialog from "../components/UserProfile/AEOReminderSettingsDialog";
+import { useSnackbar } from 'notistack'; 
 
 const UserProfile = () => {
   const { user: contextUser } = useContext(UserContext);
@@ -30,13 +31,14 @@ const UserProfile = () => {
     kycSummary,
     updateImporterName,
   } = useAEOIntegration();
-
+  const { enqueueSnackbar } = useSnackbar();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
 
+  
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -78,6 +80,39 @@ const UserProfile = () => {
     }
   };
 
+  const handleUpdateReminderSettings = async (settings) => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `${process.env.REACT_APP_API_STRING}/api/aeo/reminder-settings`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(settings),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local user state
+        setUser(prev => ({
+          ...prev,
+          aeo_reminder_enabled: settings.reminder_enabled,
+          aeo_reminder_days: settings.reminder_days,
+        }));
+        return data.settings;
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      console.error("Error updating reminder settings:", error);
+      throw error;
+    }
+  };
   const handleRefreshAEO = async () => {
     try {
       await autoVerifyImporters();
@@ -150,6 +185,7 @@ const UserProfile = () => {
           onRefreshProfile={fetchUserProfile}
           onSetError={setError}
           onSetSuccess={setSuccess}
+           onUpdateReminderSettings={handleUpdateReminderSettings}
         />
 
         {/* AEO Reminder Settings Dialog */}
