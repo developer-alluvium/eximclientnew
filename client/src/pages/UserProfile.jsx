@@ -185,16 +185,16 @@ const UserProfile = () => {
           onRefreshProfile={fetchUserProfile}
           onSetError={setError}
           onSetSuccess={setSuccess}
-           onUpdateReminderSettings={handleUpdateReminderSettings}
+           //onUpdateReminderSettings={handleUpdateReminderSettings}
         />
 
         {/* AEO Reminder Settings Dialog */}
-        <AEOReminderSettingsDialog
+        {/* <AEOReminderSettingsDialog
           open={reminderSettingsOpen}
           onClose={() => setReminderSettingsOpen(false)}
           user={user}
           aeoCertificates={kycSummary?.kyc_summaries || []}
-        />
+        /> */}
       </Container>
     </LocalizationProvider>
   );

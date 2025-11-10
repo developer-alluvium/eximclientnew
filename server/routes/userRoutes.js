@@ -9,7 +9,8 @@ import {
   verifyEmail,
   requestPasswordReset,
   resetPassword, 
-  generateSSOToken
+  generateSSOToken, 
+  getCurrentUser
 } from "../controllers/userController.js";
 import { authenticateUser, authorize } from "../middlewares/authMiddleware.js";
 
@@ -24,6 +25,8 @@ router.post("/request-password-reset", requestPasswordReset);
 
 // POST /api/users/reset-password/:token
 router.post("/reset-password/:token", resetPassword);
+// Add this route to your user routes
+router.get('/current', authenticateUser, getCurrentUser);
 
 
 // Protected routes (requires authentication)

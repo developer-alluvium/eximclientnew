@@ -638,7 +638,87 @@ export const generateSSOToken = async (req, res) => {
     });
   }
 };
+/**
+ * Get Current User Data
+ */
+export const getCurrentUser = async (req, res) => {
+  try {
+    const user = await EximclientUser.findById(req.user._id)
+      .select('-password') // Exclude password
+      .populate('adminId', 'name ie_code_no'); // Populate admin data if needed
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Get user's module access
+    const moduleAccess = await ModuleAccess.find({ 
+      userId: user._id,
+      isEnabled: true 
+    });
+
+    // Get document expiry information
+    const today = new Date();
+    const documents = user.documents || [];
+    
+    const expiringDocs = documents.filter(doc => {
+      if (!doc.expirationDate) return false;
+      const expirationDate = new Date(doc.expirationDate);
+      const daysUntilExpiration = Math.ceil(
+        (expirationDate - today) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilExpiration > 0 && daysUntilExpiration <= 30;
+    });
+
+    const expiredDocs = documents.filter(doc => {
+      if (!doc.expirationDate) return false;
+      const expirationDate = new Date(doc.expirationDate);
+      const daysUntilExpiration = Math.ceil(
+        (expirationDate - today) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilExpiration <= 0;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          status: user.status,
+          isActive: user.isActive,
+          role: user.role,
+          ie_code_no: user.ie_code_no,
+          ie_code_assignments: user.ie_code_assignments,
+          documents: user.documents,
+          aeo_reminder_days: user.aeo_reminder_days,
+          aeo_reminder_enabled: user.aeo_reminder_enabled,
+          lastLogin: user.lastLogin,
+          assignedModules: user.assignedModules,
+          jobsTabVisible: user.jobsTabVisible,
+          gandhidhamTabVisible: user.gandhidhamTabVisible,
+          emailVerified: user.emailVerified
+        },
+        moduleAccess,
+        documentAlerts: {
+          expiring: expiringDocs,
+          expired: expiredDocs
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user data."
+    });
+  }
+};
 
 
 /**

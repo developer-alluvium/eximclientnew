@@ -51,7 +51,7 @@ import AEOReminderSettings from "../components/AEOReminderSettings";
 
 import { ThemeProvider, styled, alpha } from "@mui/material/styles";
 import { modernTheme } from "../styles/modernTheme";
-
+import { useUserData } from "../customHooks/useUserData";
 import {
   filterModulesByAccess,
   getUserAssignedModules,
@@ -164,6 +164,7 @@ const UserMenu = styled(Box)(({ theme }) => ({
 }));
 
 function UserDashboard() {
+   const { userData, loading: userLoading, error: userError, refreshUserData } = useUserData();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -179,86 +180,68 @@ function UserDashboard() {
   const [aeoCertificates, setAeoCertificates] = useState([]);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
 
-  const renderAeoReminderAlert = () => {
-    const userReminderDays = parsedUser?.aeo_reminder_days || 90;
-    const isEnabled = parsedUser?.aeo_reminder_enabled !== false;
-
-    if (!isEnabled) {
-      return (
-        <Alert
-          severity="info"
-          sx={{ mb: 1, cursor: "pointer" }}
-          onClick={() => setReminderSettingsOpen(true)}
-          action={
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                setReminderSettingsOpen(true);
-              }}
-            >
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-          }
-        >
-          <Typography variant="body2">
-            AEO certificate reminders are currently disabled.
-            <Button
-              color="inherit"
-              size="small"
-              sx={{ ml: 1, textTransform: "none" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setReminderSettingsOpen(true);
-              }}
-            >
-              Enable reminders
-            </Button>
-          </Typography>
-        </Alert>
+  const fetchAndUpdateUserData = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/users/current`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          withCredentials: true
+        }
       );
-    }
 
-    if (
-      expiringAeoCertificates.length > 0 ||
-      expiredAeoCertificates.length > 0
-    ) {
-      return (
-        <Alert
-          severity="warning"
-          sx={{ mb: 1, cursor: "pointer" }}
-          onClick={() => setReminderSettingsOpen(true)}
-          action={
-            <Box>
-              <Chip
-                label={`${userReminderDays} days`}
-                size="small"
-                color="primary"
-                variant="outlined"
-                sx={{ mr: 1 }}
-              />
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setReminderSettingsOpen(true);
-                }}
-              >
-                <SettingsIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          }
-        >
-          <Typography variant="body2">
-            AEO certificate reminders are active ({userReminderDays} days before
-            expiry). You will be notified about expiring certificates.
-          </Typography>
-        </Alert>
-      );
-    }
+      if (response.data.success) {
+        const userData = response.data.data.user;
+        
+        // Update localStorage with latest user data
+        localStorage.setItem("exim_user", JSON.stringify(userData));
+        
+        // Update dashboard data state if needed
+        setDashboardData(prevData => ({
+          ...prevData,
+          user: userData
+        }));
 
-    return null;
+        return userData;
+      }
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+      if (error.response?.status === 401) {
+        handleLogout();
+      }
+    }
   };
+
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      try {
+        // First, update user data from API
+        const updatedUser = await fetchAndUpdateUserData();
+        
+        // Then fetch dashboard data
+              await refreshUserData();
+        await fetchDashboardData();
+    
+        // Fetch AEO certificate data
+        await fetchAEOCertificateData();
+      } catch (error) {
+        setError("Failed to load dashboard data.");
+        if (error.response?.status === 401) handleLogout();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeDashboard();
+    
+    const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+
   const navigate = useNavigate();
 
   const allModules = [
@@ -403,13 +386,8 @@ function UserDashboard() {
   };
 
   const eximUser = localStorage.getItem("exim_user");
-  const parsedUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("exim_user"));
-    } catch {
-      return null;
-    }
-  }, []);
+  const parsedUser = userData;
+  console.log(parsedUser);
 
   const ieCodeAssignments = parsedUser?.ie_code_assignments || [];
   const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
