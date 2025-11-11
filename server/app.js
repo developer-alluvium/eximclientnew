@@ -22,6 +22,9 @@ import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
 import aeoReminderRoutes from "./routes/aeoReminderRoutes.js";
 
 import icegateProxy from "./routes/icegateProxy.js";
+
+//currency rate routes
+import currencyRate from "./routes/currencyRate.js";
 // Load environment variables
 dotenv.config();
 
@@ -95,7 +98,7 @@ app.use("/api/superadmin", superAdminIeCodeRoutes);
 app.use(aeoIntegrationRoutes);
 app.use(aeoReminderRoutes);
 app.use(icegateProxy);
-
+app.use(currencyRate);
 // Root route
 app.get("/", (req, res) => {
   res.send("Hello - API is running");

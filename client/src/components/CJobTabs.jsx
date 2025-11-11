@@ -9,6 +9,8 @@ import ContainerSummaryModal from "./ContainerSummaryModal";
 import { useImportersContext } from "../context/importersContext";
 import Typography from "@mui/material/Typography";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney"; // Added for new button
+import CurrencyRateDialog from "./CurrencyRateDialog"; // Added import for the dialog
 
 function CustomTabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -21,7 +23,7 @@ function CustomTabPanel(props) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-       {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   );
 }
@@ -42,6 +44,10 @@ function a11yProps(index) {
 function CJobTabs({ gandhidham = false }) {
   const [value, setValue] = React.useState(0);
   const [containerSummaryOpen, setContainerSummaryOpen] = React.useState(false);
+  
+  // --- New State for Currency Dialog ---
+  const [currencyDialogOpen, setCurrencyDialogOpen] = React.useState(false);
+  
   const { importers } = React.useContext(useImportersContext) || {};
   const [userImporterName, setUserImporterName] = React.useState(null);
 
@@ -71,73 +77,83 @@ function CJobTabs({ gandhidham = false }) {
     setContainerSummaryOpen(false);
   };
 
+  // --- New Handlers for Currency Dialog ---
+  const handleCurrencyDialogOpen = () => {
+    setCurrencyDialogOpen(true);
+  };
+
+  const handleCurrencyDialogClose = () => {
+    setCurrencyDialogOpen(false);
+  };
+
   return (
-     <Box sx={{ width: "100%" }}>
-<Box sx={{ borderBottom: 1, borderColor: "divider", display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '-16px' }}>        <Tabs
+    <Box sx={{ width: "100%" }}>
+      <Box sx={{ borderBottom: 1, borderColor: "divider", display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '-16px' }}>
+        <Tabs
           value={value}
           onChange={handleChange}
           aria-label="basic tabs example"
         >
           [
-          <Tab label="Pending" {...a11yProps(0)} key={0} />,
-          <Tab label="Completed" {...a11yProps(1)} key={1} />,
-          <Tab label="Cancelled" {...a11yProps(2)} key={2} />
+            <Tab label="Pending" {...a11yProps(0)} key={0} />,
+            <Tab label="Completed" {...a11yProps(1)} key={1} />,
+            <Tab label="Cancelled" {...a11yProps(2)} key={2} />
           ,]
         </Tabs>
 
-        {/* Container Summary Button - positioned in the top right */}
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AssessmentIcon />}
-          onClick={handleContainerSummaryOpen}
-          sx={{
-            mr: 2,
-            textTransform: 'none',
-            fontWeight: 'bold',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
-            '&:hover': {
-              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)',
-              transform: 'translateY(-1px)',
-            },
-            transition: 'all 0.2s ease-in-out'
-          }}
-        >
-          Container Summary
-        </Button>
-
-        {/* {userImporterName && (
-          <Typography
-            variant="body1"
+        {/* --- Grouped Buttons --- */}
+        <Box sx={{ display: 'flex', gap: 2, mr: 2 }}>
+          {/* New Currency Rate Dialog Button */}
+          <Button
+            variant="contained"
+            color="primary" // Changed color to differentiate
+            startIcon={<AttachMoneyIcon />}
+            onClick={handleCurrencyDialogOpen}
             sx={{
-              marginRight: "20px",
-              padding: "8px 16px", // Increased padding
-              borderRadius: "4px",
-              backgroundColor: "#f8f9fa",
-              border: "1px solid #dee2e6",
-              // display: "flex",
-              alignItems: "center",
-              gap: "8px", // Increased gap
-              fontWeight: 500,
-              color: "#495057",
-              fontSize: "1rem", // Slightly larger font
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              right: "20px",
-              top: "15px",
-              minWidth: "240px", // Added minimum width
-              height: "40px", // Fixed height
-              //transition: "all 0.2s ease-in-out",
-              "&:hover": {
-                backgroundColor: "#e9ecef",
-                borderColor: "black",
+              textTransform: 'none',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
+              '&:hover': {
+                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)',
+                transform: 'translateY(-1px)',
               },
+              transition: 'all 0.2s ease-in-out'
             }}
           >
-            <span style={{ fontWeight: 600 }}>IMPORTER:</span>
-            {userImporterName}
-          </Typography>
-        )} */}
+            Currency Rates
+          </Button>
+
+          {/* Existing Container Summary Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AssessmentIcon />}
+            onClick={handleContainerSummaryOpen}
+            sx={{
+              // mr: 2, // Removed mr, using gap on parent Box now
+              textTransform: 'none',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
+              '&:hover': {
+                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)',
+                transform: 'translateY(-1px)',
+              },
+              transition: 'all 0.2s ease-in-out'
+            }}
+          >
+            Container Summary
+          </Button>
+        </Box>
+
+        {/* This <Box> was removed as it's replaced by the button
+        <Box>
+          CurrencyRateDialog
+        </Box> 
+        */}
+
+        {/* {userImporterName && ( ...omitted for brevity... )} */}
       </Box>
 
       <CustomTabPanel value={value} index={0}>
@@ -154,7 +170,13 @@ function CJobTabs({ gandhidham = false }) {
       <ContainerSummaryModal 
         open={containerSummaryOpen}
         onClose={handleContainerSummaryClose}
-         gandhidham={gandhidham} 
+        gandhidham={gandhidham} 
+      />
+
+      {/* --- New Currency Rate Dialog --- */}
+      <CurrencyRateDialog
+        open={currencyDialogOpen}
+        onClose={handleCurrencyDialogClose}
       />
     </Box>
   );

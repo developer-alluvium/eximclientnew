@@ -12,7 +12,7 @@ const config = {
   nodeEnv: process.env.NODE_ENV || "development",
 
   // Server configuration
-  port: process.env.PORT || 9001,
+  port: process.env.PORT || 9003,
 
   // MongoDB URIs
   mongodb: {

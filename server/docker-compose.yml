@@ -3,7 +3,7 @@ services:
     container_name: customer
     build: . # Build using the Dockerfile in the current directory
     ports:
-      - "9001:9001"
+      - "9003:9003"
     volumes:
       - .:/server # Mount the current directory (where docker-compose.yml is) to /server
       - /server/node_modules # Prevent overwriting node_modules
