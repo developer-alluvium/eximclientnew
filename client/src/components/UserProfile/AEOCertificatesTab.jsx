@@ -230,7 +230,12 @@ const AEOReminderSettingsDialog = ({
                     />
                   </Box>
 
-                  <Box display="flex" alignItems="center" gap={3} sx={{ mb: 4 }}>
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    gap={3}
+                    sx={{ mb: 4 }}
+                  >
                     <TextField
                       label="Days before expiry"
                       type="number"
@@ -300,8 +305,8 @@ const AEOReminderSettingsDialog = ({
                     sx={{ mb: 3, lineHeight: 1.6 }}
                   >
                     You will receive email reminders{" "}
-                    <strong>{settings.reminder_days} days</strong> before your AEO
-                    certificates expire.
+                    <strong>{settings.reminder_days} days</strong> before your
+                    AEO certificates expire.
                   </Typography>
 
                   <Divider sx={{ my: 3 }} />
@@ -640,7 +645,7 @@ const AEOCertificatesTab = ({
           },
           bgcolor: "white",
           position: "sticky",
-          top: 16, 
+          top: 16,
         }}
       >
         <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
@@ -960,9 +965,7 @@ const AEOCertificatesTab = ({
                         : "#2e7d32",
                   }}
                 >
-                  {daysUntilExpiry !== null
-                    ? `${daysUntilExpiry} days`
-                    : "N/A"}
+                  {daysUntilExpiry !== null ? `${daysUntilExpiry} days` : "N/A"}
                 </Typography>
               </Grid>
               <Grid item xs={6}>
@@ -1009,10 +1012,26 @@ const AEOCertificatesTab = ({
   // --- Main Render: 2-COLUMN LAYOUT ---
   return (
     <Box>
-      <Grid container spacing={4}> {/* Increased spacing for a cleaner look */}
-        
+      {/* --- This is the new Flexbox Parent Container --- */}
+      {/* It replaces your <Grid container> */}
+      <Box
+        sx={{
+          display: "flex",
+          // On small screens (xs), stack vertically.
+          flexDirection: { xs: "column", md: "row" },
+          // On medium screens (md) and up, display side-by-side.
+          gap: 4, // This replaces grid 'spacing={4}'
+        }}
+      >
         {/* --- Left Column (Certificates List) --- */}
-        <Grid item xs={12} md={8}>
+        {/* It replaces <Grid item xs={12} md={8}> */}
+        <Box
+          sx={{
+            flex: { md: 2 }, // On md+, take 2 "parts" of the space (2/3)
+            width: "100%", // Ensure it takes full width when stacked
+            minWidth: 0, // Prevents flex overflow issues
+          }}
+        >
           <Box sx={{ mb: 2 }}>
             <Box sx={{ mb: 3 }}>
               <Typography
@@ -1064,6 +1083,8 @@ const AEOCertificatesTab = ({
           {aeoLoading && <LinearProgress sx={{ mb: 3 }} />}
 
           {kycSummary?.kyc_summaries?.length > 0 ? (
+            // Note: I'm keeping your internal Grid here for the *cards*
+            // This is fine, as it's only managing the layout *within* the left column
             <Grid container spacing={3}>
               {kycSummary.kyc_summaries
                 .filter(
@@ -1103,16 +1124,23 @@ const AEOCertificatesTab = ({
               </Button>
             </Box>
           )}
-        </Grid>
+        </Box>
 
         {/* --- Right Column (Reminder Card) --- */}
-        <Grid item xs={12} md={4}>
+        {/* It replaces <Grid item xs={12} md={4}> */}
+        <Box
+          sx={{
+            flex: { md: 1 }, // On md+, take 1 "part" of the space (1/3)
+            width: "100%", // Ensure it takes full width when stacked
+            minWidth: 0,
+          }}
+        >
           <ReminderSettingsCard />
-        </Grid>
-
-      </Grid>
+        </Box>
+      </Box>
 
       {/* --- Dialogs (Modals) --- */}
+      {/* These are unaffected as they are outside the layout flow */}
       <Dialog
         open={updateImporterOpen}
         onClose={() => setUpdateImporterOpen(false)}

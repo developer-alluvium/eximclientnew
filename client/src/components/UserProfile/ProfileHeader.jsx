@@ -1,4 +1,3 @@
-// components/UserProfile/ProfileHeader.jsx
 import React from "react";
 import { Typography, Box, Grid, Paper, Button } from "@mui/material";
 import {

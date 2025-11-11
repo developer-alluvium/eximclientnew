@@ -44,7 +44,9 @@ const LayoutWrapper = ({ children }) => {
     "/superadmin/login",
     "/user/register",
     "/verify-email",
-    "/reset-password"
+    "/reset-password",
+      "/superadmin-dashboard",        // Added
+  "/module-access-management"  
   ];
   
   const shouldShowHeader = !noHeaderPages.some(page => 

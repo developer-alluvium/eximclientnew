@@ -1,4 +1,3 @@
-
 import SuperAdminModel from "../models/superAdminModel.js";
 import AdminModel from "../models/adminModel.js";
 import EximclientUser from "../models/eximclientUserModel.js";
@@ -17,11 +16,16 @@ const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 export async function getCustomerTabVisibility(req, res) {
   try {
     const { customerId } = req.params;
-    const customer = await CustomerModel.findById(customerId).select("jobsTabVisible gandhidhamTabVisible");
+    const customer = await CustomerModel.findById(customerId).select(
+      "jobsTabVisible gandhidhamTabVisible"
+    );
     if (!customer) {
       return res.status(404).json({ error: "Customer not found" });
     }
-    res.json({ jobsTabVisible: customer.jobsTabVisible, gandhidhamTabVisible: customer.gandhidhamTabVisible });
+    res.json({
+      jobsTabVisible: customer.jobsTabVisible,
+      gandhidhamTabVisible: customer.gandhidhamTabVisible,
+    });
   } catch (error) {
     console.error("Error fetching customer tab visibility:", error);
     res.status(500).json({ error: "Error fetching customer tab visibility" });
@@ -37,18 +41,22 @@ export async function updateCustomerTabVisibility(req, res) {
     if (!customer) {
       return res.status(404).json({ error: "Customer not found" });
     }
-    if (typeof jobsTabVisible === "boolean") customer.jobsTabVisible = jobsTabVisible;
-    if (typeof gandhidhamTabVisible === "boolean") customer.gandhidhamTabVisible = gandhidhamTabVisible;
+    if (typeof jobsTabVisible === "boolean")
+      customer.jobsTabVisible = jobsTabVisible;
+    if (typeof gandhidhamTabVisible === "boolean")
+      customer.gandhidhamTabVisible = gandhidhamTabVisible;
     await customer.save();
-    res.json({ success: true, jobsTabVisible: customer.jobsTabVisible, gandhidhamTabVisible: customer.gandhidhamTabVisible });
+    res.json({
+      success: true,
+      jobsTabVisible: customer.jobsTabVisible,
+      gandhidhamTabVisible: customer.gandhidhamTabVisible,
+    });
   } catch (error) {
     console.error("Error updating customer tab visibility:", error);
     res.status(500).json({ error: "Error updating customer tab visibility" });
   }
 }
 // Endpoint to get allowed customers for Gandhidham tab
-
-
 
 /**
  * SuperAdmin Login
@@ -84,7 +92,8 @@ export const superAdminLogin = async (req, res) => {
       console.log(`SuperAdmin account for email ${email} is locked`);
       return res.status(423).json({
         success: false,
-        message: "Account is temporarily locked due to too many failed login attempts. Please try again later.",
+        message:
+          "Account is temporarily locked due to too many failed login attempts. Please try again later.",
       });
     }
 
@@ -102,10 +111,10 @@ export const superAdminLogin = async (req, res) => {
 
     if (!isPasswordCorrect) {
       console.log(`Invalid password for SuperAdmin with email ${email}`);
-      
+
       // Increment login attempts
       await superAdmin.incLoginAttempts();
-      
+
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -117,16 +126,18 @@ export const superAdminLogin = async (req, res) => {
 
     // Generate JWT token (payload remains the same)
     const token = jwt.sign(
-      { 
-        id: superAdmin._id, 
+      {
+        id: superAdmin._id,
         username: superAdmin.username,
-        role: "superadmin"
+        role: "superadmin",
       },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRATION }
     );
 
-    console.log(`SuperAdmin ${superAdmin.username} (email: ${email}) logged in successfully`);
+    console.log(
+      `SuperAdmin ${superAdmin.username} (email: ${email}) logged in successfully`
+    );
 
     // Send successful response
     res.status(200).json({
@@ -138,10 +149,9 @@ export const superAdminLogin = async (req, res) => {
         username: superAdmin.username,
         email: superAdmin.email,
         lastLogin: superAdmin.lastLogin,
-        role: "superadmin"
+        role: "superadmin",
       },
     });
-
   } catch (error) {
     console.error("SuperAdmin login error:", error);
     res.status(500).json({
@@ -187,8 +197,10 @@ export const superAdminLogout = async (req, res) => {
  */
 export const getSuperAdminProfile = async (req, res) => {
   try {
-    const superAdmin = await SuperAdminModel.findById(req.superAdmin.id).select('-password');
-    
+    const superAdmin = await SuperAdminModel.findById(req.superAdmin.id).select(
+      "-password"
+    );
+
     if (!superAdmin) {
       return res.status(404).json({
         success: false,
@@ -203,7 +215,7 @@ export const getSuperAdminProfile = async (req, res) => {
         username: superAdmin.username,
         email: superAdmin.email,
         lastLogin: superAdmin.lastLogin,
-        role: "superadmin"
+        role: "superadmin",
       },
     });
   } catch (error) {
@@ -242,10 +254,8 @@ export const protectSuperAdmin = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, JWT_SECRET);
 
-
     // Check if user has superadmin role
     if (decoded.role !== "superadmin") {
-    
       return res.status(403).json({
         success: false,
         message: "Access denied. SuperAdmin privileges required.",
@@ -256,7 +266,6 @@ export const protectSuperAdmin = async (req, res, next) => {
     const superAdmin = await SuperAdminModel.findById(decoded.id);
 
     if (!superAdmin) {
-
       return res.status(401).json({
         success: false,
         message: "SuperAdmin not found",
@@ -265,7 +274,6 @@ export const protectSuperAdmin = async (req, res, next) => {
 
     // Check if superadmin is active
     if (!superAdmin.isActive) {
-      
       return res.status(401).json({
         success: false,
         message: "SuperAdmin account is inactive",
@@ -277,12 +285,11 @@ export const protectSuperAdmin = async (req, res, next) => {
       id: superAdmin._id,
       username: superAdmin.username,
       email: superAdmin.email,
-      role: 'superadmin'
+      role: "superadmin",
     };
 
     next();
   } catch (error) {
-
     return res.status(401).json({
       success: false,
       message: "Access denied. Invalid or expired token.",
@@ -298,11 +305,12 @@ export const createInitialSuperAdmin = async (req, res) => {
   try {
     // Check if any superadmin already exists
     const existingCount = await SuperAdminModel.countDocuments();
-    
+
     if (existingCount > 0) {
       return res.status(400).json({
         success: false,
-        message: "SuperAdmin already exists. This endpoint is only for initial setup.",
+        message:
+          "SuperAdmin already exists. This endpoint is only for initial setup.",
       });
     }
 
@@ -344,7 +352,6 @@ export const createInitialSuperAdmin = async (req, res) => {
         email: superAdmin.email,
       },
     });
-
   } catch (error) {
     console.error("Create initial SuperAdmin error:", error);
     res.status(500).json({
@@ -367,7 +374,7 @@ export const registerAdmin = async (req, res) => {
     if (!name || !email || !password || !ie_code_no) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required (name, email, password, ie_code_no)."
+        message: "All fields are required (name, email, password, ie_code_no).",
       });
     }
 
@@ -376,7 +383,7 @@ export const registerAdmin = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: "Please enter a valid email address."
+        message: "Please enter a valid email address.",
       });
     }
 
@@ -384,16 +391,18 @@ export const registerAdmin = async (req, res) => {
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters long."
+        message: "Password must be at least 8 characters long.",
       });
     }
 
     // Check if email already exists
-    const existingAdmin = await AdminModel.findOne({ email: email.toLowerCase() });
+    const existingAdmin = await AdminModel.findOne({
+      email: email.toLowerCase(),
+    });
     if (existingAdmin) {
       return res.status(409).json({
         success: false,
-        message: "Email already registered. Please use a different email."
+        message: "Email already registered. Please use a different email.",
       });
     }
 
@@ -403,16 +412,19 @@ export const registerAdmin = async (req, res) => {
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Invalid IE Code. Please verify the IE code exists in the system."
+        message:
+          "Invalid IE Code. Please verify the IE code exists in the system.",
       });
     }
 
     // Check if admin already exists for this IE code
-    const existingAdminForIE = await AdminModel.findOne({ ie_code_no: ieCodeUpper });
+    const existingAdminForIE = await AdminModel.findOne({
+      ie_code_no: ieCodeUpper,
+    });
     if (existingAdminForIE) {
       return res.status(409).json({
         success: false,
-        message: "An admin already exists for this IE code."
+        message: "An admin already exists for this IE code.",
       });
     }
 
@@ -423,27 +435,25 @@ export const registerAdmin = async (req, res) => {
       password,
       ie_code_no: ieCodeUpper,
       createdBy: superAdmin._id,
-      isActive: true
+      isActive: true,
     });
 
     await admin.save();
 
-
-
     // Create notification for the new admin (welcome message)
     await Notification.createNotification({
-      type: 'admin_created',
+      type: "admin_created",
       recipient: admin._id,
-      recipientModel: 'Admin',
+      recipientModel: "Admin",
       sender: superAdmin._id,
-      senderModel: 'SuperAdmin',
-      title: 'Welcome to Admin Panel',
+      senderModel: "SuperAdmin",
+      title: "Welcome to Admin Panel",
       message: `Your admin account has been created successfully for IE Code ${ieCodeUpper}. You can now manage users under this IE code.`,
       data: {
         ie_code_no: ieCodeUpper,
-        createdBy: superAdmin.username
+        createdBy: superAdmin.username,
       },
-      priority: 'medium'
+      priority: "medium",
     });
 
     res.status(201).json({
@@ -455,23 +465,22 @@ export const registerAdmin = async (req, res) => {
         email: admin.email,
         ie_code_no: admin.ie_code_no,
         isActive: admin.isActive,
-        createdAt: admin.createdAt
-      }
+        createdAt: admin.createdAt,
+      },
     });
-
   } catch (error) {
     console.error("Admin registration error:", error);
-    
+
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Admin with this email already exists."
+        message: "Admin with this email already exists.",
       });
     }
 
     res.status(500).json({
       success: false,
-      message: "Failed to register admin. Please try again later."
+      message: "Failed to register admin. Please try again later.",
     });
   }
 };
@@ -485,23 +494,23 @@ export const getAdmins = async (req, res) => {
 
     // Build query
     const query = {};
-    
+
     if (status) {
-      query.isActive = status === 'active';
+      query.isActive = status === "active";
     }
 
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { ie_code_no: { $regex: search, $options: 'i' } }
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { ie_code_no: { $regex: search, $options: "i" } },
       ];
     }
 
     // Get admins with pagination
     const admins = await AdminModel.find(query)
-      .select('-password')
-      .populate('createdBy', 'username')
+      .select("-password")
+      .populate("createdBy", "username")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -511,19 +520,21 @@ export const getAdmins = async (req, res) => {
     // Get user counts for each admin
     const adminsWithStats = await Promise.all(
       admins.map(async (admin) => {
-        const userCount = await EximclientUser.countDocuments({ ie_code_no: admin.ie_code_no });
-        const activeUserCount = await EximclientUser.countDocuments({ 
+        const userCount = await EximclientUser.countDocuments({
           ie_code_no: admin.ie_code_no,
-          status: 'active' 
         });
-        
+        const activeUserCount = await EximclientUser.countDocuments({
+          ie_code_no: admin.ie_code_no,
+          status: "active",
+        });
+
         return {
           ...admin.toObject(),
           userStats: {
             total: userCount,
             active: activeUserCount,
-            pending: userCount - activeUserCount
-          }
+            pending: userCount - activeUserCount,
+          },
         };
       })
     );
@@ -535,16 +546,15 @@ export const getAdmins = async (req, res) => {
         pagination: {
           current: parseInt(page),
           pages: Math.ceil(total / limit),
-          total
-        }
-      }
+          total,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Get admins error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch admins."
+      message: "Failed to fetch admins.",
     });
   }
 };
@@ -563,7 +573,7 @@ export const updateAdminStatus = async (req, res) => {
     if (!admin) {
       return res.status(404).json({
         success: false,
-        message: "Admin not found."
+        message: "Admin not found.",
       });
     }
 
@@ -576,45 +586,46 @@ export const updateAdminStatus = async (req, res) => {
     if (!isActive && oldStatus) {
       await EximclientUser.updateMany(
         { ie_code_no: admin.ie_code_no },
-        { status: 'inactive', isActive: false }
+        { status: "inactive", isActive: false }
       );
     }
 
     // Create notification for admin
     await Notification.createNotification({
-      type: isActive ? 'admin_activated' : 'admin_deactivated',
+      type: isActive ? "admin_activated" : "admin_deactivated",
       recipient: admin._id,
-      recipientModel: 'Admin',
+      recipientModel: "Admin",
       sender: superAdmin._id,
-      senderModel: 'SuperAdmin',
-      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
-      message: `Your admin account has been ${isActive ? 'activated' : 'deactivated'} by SuperAdmin. ${reason ? 'Reason: ' + reason : ''}`,
+      senderModel: "SuperAdmin",
+      title: `Account ${isActive ? "Activated" : "Deactivated"}`,
+      message: `Your admin account has been ${
+        isActive ? "activated" : "deactivated"
+      } by SuperAdmin. ${reason ? "Reason: " + reason : ""}`,
       data: {
         oldStatus,
         newStatus: isActive,
-        reason: reason || null
+        reason: reason || null,
       },
-      priority: isActive ? 'medium' : 'high'
+      priority: isActive ? "medium" : "high",
     });
 
     // Log activity
- 
+
     res.json({
       success: true,
-      message: `Admin ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      message: `Admin ${isActive ? "activated" : "deactivated"} successfully.`,
       data: {
         adminId: admin._id,
         oldStatus,
         newStatus: isActive,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("Update admin status error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update admin status."
+      message: "Failed to update admin status.",
     });
   }
 };
@@ -632,18 +643,18 @@ export const designateCustomerAsAdmin = async (req, res) => {
     if (!ie_code_no) {
       return res.status(400).json({
         success: false,
-        message: "IE Code is required."
+        message: "IE Code is required.",
       });
     }
 
     // Find customer by IE code
     const ieCodeUpper = ie_code_no.toUpperCase();
     const customer = await CustomerModel.findOne({ ie_code_no: ieCodeUpper });
-    
+
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Customer with this IE Code not found."
+        message: "Customer with this IE Code not found.",
       });
     }
 
@@ -651,19 +662,18 @@ export const designateCustomerAsAdmin = async (req, res) => {
     if (!customer.isActive) {
       return res.status(400).json({
         success: false,
-        message: "Customer account is not active."
+        message: "Customer account is not active.",
       });
     }
 
     // Update customer's role to admin
-    customer.role = 'admin';
+    customer.role = "admin";
     customer.roleGrantedBy = superAdmin._id;
     customer.roleGrantedAt = new Date();
-    
+
     await customer.save();
 
     // Log activity
- 
 
     res.status(200).json({
       success: true,
@@ -673,15 +683,14 @@ export const designateCustomerAsAdmin = async (req, res) => {
         name: customer.name,
         ie_code_no: customer.ie_code_no,
         role: customer.role,
-        promotedAt: customer.roleGrantedAt
-      }
+        promotedAt: customer.roleGrantedAt,
+      },
     });
-
   } catch (error) {
     console.error("Designate customer as admin error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to designate customer as admin."
+      message: "Failed to designate customer as admin.",
     });
   }
 };
@@ -695,20 +704,24 @@ export const getSystemStats = async (req, res) => {
     const totalAdmins = await AdminModel.countDocuments({});
     const activeAdmins = await AdminModel.countDocuments({ isActive: true });
     const totalUsers = await EximclientUser.countDocuments({});
-    const activeUsers = await EximclientUser.countDocuments({ status: 'active' });
-    const pendingUsers = await EximclientUser.countDocuments({ status: 'pending' });
+    const activeUsers = await EximclientUser.countDocuments({
+      status: "active",
+    });
+    const pendingUsers = await EximclientUser.countDocuments({
+      status: "pending",
+    });
     const totalCustomers = await CustomerModel.countDocuments({});
 
     // Get recent activity
     const recentAdmins = await AdminModel.find({})
-      .select('-password')
-      .populate('createdBy', 'username')
+      .select("-password")
+      .populate("createdBy", "username")
       .sort({ createdAt: -1 })
       .limit(5);
 
     const recentUsers = await EximclientUser.find({})
-      .select('-password')
-      .populate('adminId', 'name email ie_code_no')
+      .select("-password")
+      .populate("adminId", "name email ie_code_no")
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -716,18 +729,18 @@ export const getSystemStats = async (req, res) => {
     const ieCodeStats = await EximclientUser.aggregate([
       {
         $group: {
-          _id: '$ie_code_no',
+          _id: "$ie_code_no",
           userCount: { $sum: 1 },
           activeCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
           },
           pendingCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
-          }
-        }
+            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+          },
+        },
       },
       { $sort: { userCount: -1 } },
-      { $limit: 10 }
+      { $limit: 10 },
     ]);
 
     res.json({
@@ -737,31 +750,30 @@ export const getSystemStats = async (req, res) => {
           admins: {
             total: totalAdmins,
             active: activeAdmins,
-            inactive: totalAdmins - activeAdmins
+            inactive: totalAdmins - activeAdmins,
           },
           users: {
             total: totalUsers,
             active: activeUsers,
             pending: pendingUsers,
-            inactive: totalUsers - activeUsers - pendingUsers
+            inactive: totalUsers - activeUsers - pendingUsers,
           },
           customers: {
-            total: totalCustomers
-          }
+            total: totalCustomers,
+          },
         },
         recentActivity: {
           admins: recentAdmins,
-          users: recentUsers
+          users: recentUsers,
         },
-        ieCodeDistribution: ieCodeStats
-      }
+        ieCodeDistribution: ieCodeStats,
+      },
     });
-
   } catch (error) {
     console.error("Get system stats error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch system statistics."
+      message: "Failed to fetch system statistics.",
     });
   }
 };
@@ -772,21 +784,20 @@ export const getSystemStats = async (req, res) => {
 export const getAllCustomers = async (req, res) => {
   try {
     const customers = await CustomerModel.find({})
-      .select('-password')
+      .select("-password")
       .sort({ createdAt: -1 });
 
     res.json({
       success: true,
       data: {
-        customers: customers || []
-      }
+        customers: customers || [],
+      },
     });
-
   } catch (error) {
     console.error("Get all customers error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch customers."
+      message: "Failed to fetch customers.",
     });
   }
 };
@@ -803,8 +814,8 @@ export const getAvailableIeCodes = async (req, res) => {
       {
         $match: {
           year: "25-26",
-          ie_code_no: { $exists: true, $ne: "", $ne: null }
-        }
+          ie_code_no: { $exists: true, $ne: "", $ne: null },
+        },
       },
       // Group by ie_code_no to get distinct values with additional info
       {
@@ -812,8 +823,8 @@ export const getAvailableIeCodes = async (req, res) => {
           _id: "$ie_code_no",
           importer: { $first: "$importer" },
           jobCount: { $sum: 1 },
-          lastJobDate: { $max: "$job_date" }
-        }
+          lastJobDate: { $max: "$job_date" },
+        },
       },
       // Lookup customer data to check admin status
       {
@@ -821,8 +832,8 @@ export const getAvailableIeCodes = async (req, res) => {
           from: "customers",
           localField: "_id",
           foreignField: "ie_code_no",
-          as: "customerInfo"
-        }
+          as: "customerInfo",
+        },
       },
       // Filter out IE codes where customer is already admin
       // {
@@ -842,13 +853,13 @@ export const getAvailableIeCodes = async (req, res) => {
           lastJobDate: 1,
           customerId: { $arrayElemAt: ["$customerInfo._id", 0] },
           pan_number: { $arrayElemAt: ["$customerInfo.pan_number", 0] },
-          _id: 0
-        }
+          _id: 0,
+        },
       },
       // Sort by importer name
       {
-        $sort: { name: 1 }
-      }
+        $sort: { name: 1 },
+      },
     ];
 
     const availableIeCodes = await JobModel.aggregate(pipeline);
@@ -856,22 +867,21 @@ export const getAvailableIeCodes = async (req, res) => {
     res.json({
       success: true,
       data: {
-        availableIeCodes: availableIeCodes.map(item => ({
+        availableIeCodes: availableIeCodes.map((item) => ({
           ie_code_no: item.ie_code_no,
           name: item.name || `IE Code: ${item.ie_code_no}`,
           pan_number: item.pan_number || "Not Available",
           customerId: item.customerId || null,
           jobCount: item.jobCount,
-          lastJobDate: item.lastJobDate
-        }))
-      }
+          lastJobDate: item.lastJobDate,
+        })),
+      },
     });
-
   } catch (error) {
     console.error("Get available IE codes error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch available IE codes."
+      message: "Failed to fetch available IE codes.",
     });
   }
 };
@@ -882,24 +892,27 @@ export const getAvailableIeCodes = async (req, res) => {
 export const getAllUsers = async (req, res) => {
   try {
     const users = await EximclientUser.find({})
-      .select('-password')
-      .populate('adminId', 'name ie_code_no')
-      .sort({ createdAt: -1 }); 
+      .select("-password")
+      .populate("adminId", "name ie_code_no")
+      .sort({ createdAt: -1 });
 
     // Get users with their admin status and corresponding customer info
     const usersWithAdminStatus = await Promise.all(
       users.map(async (user) => {
-        const customerRecord = await CustomerModel.findOne({ 
-          ie_code_no: user.ie_code_no
+        const customerRecord = await CustomerModel.findOne({
+          ie_code_no: user.ie_code_no,
         });
         return {
           ...user.toObject(),
-          adminCustomer: user.isAdmin && customerRecord ? {
-            id: customerRecord._id,
-            name: customerRecord.name,
-            ie_code_no: customerRecord.ie_code_no,
-            adminRoleGrantedAt: customerRecord.adminRoleGrantedAt
-          } : null
+          adminCustomer:
+            user.isAdmin && customerRecord
+              ? {
+                  id: customerRecord._id,
+                  name: customerRecord.name,
+                  ie_code_no: customerRecord.ie_code_no,
+                  adminRoleGrantedAt: customerRecord.adminRoleGrantedAt,
+                }
+              : null,
         };
       })
     );
@@ -907,15 +920,14 @@ export const getAllUsers = async (req, res) => {
     res.json({
       success: true,
       data: {
-        users: usersWithAdminStatus || []
-      }
+        users: usersWithAdminStatus || [],
+      },
     });
-
   } catch (error) {
     console.error("Get all users error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch users."
+      message: "Failed to fetch users.",
     });
   }
 };
@@ -932,7 +944,7 @@ export const updateCustomerAdminStatus = async (req, res) => {
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Customer not found."
+        message: "Customer not found.",
       });
     }
 
@@ -940,26 +952,26 @@ export const updateCustomerAdminStatus = async (req, res) => {
     await customer.save();
 
     // Log activity
-   
 
     res.json({
       success: true,
-      message: `Customer admin status ${isAdmin ? 'granted' : 'revoked'} successfully.`,
+      message: `Customer admin status ${
+        isAdmin ? "granted" : "revoked"
+      } successfully.`,
       data: {
         customer: {
           id: customer._id,
           name: customer.name,
           ie_code_no: customer.ie_code_no,
-          isAdmin: customer.isAdmin
-        }
-      }
+          isAdmin: customer.isAdmin,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Update customer admin status error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update customer admin status."
+      message: "Failed to update customer admin status.",
     });
   }
 };
@@ -976,7 +988,7 @@ export const promoteUserToAdmin = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
@@ -988,7 +1000,8 @@ export const promoteUserToAdmin = async (req, res) => {
     if (!ieCodeToUse) {
       return res.status(400).json({
         success: false,
-        message: "IE code is required to promote user to admin. Either provide an IE code or ensure the user already has one assigned."
+        message:
+          "IE code is required to promote user to admin. Either provide an IE code or ensure the user already has one assigned.",
       });
     }
 
@@ -997,15 +1010,15 @@ export const promoteUserToAdmin = async (req, res) => {
     if (!customer) {
       return res.status(400).json({
         success: false,
-        message: `No customer found with IE code ${ieCodeToUse}. Cannot promote user to admin.`
+        message: `No customer found with IE code ${ieCodeToUse}. Cannot promote user to admin.`,
       });
     }
 
     // Check if customer is already an admin
-    if (customer.role === 'admin') {
+    if (customer.role === "admin") {
       return res.status(400).json({
         success: false,
-        message: "This customer is already an admin."
+        message: "This customer is already an admin.",
       });
     }
 
@@ -1015,27 +1028,27 @@ export const promoteUserToAdmin = async (req, res) => {
       user.assignedIeCode = ie_code_no;
       user.assignedImporterName = customer.name;
     }
-    user.role = 'admin';
+    user.role = "admin";
     await user.save();
 
     // Update customer record to admin role
-    customer.role = 'admin';
+    customer.role = "admin";
     customer.roleGrantedBy = req.superAdmin.id;
     customer.roleGrantedAt = new Date();
     await customer.save();
 
     // Prepare log message
-    const logMessage = ie_code_no && ie_code_no !== existingIeCode 
-      ? `Promoted user ${user.name} to admin and assigned new IE code ${ie_code_no}`
-      : `Promoted user ${user.name} to admin using existing IE code ${ieCodeToUse}`;
-
-
+    const logMessage =
+      ie_code_no && ie_code_no !== existingIeCode
+        ? `Promoted user ${user.name} to admin and assigned new IE code ${ie_code_no}`
+        : `Promoted user ${user.name} to admin using existing IE code ${ieCodeToUse}`;
 
     res.json({
       success: true,
-      message: ie_code_no && ie_code_no !== existingIeCode 
-        ? "User promoted to admin and new IE code assigned successfully."
-        : "User promoted to admin using existing IE code successfully.",
+      message:
+        ie_code_no && ie_code_no !== existingIeCode
+          ? "User promoted to admin and new IE code assigned successfully."
+          : "User promoted to admin using existing IE code successfully.",
       data: {
         user: {
           id: user._id,
@@ -1044,7 +1057,7 @@ export const promoteUserToAdmin = async (req, res) => {
           ie_code_no: user.ie_code_no,
           assignedIeCode: user.assignedIeCode,
           assignedImporterName: user.assignedImporterName,
-          role: user.role
+          role: user.role,
         },
         customer: {
           id: customer._id,
@@ -1052,26 +1065,24 @@ export const promoteUserToAdmin = async (req, res) => {
           ie_code_no: customer.ie_code_no,
           role: customer.role,
           roleGrantedBy: customer.roleGrantedBy,
-          roleGrantedAt: customer.roleGrantedAt
+          roleGrantedAt: customer.roleGrantedAt,
         },
         ieCodeStatus: {
           used: ieCodeToUse,
           wasExisting: existingIeCode ? true : false,
           wasProvided: ie_code_no ? true : false,
-          changed: ie_code_no && ie_code_no !== existingIeCode
-        }
-      }
+          changed: ie_code_no && ie_code_no !== existingIeCode,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Promote user to admin error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to promote user to admin."
+      message: "Failed to promote user to admin.",
     });
   }
 };
-
 
 /**
  * Demote User from Admin
@@ -1084,15 +1095,15 @@ export const demoteUserFromAdmin = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
     // Check if user is currently an admin
-    if (user.role !== 'admin') {
+    if (user.role !== "admin") {
       return res.status(400).json({
         success: false,
-        message: "User is not currently an admin."
+        message: "User is not currently an admin.",
       });
     }
 
@@ -1101,7 +1112,7 @@ export const demoteUserFromAdmin = async (req, res) => {
     if (!userIeCode) {
       return res.status(400).json({
         success: false,
-        message: "User does not have an IE code assigned."
+        message: "User does not have an IE code assigned.",
       });
     }
 
@@ -1110,19 +1121,19 @@ export const demoteUserFromAdmin = async (req, res) => {
     if (!customer) {
       return res.status(400).json({
         success: false,
-        message: "No customer found with this IE code."
+        message: "No customer found with this IE code.",
       });
     }
 
-    if (customer.role !== 'admin') {
+    if (customer.role !== "admin") {
       return res.status(400).json({
         success: false,
-        message: "Customer with this IE code does not have admin role."
+        message: "Customer with this IE code does not have admin role.",
       });
     }
 
     // Change user role back to customer
-    user.role = 'customer';
+    user.role = "customer";
     // Optionally clear IE code assignment if you want to unassign completely
     // user.ie_code_no = null;
     // user.assignedIeCode = null;
@@ -1130,12 +1141,10 @@ export const demoteUserFromAdmin = async (req, res) => {
     await user.save();
 
     // Update customer record back to customer role
-    customer.role = 'customer';
+    customer.role = "customer";
     customer.roleGrantedBy = null;
     customer.roleGrantedAt = null; // Clear the granted date or set to demotion date
     await customer.save();
-
-  
 
     res.json({
       success: true,
@@ -1146,7 +1155,7 @@ export const demoteUserFromAdmin = async (req, res) => {
           name: user.name,
           email: user.email,
           ie_code_no: user.ie_code_no,
-          role: user.role
+          role: user.role,
         },
         customer: {
           id: customer._id,
@@ -1154,16 +1163,15 @@ export const demoteUserFromAdmin = async (req, res) => {
           ie_code_no: customer.ie_code_no,
           role: customer.role,
           roleGrantedBy: customer.roleGrantedBy,
-          roleGrantedAt: customer.roleGrantedAt
-        }
-      }
+          roleGrantedAt: customer.roleGrantedAt,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Demote user from admin error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to demote user from admin."
+      message: "Failed to demote user from admin.",
     });
   }
 };
@@ -1178,56 +1186,57 @@ export const updateUserStatus = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
     // Update user status
     const oldStatus = user.isActive;
     user.isActive = isActive;
-    user.status = isActive ? 'active' : 'inactive';
+    user.status = isActive ? "active" : "inactive";
     await user.save();
 
     // Create notification for user
-    const notificationMessage = isActive 
-      ? 'Your account has been activated by SuperAdmin. You can now access the system.'
-      : `Your account has been deactivated by SuperAdmin. ${reason ? 'Reason: ' + reason : ''}`;
+    const notificationMessage = isActive
+      ? "Your account has been activated by SuperAdmin. You can now access the system."
+      : `Your account has been deactivated by SuperAdmin. ${
+          reason ? "Reason: " + reason : ""
+        }`;
 
     await Notification.createNotification({
-      type: isActive ? 'user_activated' : 'user_deactivated',
+      type: isActive ? "user_activated" : "user_deactivated",
       recipient: user._id,
-      recipientModel: 'EximclientUser',
+      recipientModel: "EximclientUser",
       sender: req.superAdmin.id,
-      senderModel: 'SuperAdmin',
-      title: `Account ${isActive ? 'Activated' : 'Deactivated'}`,
+      senderModel: "SuperAdmin",
+      title: `Account ${isActive ? "Activated" : "Deactivated"}`,
       message: notificationMessage,
       data: {
         oldStatus,
         newStatus: isActive,
         reason: reason || null,
-        updatedBy: 'SuperAdmin'
+        updatedBy: "SuperAdmin",
       },
-      priority: isActive ? 'medium' : 'high'
+      priority: isActive ? "medium" : "high",
     });
 
     // Log activity
 
     res.json({
       success: true,
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully.`,
+      message: `User ${isActive ? "activated" : "deactivated"} successfully.`,
       data: {
         userId: user._id,
         oldStatus,
         newStatus: isActive,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("Update user status error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to update user status."
+      message: "Failed to update user status.",
     });
   }
 };
@@ -1243,7 +1252,7 @@ export const assignModulesToUser = async (req, res) => {
     if (!Array.isArray(moduleIds)) {
       return res.status(400).json({
         success: false,
-        message: "Module IDs must be an array."
+        message: "Module IDs must be an array.",
       });
     }
 
@@ -1252,7 +1261,7 @@ export const assignModulesToUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found."
+        message: "User not found.",
       });
     }
 
@@ -1262,22 +1271,20 @@ export const assignModulesToUser = async (req, res) => {
 
     // Log activity
 
-
     res.json({
       success: true,
       message: `Successfully assigned ${moduleIds.length} modules to user.`,
       data: {
         userId: user._id,
         assignedModules: moduleIds,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("Assign modules to user error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to assign modules to user."
+      message: "Failed to assign modules to user.",
     });
   }
 };
@@ -1292,14 +1299,14 @@ export const bulkAssignModulesToUsers = async (req, res) => {
     if (!Array.isArray(userIds) || !Array.isArray(moduleIds)) {
       return res.status(400).json({
         success: false,
-        message: "User IDs and Module IDs must be arrays."
+        message: "User IDs and Module IDs must be arrays.",
       });
     }
 
     if (userIds.length === 0 || moduleIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "At least one user and one module must be selected."
+        message: "At least one user and one module must be selected.",
       });
     }
 
@@ -1308,27 +1315,26 @@ export const bulkAssignModulesToUsers = async (req, res) => {
     if (users.length !== userIds.length) {
       return res.status(404).json({
         success: false,
-        message: "Some users not found."
+        message: "Some users not found.",
       });
     }
 
     // Update all users' assigned modules (add new modules to existing ones)
-    const bulkOperations = users.map(user => {
+    const bulkOperations = users.map((user) => {
       const existingModules = user.assignedModules || [];
       const newModules = [...new Set([...existingModules, ...moduleIds])]; // Remove duplicates
-      
+
       return {
         updateOne: {
           filter: { _id: user._id },
-          update: { $set: { assignedModules: newModules } }
-        }
+          update: { $set: { assignedModules: newModules } },
+        },
       };
     });
 
     await EximclientUser.bulkWrite(bulkOperations);
 
     // Log activity for each user
-    
 
     res.json({
       success: true,
@@ -1336,15 +1342,14 @@ export const bulkAssignModulesToUsers = async (req, res) => {
       data: {
         affectedUsers: users.length,
         assignedModules: moduleIds.length,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("Bulk assign modules error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to bulk assign modules."
+      message: "Failed to bulk assign modules.",
     });
   }
 };
@@ -1360,10 +1365,11 @@ export async function getAllowedGandhidhamCustomers(req, res) {
     res.json({ allowedCustomers: superadmin.allowedCustomers || [] });
   } catch (error) {
     console.error("Error fetching allowed Gandhidham customers:", error);
-    res.status(500).json({ error: "Error fetching allowed Gandhidham customers" });
+    res
+      .status(500)
+      .json({ error: "Error fetching allowed Gandhidham customers" });
   }
 }
-
 
 /* IEcode controller*/
 
@@ -1375,7 +1381,9 @@ export const assignIeCodeToUser = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userId } = req.params;
@@ -1385,20 +1393,23 @@ export const assignIeCodeToUser = async (req, res) => {
     if (!ieCodeNo) {
       return res.status(400).json({
         success: false,
-        message: "IE Code is required."
+        message: "IE Code is required.",
       });
     }
 
     const user = await EximclientUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
 
     // Security Check for Admins - they can only assign their own IE code to users
-    if (actor.role === 'admin' && ieCodeNo !== actor.ie_code_no) {
+    if (actor.role === "admin" && ieCodeNo !== actor.ie_code_no) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: Admins can only assign their own IE Code to users."
+        message:
+          "Forbidden: Admins can only assign their own IE Code to users.",
       });
     }
 
@@ -1407,14 +1418,14 @@ export const assignIeCodeToUser = async (req, res) => {
     if (!customerKyc) {
       return res.status(400).json({
         success: false,
-        message: `No customer KYC record found with IEC number ${ieCodeNo}.`
+        message: `No customer KYC record found with IEC number ${ieCodeNo}.`,
       });
     }
 
     if (!customerKyc.name_of_individual) {
       return res.status(400).json({
         success: false,
-        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`
+        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`,
       });
     }
 
@@ -1429,11 +1440,13 @@ export const assignIeCodeToUser = async (req, res) => {
     user.ieCodeAssignedAt = new Date();
     await user.save();
 
-
-
     // Log activity
 
-    console.log(`IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to user ${user.name} by ${actor.role || 'superadmin'}`);
+    console.log(
+      `IEC ${ieCodeNo} and Importer ${
+        customerKyc.name_of_individual
+      } assigned to user ${user.name} by ${actor.role || "superadmin"}`
+    );
 
     res.json({
       success: true,
@@ -1447,16 +1460,15 @@ export const assignIeCodeToUser = async (req, res) => {
         previousImporterName,
         newImporterName: customerKyc.name_of_individual,
         assignedBy: actor.id,
-        assignedAt: user.ieCodeAssignedAt
-      }
+        assignedAt: user.ieCodeAssignedAt,
+      },
     });
-
   } catch (error) {
     console.error("Assign IE code to user error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to assign IE code to user.",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1469,7 +1481,9 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     const { userIds, ieCodeNo, reason } = req.body;
@@ -1478,22 +1492,23 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "userIds must be a non-empty array."
+        message: "userIds must be a non-empty array.",
       });
     }
 
     if (!ieCodeNo) {
       return res.status(400).json({
         success: false,
-        message: "IE Code is required."
+        message: "IE Code is required.",
       });
     }
 
     // Security Check for Admins - they can only assign their own IE code
-    if (actor.role === 'admin' && ieCodeNo !== actor.ie_code_no) {
+    if (actor.role === "admin" && ieCodeNo !== actor.ie_code_no) {
       return res.status(403).json({
         success: false,
-        message: "Forbidden: Admins can only assign their own IE Code to users."
+        message:
+          "Forbidden: Admins can only assign their own IE Code to users.",
       });
     }
 
@@ -1502,14 +1517,14 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
     if (!customerKyc) {
       return res.status(400).json({
         success: false,
-        message: `No customer KYC record found with IEC number ${ieCodeNo}.`
+        message: `No customer KYC record found with IEC number ${ieCodeNo}.`,
       });
     }
 
     if (!customerKyc.name_of_individual) {
       return res.status(400).json({
         success: false,
-        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`
+        message: `Customer KYC record found but name_of_individual is missing for IEC ${ieCodeNo}.`,
       });
     }
 
@@ -1520,31 +1535,41 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
         ie_code_no: ieCodeNo,
         assignedImporterName: customerKyc.name_of_individual, // Use name_of_individual from CustomerKyc
         ieCodeAssignedBy: actor.id,
-        ieCodeAssignedAt: new Date()
+        ieCodeAssignedAt: new Date(),
       }
     );
 
     // Get updated users for notification
-    const updatedUsers = await EximclientUser.find({ _id: { $in: userIds } }).select('_id name email');
+    const updatedUsers = await EximclientUser.find({
+      _id: { $in: userIds },
+    }).select("_id name email");
 
     // Create notifications for all users
-    const notifications = updatedUsers.map(user => ({
-      type: 'ie_code_assigned',
+    const notifications = updatedUsers.map((user) => ({
+      type: "ie_code_assigned",
       recipient: user._id,
-      recipientModel: 'EximclientUser',
+      recipientModel: "EximclientUser",
       sender: actor.id,
-      senderModel: actor.role === 'superadmin' ? 'SuperAdmin' : 'EximclientUser',
-      title: 'IE Code and Importer Assigned',
-      message: `Your account has been assigned IEC: ${ieCodeNo} and Importer: ${customerKyc.name_of_individual}. ${reason ? 'Reason: ' + reason : ''}`,
+      senderModel:
+        actor.role === "superadmin" ? "SuperAdmin" : "EximclientUser",
+      title: "IE Code and Importer Assigned",
+      message: `Your account has been assigned IEC: ${ieCodeNo} and Importer: ${
+        customerKyc.name_of_individual
+      }. ${reason ? "Reason: " + reason : ""}`,
     }));
 
     // Bulk create notifications
     await Notification.insertMany(notifications);
 
     // Log activity
-    
 
-    console.log(`Bulk IEC assignment: ${ieCodeNo} and Importer ${customerKyc.name_of_individual} assigned to ${result.modifiedCount} users by ${actor.role || 'superadmin'}`);
+    console.log(
+      `Bulk IEC assignment: ${ieCodeNo} and Importer ${
+        customerKyc.name_of_individual
+      } assigned to ${result.modifiedCount} users by ${
+        actor.role || "superadmin"
+      }`
+    );
 
     res.json({
       success: true,
@@ -1554,16 +1579,15 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
         importerName: customerKyc.name_of_individual,
         modifiedCount: result.modifiedCount,
         assignedBy: actor.id,
-        assignedAt: new Date()
-      }
+        assignedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("Bulk assign IE code error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to bulk assign IE code to users.",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1576,41 +1600,52 @@ export const getAvailableIecCodes = async (req, res) => {
   try {
     const actor = req.superAdmin || req.user;
     if (!actor) {
-      return res.status(401).json({ success: false, message: "Authentication required." });
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required." });
     }
 
     // Build query based on user role
-    let query = { iec_no: { $exists: true, $ne: null, $ne: '' } };
-    
+    let query = { iec_no: { $exists: true, $ne: null, $ne: "" } };
+
     // Security Check for Admins - can only see their own IEC code
-    if (actor.role === 'admin') {
+    if (actor.role === "admin") {
       query.iec_no = actor.ie_code_no;
     }
 
+    // Add search functionality
+    const { search } = req.query;
+    if (search && search.trim() !== "") {
+      const searchRegex = new RegExp(search.trim(), "i");
+      query.$or = [
+        { iec_no: searchRegex },
+        { name_of_individual: searchRegex },
+      ];
+    }
+
     const iecCodes = await CustomerKycModel.find(query)
-      .select('iec_no name_of_individual status approval')
+      .select("iec_no name_of_individual status approval")
       .sort({ name_of_individual: 1 });
 
-    const formattedData = iecCodes.map(kyc => ({
+    const formattedData = iecCodes.map((kyc) => ({
       iecNo: kyc.iec_no,
       importerName: kyc.name_of_individual,
       status: kyc.status,
       approval: kyc.approval,
-      id: kyc._id
+      id: kyc._id,
     }));
 
     res.json({
       success: true,
       data: formattedData,
-      message: `Found ${formattedData.length} IEC codes`
+      message: `Found ${formattedData.length} IEC codes`,
     });
-
   } catch (error) {
     console.error("Get available IEC codes error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get available IEC codes.",
-      error: error.message
+      error: error.message,
     });
   }
 };

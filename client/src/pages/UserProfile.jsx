@@ -16,10 +16,10 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { UserContext } from "../context/UserContext";
 import BackButton from "../components/BackButton";
 import { useAEOIntegration } from "../hooks/useAEOIntegration";
-import ProfileHeader from "../components/UserProfile/ProfileHeader"
+import ProfileHeader from "../components/UserProfile/ProfileHeader";
 import ProfileTabs from "../components/UserProfile/ProfileTabs";
-import AEOReminderSettingsDialog from "../components/UserProfile/AEOReminderSettingsDialog";
-import { useSnackbar } from 'notistack'; 
+// import AEOReminderSettingsDialog from "../components/UserProfile/AEOReminderSettingsDialog.jsx";
+import { useSnackbar } from "notistack";
 
 const UserProfile = () => {
   const { user: contextUser } = useContext(UserContext);
@@ -38,7 +38,6 @@ const UserProfile = () => {
   const [success, setSuccess] = useState("");
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
 
-  
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -96,10 +95,10 @@ const UserProfile = () => {
       );
 
       const data = await response.json();
-      
+
       if (data.success) {
         // Update local user state
-        setUser(prev => ({
+        setUser((prev) => ({
           ...prev,
           aeo_reminder_enabled: settings.reminder_enabled,
           aeo_reminder_days: settings.reminder_days,
@@ -167,12 +166,12 @@ const UserProfile = () => {
         </Box>
 
         {/* Header Section */}
-        <ProfileHeader 
-          user={user} 
+        <ProfileHeader
+          user={user}
           kycSummary={kycSummary}
           onRefreshAEO={handleRefreshAEO}
           aeoLoading={aeoLoading}
-          onOpenReminderSettings={() => setReminderSettingsOpen(true)}
+          // Removed onOpenReminderSettings from here
         />
 
         {/* Tabs Section */}
@@ -185,15 +184,18 @@ const UserProfile = () => {
           onRefreshProfile={fetchUserProfile}
           onSetError={setError}
           onSetSuccess={setSuccess}
-           //onUpdateReminderSettings={handleUpdateReminderSettings}
+          // Added onOpenReminderSettings here to be passed to the link
+          onOpenReminderSettings={() => setReminderSettingsOpen(true)}
         />
 
         {/* AEO Reminder Settings Dialog */}
+        {/* Uncommented the dialog and passed the handler */}
         {/* <AEOReminderSettingsDialog
           open={reminderSettingsOpen}
           onClose={() => setReminderSettingsOpen(false)}
           user={user}
           aeoCertificates={kycSummary?.kyc_summaries || []}
+          onUpdate={handleUpdateReminderSettings}
         /> */}
       </Container>
     </LocalizationProvider>

@@ -154,11 +154,10 @@ const AdminManagement = ({ onRefresh }) => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Check for SuperAdmin authentication
       const superadminToken = localStorage.getItem("superadmin_token");
       const superadminUser = localStorage.getItem("superadmin_user");
 
@@ -167,7 +166,6 @@ const AdminManagement = ({ onRefresh }) => {
         return;
       }
 
-      // Configure axios headers with authentication
       const config = {
         headers: {
           Authorization: `Bearer ${superadminToken}`,
@@ -188,11 +186,29 @@ const AdminManagement = ({ onRefresh }) => {
       ]);
 
       if (usersRes.data.success) {
-        setUsers(usersRes.data.data.users || []);
+        const usersData = usersRes.data.data.users || [];
+        setUsers(usersData);
+        
+        // Pre-populate user search options
+        const userOptions = usersData.map(user => ({
+          label: `${user.name} - ${user.email}${user.ie_code_no ? ` (${user.ie_code_no})` : ''}`,
+          value: user._id,
+          user: user
+        }));
+        setUserSearch(prev => ({ ...prev, options: userOptions }));
       }
 
       if (ieCodesRes.data.success) {
-        setAvailableIeCodes(ieCodesRes.data.data || []);
+        const ieCodesData = ieCodesRes.data.data || [];
+        setAvailableIeCodes(ieCodesData);
+        
+        // Pre-populate IE code search options
+        const ieCodeOptions = ieCodesData.map(ieCode => ({
+          label: `${ieCode.iecNo} - ${ieCode.importerName}`,
+          value: ieCode.iecNo,
+          ieCode: ieCode
+        }));
+        setIeCodeSearch(prev => ({ ...prev, options: ieCodeOptions }));
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -207,6 +223,44 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(false);
     }
   };
+
+  // Search IE codes with autocomplete
+  const searchIeCodes = async (searchTerm) => {
+    try {
+      const superadminToken = localStorage.getItem("superadmin_token");
+      if (!superadminToken) return;
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${superadminToken}`,
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/superadmin/available-iec-codes?search=${encodeURIComponent(searchTerm)}`,
+        config
+      );
+
+      if (response.data.success) {
+        const ieCodesData = response.data.data || [];
+        const ieCodeOptions = ieCodesData.map(ieCode => ({
+          label: `${ieCode.iecNo} - ${ieCode.importerName}`,
+          value: ieCode.iecNo,
+          ieCode: ieCode
+        }));
+        setIeCodeSearch(prev => ({ ...prev, options: ieCodeOptions }));
+      }
+    } catch (error) {
+      console.error("Error searching IE codes:", error);
+    }
+  };
+
+  // Filter users based on search
+
+
+
 
   // IE Code Assignment/Removal Handler
   const handleIeCodeOperation = async () => {
@@ -657,22 +711,32 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      user.ie_code_no?.toLowerCase().includes(userSearch.toLowerCase()) ||
-      user.assignedImporterName
-        ?.toLowerCase()
-        .includes(userSearch.toLowerCase())
-  );
+   const filteredUsers = useMemo(() => {
+    if (!userSearch.value) return users;
 
+    const searchTerm = userSearch.value.toLowerCase();
+    return users.filter(user => 
+      user.name?.toLowerCase().includes(searchTerm) ||
+      user.email?.toLowerCase().includes(searchTerm) ||
+      user.ie_code_no?.toLowerCase().includes(searchTerm) ||
+      user.assignedImporterName?.toLowerCase().includes(searchTerm) ||
+      user.ie_code_assignments?.some(assignment => 
+        assignment.ie_code_no?.toLowerCase().includes(searchTerm) ||
+        assignment.importer_name?.toLowerCase().includes(searchTerm)
+      )
+    );
+  }, [users, userSearch.value]);
   // Filter IE codes based on search
-  const filteredIeCodes = availableIeCodes.filter(
-    (ieCode) =>
-      ieCode.iecNo?.toLowerCase().includes(ieCodeSearch.toLowerCase()) ||
-      ieCode.importerName?.toLowerCase().includes(ieCodeSearch.toLowerCase())
-  );
+  // Filter IE codes based on search
+  const filteredIeCodes = useMemo(() => {
+    if (!ieCodeSearch.value) return availableIeCodes;
+
+    const searchTerm = ieCodeSearch.value.toLowerCase();
+    return availableIeCodes.filter(ieCode =>
+      ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
+      ieCode.importerName?.toLowerCase().includes(searchTerm)
+    );
+  }, [availableIeCodes, ieCodeSearch.value]);
 
   return (
     <Box>
@@ -859,19 +923,76 @@ const AdminManagement = ({ onRefresh }) => {
       </Grid>
 
       {/* Main Content Card */}
-      <Card sx={{ borderRadius: 2, border: "1px solid #e5e7eb" }}>
+     <Card sx={{ borderRadius: 2, border: "1px solid #e5e7eb" }}>
         <Box sx={{ p: 3 }}>
           <Box sx={{ mb: 3, display: "flex", gap: 2, alignItems: "center" }}>
-            <TextField
-              placeholder="Search users..."
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <Search sx={{ mr: 1, color: "text.secondary" }} />
-                ),
+            {/* User Search with Autocomplete */}
+            <Autocomplete
+              freeSolo
+              options={userSearch.options}
+              value={userSearch.value}
+              onChange={(event, newValue) => {
+                if (typeof newValue === 'string') {
+                  setUserSearch(prev => ({ ...prev, value: newValue }));
+                } else if (newValue && newValue.label) {
+                  setUserSearch(prev => ({ ...prev, value: newValue.label }));
+                } else {
+                  setUserSearch(prev => ({ ...prev, value: '' }));
+                }
               }}
+              onInputChange={(event, newInputValue) => {
+                setUserSearch(prev => ({ ...prev, value: newInputValue }));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Search users by name, email, IE code, or importer name..."
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <Search sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                  sx={{ flexGrow: 1 }}
+                />
+              )}
               sx={{ flexGrow: 1 }}
+            />
+
+            {/* IE Code Search with Autocomplete */}
+            <Autocomplete
+              freeSolo
+              options={ieCodeSearch.options}
+              value={ieCodeSearch.value}
+              onChange={(event, newValue) => {
+                if (typeof newValue === 'string') {
+                  setIeCodeSearch(prev => ({ ...prev, value: newValue }));
+                  searchIeCodes(newValue);
+                } else if (newValue && newValue.label) {
+                  setIeCodeSearch(prev => ({ ...prev, value: newValue.label }));
+                } else {
+                  setIeCodeSearch(prev => ({ ...prev, value: '' }));
+                }
+              }}
+              onInputChange={(event, newInputValue) => {
+                setIeCodeSearch(prev => ({ ...prev, value: newInputValue }));
+                if (newInputValue.length > 2) {
+                  searchIeCodes(newInputValue);
+                }
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Search IE codes by code or importer name..."
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <Business sx={{ mr: 1, color: "text.secondary" }} />
+                    ),
+                  }}
+                  sx={{ minWidth: 300 }}
+                />
+              )}
             />
           </Box>
 
@@ -1110,17 +1231,6 @@ const AdminManagement = ({ onRefresh }) => {
                             <AccountBox />
                           </IconButton>
                         </Tooltip>
-                        {/* {user.ie_code_assignments?.length > 0 && (
-                          <Tooltip title="Remove IE Codes">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => openIeCodeDialog(user, true)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        )} */}
 
                         {/* Status Toggle Button */}
                         <Tooltip
@@ -1208,6 +1318,7 @@ const AdminManagement = ({ onRefresh }) => {
         </Box>
       </Card>
 
+
       <IeCodeDialog
         open={ieCodeDialog}
         onClose={() => {
@@ -1228,7 +1339,7 @@ const AdminManagement = ({ onRefresh }) => {
         filteredIeCodes={filteredIeCodes}
       />
 
-      {/* All existing dialogs remain the same... */}
+
       {/* Admin Action Dialog */}
       <Dialog
         open={adminDialog}

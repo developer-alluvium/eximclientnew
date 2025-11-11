@@ -45,7 +45,7 @@ export const useSuperAdminApi = () => {
       setError(null);
       
       const token = localStorage.getItem('superadmin_token');
-      console.log('Superadmin token:', token); // Debugging line
+
 
       const config = {
         method,

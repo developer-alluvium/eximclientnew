@@ -1,4 +1,3 @@
-// components/UserProfile/ProfileTabs.js
 import React, { useState } from "react";
 import { Paper, Box, Tabs, Tab } from "@mui/material";
 import ProfileInfoTab from "./ProfileInfoTab";

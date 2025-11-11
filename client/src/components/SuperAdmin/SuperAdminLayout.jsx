@@ -1,12 +1,12 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Box, ThemeProvider, Alert } from '@mui/material';
-import { UserContext } from '../../context/UserContext';
-import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
+import React, { useState, useContext, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Box, ThemeProvider, Alert } from "@mui/material";
+import { UserContext } from "../../context/UserContext";
+import { useSuperAdminApi } from "../../hooks/useSuperAdminApi";
 
 // Import modern theme and components
-import { modernTheme } from '../../styles/modernTheme';
-import ModernSidebar from './ModernSidebar';
+import { modernTheme } from "../../styles/modernTheme";
+import ModernSidebar from "./ModernSidebar";
 import LoadingScreen from "../LoadingScreen.jsx";
 
 const SuperAdminLayout = () => {
@@ -15,13 +15,8 @@ const SuperAdminLayout = () => {
   const { user, setUser } = useContext(UserContext);
 
   // Use custom hook for API calls
-  const { 
-    loading, 
-    error, 
-    setError,
-    getDashboardAnalytics, 
-    getUserActivity 
-  } = useSuperAdminApi();
+  const { loading, error, setError, getDashboardAnalytics, getUserActivity } =
+    useSuperAdminApi();
 
   // Sidebar state management
   const [activeTab, setActiveTab] = useState(0);
@@ -34,13 +29,13 @@ const SuperAdminLayout = () => {
 
   // Tab configuration
   const tabs = [
-    { label: 'Overview', icon: 'dashboard', component: 'overview' },
-    { label: 'Customer Management', icon: 'people', component: 'customers' },
-    { label: 'Module Management', icon: 'settings', component: 'modules' },
-    { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
-    { label: 'System Analytics', icon: 'analytics', component: 'analytics' },
-    { label: 'User Activity', icon: 'timeline', component: 'activity' },
-    { label: 'Session Manager', icon: 'security', component: 'sessions' }
+    { label: "Overview", icon: "dashboard", component: "overview" },
+    { label: "Customer Management", icon: "people", component: "customers" },
+    { label: "Module Management", icon: "settings", component: "modules" },
+    // { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
+    // { label: 'System Analytics', icon: 'analytics', component: 'analytics' },
+    // { label: 'User Activity', icon: 'timeline', component: 'activity' },
+    // { label: 'Session Manager', icon: 'security', component: 'sessions' }
   ];
 
   // Authentication check
@@ -48,16 +43,16 @@ const SuperAdminLayout = () => {
     const checkSuperAdminAuth = () => {
       const token = localStorage.getItem("superadmin_token");
       const user = localStorage.getItem("superadmin_user");
-      
+
       if (!token || !user) {
         navigate("/login");
         return;
       }
-      
+
       setIsAuthenticating(false);
       fetchDashboardData();
     };
-    
+
     checkSuperAdminAuth();
   }, [navigate]);
 
@@ -66,9 +61,9 @@ const SuperAdminLayout = () => {
     try {
       const [analyticsData, activityData] = await Promise.all([
         getDashboardAnalytics(),
-        getUserActivity('active', 5)
+        getUserActivity("active", 5),
       ]);
-      
+
       setDashboardData(analyticsData.data);
       setUserActivity(activityData.data);
     } catch (error) {
@@ -86,27 +81,27 @@ const SuperAdminLayout = () => {
     if (location.state?.activeTab !== undefined) {
       setActiveTab(location.state.activeTab);
       // Clear the state to avoid issues with browser back/forward
-      window.history.replaceState({}, '', location.pathname);
+      window.history.replaceState({}, "", location.pathname);
     }
   }, [location.state]);
 
   // Set active tab based on current route
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/superadmin-dashboard') {
+    if (path === "/superadmin-dashboard") {
       // Don't change activeTab if it's already set by navigation state
       if (location.state?.activeTab === undefined) {
         setActiveTab(0); // Default to overview
       }
-    } else if (path.includes('/customer/')) {
+    } else if (path.includes("/customer/")) {
       setActiveTab(1); // Customer Management
-    } else if (path.includes('/module')) {
+    } else if (path.includes("/module")) {
       setActiveTab(2); // Module Management
-    } else if (path.includes('/analytics')) {
+    } else if (path.includes("/analytics")) {
       setActiveTab(4); // Analytics
-    } else if (path.includes('/activity')) {
+    } else if (path.includes("/activity")) {
       setActiveTab(5); // Activity
-    } else if (path.includes('/sessions')) {
+    } else if (path.includes("/sessions")) {
       setActiveTab(5); // Sessions
     }
   }, [location.pathname]);
@@ -116,36 +111,36 @@ const SuperAdminLayout = () => {
     if (location.state?.activeTab !== undefined) {
       setActiveTab(location.state.activeTab);
       // Clear the state to avoid issues with browser back/forward
-      window.history.replaceState({}, '', location.pathname);
+      window.history.replaceState({}, "", location.pathname);
     }
   }, [location.state]);
 
   // Handle tab changes
   const handleTabChange = (tabIndex) => {
     setActiveTab(tabIndex);
-    
+
     // Navigate to appropriate route
     switch (tabIndex) {
       case 0:
-        navigate('/superadmin-dashboard');
+        navigate("/superadmin-dashboard");
         break;
       case 1:
-        navigate('/superadmin-dashboard'); // Will show customer management
+        navigate("/superadmin-dashboard"); // Will show customer management
         break;
       case 2:
-        navigate('/superadmin-dashboard'); // Will show module management
+        navigate("/superadmin-dashboard"); // Will show module management
         break;
       case 3:
-        navigate('/superadmin-dashboard'); // Will show analytics
+        navigate("/superadmin-dashboard"); // Will show analytics
         break;
       case 4:
-        navigate('/superadmin-dashboard'); // Will show activity
+        navigate("/superadmin-dashboard"); // Will show activity
         break;
       case 5:
-        navigate('/superadmin-dashboard'); // Will show sessions
+        navigate("/superadmin-dashboard"); // Will show sessions
         break;
       default:
-        navigate('/superadmin-dashboard');
+        navigate("/superadmin-dashboard");
     }
   };
 
@@ -154,31 +149,31 @@ const SuperAdminLayout = () => {
     try {
       // Get SuperAdmin user data from localStorage
       const superAdminUser = localStorage.getItem("superadmin_user");
-      
+
       if (superAdminUser) {
         try {
           const userData = JSON.parse(superAdminUser);
-          
+
           // Call logout API to update logout time
           await fetch(`${process.env.REACT_APP_API_STRING}/superadmin/logout`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ userId: userData.id }),
           });
         } catch (error) {
-          console.error('Error calling SuperAdmin logout API:', error);
+          console.error("Error calling SuperAdmin logout API:", error);
         }
       }
-      
+
       // Clear localStorage and redirect
       localStorage.removeItem("superadmin_token");
       localStorage.removeItem("superadmin_user");
       localStorage.removeItem("user_access_token");
       navigate("/login");
     } catch (error) {
-      console.error('Error during SuperAdmin logout:', error);
+      console.error("Error during SuperAdmin logout:", error);
       // Still clear localStorage and redirect even if API call fails
       localStorage.removeItem("superadmin_token");
       localStorage.removeItem("superadmin_user");
@@ -211,19 +206,19 @@ const SuperAdminLayout = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: '100vh',
-          ml: { 
-            xs: 0, 
-            md: sidebarCollapsed ? '64px' : '240px' 
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100vh",
+          ml: {
+            xs: 0,
+            md: sidebarCollapsed ? "64px" : "240px",
           },
-          transition: 'margin-left 0.2s ease',
-          width: { 
-            xs: '100%',
-            md: `calc(100% - ${sidebarCollapsed ? '64px' : '240px'})`
+          transition: "margin-left 0.2s ease",
+          width: {
+            xs: "100%",
+            md: `calc(100% - ${sidebarCollapsed ? "64px" : "240px"})`,
           },
-          overflow: 'hidden',
+          overflow: "hidden",
         }}
       >
         {/* Content Area */}
@@ -231,40 +226,42 @@ const SuperAdminLayout = () => {
           sx={{
             flexGrow: 1,
             p: { xs: 2, sm: 3, md: 3 },
-            backgroundColor: '#F8FAFC',
-            minHeight: '100vh',
-            width: '100%',
-            maxWidth: '100%',
-            overflow: 'hidden',
+            backgroundColor: "#F8FAFC",
+            minHeight: "100vh",
+            width: "100%",
+            maxWidth: "100%",
+            overflow: "hidden",
           }}
         >
           {error && (
-            <Alert 
-              severity="error" 
-              sx={{ 
+            <Alert
+              severity="error"
+              sx={{
                 mb: 3,
                 borderRadius: 2,
-                border: '1px solid #FEE2E2',
-                backgroundColor: '#FEF2F2',
-                color: '#DC2626',
-              }} 
+                border: "1px solid #FEE2E2",
+                backgroundColor: "#FEF2F2",
+                color: "#DC2626",
+              }}
               onClose={() => setError(null)}
             >
               {error}
             </Alert>
           )}
-          
+
           {/* This is where child routes will render */}
-          <Outlet context={{ 
-            dashboardData, 
-            userActivity, 
-            fetchDashboardData, 
-            loading,
-            activeTab,
-            setActiveTab,
-            error,
-            setError
-          }} />
+          <Outlet
+            context={{
+              dashboardData,
+              userActivity,
+              fetchDashboardData,
+              loading,
+              activeTab,
+              setActiveTab,
+              error,
+              setError,
+            }}
+          />
         </Box>
       </Box>
     </ThemeProvider>
