@@ -187,13 +187,11 @@ export const requestPasswordReset = async (req, res) => {
     // Important: Don't reveal if a user exists or not for security reasons.
     // Always send a success-like response.
     if (!user) {
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message:
-            "If an account with that email exists, a password reset link has been sent.",
-        });
+      return res.status(200).json({
+        success: true,
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
+      });
     }
 
     // Generate the reset token (this is the unhashed version)
@@ -203,13 +201,11 @@ export const requestPasswordReset = async (req, res) => {
     // Send the email
     await sendPasswordResetEmail(user.email, user.name, resetToken);
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message:
-          "If an account with that email exists, a password reset link has been sent.",
-      });
+    res.status(200).json({
+      success: true,
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
+    });
   } catch (error) {
     console.error("Request password reset error:", error);
     // In case of error, clear the token to allow the user to try again
@@ -219,12 +215,10 @@ export const requestPasswordReset = async (req, res) => {
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
     }
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to send password reset email.",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to send password reset email.",
+    });
   }
 };
 /**
@@ -238,12 +232,10 @@ export const resetPassword = async (req, res) => {
     const { newPassword } = req.body;
 
     if (!token || !newPassword) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Token and new password are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password are required",
+      });
     }
 
     // 1. Hash the incoming token to match the one in the DB
@@ -270,12 +262,10 @@ export const resetPassword = async (req, res) => {
 
     await user.save();
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Password has been reset successfully. Please log in.",
-      });
+    res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully. Please log in.",
+    });
   } catch (error) {
     console.error("Password reset error:", error);
     res
@@ -607,55 +597,57 @@ export const generateSSOToken = async (req, res) => {
         message: "Authentication required",
       });
     }
-    console.log(
-      `Generating SSO token for user: ${req.user.id} (${req.user.name})`
-    );
 
-    // Get requested ie_code_no from query or body or params
-    // (Assuming frontend sends as query param ?ie_code_no=xxxx)
-    const requestedIeCode =
-      req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
-    if (!requestedIeCode) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing IE code parameter",
-      });
-    }
+    console.log(`Generating SSO token for user: ${req.user.id} (${req.user.name})`);
+    console.log('User IE code assignments:', req.user.ie_code_assignments);
 
-    // Extract user's assigned ie codes (array of strings)
+    // Extract all assigned IE codes from user's assignments
     let userIeCodes = [];
-    if (
-      Array.isArray(req.user.ie_code_assignments) &&
-      req.user.ie_code_assignments.length > 0
-    ) {
+    let ieCodeAssignments = [];
+    
+    if (Array.isArray(req.user.ie_code_assignments) && req.user.ie_code_assignments.length > 0) {
       userIeCodes = req.user.ie_code_assignments.map((a) => a.ie_code_no);
+      ieCodeAssignments = req.user.ie_code_assignments.map(assignment => ({
+        ie_code_no: assignment.ie_code_no,
+        importer_name: assignment.importer_name
+      }));
     } else if (req.user.ie_code_no) {
       userIeCodes = [req.user.ie_code_no];
+      ieCodeAssignments = [{
+        ie_code_no: req.user.ie_code_no,
+        importer_name: req.user.assignedImporterName || 'Unknown'
+      }];
     }
 
-    // Check if requested IE code is assigned to this user
-    if (!userIeCodes.includes(requestedIeCode)) {
+    // If no specific IE code requested, include all assigned IE codes
+    const requestedIeCode = req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
+    
+    let tokenIeCodes = userIeCodes;
+    let primaryIeCode = requestedIeCode || userIeCodes[0];
+    
+    // If specific IE code requested, validate it's assigned to user
+    if (requestedIeCode && !userIeCodes.includes(requestedIeCode)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden: IE code not assigned to user",
+        available_ie_codes: userIeCodes
       });
     }
 
-    console.log(
-      `User IE codes: ${userIeCodes.join(
-        ", "
-      )}, requested IE code: ${requestedIeCode}`
-    );
+    console.log(`User IE codes: ${userIeCodes.join(", ")}, token will include all assigned IE codes`);
 
-    // Generate short-lived SSO token with standard JWT format
+    // Generate SSO token with ALL assigned IE codes
     const ssoToken = jwt.sign(
       {
-        sub: req.user.id, // Standard JWT subject field
-        ie_code_no: requestedIeCode, // Pass requested IE code only
+        sub: req.user.id,
+        ie_code_no: primaryIeCode, // Primary IE code for backward compatibility
+        ie_codes: userIeCodes, // Array of all assigned IE codes
+        ie_code_assignments: ieCodeAssignments, // Full assignment details
         name: req.user.name,
+        email: req.user.email,
       },
       JWT_SECRET,
-      { expiresIn: "1d" } // 1 day expiry for security
+      { expiresIn: "1d" }
     );
 
     res.status(200).json({
@@ -663,7 +655,9 @@ export const generateSSOToken = async (req, res) => {
       message: "SSO token generated successfully",
       data: {
         token: ssoToken,
-        ie_code_no: requestedIeCode,
+        ie_code_no: primaryIeCode,
+        ie_codes: userIeCodes,
+        ie_code_assignments: ieCodeAssignments,
         expires_in: "1d",
       },
     });

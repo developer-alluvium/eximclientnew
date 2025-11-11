@@ -98,6 +98,7 @@ const AVAILABLE_MODULES = [
   },
   {
     id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    // id:"http://localhost:3005/",
     name: "E-Lock",
     description:
       "Secure electronic document locking and verification (Tracking)",
@@ -154,7 +155,7 @@ const AdminManagement = ({ onRefresh }) => {
     fetchData();
   }, []);
 
-const fetchData = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -188,27 +189,29 @@ const fetchData = async () => {
       if (usersRes.data.success) {
         const usersData = usersRes.data.data.users || [];
         setUsers(usersData);
-        
+
         // Pre-populate user search options
-        const userOptions = usersData.map(user => ({
-          label: `${user.name} - ${user.email}${user.ie_code_no ? ` (${user.ie_code_no})` : ''}`,
+        const userOptions = usersData.map((user) => ({
+          label: `${user.name} - ${user.email}${
+            user.ie_code_no ? ` (${user.ie_code_no})` : ""
+          }`,
           value: user._id,
-          user: user
+          user: user,
         }));
-        setUserSearch(prev => ({ ...prev, options: userOptions }));
+        setUserSearch((prev) => ({ ...prev, options: userOptions }));
       }
 
       if (ieCodesRes.data.success) {
         const ieCodesData = ieCodesRes.data.data || [];
         setAvailableIeCodes(ieCodesData);
-        
+
         // Pre-populate IE code search options
-        const ieCodeOptions = ieCodesData.map(ieCode => ({
+        const ieCodeOptions = ieCodesData.map((ieCode) => ({
           label: `${ieCode.iecNo} - ${ieCode.importerName}`,
           value: ieCode.iecNo,
-          ieCode: ieCode
+          ieCode: ieCode,
         }));
-        setIeCodeSearch(prev => ({ ...prev, options: ieCodeOptions }));
+        setIeCodeSearch((prev) => ({ ...prev, options: ieCodeOptions }));
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -239,18 +242,22 @@ const fetchData = async () => {
       };
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/superadmin/available-iec-codes?search=${encodeURIComponent(searchTerm)}`,
+        `${
+          process.env.REACT_APP_API_STRING
+        }/superadmin/available-iec-codes?search=${encodeURIComponent(
+          searchTerm
+        )}`,
         config
       );
 
       if (response.data.success) {
         const ieCodesData = response.data.data || [];
-        const ieCodeOptions = ieCodesData.map(ieCode => ({
+        const ieCodeOptions = ieCodesData.map((ieCode) => ({
           label: `${ieCode.iecNo} - ${ieCode.importerName}`,
           value: ieCode.iecNo,
-          ieCode: ieCode
+          ieCode: ieCode,
         }));
-        setIeCodeSearch(prev => ({ ...prev, options: ieCodeOptions }));
+        setIeCodeSearch((prev) => ({ ...prev, options: ieCodeOptions }));
       }
     } catch (error) {
       console.error("Error searching IE codes:", error);
@@ -258,9 +265,6 @@ const fetchData = async () => {
   };
 
   // Filter users based on search
-
-
-
 
   // IE Code Assignment/Removal Handler
   const handleIeCodeOperation = async () => {
@@ -276,19 +280,19 @@ const fetchData = async () => {
         setError("SuperAdmin authentication required. Please login again.");
         return;
       }
-
+      console.log(superadminToken);
       const config = {
         headers: {
           Authorization: `Bearer ${superadminToken}`,
           "Content-Type": "application/json",
         },
-        withCredentials: true,
+        //withCredentials: true,
       };
 
       let response;
       if (isRemovingIeCode) {
         const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`;
-        // Axios delete needs data inside config as { data: { ... } }
+        
         response = await axios.delete(endpoint, {
           ...config,
           data: {
@@ -711,19 +715,21 @@ const fetchData = async () => {
     }
   };
 
-   const filteredUsers = useMemo(() => {
+  const filteredUsers = useMemo(() => {
     if (!userSearch.value) return users;
 
     const searchTerm = userSearch.value.toLowerCase();
-    return users.filter(user => 
-      user.name?.toLowerCase().includes(searchTerm) ||
-      user.email?.toLowerCase().includes(searchTerm) ||
-      user.ie_code_no?.toLowerCase().includes(searchTerm) ||
-      user.assignedImporterName?.toLowerCase().includes(searchTerm) ||
-      user.ie_code_assignments?.some(assignment => 
-        assignment.ie_code_no?.toLowerCase().includes(searchTerm) ||
-        assignment.importer_name?.toLowerCase().includes(searchTerm)
-      )
+    return users.filter(
+      (user) =>
+        user.name?.toLowerCase().includes(searchTerm) ||
+        user.email?.toLowerCase().includes(searchTerm) ||
+        user.ie_code_no?.toLowerCase().includes(searchTerm) ||
+        user.assignedImporterName?.toLowerCase().includes(searchTerm) ||
+        user.ie_code_assignments?.some(
+          (assignment) =>
+            assignment.ie_code_no?.toLowerCase().includes(searchTerm) ||
+            assignment.importer_name?.toLowerCase().includes(searchTerm)
+        )
     );
   }, [users, userSearch.value]);
   // Filter IE codes based on search
@@ -732,9 +738,10 @@ const fetchData = async () => {
     if (!ieCodeSearch.value) return availableIeCodes;
 
     const searchTerm = ieCodeSearch.value.toLowerCase();
-    return availableIeCodes.filter(ieCode =>
-      ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
-      ieCode.importerName?.toLowerCase().includes(searchTerm)
+    return availableIeCodes.filter(
+      (ieCode) =>
+        ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
+        ieCode.importerName?.toLowerCase().includes(searchTerm)
     );
   }, [availableIeCodes, ieCodeSearch.value]);
 
@@ -923,7 +930,7 @@ const fetchData = async () => {
       </Grid>
 
       {/* Main Content Card */}
-     <Card sx={{ borderRadius: 2, border: "1px solid #e5e7eb" }}>
+      <Card sx={{ borderRadius: 2, border: "1px solid #e5e7eb" }}>
         <Box sx={{ p: 3 }}>
           <Box sx={{ mb: 3, display: "flex", gap: 2, alignItems: "center" }}>
             {/* User Search with Autocomplete */}
@@ -932,16 +939,16 @@ const fetchData = async () => {
               options={userSearch.options}
               value={userSearch.value}
               onChange={(event, newValue) => {
-                if (typeof newValue === 'string') {
-                  setUserSearch(prev => ({ ...prev, value: newValue }));
+                if (typeof newValue === "string") {
+                  setUserSearch((prev) => ({ ...prev, value: newValue }));
                 } else if (newValue && newValue.label) {
-                  setUserSearch(prev => ({ ...prev, value: newValue.label }));
+                  setUserSearch((prev) => ({ ...prev, value: newValue.label }));
                 } else {
-                  setUserSearch(prev => ({ ...prev, value: '' }));
+                  setUserSearch((prev) => ({ ...prev, value: "" }));
                 }
               }}
               onInputChange={(event, newInputValue) => {
-                setUserSearch(prev => ({ ...prev, value: newInputValue }));
+                setUserSearch((prev) => ({ ...prev, value: newInputValue }));
               }}
               renderInput={(params) => (
                 <TextField
@@ -965,17 +972,20 @@ const fetchData = async () => {
               options={ieCodeSearch.options}
               value={ieCodeSearch.value}
               onChange={(event, newValue) => {
-                if (typeof newValue === 'string') {
-                  setIeCodeSearch(prev => ({ ...prev, value: newValue }));
+                if (typeof newValue === "string") {
+                  setIeCodeSearch((prev) => ({ ...prev, value: newValue }));
                   searchIeCodes(newValue);
                 } else if (newValue && newValue.label) {
-                  setIeCodeSearch(prev => ({ ...prev, value: newValue.label }));
+                  setIeCodeSearch((prev) => ({
+                    ...prev,
+                    value: newValue.label,
+                  }));
                 } else {
-                  setIeCodeSearch(prev => ({ ...prev, value: '' }));
+                  setIeCodeSearch((prev) => ({ ...prev, value: "" }));
                 }
               }}
               onInputChange={(event, newInputValue) => {
-                setIeCodeSearch(prev => ({ ...prev, value: newInputValue }));
+                setIeCodeSearch((prev) => ({ ...prev, value: newInputValue }));
                 if (newInputValue.length > 2) {
                   searchIeCodes(newInputValue);
                 }
@@ -1318,7 +1328,6 @@ const fetchData = async () => {
         </Box>
       </Card>
 
-
       <IeCodeDialog
         open={ieCodeDialog}
         onClose={() => {
@@ -1338,7 +1347,6 @@ const fetchData = async () => {
         handleIeCodeOperation={handleIeCodeOperation}
         filteredIeCodes={filteredIeCodes}
       />
-
 
       {/* Admin Action Dialog */}
       <Dialog

@@ -361,6 +361,7 @@ const handleCardClick = async (path, isExternal = false, isLocked = false, modul
       if (ssoToken) {
         localStorage.setItem('sso_token', ssoToken);
         const elockUrl = "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
+        // const elockUrl = "http://localhost:3005/"
         window.location.href = `${elockUrl}?token=${ssoToken}`;
       } else {
         alert("Failed to generate SSO token for E-Lock.");

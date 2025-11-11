@@ -211,8 +211,6 @@ export const authenticate = async (req, res, next) => {
     let user = null;
     let userType = decoded.role;
 
-  
-
     // First try SuperAdmin model for superadmin role
     if (userType === "superadmin") {
       user = await SuperAdminModel.findById(decoded.id);
@@ -269,6 +267,7 @@ export const authenticate = async (req, res, next) => {
 
     next();
   } catch (error) {
+    console.log(error);
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
