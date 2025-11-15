@@ -4,14 +4,14 @@ import axios from "axios";
 // Helper function to extract IE codes from user data (same as backend)
 const extractUserIECodes = (user) => {
   if (!user) return [];
-  
+
   const ieCodes = [];
-  
+
   // Handle new ie_code_assignments structure
   if (user.ie_code_assignments) {
     if (Array.isArray(user.ie_code_assignments)) {
       // Multiple assignments (existing functionality)
-      user.ie_code_assignments.forEach(assignment => {
+      user.ie_code_assignments.forEach((assignment) => {
         if (assignment && assignment.ie_code_no) {
           ieCodes.push(assignment.ie_code_no.toUpperCase().trim());
         }
@@ -21,29 +21,29 @@ const extractUserIECodes = (user) => {
       ieCodes.push(user.ie_code_assignments.ie_code_no.toUpperCase().trim());
     }
   }
-  
+
   // Fallback to legacy field
   if (ieCodes.length === 0 && user.ie_code_no) {
     ieCodes.push(user.ie_code_no.toUpperCase().trim());
   }
-  
-  return [...new Set(ieCodes.filter(code => code && code.length > 0))];
+
+  return [...new Set(ieCodes.filter((code) => code && code.length > 0))];
 };
 
 // Helper function to extract importers from user data
 const extractUserImporters = (user) => {
   if (!user) return [];
-  
+
   const importers = [];
-  
+
   if (user.ie_code_assignments) {
     if (Array.isArray(user.ie_code_assignments)) {
       // Multiple assignments
-      user.ie_code_assignments.forEach(assignment => {
+      user.ie_code_assignments.forEach((assignment) => {
         if (assignment && assignment.importer_name) {
           importers.push({
             ie_code_no: assignment.ie_code_no,
-            importer_name: assignment.importer_name.trim()
+            importer_name: assignment.importer_name.trim(),
           });
         }
       });
@@ -51,13 +51,13 @@ const extractUserImporters = (user) => {
       // Single assignment as object
       importers.push({
         ie_code_no: user.ie_code_assignments.ie_code_no,
-        importer_name: user.ie_code_assignments.importer_name.trim()
+        importer_name: user.ie_code_assignments.importer_name.trim(),
       });
     }
   }
-  
+
   console.log("Extracted importers:", importers);
-  
+
   return importers;
 };
 
@@ -92,61 +92,74 @@ function useFetchJobsData(
     setError(null);
 
     try {
-      const userDataFromStorage = localStorage.getItem('exim_user');
-      const userData = userDataFromStorage ? JSON.parse(userDataFromStorage) : null;
-      
+      const userDataFromStorage = localStorage.getItem("exim_user");
+      const userData = userDataFromStorage
+        ? JSON.parse(userDataFromStorage)
+        : null;
+
       // Extract IE codes and importers using helper functions
       const userIECodes = extractUserIECodes(userData);
       const userImporters = extractUserImporters(userData);
-      
+
       console.log("Extracted IE codes:", userIECodes);
       console.log("Extracted importers:", userImporters);
-      
+
       // If we have IE code assignments, use the multiple IE codes endpoint
       if (userIECodes.length > 0) {
         const apiString = process.env.REACT_APP_API_STRING || "";
-        const formattedSearchQuery = searchQuery ? encodeURIComponent(searchQuery) : "";
-        const formattedExporter = selectedExporter && selectedExporter !== "all"
-          ? encodeURIComponent(selectedExporter)
+        const formattedSearchQuery = searchQuery
+          ? encodeURIComponent(searchQuery)
           : "";
+        const formattedExporter =
+          selectedExporter && selectedExporter !== "all"
+            ? encodeURIComponent(selectedExporter)
+            : "";
 
         let selectedIeCodes = "";
         let importerToFilter = "";
 
-        if (selectedImporter && selectedImporter !== "all" && selectedImporter !== "All Importers") {
+        if (
+          selectedImporter &&
+          selectedImporter !== "all" &&
+          selectedImporter !== "All Importers"
+        ) {
           // Find the matching assignment for the selected importer
           const matchingImporter = userImporters.find(
-            importer => importer.importer_name === selectedImporter
+            (importer) => importer.importer_name === selectedImporter
           );
-          
+
           if (matchingImporter) {
             selectedIeCodes = matchingImporter.ie_code_no;
-            importerToFilter = encodeURIComponent(matchingImporter.importer_name);
+            importerToFilter = encodeURIComponent(
+              matchingImporter.importer_name
+            );
           } else {
             // If selected importer not found in ie_code_assignments, use all IE codes without importer filter
-            console.warn("⚠️ Selected importer not found in IE code assignments:", selectedImporter);
-            selectedIeCodes = userIECodes.join(',');
+            console.warn(
+              "⚠️ Selected importer not found in IE code assignments:",
+              selectedImporter
+            );
+            selectedIeCodes = userIECodes.join(",");
             importerToFilter = ""; // Don't filter by importer since it's not in assignments
           }
         } else {
           // If no importer selected or "All Importers" is chosen, use all IE codes
-          selectedIeCodes = userIECodes.join(',');
+          selectedIeCodes = userIECodes.join(",");
           importerToFilter = ""; // Omit importers param in this case
         }
 
         // Build API URL conditionally: only add importers param if importerToFilter is present
-       // let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
-       console.log("Gandhidham flag:", gandhidham);
+        // let apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
+        console.log("Gandhidham flag:", gandhidham);
         let apiUrl;
-        if(gandhidham){
-          apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`
-        }
-        else{
+        if (gandhidham) {
+          apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
+        } else {
           apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${custom_house}/multiple?ieCodes=${selectedIeCodes}`;
         }
 
         if (importerToFilter) {
-          apiUrl += `&importers=${importerToFilter}`;
+          apiUrl += `&importer=${importerToFilter}`;
         }
         apiUrl += `&page=${page}&limit=100&search=${formattedSearchQuery}`;
         if (formattedExporter) {
@@ -163,13 +176,19 @@ function useFetchJobsData(
         setTotalPages(totalPages || 1);
         setCurrentPage(currentPage || 1);
 
-        console.log(`✅ Fetched ${data?.length || 0} jobs using IE codes: ${selectedIeCodes}`);
+        console.log(
+          `✅ Fetched ${
+            data?.length || 0
+          } jobs using IE codes: ${selectedIeCodes}`
+        );
         return;
       }
 
       // If no IE code assignments, use the original importer-based endpoint
-      console.log("⚠️ No IE code assignments found, falling back to importer-based endpoint");
-      
+      console.log(
+        "⚠️ No IE code assignments found, falling back to importer-based endpoint"
+      );
+
       const cleanImporter = selectedImporter
         ? selectedImporter.replace(/\u00A0/g, " ").trim()
         : null;
@@ -185,9 +204,10 @@ function useFetchJobsData(
       const formattedSearchQuery = searchQuery
         ? encodeURIComponent(searchQuery)
         : "";
-      const formattedExporter = selectedExporter && selectedExporter !== "all"
-        ? encodeURIComponent(selectedExporter)
-        : "";
+      const formattedExporter =
+        selectedExporter && selectedExporter !== "all"
+          ? encodeURIComponent(selectedExporter)
+          : "";
       const apiString = process.env.REACT_APP_API_STRING || "";
 
       if (!apiString) {
@@ -198,9 +218,13 @@ function useFetchJobsData(
 
       let apiUrl;
       if (gandhidham) {
-        apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+        apiUrl = `${apiString}/gandhidham/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${
+          formattedExporter ? `&exporter=${formattedExporter}` : ""
+        }`;
       } else {
-        apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${formattedExporter ? `&exporter=${formattedExporter}` : ''}`;
+        apiUrl = `${apiString}/${selectedYear}/jobs/${status}/${detailedStatus}/${formattedImporter}?page=${page}&limit=100&search=${formattedSearchQuery}${
+          formattedExporter ? `&exporter=${formattedExporter}` : ""
+        }`;
       }
 
       console.log("Fetching jobs data from fallback endpoint:", apiUrl);
@@ -235,7 +259,7 @@ function useFetchJobsData(
       searchQuery,
       selectedImporter,
       selectedExporter,
-      custom_house
+      custom_house,
     });
 
     // Always attempt to fetch if we have the year
@@ -243,7 +267,15 @@ function useFetchJobsData(
       setCurrentPage(1);
       fetchJobsData(1);
     }
-  }, [detailedStatus, selectedYear, status, searchQuery, selectedImporter, selectedExporter, custom_house]);
+  }, [
+    detailedStatus,
+    selectedYear,
+    status,
+    searchQuery,
+    selectedImporter,
+    selectedExporter,
+    custom_house,
+  ]);
 
   // Handle manual page change
   const handlePageChange = (newPage) => {

@@ -20,6 +20,7 @@ import userManagementRoutes from "./routes/userManagementRoutes.js";
 import superAdminIeCodeRoutes from "./routes/superAdminIeCodeRoutes.js";
 import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
 import aeoReminderRoutes from "./routes/aeoReminderRoutes.js";
+import analytics from "./routes/analytics.js";
 
 import icegateProxy from "./routes/icegateProxy.js";
 
@@ -99,6 +100,8 @@ app.use(aeoIntegrationRoutes);
 app.use(aeoReminderRoutes);
 app.use(icegateProxy);
 app.use(currencyRate);
+app.use(analytics);
+
 // Root route
 app.get("/", (req, res) => {
   res.send("Hello - API is running");

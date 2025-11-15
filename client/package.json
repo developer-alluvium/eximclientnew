@@ -18,6 +18,7 @@
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.509.0",
     "material-react-table": "^3.2.1",
     "notistack": "^3.0.2",

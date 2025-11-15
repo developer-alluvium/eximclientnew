@@ -142,7 +142,7 @@ const ProfileHeader = ({
       </Box>
 
       {/* Stats Cards */}
-      <Grid container spacing={3}>
+      {/* <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Assigned Importers"
@@ -175,7 +175,7 @@ const ProfileHeader = ({
             icon={FolderIcon}
           />
         </Grid>
-      </Grid>
+      </Grid> */}
     </Box>
   );
 };

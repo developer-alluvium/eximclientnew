@@ -1567,6 +1567,7 @@ export const getContainerDetails = async (req, res) => {
           loading_port: 1,
           port_of_reporting: 1,
           shipping_line_airline: 1,
+          do_validity_upto_job_level: 1,
           ie_code_no: 1, // Include IE code for tracking
           container: {
             container_number: "$container_nos.container_number",

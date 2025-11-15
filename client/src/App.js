@@ -31,53 +31,55 @@ import EmailVerification from "./pages/EmailVerification.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import MainLayout from "./pages/MainLayout.jsx";
+import CImportDSR from "./components/CImportDSR.jsx";
+import AnalyticsOverview from "./components/AnalyticsOverview.jsx";// Add this import
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
   const location = useLocation();
-  
+
   // Pages that should not show the header
   const noHeaderPages = [
     "/login",
-    "/user/login", 
+    "/user/login",
     "/admin/login",
     "/superadmin/login",
     "/user/register",
     "/verify-email",
     "/reset-password",
-      "/superadmin-dashboard",        // Added
-  "/module-access-management"  
+    "/superadmin-dashboard", // Added
+    "/module-access-management",
   ];
-  
-  const shouldShowHeader = !noHeaderPages.some(page => 
+
+  const shouldShowHeader = !noHeaderPages.some((page) =>
     location.pathname.startsWith(page)
   );
-  
+
   if (shouldShowHeader) {
     return <MainLayout>{children}</MainLayout>;
   }
-  
+
   return <>{children}</>;
 };
 
 // Protected Route component
 const ProtectedRoute = ({ children, requiredAuth }) => {
   const navigate = useNavigate();
-  
+
   React.useEffect(() => {
     const checkAuth = () => {
       switch (requiredAuth) {
-        case 'superadmin':
+        case "superadmin":
           if (!localStorage.getItem("superadmin_user")) {
             navigate("/login", { replace: true });
           }
           break;
-        case 'admin':
+        case "admin":
           if (!localStorage.getItem("exim_admin")) {
             navigate("/admin/login", { replace: true });
           }
           break;
-        case 'user':
+        case "user":
           if (!localStorage.getItem("exim_user")) {
             navigate("/login", { replace: true });
           }
@@ -86,10 +88,10 @@ const ProtectedRoute = ({ children, requiredAuth }) => {
           break;
       }
     };
-    
+
     checkAuth();
   }, [navigate, requiredAuth]);
-  
+
   return children;
 };
 
@@ -100,14 +102,11 @@ function App() {
     return savedUser ? JSON.parse(savedUser) : null;
   });
   const [selectedYear, setSelectedYear] = React.useState("");
-  
 
   return (
     <BrowserRouter>
       <UserContext.Provider value={{ user, setUser }}>
-        <SelectedYearContext.Provider
-          value={{ selectedYear, setSelectedYear }}
-        >
+        <SelectedYearContext.Provider value={{ selectedYear, setSelectedYear }}>
           <TabValueProvider>
             <ImportersProvider>
               <LayoutWrapper>
@@ -116,8 +115,10 @@ function App() {
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/user/login" element={<UserLoginPage />} />
                   <Route path="/admin/login" element={<AdminLoginPage />} />
-                  <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
-
+                  <Route
+                    path="/superadmin/login"
+                    element={<SuperAdminLoginPage />}
+                  />
                   {/* User system routes - no header */}
                   <Route
                     path="/user/register"
@@ -131,7 +132,6 @@ function App() {
                     path="/reset-password/:token"
                     element={<ResetPasswordPage />}
                   />
-
                   {/* Protected routes - with header */}
                   <Route
                     path="/user/dashboard"
@@ -141,7 +141,15 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-
+                  {/* Analytics Overview route */}
+                  <Route
+                    path="/import-analytics"
+                    element={
+                      <ProtectedRoute requiredAuth="user">
+                        <AnalyticsOverview />
+                      </ProtectedRoute>
+                    }
+                  />
                   {/* Admin routes */}
                   <Route
                     path="/customer-admin/dashboard"
@@ -151,7 +159,6 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-
                   {/* SuperAdmin routes */}
                   <Route
                     path="/superadmin-dashboard"
@@ -167,7 +174,6 @@ function App() {
                       element={<SuperAdminCustomerDetail />}
                     />
                   </Route>
-                  
                   <Route
                     path="/module-access-management"
                     element={
@@ -176,7 +182,6 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-
                   {/* Legacy customer routes */}
                   <Route
                     path="/"
@@ -198,7 +203,7 @@ function App() {
                     path="/importdsr"
                     element={
                       <ProtectedRoute requiredAuth="user">
-                        <AppbarComponent />
+                        <CImportDSR />
                       </ProtectedRoute>
                     }
                   />
@@ -210,7 +215,6 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-
                   <Route
                     path="/user/profile"
                     element={
@@ -219,7 +223,6 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  
                   {/* User Management route - check for admin role */}
                   <Route
                     path="/user-management"

@@ -13,154 +13,153 @@ import {
   Toolbar,
   Menu,
   MenuItem,
-  Badge,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
   Paper,
-  Avatar,
+  Tooltip,
 } from "@mui/material";
 import {
   Lock as LockIcon,
   Person as PersonIcon,
-  Notifications as NotificationsIcon,
   Logout as LogoutIcon,
-  AccountCircle as AccountCircleIcon,
-  AccessTime as AccessTimeIcon,
   ManageAccounts as ManageAccountsIcon,
-  DescriptionOutlined as DocumentIcon,
-  SecurityOutlined as CertificateIcon,
-  Settings as SettingsIcon,
 } from "@mui/icons-material";
-import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 
-import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
-import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
+// Icons for Admin panel only (since others are now Emojis)
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
-import CameraAltOutlinedIcon from "@mui/icons-material/CameraAltOutlined";
-import QrCodeScannerOutlinedIcon from "@mui/icons-material/QrCodeScannerOutlined";
-import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
-import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
-import AEOReminderSettings from "../components/AEOReminderSettings";
 
-import { ThemeProvider, styled, alpha } from "@mui/material/styles";
+import AEOReminderSettings from "../components/AEOReminderSettings";
+import { ThemeProvider, styled } from "@mui/material/styles";
 import { modernTheme } from "../styles/modernTheme";
 import { useUserData } from "../customHooks/useUserData";
-import {
-  filterModulesByAccess,
-  getUserAssignedModules,
-} from "../utils/moduleAccess";
-import { logActivity } from "../utils/activityLogger";
+import { filterModulesByAccess } from "../utils/moduleAccess";
 import axios from "axios";
 
+// --- Styled Components ---
+
 const StyledCard = styled(Card)(({ theme }) => ({
-  height: "180px",
+  height: "100%",
+  minHeight: "180px",
   display: "flex",
   flexDirection: "column",
   cursor: "pointer",
   transition: "all 0.3s ease",
   borderRadius: "16px",
   position: "relative",
-  overflow: "hidden",
-  border: "none",
-  boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+  overflow: "visible",
+  border: "1px solid #aaa4a4ff",
+  backgroundColor: "#ffffff",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
   "&:hover": {
-    transform: "translateY(-8px)",
-    boxShadow: "0 14px 26px rgba(0, 0, 0, 0.12)",
+    transform: "translateY(-5px)",
+    boxShadow: "0 12px 24px rgba(0, 0, 0, 0.1)",
+    borderColor: theme.palette.warning.main,
   },
-  "&:before": {
-    content: '""',
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "5px",
-    height: "100%",
-    backgroundColor: theme.palette.warning.main,
-    opacity: 0,
-    transition: "opacity 0.3s",
-  },
-  "&:hover:before": {
-    opacity: 1,
-  },
+}));
+
+const BetaBadge = styled(Box)(({ theme }) => ({
+  position: "absolute",
+  top: 12,
+  right: 12,
+  backgroundColor: "#E4A959",
+  color: "white",
+  fontSize: "0.65rem",
+  fontWeight: "bold",
+  padding: "2px 8px",
+  borderRadius: "6px",
+  letterSpacing: "0.5px",
+  zIndex: 2,
 }));
 
 const IconContainer = styled(Box)(({ theme }) => ({
-  width: "48px",
-  height: "48px",
-  minWidth: "48px",
-  minHeight: "48px",
-  borderRadius: "50%",
-  backgroundColor: alpha(theme.palette.warning.main, 0.15),
+  width: "64px",
+  height: "64px",
+  borderRadius: "16px",
+  backgroundColor: "#FFF8EC", // Light warm background
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  marginBottom: theme.spacing(1.5),
-  flexShrink: 0,
-  aspectRatio: "1 / 1",
-  "& svg": {
-    fontSize: "24px",
-    color: theme.palette.warning.main,
-  },
+  marginBottom: theme.spacing(2),
+  fontSize: "32px", // Size for the Emoji
+  lineHeight: 1,
+  userSelect: "none",
 }));
 
 const WelcomeBanner = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(4.5, 4),
+  padding: theme.spacing(3, 4),
   marginBottom: theme.spacing(4),
   borderRadius: "16px",
-  background: `linear-gradient(135deg, rgba(243, 163, 16, 0.94) 0%, #a0a0a0 100%)`,
-  color: "white",
-  boxShadow: "0 10px 20px rgba(0, 0, 0, 0.12)",
+  background: "linear-gradient(90deg, #E8A249 0%, #C6A681 100%)",
+  color: "#1a1a1a",
+  boxShadow: "none",
   position: "relative",
-  overflow: "hidden",
-  "&:before": {
-    content: '""',
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.08' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E")`,
-    opacity: 0.4,
-  },
+  display: "flex",
+  flexDirection: "column",
+  gap: theme.spacing(2),
+}));
+
+const IECodeCard = styled(Box)(({ theme }) => ({
+  backgroundColor: "#ffffff",
+  borderRadius: "8px",
+  padding: theme.spacing(1.5, 2),
+  minWidth: "240px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+  borderLeft: "4px solid #E8A249",
 }));
 
 const HeaderBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: "#fff",
-  color: theme.palette.text.primary,
-  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+  backgroundColor: "#ffffff",
+  color: "#1e293b",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+  borderBottom: "1px solid #EAEEF2",
   position: "fixed",
   zIndex: theme.zIndex.drawer + 1,
 }));
 
 const DateTimeContainer = styled(Box)(({ theme }) => ({
   display: "flex",
-  alignItems: "center",
-  padding: theme.spacing(0.7, 2.5),
-  borderRadius: "24px",
-  backgroundColor: alpha(theme.palette.grey[100], 0.8),
-  marginRight: theme.spacing(2),
+  flexDirection: "column",
+  alignItems: "flex-end",
+  justifyContent: "center",
+  marginRight: theme.spacing(3),
+  paddingRight: theme.spacing(3),
+  borderRight: "1px solid #EAEEF2",
+  height: "40px",
+}));
+
+const ActionButton = styled(IconButton)(({ theme }) => ({
+  marginLeft: theme.spacing(1),
+  color: "#64748B",
+  backgroundColor: "transparent",
+  border: "1px solid transparent",
+  borderRadius: "8px",
+  padding: "8px",
+  transition: "all 0.2s ease",
+  "&:hover": {
+    backgroundColor: "#F1F5F9",
+    color: "#0F172A",
+    borderColor: "#E2E8F0",
+  },
   "& svg": {
-    marginRight: theme.spacing(1),
-    color: theme.palette.warning.main,
+    fontSize: "20px",
   },
 }));
 
-const UserMenu = styled(Box)(({ theme }) => ({
+const UserBadge = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  cursor: "pointer",
-  padding: theme.spacing(0.6, 1.2),
-  borderRadius: "24px",
-  transition: "background-color 0.2s ease",
-  "&:hover": {
-    backgroundColor: alpha(theme.palette.grey[100], 0.8),
-  },
+  padding: "4px 4px 4px 12px",
+  backgroundColor: "#F8FAFC",
+  border: "1px solid #EAEEF2",
+  borderRadius: "30px",
+  marginLeft: theme.spacing(2),
 }));
 
 function UserDashboard() {
@@ -173,18 +172,14 @@ function UserDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [notificationAnchor, setNotificationAnchor] = useState(null);
   const [moduleRequestDialog, setModuleRequestDialog] = useState(false);
   const [selectedModule, setSelectedModule] = useState(null);
   const [requestReason, setRequestReason] = useState("");
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [alertOpen, setAlertOpen] = useState(true);
   const [docAlertOpen, setDocAlertOpen] = useState(true);
   const [aeoAlertOpen, setAeoAlertOpen] = useState(true);
   const [aeoCertificates, setAeoCertificates] = useState([]);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
-
 
   const fetchAndUpdateUserData = async () => {
     try {
@@ -192,25 +187,18 @@ function UserDashboard() {
       const response = await axios.get(
         `${process.env.REACT_APP_API_STRING}/users/current`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         }
       );
 
       if (response.data.success) {
         const userData = response.data.data.user;
-
-        // Update localStorage with latest user data
         localStorage.setItem("exim_user", JSON.stringify(userData));
-
-        // Update dashboard data state if needed
         setDashboardData((prevData) => ({
           ...prevData,
           user: userData,
         }));
-
         return userData;
       }
     } catch (error) {
@@ -224,14 +212,9 @@ function UserDashboard() {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        // First, update user data from API
-        const updatedUser = await fetchAndUpdateUserData();
-
-        // Then fetch dashboard data
+        await fetchAndUpdateUserData();
         await refreshUserData();
         await fetchDashboardData();
-
-        // Fetch AEO certificate data
         await fetchAEOCertificateData();
       } catch (error) {
         setError("Failed to load dashboard data.");
@@ -242,113 +225,104 @@ function UserDashboard() {
     };
 
     initializeDashboard();
-
     const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
   const navigate = useNavigate();
 
+  // --- Updated Modules with Emojis ---
   const allModules = [
     {
       name: "Import DSR",
       description:
-        "View and manage import daily status reports and track shipments",
+        "View and manage import daily status reports with real-time shipment tracking",
       path: "/importdsr",
-      icon: <AssessmentOutlinedIcon />,
+      emoji: "📊", // Bar chart
       category: "core",
     },
     {
       name: "CostIQ",
       description:
-        "Calculate shipping costs per kilogram for better pricing decisions",
+        "Advanced freight cost calculator with per-kilogram pricing analysis",
       path: "/netpage",
-      icon: <CalculateOutlinedIcon />,
+      emoji: "💰", // Money bag
       category: "core",
     },
     {
       name: "E-Lock",
       description:
-        "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
+        "GPS-enabled electronic seal system for secure cargo transport verification",
       path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
-      // path: "http://localhost:3005/",
-      icon: <LockOutlinedIcon />,
+      emoji: "🔒", // Lock
       category: "core",
       isExternal: true,
     },
     {
       name: "SnapCheck",
       description:
-        "Beta Version - Quality control and inspection management system",
+        "AI-powered quality inspection system with automated defect detection",
       path: "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/",
-      icon: <CameraAltOutlinedIcon />,
+      emoji: "📸", // Camera
       category: "beta",
       isExternal: true,
     },
     {
       name: "QR Locker",
       description:
-        "Beta Version - Digital locker management with QR code integration",
+        "Digital container management with QR code authentication for yards",
       path: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/",
-      icon: <QrCodeScannerOutlinedIcon />,
+      emoji: "🔗", // Link/Chain
       category: "beta",
       isExternal: true,
     },
     {
       name: "Task Flow AI",
-      description: "Task management system with organizational hierarchy",
+      description:
+        "Intelligent workflow automation with hierarchical task assignment",
       path: "http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/",
-      icon: <SecurityOutlinedIcon />,
+      emoji: "⚡", // Lightning/Zap
       category: "core",
       isExternal: true,
     },
     {
-      name: "Trademaster Guide",
-      description: "Tutorials to master import and export procedures",
+      name: "Transporter Guide",
+      description:
+        "Comprehensive fleet management documentation with compliance guidelines",
       path: "/trademasterguide",
-      icon: <VideocamOutlinedIcon />,
+      emoji: "🚚", // Delivery Truck
       category: "core",
     },
     {
       name: "Export DSR",
-      description: "",
+      description:
+        "Export shipment tracking and daily status reporting with logistics coordination",
       path: "/exportdsr",
-      icon: <AssessmentOutlinedIcon />,
+      emoji: "📋", // Clipboard
       category: "core",
     },
   ];
 
-  const formattedDate = currentDateTime.toLocaleDateString("en-US", {
-    weekday: "long",
+  const formattedDate = currentDateTime.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
     year: "numeric",
-    month: "long",
-    day: "numeric",
   });
   const formattedTime = currentDateTime.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 
-  useEffect(() => {
-    fetchDashboardData();
-    fetchAEOCertificateData();
-    const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Fetch AEO Certificate data from backend
   const fetchAEOCertificateData = async () => {
     try {
       const token = localStorage.getItem("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/aeo/kyc-summary`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
       const data = await response.json();
       if (data.success) {
         setAeoCertificates(data.kyc_summaries || []);
@@ -365,6 +339,7 @@ function UserDashboard() {
         name: "Admin Panel",
         description: "Manage users, settings, and system configurations",
         path: "/admin",
+        // Admin Panel still uses an Icon, so we handle this in the render loop
         icon: <AdminPanelSettingsOutlinedIcon />,
         category: "admin",
         hasAccess: true,
@@ -393,14 +368,11 @@ function UserDashboard() {
 
   const eximUser = localStorage.getItem("exim_user");
   const parsedUser = userData;
-  console.log(parsedUser);
-
   const ieCodeAssignments = parsedUser?.ie_code_assignments || [];
   const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
   const userImporterName =
     parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
 
-  // --- DOCUMENT EXPIRY CHECK LOGIC ---
   const expiringDocs = useMemo(() => {
     if (!parsedUser?.documents) return [];
     const today = new Date();
@@ -427,7 +399,6 @@ function UserDashboard() {
     });
   }, [parsedUser?.documents]);
 
-  // --- AEO CERTIFICATE EXPIRY CHECK LOGIC ---
   const expiringAeoCertificates = useMemo(() => {
     const today = new Date();
     return aeoCertificates.filter((cert) => {
@@ -496,10 +467,7 @@ function UserDashboard() {
         const ssoToken = res.data?.data?.token;
         if (ssoToken) {
           localStorage.setItem("sso_token", ssoToken);
-          const elockUrl =
-            "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
-          // const elockUrl = "http://localhost:3005/";
-          window.location.href = `${elockUrl}?token=${ssoToken}`;
+          window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
         } else alert("Failed to generate SSO token for E-Lock.");
       } catch (err) {
         if (err.response?.status === 401) navigate("/login");
@@ -554,28 +522,6 @@ function UserDashboard() {
     } catch (error) {}
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "success";
-      case "pending":
-        return "warning";
-      case "inactive":
-        return "error";
-      default:
-        return "default";
-    }
-  };
-
-  const handleUserMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleUserMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const hours = currentDateTime.getHours();
-  let greeting = "Hi";
   const userName = dashboardData?.user?.name || "User";
   const userInitial = userName ? userName.charAt(0).toUpperCase() : "U";
 
@@ -605,139 +551,55 @@ function UserDashboard() {
 
   return (
     <ThemeProvider theme={modernTheme}>
-      <Box sx={{ flexGrow: 1 }}>
-        <HeaderBar position="fixed">
-          <Toolbar>
-            <Box
-              component="img"
-              src={require("../../src/assets/images/logo.webp")}
-              alt="EXIM User Portal"
-              sx={{
-                height: 40,
-                width: "auto",
-                display: "block",
-                mr: 2,
-                objectFit: "contain",
-              }}
-            />
-            <Box
-              sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}
-            ></Box>
-            <DateTimeContainer>
-              <AccessTimeIcon />
-              <Box>
-                <Typography
-                  variant="body2"
-                  sx={{ fontSize: "0.875rem", lineHeight: 1.2 }}
-                >
-                  {formattedTime}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{ fontSize: "0.75rem", opacity: 0.8 }}
-                >
-                  {formattedDate}
-                </Typography>
-              </Box>
-            </DateTimeContainer>
-            <UserMenu onClick={handleUserMenuOpen}>
-              <Typography variant="body2" sx={{ mr: 0.5, fontWeight: 500 }}>
-                {userName}
-              </Typography>
-              <AccountCircleIcon />
-            </UserMenu>
-          </Toolbar>
-        </HeaderBar>
-
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleUserMenuClose}
-          PaperProps={{
-            elevation: 3,
-            sx: { mt: 1.5, minWidth: 180, borderRadius: 2 },
-          }}
-        >
-          <MenuItem onClick={() => navigate("/user/profile")}>
-            <PersonIcon sx={{ mr: 2 }} />
-            Profile
-          </MenuItem>
-          {JSON.parse(eximUser || "{}")?.role === "admin" && (
-            <MenuItem onClick={() => navigate("/user-management")}>
-              <ManageAccountsIcon sx={{ mr: 2 }} />
-              Users Management
-            </MenuItem>
-          )}
-          <MenuItem onClick={handleLogout}>
-            <LogoutIcon sx={{ mr: 2 }} />
-            Logout
-          </MenuItem>
-        </Menu>
-
-        <Menu
-          anchorEl={notificationAnchor}
-          open={Boolean(notificationAnchor)}
-          onClose={() => setNotificationAnchor(null)}
-        >
-          {dashboardData?.notifications?.length > 0 ? (
-            dashboardData.notifications.map((notification, index) => (
-              <MenuItem key={index} onClick={() => setNotificationAnchor(null)}>
-                <Box>
-                  <Typography variant="body2" fontWeight="bold">
-                    {notification.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {notification.message}
-                  </Typography>
-                </Box>
-              </MenuItem>
-            ))
-          ) : (
-            <MenuItem>
-              <Typography variant="body2" color="text.secondary">
-                No new notifications
-              </Typography>
-            </MenuItem>
-          )}
-        </Menu>
-
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          overflow: "hidden",
+          backgroundColor: "#F8F9FB",
+        }}
+      >
+        {/* Main Content Area */}
         <Box
           component="main"
           sx={{
             flexGrow: 1,
-            backgroundColor: "#F9FAFB",
-            minHeight: "100vh",
-            paddingTop: "80px",
-            padding: "20px",
+            overflow: "auto",
+            padding: { xs: 2, md: 4 },
+            pb: 4,
           }}
         >
-          <Container maxWidth="xl" sx={{ mt: 7, px: { xs: 2, sm: 3, md: 4 } }}>
-            <WelcomeBanner elevation={0}>
-              <Box sx={{ position: "relative", zIndex: 1 }}>
-                <Typography variant="h4" fontWeight="600" gutterBottom>
-                  {greeting}, {userName}!
-                </Typography>
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  gap={2}
-                  sx={{ mt: 2, flexWrap: "wrap" }}
-                >
-                  <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                    Status:
-                  </Typography>
-                  <Chip
-                    label={dashboardData?.user?.status?.toUpperCase()}
-                    color={getStatusColor(dashboardData?.user?.status)}
-                    size="small"
-                    sx={{
-                      backgroundColor: "rgba(255,255,255,0.2)",
-                      color: "white",
-                    }}
-                  />
+          {/* Welcome Banner */}
+          <WelcomeBanner elevation={0}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h4" fontWeight="700" sx={{ color: "#000" }}>
+                Welcome back, {userName}
+              </Typography>
+              <Chip
+                label="ACTIVE"
+                sx={{
+                  backgroundColor: "rgba(76, 175, 80, 0.2)",
+                  color: "#1b5e20",
+                  fontWeight: "bold",
+                  borderRadius: "16px",
+                  height: "28px",
+                  border: "1px solid rgba(76, 175, 80, 0.3)",
+                }}
+              />
+            </Box>
 
-                  {/* Render all IE code assignments */}
-                  {ieCodeAssignments.map((assignment, index) => (
+            <Box
+              display="flex"
+              gap={2}
+              flexWrap="wrap"
+              sx={{ mt: 1, width: "100%" }}
+            >
+                {ieCodeAssignments.map((assignment, index) => (
                     <Box
                       key={index}
                       display="flex"
@@ -770,304 +632,133 @@ function UserDashboard() {
                       </Typography>
                     </Box>
                   ))}
-                </Box>
-              </Box>
-            </WelcomeBanner>
-
-            {/* ALERTS SECTION */}
-            <Box sx={{ mb: 3 }}>
-              {/* Document Alerts */}
-              {docAlertOpen &&
-                (expiringDocs.length > 0 || expiredDocs.length > 0) && (
-                  <Alert
-                    severity="warning"
-                    sx={{ mb: 1, cursor: "pointer" }}
-                    onClick={() => navigate("/user/profile")}
-                    action={
-                      <IconButton
-                        aria-label="close"
-                        color="inherit"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDocAlertOpen(false);
-                        }}
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    }
-                    icon={<DocumentIcon />}
-                  >
-                    <Box>
-                      {expiredDocs.length > 0 && (
-                        <Box sx={{ mb: 0.5 }}>
-                          <strong>Expired Documents:</strong>{" "}
-                          {expiredDocs
-                            .map(
-                              (doc) =>
-                                `${doc.title} (${new Date(
-                                  doc.expirationDate
-                                ).toLocaleDateString()})`
-                            )
-                            .join(", ")}
-                        </Box>
-                      )}
-                      {expiringDocs.length > 0 && (
-                        <Box>
-                          <strong>Expiring Soon:</strong>{" "}
-                          {expiringDocs
-                            .filter((doc) => !expiredDocs.includes(doc))
-                            .map((doc) => {
-                              const daysLeft = Math.ceil(
-                                (new Date(doc.expirationDate) - new Date()) /
-                                  (1000 * 60 * 60 * 24)
-                              );
-                              return `${doc.title} (${daysLeft} days)`;
-                            })
-                            .join(", ")}
-                        </Box>
-                      )}
-                    </Box>
-                  </Alert>
-                )}
-
-              {/* AEO Certificate Alerts */}
-              {aeoAlertOpen &&
-                (expiringAeoCertificates.length > 0 ||
-                  expiredAeoCertificates.length > 0) && (
-                  <Alert
-                    severity="error"
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => navigate("/user/profile")}
-                    action={
-                      <IconButton
-                        aria-label="close"
-                        color="inherit"
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAeoAlertOpen(false);
-                        }}
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    }
-                    icon={<CertificateIcon />}
-                  >
-                    <Box>
-                      {expiredAeoCertificates.length > 0 && (
-                        <Box sx={{ mb: 0.5 }}>
-                          <strong>Expired AEO Certificates:</strong>{" "}
-                          {expiredAeoCertificates
-                            .map(
-                              (cert) =>
-                                `${cert.importer_name} (${
-                                  cert.ie_code_no
-                                }) - ${new Date(
-                                  cert.certificate_validity_date
-                                ).toLocaleDateString()}`
-                            )
-                            .join(", ")}
-                        </Box>
-                      )}
-                      {expiringAeoCertificates.length > 0 && (
-                        <Box>
-                          <strong>Expiring Soon AEO Certificates:</strong>{" "}
-                          {expiringAeoCertificates
-                            .filter(
-                              (cert) => !expiredAeoCertificates.includes(cert)
-                            )
-                            .map((cert) => {
-                              const daysLeft = Math.ceil(
-                                (new Date(cert.certificate_validity_date) -
-                                  new Date()) /
-                                  (1000 * 60 * 60 * 24)
-                              );
-                              return `${cert.importer_name} (${cert.ie_code_no}) - ${daysLeft} days`;
-                            })
-                            .join(", ")}
-                        </Box>
-                      )}
-                    </Box>
-                  </Alert>
-                )}
             </Box>
+          </WelcomeBanner>
 
-            {dashboardData?.user?.status === "pending" && (
-              <Alert severity="warning" sx={{ mb: 4 }}>
-                Your account is pending verification. Please contact support for
-                activation. Modules are currently locked until admin approval.
-              </Alert>
-            )}
-
-            <Typography
-              variant="h5"
-              sx={{ mb: 3, fontWeight: 600, color: "#2c3e50" }}
-            >
-              Available Modules
-            </Typography>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, 1fr)",
-                  md: "repeat(3, 1fr)",
-                },
-                gap: 3,
-                mb: 4,
-              }}
-            >
-              {modules.map((module, index) => (
-                <StyledCard
-                  key={index}
-                  onClick={() =>
-                    handleCardClick(
-                      module.path,
-                      module.isExternal,
-                      module.isLocked,
-                      module.name
-                    )
-                  }
-                  sx={{
-                    ...(module.category === "beta"
-                      ? {
-                          "&:before": { backgroundColor: "#ff9800" },
-                        }
-                      : {}),
-                    ...(module.category === "coming-soon"
-                      ? {
-                          opacity: 0.7,
-                          cursor: "not-allowed",
-                          "&:hover": {
-                            transform: "none",
-                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                          },
-                          "&:before": { backgroundColor: "#9e9e9e" },
-                        }
-                      : {}),
-                    ...(module.isLocked
-                      ? {
-                          opacity: 0.6,
-                          filter: "grayscale(50%)",
-                          cursor: "not-allowed",
-                          "&:hover": {
-                            transform: "none",
-                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                          },
-                          "&:before": { backgroundColor: "#f44336" },
-                        }
-                      : {}),
-                  }}
+          {/* Alerts */}
+          <Box sx={{ mb: 3 }}>
+            {docAlertOpen &&
+              (expiringDocs.length > 0 || expiredDocs.length > 0) && (
+                <Alert
+                  severity="warning"
+                  onClose={() => setDocAlertOpen(false)}
+                  onClick={() => navigate("/user/profile")}
+                  sx={{ mb: 1, cursor: "pointer" }}
                 >
-                  <CardContent
+                  Attention: You have documents expiring soon or expired.
+                </Alert>
+              )}
+            {aeoAlertOpen &&
+              (expiringAeoCertificates.length > 0 ||
+                expiredAeoCertificates.length > 0) && (
+                <Alert
+                  severity="error"
+                  onClose={() => setAeoAlertOpen(false)}
+                  onClick={() => navigate("/user/profile")}
+                  sx={{ cursor: "pointer" }}
+                >
+                  Attention: AEO Certificates expiring soon or expired.
+                </Alert>
+              )}
+          </Box>
+
+          {/* Modules Grid with Emojis */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(4, 1fr)",
+              },
+              gap: 3,
+              mb: 4,
+            }}
+          >
+            {modules.map((module, index) => (
+              <StyledCard
+                key={index}
+                onClick={() =>
+                  handleCardClick(
+                    module.path,
+                    module.isExternal,
+                    module.isLocked,
+                    module.name
+                  )
+                }
+                sx={{
+                  ...(module.isLocked
+                    ? { opacity: 0.6, filter: "grayscale(100%)" }
+                    : {}),
+                }}
+              >
+                {(module.category === "beta" ||
+                  module.name === "Import DSR" ||
+                  module.name === "E-Lock" ||
+                  module.name === "QR Locker") &&
+                  module.category === "beta" && <BetaBadge>BETA</BetaBadge>}
+
+                {module.isLocked && (
+                  <Box
                     sx={{
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: "24px",
-                      position: "relative",
+                      position: "absolute",
+                      top: 12,
+                      right: 12,
+                      color: "#ef4444",
+                      zIndex: 2,
                     }}
                   >
-                    {module.isLocked && (
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 12,
-                          right: 12,
-                          backgroundColor: "error.main",
-                          borderRadius: "50%",
-                          p: 0.5,
-                          minWidth: 28,
-                          minHeight: 28,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <LockOutlinedIcon
-                          sx={{ fontSize: 18, color: "white" }}
-                        />
-                      </Box>
-                    )}
-                    <IconContainer
-                      sx={{
-                        width: "48px",
-                        height: "48px",
-                        ...(module.category === "beta"
-                          ? { backgroundColor: "rgba(255, 152, 0, 0.1)" }
-                          : module.category === "coming-soon"
-                          ? { backgroundColor: "rgba(158, 158, 158, 0.1)" }
-                          : {}),
-                        ...(module.isLocked
-                          ? { backgroundColor: "rgba(244, 67, 54, 0.1)" }
-                          : {}),
-                      }}
-                    >
-                      {module.category === "beta"
-                        ? React.cloneElement(module.icon, {
-                            sx: {
-                              fontSize: "24px",
-                              color: module.isLocked ? "#f44336" : "#ff9800",
-                            },
-                          })
-                        : module.category === "coming-soon"
-                        ? React.cloneElement(module.icon, {
-                            sx: {
-                              fontSize: "24px",
-                              color: module.isLocked ? "#f44336" : "#9e9e9e",
-                            },
-                          })
-                        : React.cloneElement(module.icon, {
-                            sx: {
-                              fontSize: "24px",
-                              color: module.isLocked ? "#f44336" : undefined,
-                            },
-                          })}
-                    </IconContainer>
-                    <Typography
-                      variant="h6"
-                      fontWeight="500"
-                      sx={{
-                        color: module.isLocked ? "#666" : "#2c3e50",
-                        fontSize: "16px",
-                        lineHeight: 1.3,
-                        mb: 1,
-                      }}
-                    >
-                      {module.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        maxWidth: "90%",
-                        mx: "auto",
-                        lineHeight: 1.4,
-                        fontSize: "13px",
-                      }}
-                    >
-                      {module.isLocked
-                        ? "Contact Admin for Access"
-                        : module.description}
-                    </Typography>
-                    {module.isLocked && (
-                      <Chip
-                        size="small"
-                        label="Access Restricted"
-                        color="error"
-                        sx={{ mt: 1, fontSize: "0.7rem" }}
-                      />
-                    )}
-                  </CardContent>
-                </StyledCard>
-              ))}
-            </Box>
-          </Container>
+                    <LockIcon fontSize="small" />
+                  </Box>
+                )}
+
+                <CardContent
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    padding: "24px",
+                  }}
+                >
+                  <IconContainer>
+                    {/* Render Emoji or Fallback Icon (for Admin) */}
+                    {module.emoji ? <span>{module.emoji}</span> : module.icon}
+                  </IconContainer>
+
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "1rem",
+                      color: "#1e293b",
+                      mb: 1,
+                    }}
+                  >
+                    {module.name}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "#64748B",
+                      fontSize: "0.8rem",
+                      lineHeight: 1.5,
+                      maxWidth: "90%",
+                    }}
+                  >
+                    {module.isLocked
+                      ? "Contact Admin for Access"
+                      : module.description}
+                  </Typography>
+                </CardContent>
+              </StyledCard>
+            ))}
+          </Box>
         </Box>
+
         <AEOReminderSettings
           open={reminderSettingsOpen}
           onClose={() => setReminderSettingsOpen(false)}
@@ -1093,7 +784,6 @@ function UserDashboard() {
               label="Reason for request"
               value={requestReason}
               onChange={(e) => setRequestReason(e.target.value)}
-              placeholder="Explain why you need access to this module..."
             />
           </DialogContent>
           <DialogActions>

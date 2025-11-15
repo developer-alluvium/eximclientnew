@@ -24,6 +24,8 @@ import {
   MenuItem,
   Menu,
   Divider,
+  Tooltip,
+  alpha,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -45,8 +47,6 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
   const [expirationDate, setExpirationDate] = useState(null);
   const [reminderDays, setReminderDays] = useState(30);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedDoc, setSelectedDoc] = useState(null);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -134,11 +134,41 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
     }
   };
 
+  const handleViewDocument = (url) => {
+    if (!url) {
+      onSetError("Document URL not available");
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownloadDocument = async (url, title) => {
+    if (!url) {
+      onSetError("Document URL not available");
+      return;
+    }
+
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = title || "document";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      onSetSuccess("Document downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      onSetError("Failed to download document");
+    }
+  };
   const handleDeleteDocument = async (documentId) => {
     if (!window.confirm("Are you sure you want to delete this document?")) {
       return;
     }
-    handleMenuClose();
     try {
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/user/profile/documents/${documentId}`,
@@ -163,15 +193,10 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
     }
   };
 
-  const handleMenuOpen = (event, doc) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedDoc(doc);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedDoc(null);
-  };
+  const filteredDocuments =
+    user?.documents?.filter((doc) =>
+      doc.title.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -276,12 +301,74 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
                         )}
                       </TableCell>
                       <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, doc)}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            gap: 1, // spacing between buttons
+                          }}
                         >
-                          <MoreVertIcon />
-                        </IconButton>
+                          <Tooltip title="View Document" arrow>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewDocument(doc.url)}
+                              sx={{
+                                bgcolor: alpha("#2196f3", 0.1),
+                                color: "#2196f3",
+                                width: 36,
+                                height: 36,
+                                "&:hover": {
+                                  bgcolor: alpha("#2196f3", 0.2),
+                                  transform: "scale(1.05)",
+                                },
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download Document" arrow>
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleDownloadDocument(doc.url, doc.title)
+                              }
+                              sx={{
+                                bgcolor: alpha("#4caf50", 0.1),
+                                color: "#4caf50",
+                                width: 36,
+                                height: 36,
+                                "&:hover": {
+                                  bgcolor: alpha("#4caf50", 0.2),
+                                  transform: "scale(1.05)",
+                                },
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              <DownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete Document" arrow>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDeleteDocument(doc._id)}
+                              sx={{
+                                bgcolor: alpha("#f44336", 0.1),
+                                color: "#f44336",
+                                width: 36,
+                                height: 36,
+                                "&:hover": {
+                                  bgcolor: alpha("#f44336", 0.2),
+                                  transform: "scale(1.05)",
+                                },
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))
@@ -300,41 +387,6 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
             </TableBody>
           </Table>
         </TableContainer>
-
-        {/* Action Menu */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
-          <MenuItem
-            component="a"
-            href={selectedDoc?.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleMenuClose}
-          >
-            <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
-            View
-          </MenuItem>
-          <MenuItem
-            component="a"
-            href={selectedDoc?.url}
-            download
-            onClick={handleMenuClose}
-          >
-            <DownloadIcon fontSize="small" sx={{ mr: 1 }} />
-            Download
-          </MenuItem>
-          <Divider />
-          <MenuItem
-            onClick={() => handleDeleteDocument(selectedDoc?._id)}
-            sx={{ color: "error.main" }}
-          >
-            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-            Delete
-          </MenuItem>
-        </Menu>
 
         {/* Add Document Dialog */}
         <Dialog
@@ -393,9 +445,29 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
               </Select>
             </FormControl>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAddDocumentOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddDocument} variant="contained">
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            <Button
+              onClick={() => setAddDocumentOpen(false)}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddDocument}
+              variant="contained"
+              sx={{
+                background: "linear-gradient(135deg, #667eea, #764ba2)",
+                textTransform: "none",
+                fontWeight: 600,
+                px: 3,
+                "&:hover": {
+                  background: "linear-gradient(135deg, #5a6fd8, #6a42a0)",
+                },
+              }}
+            >
               Add Document
             </Button>
           </DialogActions>
