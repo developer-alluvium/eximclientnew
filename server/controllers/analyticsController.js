@@ -1,4 +1,5 @@
 import JobModel from "../models/jobModel.js";
+import { format, subDays } from "date-fns";
 const analyticsCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -473,7 +474,196 @@ const calculateOperationalStatuses = (today) => {
   ];
 };
 
-// Optimized pipeline builder
+
+// Updated buildDateValidityPipeline to include billing and examination data
+// New pipeline for status distribution
+const buildStatusDistributionPipeline = (year, additionalMatch = {}) => {
+  return [
+    {
+      $match: {
+        year,
+        status: { $ne: "Completed" },
+        ...additionalMatch,
+      },
+    },
+    {
+      $group: {
+        _id: "$detailed_status",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        status: "$_id",
+        count: 1,
+        _id: 0,
+      },
+    },
+  ];
+};
+
+// Updated event timeline pipeline to include container numbers
+const buildEventTimelinePipeline = (year, additionalMatch = {}) => {
+  const thirtyDaysAgo = subDays(new Date(), 30);
+
+  return [
+    {
+      $match: {
+        year,
+        ...additionalMatch,
+      },
+    },
+    { $unwind: "$container_nos" },
+    {
+      $addFields: {
+        oocDate: {
+          $cond: {
+            if: { $ne: ["$out_of_charge", ""] },
+            then: { $toDate: "$out_of_charge" },
+            else: null,
+          },
+        },
+        arrivalDate: {
+          $cond: {
+            if: { $ne: ["$container_nos.arrival_date", ""] },
+            then: { $toDate: "$container_nos.arrival_date" },
+            else: null,
+          },
+        },
+        railOutDate: {
+          $cond: {
+            if: { $ne: ["$container_nos.container_rail_out_date", ""] },
+            then: { $toDate: "$container_nos.container_rail_out_date" },
+            else: null,
+          },
+        },
+        deliveryDate: {
+          $cond: {
+            if: { $ne: ["$container_nos.delivery_date", ""] },
+            then: { $toDate: "$container_nos.delivery_date" },
+            else: null,
+          },
+        },
+      },
+    },
+    {
+      $match: {
+        $or: [
+          { oocDate: { $gte: thirtyDaysAgo } },
+          { arrivalDate: { $gte: thirtyDaysAgo } },
+          { railOutDate: { $gte: thirtyDaysAgo } },
+          { deliveryDate: { $gte: thirtyDaysAgo } },
+        ],
+      },
+    },
+    {
+      $facet: {
+        oocTimeline: [
+          { $match: { oocDate: { $ne: null } } },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$oocDate" },
+              },
+              count: { $sum: 1 },
+              jobNumbers: { $addToSet: "$job_no" },
+              containerNumbers: {
+                $addToSet: "$container_nos.container_number",
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+          {
+            $project: {
+              date: "$_id",
+              count: 1,
+              jobNumbers: 1,
+              containerNumbers: 1,
+              _id: 0,
+            },
+          },
+        ],
+        arrivalTimeline: [
+          { $match: { arrivalDate: { $ne: null } } },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$arrivalDate" },
+              },
+              count: { $sum: 1 },
+              jobNumbers: { $addToSet: "$job_no" },
+              containerNumbers: {
+                $addToSet: "$container_nos.container_number",
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+          {
+            $project: {
+              date: "$_id",
+              count: 1,
+              jobNumbers: 1,
+              containerNumbers: 1,
+              _id: 0,
+            },
+          },
+        ],
+        railOutTimeline: [
+          { $match: { railOutDate: { $ne: null } } },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$railOutDate" },
+              },
+              count: { $sum: 1 },
+              jobNumbers: { $addToSet: "$job_no" },
+              containerNumbers: {
+                $addToSet: "$container_nos.container_number",
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+          {
+            $project: {
+              date: "$_id",
+              count: 1,
+              jobNumbers: 1,
+              containerNumbers: 1,
+              _id: 0,
+            },
+          },
+        ],
+        deliveryTimeline: [
+          { $match: { deliveryDate: { $ne: null } } },
+          {
+            $group: {
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$deliveryDate" },
+              },
+              count: { $sum: 1 },
+              jobNumbers: { $addToSet: "$job_no" },
+              containerNumbers: {
+                $addToSet: "$container_nos.container_number",
+              },
+            },
+          },
+          { $sort: { _id: 1 } },
+          {
+            $project: {
+              date: "$_id",
+              count: 1,
+              jobNumbers: 1,
+              containerNumbers: 1,
+              _id: 0,
+            },
+          },
+        ],
+      },
+    },
+  ];
+};
+
+// Updated date validity pipeline to include actual dates
 const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
   const todayStr = today.toISOString().split("T")[0];
 
@@ -501,6 +691,11 @@ const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
         daysUntilDoExpiry: 1,
         daysUntilDetention: 1,
         railOutDate: 1,
+        arrivalDate: "$container_nos.arrival_date",
+        doValidityDate: "$container_nos.do_validity_upto_container_level",
+        detentionStartDate: "$container_nos.detention_from",
+        rms_status: "$container_nos.rms",
+        detailed_status: 1,
         isRailOutToday: {
           $cond: {
             if: { $ne: ["$railOutDate", null] },
@@ -523,6 +718,20 @@ const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
               _id: null,
               totalActiveContainers: { $sum: 1 },
               totalActiveJobs: { $addToSet: "$job_no" },
+              billingPendingCount: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$detailed_status", "Billing Pending"] },
+                    1,
+                    0,
+                  ],
+                },
+              },
+              underExaminationCount: {
+                $sum: {
+                  $cond: [{ $eq: ["$rms_status", "no"] }, 1, 0],
+                },
+              },
               arrivalsToday: {
                 $sum: {
                   $cond: [{ $eq: ["$arrivalStatus", "ARRIVING_TODAY"] }, 1, 0],
@@ -588,19 +797,24 @@ const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
               arrival: {
                 status: "$arrivalStatus",
                 days: { $round: ["$daysUntilArrival", 1] },
+                actualDate: "$arrivalDate",
               },
               rail_out: {
                 status: "$railOutStatus",
                 days: { $round: ["$daysUntilRailOut", 1] },
+                actualDate: "$railOutDate",
               },
               do_validity: {
                 status: "$doValidityStatus",
                 days: { $round: ["$daysUntilDoExpiry", 1] },
+                actualDate: "$doValidityDate",
               },
               detention: {
                 status: "$detentionStatus",
                 days: { $round: ["$daysUntilDetention", 1] },
+                actualDate: "$detentionStartDate",
               },
+              rms_status: 1,
             },
           },
         ],
@@ -616,6 +830,8 @@ const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
             in: {
               totalActiveJobs: { $size: "$$summaryData.totalActiveJobs" },
               totalActiveContainers: "$$summaryData.totalActiveContainers",
+              billingPendingCount: "$$summaryData.billingPendingCount",
+              underExaminationCount: "$$summaryData.underExaminationCount",
             },
           },
         },
@@ -649,6 +865,102 @@ const buildDateValidityPipeline = (year, today, additionalMatch = {}) => {
       },
     },
   ];
+};
+
+// New endpoint for status distribution
+export const getStatusDistribution = async (req, res) => {
+  const { year } = req.params;
+  const { importer } = req.query;
+
+  if (!importer || importer === "All Importers") {
+    return res.status(400).json({
+      message: "Importer parameter is required for personalized analytics",
+    });
+  }
+
+  try {
+    const additionalMatch = { importer: decodeURIComponent(importer) };
+    const pipeline = buildStatusDistributionPipeline(year, additionalMatch);
+
+    const result = await JobModel.aggregate(pipeline);
+
+    // Transform array into object with status as key
+    const distribution = {};
+    result.forEach((item) => {
+      if (item.status) {
+        distribution[item.status] = item.count;
+      }
+    });
+
+    // Ensure all required statuses are present (even if count is 0)
+    const requiredStatuses = [
+      "Billing Pending",
+      "ETA Date Pending",
+      "Estimated Time of Arrival",
+      "Gateway IGM Filed",
+      "Discharged",
+      "Rail Out",
+      "BE Noted, Arrival Pending",
+      "BE Noted, Clearance Pending",
+      "PCV Done, Duty Payment Pending",
+      "Custom Clearance Completed",
+    ];
+
+    requiredStatuses.forEach((status) => {
+      if (!distribution[status]) {
+        distribution[status] = 0;
+      }
+    });
+
+    res.status(200).json({
+      distribution,
+      totalJobs: Object.values(distribution).reduce(
+        (sum, count) => sum + count,
+        0
+      ),
+    });
+  } catch (error) {
+    console.error("❌ Error in status distribution route:", error);
+    res.status(500).json({
+      message: "Failed to generate status distribution data.",
+    });
+  }
+};
+
+// New endpoint for event timeline data
+export const getEventTimelineData = async (req, res) => {
+  const { year } = req.params;
+  const { importer } = req.query;
+
+  if (!importer || importer === "All Importers") {
+    return res.status(400).json({
+      message: "Importer parameter is required for personalized analytics",
+    });
+  }
+
+  try {
+    const additionalMatch = { importer: decodeURIComponent(importer) };
+    const pipeline = buildEventTimelinePipeline(year, additionalMatch);
+
+    const result = await JobModel.aggregate(pipeline).allowDiskUse(true);
+
+    const timelineData =
+      result.length > 0
+        ? result[0]
+        : {
+            oocTimeline: [],
+            arrivalTimeline: [],
+            railOutTimeline: [],
+            deliveryTimeline: [],
+          };
+
+    res.status(200).json(timelineData);
+  } catch (error) {
+    console.error("❌ Error in event timeline route:", error);
+    res.status(500).json({
+      message: "Failed to generate event timeline data.",
+    });
+  }
 };
 
 // Optimized Date Validity Analytics - Only personalized data

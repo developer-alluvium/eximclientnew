@@ -1,4 +1,4 @@
-// AnalyticsOverview.jsx - Pure JSX + CSS version (no MUI)
+// AnalyticsOverview.jsx - Updated with Enhanced Features
 import React, {
   useState,
   useEffect,
@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import axios from "axios";
-import { format } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import { debounce } from "lodash";
 import {
   PieChart,
@@ -22,11 +22,13 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  LineChart,
+  Line,
 } from "recharts";
 import { UserContext } from "../context/UserContext";
-import "../styles/analytics-overview.css"; // <-- create this
+import "../styles/analytics-overview.css";
 
-// ---- Simple “icons” (text-based) ----
+// ---- Simple "icons" (text-based) ----
 const Icon = ({ children }) => <span className="icon-circle">{children}</span>;
 
 // ---- Action card ----
@@ -45,7 +47,7 @@ const ActionCard = React.memo(({ title, count, icon, color, subtitle }) => {
   );
 });
 
-// ---- Status chip ----
+// ---- Status chip with Hover Tooltip ----
 const STATUS_INFO = {
   EXPIRED: { label: "Expired", color: "error" },
   EXPIRES_TODAY: { label: "Expires Today", color: "error" },
@@ -65,28 +67,202 @@ const STATUS_INFO = {
   NOT_SET: { label: "Not Set", color: "neutral" },
 };
 
-const StatusChip = React.memo(({ status, days }) => {
+const StatusChip = React.memo(({ status, days, date, eventType }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
   const info = STATUS_INFO[status] || STATUS_INFO.NOT_SET;
   const dayText = typeof days === "number" ? ` (${days}d)` : "";
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "Date not available";
+    try {
+      return format(parseISO(dateString), "dd MMM yyyy");
+    } catch {
+      return dateString;
+    }
+  };
+
   return (
-    <span className={`status-chip status-${info.color}`}>
-      {info.label}
-      {dayText}
+    <div
+      className="status-chip-wrapper"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      style={{ position: "relative", display: "inline-block" }}
+    >
+      <span className={`status-chip status-${info.color}`}>
+        {info.label}
+        {dayText}
+      </span>
+
+      {showTooltip && date && (
+        <div className="status-hover-tooltip">
+          <div className="status-hover-date">{formatDate(date)}</div>
+          <div className="status-hover-info">{eventType || status}</div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ---- Enhanced Line Chart Tooltip ----
+const EnhancedLineTooltip = ({ active, payload, label, eventType }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+
+    // Calculate if we need scrollable sections
+    const totalItems =
+      (data.jobNumbers?.length || 0) + (data.containerNumbers?.length || 0);
+    const needsScrollable = totalItems > 15;
+
+    return (
+      <div
+        className={`enhanced-tooltip ${
+          needsScrollable ? "enhanced-tooltip-auto" : ""
+        }`}
+      >
+        <div className="enhanced-tooltip-header">
+          <strong>{eventType}</strong>
+          <div className="enhanced-tooltip-date">{label}</div>
+        </div>
+
+        <div className="enhanced-tooltip-content">
+          <div className="enhanced-tooltip-metric">
+            <span className="enhanced-metric-label">Containers:</span>
+            <span className="enhanced-metric-value">{data.count}</span>
+          </div>
+
+          {data.jobNumbers && data.jobNumbers.length > 0 && (
+            <div className="enhanced-tooltip-section">
+              <div className="enhanced-section-label">
+                Job Numbers
+                <span className="enhanced-section-count">
+                  {data.jobNumbers.length}
+                </span>
+              </div>
+              <div
+                className={`enhanced-items-list ${
+                  needsScrollable && data.jobNumbers.length > 8
+                    ? "enhanced-items-list-scrollable"
+                    : ""
+                }`}
+              >
+                {data.jobNumbers.map((jobNo, index) => (
+                  <div key={index} className="enhanced-item">
+                    {jobNo}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.containerNumbers && data.containerNumbers.length > 0 && (
+            <div className="enhanced-tooltip-section">
+              <div className="enhanced-section-label">
+                Container Numbers
+                <span className="enhanced-section-count">
+                  {data.containerNumbers.length}
+                </span>
+              </div>
+              <div
+                className={`enhanced-items-list ${
+                  needsScrollable && data.containerNumbers.length > 12
+                    ? "enhanced-items-list-scrollable"
+                    : ""
+                }`}
+              >
+                {data.containerNumbers.map((containerNo, index) => (
+                  <div key={index} className="enhanced-item">
+                    {containerNo}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// ---- Status Distribution Component ----
+const StatusDistribution = React.memo(({ distributionData }) => {
+  const statusColors = {
+    "Billing Pending": "#ff6b6b",
+    "ETA Date Pending": "#4ecdc4",
+    "Estimated Time of Arrival": "#45b7d1",
+    "Gateway IGM Filed": "#96ceb4",
+    Discharged: "#feca57",
+    "Rail Out": "#ff9ff3",
+    "BE Noted, Arrival Pending": "#54a0ff",
+    "BE Noted, Clearance Pending": "#5f27cd",
+    "PCV Done, Duty Payment Pending": "#ff9f43",
+    "Custom Clearance Completed": "#1dd1a1",
+  };
+
+  return (
+    <div className="status-distribution-grid">
+      {Object.entries(distributionData).map(([status, count]) => (
+        <div
+          key={status}
+          className="status-distribution-item"
+          style={{ borderLeftColor: statusColors[status] || "#1976d2" }}
+        >
+          <span className="status-distribution-name">{status}</span>
+          <span className="status-distribution-count">{count}</span>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+// ---- Examination Badge ----
+const ExaminationBadge = React.memo(({ rmsStatus }) => {
+  const isUnderExamination = rmsStatus?.toLowerCase() === "no";
+  return (
+    <span
+      className={`examination-badge ${
+        isUnderExamination ? "examination-under" : "examination-clear"
+      }`}
+    >
+      {isUnderExamination ? "Under Exam" : "Clear"}
     </span>
   );
 });
+
+// ---- Global Search Component ----
+const GlobalSearch = ({
+  searchTerm,
+  onSearchChange,
+  placeholder = "Search containers, job numbers...",
+}) => {
+  return (
+    <div className="ao-global-search">
+      <div className="search-input-wrapper">
+        <span className="search-icon">🔍</span>
+        <input
+          type="text"
+          className="search-input"
+          placeholder={placeholder}
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+};
 
 const AnalyticsOverview = () => {
   const { user } = useContext(UserContext);
 
   const [year, setYear] = useState("25-26");
-  const [selectedDate, setSelectedDate] = useState(
-    () => new Date() // avoid new Date() each render
-  );
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [loading, setLoading] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [eventTimelineData, setEventTimelineData] = useState(null);
+  const [statusDistribution, setStatusDistribution] = useState({});
   const [error, setError] = useState("");
   const [selectedImporter, setSelectedImporter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const debouncedFetchRef = useRef(null);
 
@@ -114,14 +290,31 @@ const AnalyticsOverview = () => {
     try {
       const formattedDate = format(selectedDate, "yyyy-MM-dd");
       const encodedImporter = encodeURIComponent(selectedImporter);
-      const url = `${process.env.REACT_APP_API_STRING}/date-validity/${year}?date=${formattedDate}&importer=${encodedImporter}`;
 
-      const response = await axios.get(url, {
+      // Fetch main analytics data
+      const analyticsUrl = `${process.env.REACT_APP_API_STRING}/date-validity/${year}?date=${formattedDate}&importer=${encodedImporter}`;
+      const analyticsResponse = await axios.get(analyticsUrl, {
         withCredentials: true,
         timeout: 30000,
       });
 
-      setAnalyticsData(response.data);
+      // Fetch event timeline data
+      const timelineUrl = `${process.env.REACT_APP_API_STRING}/event-timeline/${year}?importer=${encodedImporter}`;
+      const timelineResponse = await axios.get(timelineUrl, {
+        withCredentials: true,
+        timeout: 30000,
+      });
+
+      // Fetch status distribution data
+      const statusUrl = `${process.env.REACT_APP_API_STRING}/status-distribution/${year}?importer=${encodedImporter}`;
+      const statusResponse = await axios.get(statusUrl, {
+        withCredentials: true,
+        timeout: 30000,
+      });
+
+      setAnalyticsData(analyticsResponse.data);
+      setEventTimelineData(timelineResponse.data);
+      setStatusDistribution(statusResponse.data.distribution || {});
     } catch (err) {
       console.error("Error fetching analytics data:", err);
       if (err.code === "ECONNABORTED") {
@@ -168,7 +361,6 @@ const AnalyticsOverview = () => {
         value: a?.actionRequired?.do_validity?.expired || 0,
         color: "#b71c1c",
       },
-
       {
         name: "DO Expires Today",
         value: a?.actionRequired?.do_validity?.expiresToday || 0,
@@ -177,28 +369,22 @@ const AnalyticsOverview = () => {
     ];
   }, [analyticsData]);
 
-  const statusDistributionData = useMemo(() => {
-    const d = analyticsData?.details || [];
-    return [
-      {
-        name: "Valid",
-        count: d.filter((x) => x.do_validity.status === "VALID").length,
-      },
-      {
-        name: "Expired",
-        count: d.filter((x) => x.do_validity.status === "EXPIRED").length,
-      },
-      {
-        name: "Expiring Soon",
-        count: d.filter((x) => x.do_validity.status === "EXPIRES_SOON_3_DAYS")
-          .length,
-      },
-      {
-        name: "On Detention",
-        count: d.filter((x) => x.detention.status === "ON_DETENTION").length,
-      },
-    ];
-  }, [analyticsData]);
+  // Filtered table data based on search term
+  const filteredTableData = useMemo(() => {
+    if (!analyticsData?.details) return [];
+
+    const searchLower = searchTerm.toLowerCase();
+    return analyticsData.details.filter(
+      (item) =>
+        item.job_no?.toLowerCase().includes(searchLower) ||
+        item.container_number?.toLowerCase().includes(searchLower) ||
+        item.arrival?.status?.toLowerCase().includes(searchLower) ||
+        item.rail_out?.status?.toLowerCase().includes(searchLower) ||
+        item.do_validity?.status?.toLowerCase().includes(searchLower) ||
+        item.detention?.status?.toLowerCase().includes(searchLower) ||
+        item.rms_status?.toLowerCase().includes(searchLower)
+    );
+  }, [analyticsData?.details, searchTerm]);
 
   const actionCards = useMemo(
     () => [
@@ -223,19 +409,19 @@ const AnalyticsOverview = () => {
         color: "warning",
         subtitle: "Urgent attention required",
       },
+      {
+        title: "Billing Pending",
+        count: analyticsData?.summary?.billingPendingCount || 0,
+        icon: "💰",
+        color: "billing",
+        subtitle: "Awaiting billing completion",
+      },
     ],
     [analyticsData]
   );
 
   const todayStatusCards = useMemo(
     () => [
-      {
-        title: "Rail-Out Completed",
-        count: analyticsData?.actionRequired?.rail_out?.completedToday || 0,
-        icon: "🚆",
-        color: "success",
-        subtitle: "Today's completions",
-      },
       {
         title: "Arrivals Today",
         count: analyticsData?.actionRequired?.arrivals?.arrivingToday || 0,
@@ -249,6 +435,13 @@ const AnalyticsOverview = () => {
         icon: "📅",
         color: "warning",
         subtitle: "Monitor closely",
+      },
+      {
+        title: "Under Examination",
+        count: analyticsData?.summary?.underExaminationCount || 0,
+        icon: "🔍",
+        color: "warning",
+        subtitle: "Containers in examination",
       },
       {
         title: "Total Active Containers",
@@ -331,40 +524,149 @@ const AnalyticsOverview = () => {
 
       {analyticsData && !loading && (
         <>
-          {/* Action Required */}
+          {/* Status Distribution */}
           <section className="ao-section">
             <div className="ao-section-header">
               <div className="ao-section-title">
-                <span className="ao-section-icon ao-section-icon-error">!</span>
-                Action Required
-              </div>
-              <span className="chip chip-error">Critical</span>
-            </div>
-            <div className="card-grid">
-              {actionCards.map((c, idx) => (
-                <ActionCard key={idx} {...c} />
-              ))}
-            </div>
-          </section>
-
-          {/* Today Status */}
-          <section className="ao-section">
-            <div className="ao-section-header">
-              <div className="ao-section-title">
-                <span className="ao-section-icon">📅</span>
-                Status for {format(selectedDate, "dd MMMM yyyy")}
+                <span className="ao-section-icon">📊</span>
+                Detailed Status Distribution
               </div>
             </div>
-            <div className="card-grid">
-              {todayStatusCards.map((c, idx) => (
-                <ActionCard key={idx} {...c} />
-              ))}
-            </div>
+            <StatusDistribution distributionData={statusDistribution} />
           </section>
 
-          {/* Charts + Table */}
+          {/* Event Timeline Charts */}
+          {eventTimelineData && (
+            <section className="ao-section">
+              <div className="ao-section-header">
+                <div className="ao-section-title">
+                  <span className="ao-section-icon">📈</span>
+                  Container Events Timeline (Last 30 Days)
+                </div>
+              </div>
+              <div className="ao-grid-4">
+                {/* Out of Charge Chart */}
+                <div className="ao-panel ao-line-chart-panel">
+                  <div className="ao-panel-header">
+                    Out of Charge
+                    <span className="chart-period">30 days</span>
+                  </div>
+                  <div className="ao-line-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={eventTimelineData?.oocTimeline || []}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                        <XAxis dataKey="date" fontSize={10} />
+                        <YAxis allowDecimals={false} fontSize={10} />
+                        <Tooltip
+                          content={
+                            <EnhancedLineTooltip eventType="Out of Charge" />
+                          }
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#8884d8"
+                          strokeWidth={2}
+                          dot={{ fill: "#8884d8", strokeWidth: 2, r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Arrival Chart */}
+                <div className="ao-panel ao-line-chart-panel">
+                  <div className="ao-panel-header">
+                    Arrivals
+                    <span className="chart-period">30 days</span>
+                  </div>
+                  <div className="ao-line-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={eventTimelineData?.arrivalTimeline || []}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                        <XAxis dataKey="date" fontSize={10} />
+                        <YAxis allowDecimals={false} fontSize={10} />
+                        <Tooltip
+                          content={<EnhancedLineTooltip eventType="Arrival" />}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#82ca9d"
+                          strokeWidth={2}
+                          dot={{ fill: "#82ca9d", strokeWidth: 2, r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Rail-out Chart */}
+                <div className="ao-panel ao-line-chart-panel">
+                  <div className="ao-panel-header">
+                    Rail-out
+                    <span className="chart-period">30 days</span>
+                  </div>
+                  <div className="ao-line-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={eventTimelineData?.railOutTimeline || []}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                        <XAxis dataKey="date" fontSize={10} />
+                        <YAxis allowDecimals={false} fontSize={10} />
+                        <Tooltip
+                          content={<EnhancedLineTooltip eventType="Rail-out" />}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#ffc658"
+                          strokeWidth={2}
+                          dot={{ fill: "#ffc658", strokeWidth: 2, r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Delivery Chart */}
+                <div className="ao-panel ao-line-chart-panel">
+                  <div className="ao-panel-header">
+                    Delivery
+                    <span className="chart-period">30 days</span>
+                  </div>
+                  <div className="ao-line-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={eventTimelineData?.deliveryTimeline || []}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                        <XAxis dataKey="date" fontSize={10} />
+                        <YAxis allowDecimals={false} fontSize={10} />
+                        <Tooltip
+                          content={<EnhancedLineTooltip eventType="Delivery" />}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#ff8042"
+                          strokeWidth={2}
+                          dot={{ fill: "#ff8042", strokeWidth: 2, r: 3 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Charts */}
           <section className="ao-grid-2">
-            {/* Pie */}
+            {/* Pie Chart */}
             <div className="ao-panel">
               <div className="ao-panel-header">
                 Critical Issues Distribution
@@ -378,8 +680,8 @@ const AnalyticsOverview = () => {
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={90}
-                      innerRadius={45}
+                      outerRadius={70}
+                      innerRadius={35}
                       label={({ name, value }) => `${name}: ${value}`}
                       labelLine={false}
                     >
@@ -394,26 +696,67 @@ const AnalyticsOverview = () => {
               </div>
             </div>
 
-            {/* Bar */}
+            {/* Status Distribution Bar Chart - Removed as we have detailed distribution now */}
             <div className="ao-panel">
-              <div className="ao-panel-header">Status Distribution</div>
+              <div className="ao-panel-header">Operational Status Overview</div>
               <div className="ao-chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={statusDistributionData}>
+                  <BarChart
+                    data={[
+                      {
+                        name: "Active",
+                        count:
+                          analyticsData?.summary?.totalActiveContainers || 0,
+                      },
+                      {
+                        name: "On Detention",
+                        count:
+                          analyticsData?.actionRequired?.detention
+                            ?.onDetention || 0,
+                      },
+                      {
+                        name: "Under Exam",
+                        count:
+                          analyticsData?.summary?.underExaminationCount || 0,
+                      },
+                    ]}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                    <XAxis dataKey="name" />
-                    <YAxis allowDecimals={false} />
+                    <XAxis dataKey="name" fontSize={11} />
+                    <YAxis allowDecimals={false} fontSize={11} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#1976d2" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="#1976d2" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </section>
 
-          {/* Table */}
+          {/* Table with Global Search */}
           <section className="ao-panel ao-table-panel">
-            <div className="ao-panel-header">Container Details</div>
+            <div className="ao-panel-header">
+              Container Details
+              {searchTerm && (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#666",
+                    marginLeft: "8px",
+                  }}
+                >
+                  ({filteredTableData.length} of {analyticsData.details.length}{" "}
+                  results)
+                </span>
+              )}
+            </div>
+
+            <GlobalSearch
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              placeholder="Search containers, job numbers, status..."
+            />
+
             <div className="ao-table-container">
               <table className="ao-table">
                 <thead>
@@ -424,17 +767,20 @@ const AnalyticsOverview = () => {
                     <th>Rail-Out Status</th>
                     <th>DO Validity</th>
                     <th>Detention Status</th>
+                    <th>Examination</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {analyticsData.details.length === 0 ? (
+                  {filteredTableData.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="ao-table-empty">
-                        No active containers found for the selected criteria.
+                      <td colSpan={7} className="ao-table-empty">
+                        {searchTerm
+                          ? "No containers match your search."
+                          : "No active containers found for the selected criteria."}
                       </td>
                     </tr>
                   ) : (
-                    analyticsData.details.map((c, i) => (
+                    filteredTableData.map((c, i) => (
                       <tr key={i}>
                         <td className="ao-table-job">
                           <span>{c.job_no}</span>
@@ -446,25 +792,36 @@ const AnalyticsOverview = () => {
                           <StatusChip
                             status={c.arrival.status}
                             days={Math.round(c.arrival.days)}
+                            date={c.arrival.actualDate}
+                            eventType="Arrival"
                           />
                         </td>
                         <td>
                           <StatusChip
                             status={c.rail_out.status}
                             days={Math.round(c.rail_out.days)}
+                            date={c.rail_out.actualDate}
+                            eventType="Rail Out"
                           />
                         </td>
                         <td>
                           <StatusChip
                             status={c.do_validity.status}
                             days={Math.round(c.do_validity.days)}
+                            date={c.do_validity.actualDate}
+                            eventType="DO Validity"
                           />
                         </td>
                         <td>
                           <StatusChip
                             status={c.detention.status}
                             days={Math.round(c.detention.days)}
+                            date={c.detention.actualDate}
+                            eventType="Detention"
                           />
+                        </td>
+                        <td className="examination-cell">
+                          <ExaminationBadge rmsStatus={c.rms_status} />
                         </td>
                       </tr>
                     ))
