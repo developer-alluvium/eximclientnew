@@ -199,9 +199,30 @@ const StatusDistribution = React.memo(({ distributionData }) => {
     "Custom Clearance Completed": "#1dd1a1",
   };
 
+  // Define the desired order of statuses
+  const statusOrder = [
+    "Billing Pending",
+    "ETA Date Pending",
+    "Estimated Time of Arrival",
+    "Gateway IGM Filed",
+    "Discharged",
+    "Rail Out",
+    "BE Noted, Arrival Pending",
+    "BE Noted, Clearance Pending",
+    "PCV Done, Duty Payment Pending",
+    "Custom Clearance Completed",
+  ];
+
+  // Sort the entries based on the predefined order
+  const sortedEntries = Object.entries(distributionData)
+    .filter(([status]) => statusOrder.includes(status))
+    .sort(([statusA], [statusB]) => {
+      return statusOrder.indexOf(statusA) - statusOrder.indexOf(statusB);
+    });
+
   return (
     <div className="status-distribution-grid">
-      {Object.entries(distributionData).map(([status, count]) => (
+      {sortedEntries.map(([status, count]) => (
         <div
           key={status}
           className="status-distribution-item"
