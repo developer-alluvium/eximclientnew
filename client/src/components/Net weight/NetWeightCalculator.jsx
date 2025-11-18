@@ -21,6 +21,7 @@ import {
   Info as InfoIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
+import { getJsonCookie } from "../../utils/cookies";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -175,7 +176,7 @@ const NetWeightCalculator = ({
     }));
 
     // Auto-calculate when duty or weight changes
-    if ((id === 'duty' || id === 'weight') && jobNo && value) {
+    if ((id === "duty" || id === "weight") && jobNo && value) {
       await triggerAutoCalculation(id, value);
     }
   };
@@ -183,11 +184,17 @@ const NetWeightCalculator = ({
   // Function to trigger auto-calculation via API when duty or weight changes
   const triggerAutoCalculation = async (fieldId, fieldValue) => {
     try {
-      const currentWeight = fieldId === 'weight' ? fieldValue : calculatorData.weight;
-      const currentDuty = fieldId === 'duty' ? fieldValue : calculatorData.duty;
-      
+      const currentWeight =
+        fieldId === "weight" ? fieldValue : calculatorData.weight;
+      const currentDuty = fieldId === "duty" ? fieldValue : calculatorData.duty;
+
       // Only trigger if we have both duty and weight
-      if (!currentDuty || !currentWeight || parseFloat(currentDuty) <= 0 || parseFloat(currentWeight) <= 0) {
+      if (
+        !currentDuty ||
+        !currentWeight ||
+        parseFloat(currentDuty) <= 0 ||
+        parseFloat(currentWeight) <= 0
+      ) {
         return;
       }
 
@@ -202,7 +209,14 @@ const NetWeightCalculator = ({
             year: "25-26", // You might want to get this dynamically
             total_duty: currentDuty,
             job_net_weight: currentWeight,
-            ie_code_no: localStorage.getItem('ie_code_no') // Get user's IE code
+            ie_code_no: (() => {
+              try {
+                const user = getJsonCookie("exim_user");
+                return user?.primary_ie_code || user?.ie_code_no || null;
+              } catch (e) {
+                return null;
+              }
+            })(), // Get user's IE code from cookies
           }),
         }
       );
@@ -212,7 +226,7 @@ const NetWeightCalculator = ({
         if (responseData.success && responseData.data.per_kg_cost) {
           const newPerKgCost = responseData.data.per_kg_cost;
           setPerKgCost(newPerKgCost);
-          
+
           // Notify parent component about the updated per kg cost
           if (onPerKgCostUpdate) {
             onPerKgCostUpdate(newPerKgCost);
@@ -227,7 +241,8 @@ const NetWeightCalculator = ({
   const calculateCost = () => {
     const duty = parseFloat(calculatorData.duty) || 0;
     const shipping = parseFloat(calculatorData.shipping) || 0;
-    const customclearancecharges = parseFloat(calculatorData.customclearancecharges) || 0;
+    const customclearancecharges =
+      parseFloat(calculatorData.customclearancecharges) || 0;
     const detention = parseFloat(calculatorData.detention) || 0;
     const cfs = parseFloat(calculatorData.cfs) || 0;
     const transport = parseFloat(calculatorData.transport) || 0;
@@ -236,7 +251,14 @@ const NetWeightCalculator = ({
     const weight = parseFloat(calculatorData.weight) || 0;
 
     const totalINR =
-      duty + shipping + detention + cfs + transport + Labour + miscellaneous + customclearancecharges;
+      duty +
+      shipping +
+      detention +
+      cfs +
+      transport +
+      Labour +
+      miscellaneous +
+      customclearancecharges;
     setTotalCost(totalINR.toFixed(2));
 
     const perKG = weight > 0 ? (totalINR / weight).toFixed(2) : "0.00";

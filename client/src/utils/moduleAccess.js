@@ -1,21 +1,20 @@
-
 /**
  * Get user's assigned modules from localStorage
  * @returns {Array} Array of assigned module IDs
  */
+import { getJsonCookie } from "./cookies";
+
 export const getUserAssignedModules = () => {
   try {
-    const userData = localStorage.getItem("exim_user");
-    
-    if (userData) {
-      const parsedUser = JSON.parse(userData);
-      
+    const parsedUser = getJsonCookie("exim_user");
+
+    if (parsedUser) {
       // Handle both old and new user data structures
       // New structure: user data is stored directly
       if (parsedUser.assignedModules) {
         return parsedUser.assignedModules || [];
       }
-      
+
       // Old structure: user data is nested under data.user
       const oldFormatModules = parsedUser?.data?.user?.assignedModules || [];
       return oldFormatModules;
@@ -23,7 +22,7 @@ export const getUserAssignedModules = () => {
   } catch (error) {
     console.error("Error parsing user data for modules:", error);
   }
-  
+
   return [];
 };
 
@@ -44,14 +43,14 @@ export const hasModuleAccess = (moduleId) => {
  */
 export const filterModulesByAccess = (allModules) => {
   const assignedModules = getUserAssignedModules();
-  return allModules.map(module => {
+  return allModules.map((module) => {
     // Check both path and id for access
     const moduleIds = [module.path, module.id].filter(Boolean);
-    const hasAccess = moduleIds.some(id => assignedModules.includes(id));
+    const hasAccess = moduleIds.some((id) => assignedModules.includes(id));
     return {
       ...module,
       hasAccess,
-      isLocked: !hasAccess
+      isLocked: !hasAccess,
     };
   });
 };
@@ -63,6 +62,6 @@ export const filterModulesByAccess = (allModules) => {
  */
 export const getLockedModules = (allModules) => {
   const assignedModules = getUserAssignedModules();
-  
-  return allModules.filter(module => !assignedModules.includes(module.path));
+
+  return allModules.filter((module) => !assignedModules.includes(module.path));
 };

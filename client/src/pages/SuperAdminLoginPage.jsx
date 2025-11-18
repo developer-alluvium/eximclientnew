@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
+  getCookie,
+  setCookie,
+  setJsonCookie,
+  removeCookie,
+  getJsonCookie,
+} from "../utils/cookies";
+import {
   TextField,
   Button,
   Box,
@@ -38,8 +45,8 @@ function SuperAdminLoginPage() {
   // Check if already logged in (no changes needed here)
   useEffect(() => {
     const checkAuth = () => {
-      const token = localStorage.getItem("superadmin_token");
-      const user = localStorage.getItem("superadmin_user");
+      const token = getCookie("superadmin_token");
+      const user = getCookie("superadmin_user");
 
       if (token && user) {
         try {
@@ -47,9 +54,9 @@ function SuperAdminLoginPage() {
           console.log("Valid auth found, redirecting...");
           navigate("/superadmin-dashboard", { replace: true });
         } catch (error) {
-          console.error("Invalid user data in localStorage:", error);
-          localStorage.removeItem("superadmin_token");
-          localStorage.removeItem("superadmin_user");
+          console.error("Invalid user data in cookies:", error);
+          removeCookie("superadmin_token");
+          removeCookie("superadmin_user");
         }
       }
     };
@@ -60,16 +67,16 @@ function SuperAdminLoginPage() {
   // Listen for storage changes (no changes needed here)
   useEffect(() => {
     const handleStorageChange = () => {
-      const token = localStorage.getItem("superadmin_token");
-      const user = localStorage.getItem("superadmin_user");
-      
+      const token = getCookie("superadmin_token");
+      const user = getCookie("superadmin_user");
+
       if (token && user) {
         navigate("/superadmin-dashboard", { replace: true });
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [navigate]);
 
   const handleSubmit = async (event) => {
@@ -99,25 +106,29 @@ function SuperAdminLoginPage() {
       if (response.data.success) {
         console.log("Login successful, storing data...");
         setIsRedirecting(true);
-        
-        localStorage.setItem("superadmin_token", response.data.token);
-        localStorage.setItem("superadmin_user", JSON.stringify(response.data.superAdmin));
-        
+        setCookie("superadmin_token", response.data.token, 7);
+        setJsonCookie("superadmin_user", response.data.superAdmin, 7);
+
         // 5. Clear 'email' state on success
         setEmail("");
         setPassword("");
         setError(null);
         setSessionMessage(null);
-        
-        const storedToken = localStorage.getItem("superadmin_token");
-        const storedUser = localStorage.getItem("exim_user");
-        console.log("Storage verification - Token:", !!storedToken, "User:", !!storedUser);
-        
+
+        const storedToken = getCookie("superadmin_token");
+        const storedUser = getJsonCookie("exim_user");
+        console.log(
+          "Storage verification - Token:",
+          !!storedToken,
+          "User:",
+          !!storedUser
+        );
+
         setTimeout(() => {
           console.log("Redirecting to dashboard...");
           window.location.href = "/superadmin-dashboard";
         }, 100);
-        
+
         setTimeout(() => {
           if (window.location.pathname === "/login") {
             console.log("Fallback navigation...");
@@ -128,14 +139,16 @@ function SuperAdminLoginPage() {
     } catch (error) {
       console.error("SuperAdmin login error:", error);
       setIsRedirecting(false);
-      
+
       if (error.response) {
         switch (error.response.status) {
           case 401:
             setError("Invalid email or password"); // Updated error message
             break;
           case 423:
-            setError("Account is temporarily locked due to too many failed attempts. Please try again later.");
+            setError(
+              "Account is temporarily locked due to too many failed attempts. Please try again later."
+            );
             break;
           case 500:
             setError("Server error. Please try again later.");
@@ -206,19 +219,28 @@ function SuperAdminLoginPage() {
             {/* Alerts (no changes needed) */}
             <Alert
               severity="warning"
-              sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.5rem" } }}
+              sx={{
+                mb: 3,
+                borderRadius: 2,
+                "& .MuiAlert-icon": { fontSize: "1.5rem" },
+              }}
             >
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 🔐 SuperAdmin Access Required
               </Typography>
               <Typography variant="caption" sx={{ display: "block", mt: 0.5 }}>
-                Only authorized SuperAdmin users can access the customer registration system.
+                Only authorized SuperAdmin users can access the customer
+                registration system.
               </Typography>
             </Alert>
             {error && (
               <Alert
                 severity="error"
-                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
+                }}
                 onClose={() => setError(null)}
               >
                 {error}
@@ -227,7 +249,11 @@ function SuperAdminLoginPage() {
             {sessionMessage && (
               <Alert
                 severity="info"
-                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
+                }}
                 onClose={() => setSessionMessage(null)}
               >
                 {sessionMessage}
@@ -236,7 +262,11 @@ function SuperAdminLoginPage() {
             {isRedirecting && (
               <Alert
                 severity="success"
-                sx={{ mb: 3, borderRadius: 2, "& .MuiAlert-icon": { fontSize: "1.2rem" } }}
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  "& .MuiAlert-icon": { fontSize: "1.2rem" },
+                }}
               >
                 Login successful! Redirecting to dashboard...
               </Alert>
@@ -298,7 +328,7 @@ function SuperAdminLoginPage() {
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                 />
               </Box>
-              
+
               {/* Submit button (no changes needed) */}
               <Button
                 type="submit"
@@ -310,18 +340,22 @@ function SuperAdminLoginPage() {
                   borderRadius: 2,
                   fontWeight: 600,
                   fontSize: "1.1rem",
-                  background: isRedirecting 
+                  background: isRedirecting
                     ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
                     : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   "&:hover": {
-                    background: isRedirecting 
+                    background: isRedirecting
                       ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
                       : "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)",
                   },
                   "&:disabled": { background: "#ccc" },
                 }}
               >
-                {isLoading ? "Authenticating..." : isRedirecting ? "Redirecting..." : "Access SuperAdmin Portal"}
+                {isLoading
+                  ? "Authenticating..."
+                  : isRedirecting
+                  ? "Redirecting..."
+                  : "Access SuperAdmin Portal"}
               </Button>
             </form>
 
@@ -332,14 +366,34 @@ function SuperAdminLoginPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 Need customer access instead?
               </Typography>
-              <Link to="/login" style={{ textDecoration: "none", color: "#667eea", fontWeight: 600 }}>
+              <Link
+                to="/login"
+                style={{
+                  textDecoration: "none",
+                  color: "#667eea",
+                  fontWeight: 600,
+                }}
+              >
                 Customer Login →
               </Link>
             </Box>
 
-            <Box sx={{ mt: 3, p: 2, bgcolor: "grey.50", borderRadius: 2, border: "1px solid #e0e0e0" }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center" }}>
-                🛡️ This portal is protected by enterprise-grade security measures.
+            <Box
+              sx={{
+                mt: 3,
+                p: 2,
+                bgcolor: "grey.50",
+                borderRadius: 2,
+                border: "1px solid #e0e0e0",
+              }}
+            >
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", textAlign: "center" }}
+              >
+                🛡️ This portal is protected by enterprise-grade security
+                measures.
                 <br />
                 Unauthorized access attempts are logged and monitored.
               </Typography>
@@ -349,7 +403,8 @@ function SuperAdminLoginPage() {
 
         <Box sx={{ textAlign: "center", mt: 3 }}>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>
-            EXIM Client Management System v{process.env.REACT_APP_VERSION || "1.0.0"}
+            EXIM Client Management System v
+            {process.env.REACT_APP_VERSION || "1.0.0"}
           </Typography>
           <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
             SuperAdmin Portal

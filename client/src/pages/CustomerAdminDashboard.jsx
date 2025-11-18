@@ -29,7 +29,7 @@ import {
   Tab,
   IconButton,
   Tooltip,
-  Badge
+  Badge,
 } from "@mui/material";
 import {
   People,
@@ -42,12 +42,13 @@ import {
   Visibility,
   Check,
   Close,
-  Pending
+  Pending,
 } from "@mui/icons-material";
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider } from "@mui/material/styles";
 import { modernTheme } from "../styles/modernTheme";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { removeCookie } from "../utils/cookies";
 
 function CustomerAdminDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -68,44 +69,54 @@ function CustomerAdminDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_STRING}/customer-admin/dashboard`, {
-        withCredentials: true
-      });
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/customer-admin/dashboard`,
+        {
+          withCredentials: true,
+        }
+      );
       if (response.data.success) {
         setDashboardData(response.data.data);
       }
     } catch (error) {
-      console.error('Dashboard fetch error:', error);
+      console.error("Dashboard fetch error:", error);
       if (error.response?.status === 401) {
-        navigate('/login');
+        navigate("/login");
       }
-      setError('Failed to fetch dashboard data');
+      setError("Failed to fetch dashboard data");
     }
   };
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_STRING}/customer-admin/users`, {
-        withCredentials: true
-      });
+      const response = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/customer-admin/users`,
+        {
+          withCredentials: true,
+        }
+      );
       if (response.data.success) {
         setUsers(response.data.data.users);
       }
       setLoading(false);
     } catch (error) {
-      console.error('Users fetch error:', error);
-      setError('Failed to fetch users');
+      console.error("Users fetch error:", error);
+      setError("Failed to fetch users");
       setLoading(false);
     }
   };
 
   const handleStatusUpdate = async () => {
     try {
-      await axios.put(`/${process.env.REACT_APP_API_STRING}api/customer-admin/users/${selectedUser._id}/status`, {
-        status: newStatus,
-        reason: statusReason
-      }, { withCredentials: true });
-      
+      await axios.put(
+        `/${process.env.REACT_APP_API_STRING}api/customer-admin/users/${selectedUser._id}/status`,
+        {
+          status: newStatus,
+          reason: statusReason,
+        },
+        { withCredentials: true }
+      );
+
       setStatusDialog(false);
       setSelectedUser(null);
       setNewStatus("");
@@ -113,39 +124,46 @@ function CustomerAdminDashboard() {
       fetchUsers();
       fetchDashboardData();
     } catch (error) {
-      console.error('Status update error:', error);
-      setError('Failed to update user status');
+      console.error("Status update error:", error);
+      setError("Failed to update user status");
     }
   };
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/logout', {}, { withCredentials: true });
-      localStorage.removeItem('exim_user');
-              localStorage.clear();
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token'); 
-      navigate('/login');
+      await axios.post("/api/logout", {}, { withCredentials: true });
+      removeCookie("exim_user");
+      removeCookie("access_token");
+      removeCookie("refresh_token");
+      navigate("/login");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active': return 'success';
-      case 'pending': return 'warning';
-      case 'inactive': return 'error';
-      default: return 'default';
+      case "active":
+        return "success";
+      case "pending":
+        return "warning";
+      case "inactive":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'active': return <Check />;
-      case 'pending': return <Pending />;
-      case 'inactive': return <Close />;
-      default: return null;
+      case "active":
+        return <Check />;
+      case "pending":
+        return <Pending />;
+      case "inactive":
+        return <Close />;
+      default:
+        return null;
     }
   };
 
@@ -153,7 +171,12 @@ function CustomerAdminDashboard() {
     return (
       <ThemeProvider theme={modernTheme}>
         <Container>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            minHeight="50vh"
+          >
             <Typography>Loading dashboard...</Typography>
           </Box>
         </Container>
@@ -165,17 +188,26 @@ function CustomerAdminDashboard() {
     <ThemeProvider theme={modernTheme}>
       <Container maxWidth="xl" sx={{ py: 4 }}>
         {/* Header */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={3}
+        >
           <Box>
             <Typography variant="h4" fontWeight="bold" color="primary">
               Admin Dashboard
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              {dashboardData?.customer?.name} - {dashboardData?.customer?.ie_code_no}
+              {dashboardData?.customer?.name} -{" "}
+              {dashboardData?.customer?.ie_code_no}
             </Typography>
           </Box>
           <Box display="flex" gap={2}>
-            <Badge badgeContent={dashboardData?.notifications?.length || 0} color="error">
+            <Badge
+              badgeContent={dashboardData?.notifications?.length || 0}
+              color="error"
+            >
               <IconButton>
                 <Notifications />
               </IconButton>
@@ -220,7 +252,11 @@ function CustomerAdminDashboard() {
                 <Box display="flex" alignItems="center">
                   <PersonAdd color="success" sx={{ mr: 2 }} />
                   <Box>
-                    <Typography variant="h4" fontWeight="bold" color="success.main">
+                    <Typography
+                      variant="h4"
+                      fontWeight="bold"
+                      color="success.main"
+                    >
                       {dashboardData?.statistics?.activeUsers || 0}
                     </Typography>
                     <Typography color="text.secondary">Active Users</Typography>
@@ -236,10 +272,16 @@ function CustomerAdminDashboard() {
                 <Box display="flex" alignItems="center">
                   <Pending color="warning" sx={{ mr: 2 }} />
                   <Box>
-                    <Typography variant="h4" fontWeight="bold" color="warning.main">
+                    <Typography
+                      variant="h4"
+                      fontWeight="bold"
+                      color="warning.main"
+                    >
                       {dashboardData?.statistics?.pendingUsers || 0}
                     </Typography>
-                    <Typography color="text.secondary">Pending Users</Typography>
+                    <Typography color="text.secondary">
+                      Pending Users
+                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
@@ -250,7 +292,10 @@ function CustomerAdminDashboard() {
         {/* Main Content */}
         <Card>
           <CardContent>
-            <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+            <Tabs
+              value={tabValue}
+              onChange={(e, newValue) => setTabValue(newValue)}
+            >
               <Tab label="Users Management" />
               <Tab label="Notifications" />
             </Tabs>
@@ -311,17 +356,23 @@ function CustomerAdminDashboard() {
               <Box mt={3}>
                 {dashboardData?.notifications?.length > 0 ? (
                   dashboardData.notifications.map((notification) => (
-                    <Alert 
-                      key={notification._id} 
-                      severity="info" 
+                    <Alert
+                      key={notification._id}
+                      severity="info"
                       sx={{ mb: 2 }}
                     >
-                      <Typography variant="subtitle2">{notification.title}</Typography>
-                      <Typography variant="body2">{notification.message}</Typography>
+                      <Typography variant="subtitle2">
+                        {notification.title}
+                      </Typography>
+                      <Typography variant="body2">
+                        {notification.message}
+                      </Typography>
                     </Alert>
                   ))
                 ) : (
-                  <Typography color="text.secondary">No new notifications</Typography>
+                  <Typography color="text.secondary">
+                    No new notifications
+                  </Typography>
                 )}
               </Box>
             )}
@@ -360,7 +411,6 @@ function CustomerAdminDashboard() {
             </Button>
           </DialogActions>
         </Dialog>
-
       </Container>
     </ThemeProvider>
   );

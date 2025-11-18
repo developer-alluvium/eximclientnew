@@ -1,10 +1,12 @@
-import axios from 'axios';
+import axios from "axios";
+import { getCookie } from "./cookies";
 
-// Axios request interceptor to add access_token from localStorage to Authorization header
+// Axios request interceptor to add access_token from cookies to Authorization header
 axios.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = getCookie("access_token");
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

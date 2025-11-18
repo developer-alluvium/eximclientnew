@@ -29,6 +29,7 @@ import {
 } from "@mui/material";
 import { Search as SearchIcon } from "@mui/icons-material";
 import axios from "axios";
+import { getJsonCookie } from "../../utils/cookies";
 import TablePagination from "@mui/material/TablePagination";
 import { detailedStatusOptions } from "../../assets/data/detailedStatusOptions";
 
@@ -69,7 +70,6 @@ const extractUserImporters = (user) => {
 
 const JobExcelTable = ({ userId, gandhidham }) => {
   const [jobData, setJobData] = useState([]);
-  
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -128,11 +128,9 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   };
 
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
-    if (userDataFromStorage) {
+    const user = getJsonCookie("exim_user");
+    if (user) {
       try {
-        const user = JSON.parse(userDataFromStorage);
-
         const extractedIECodes = extractUserIECodes(user);
         const extractedImporters = extractUserImporters(user);
 
@@ -200,10 +198,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   }, [selectedYear, selectedStatus]);
 
   const fetchJobData = useCallback(async () => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
-    const userData = userDataFromStorage
-      ? JSON.parse(userDataFromStorage)
-      : null;
+    const userData = getJsonCookie("exim_user");
 
     const userIECodes = extractUserIECodes(userData);
     const userImporters = extractUserImporters(userData);
@@ -311,13 +306,13 @@ const JobExcelTable = ({ userId, gandhidham }) => {
 
   const getUserIECode = useCallback(() => {
     try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
+      const userDataFromStorage = getJsonCookie("exim_user");
       if (userDataFromStorage) {
-        const parsedUser = JSON.parse(userDataFromStorage);
+        const parsedUser = userDataFromStorage;
         return parsedUser?.primary_ie_code || parsedUser?.ie_code_no || null;
       }
     } catch (error) {
-      console.error("Error parsing user data:", error);
+      console.error("Error parsing user data from cookies:", error);
     }
     return null;
   }, []);

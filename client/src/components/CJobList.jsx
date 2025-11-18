@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import axios from "axios";
+import { getJsonCookie, getCookie } from "../utils/cookies";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -115,11 +116,11 @@ function CJobList(props) {
 
   // Get username and importer name from localStorage
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
+    const userDataFromStorage = getJsonCookie("exim_user");
     if (userDataFromStorage) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
-  
+        const parsedUser = userDataFromStorage;
+
         const userId = parsedUser?._id;
         const role = parsedUser?.role || "customer";
 
@@ -138,8 +139,6 @@ function CJobList(props) {
         }
 
         setIeCodeAssignments(parsedUser?.ie_code_assignments || []);
-
-        
       } catch (e) {
         console.error("Error parsing user data from storage:", e);
       }
@@ -202,7 +201,7 @@ function CJobList(props) {
     const fetchColumnOrder = async () => {
       setHasAttemptedFetch(true);
 
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       if (!token) {
         console.error("Authentication token not found.");
         setIsColumnOrderLoaded(true);
@@ -291,7 +290,7 @@ function CJobList(props) {
 
   // Fixed saveColumnOrderToBackend function
   const saveColumnOrderToBackend = async () => {
-    const token = localStorage.getItem("access_token");
+    const token = getCookie("access_token");
     if (!token) {
       console.warn("No token found. Cannot save column layout.");
       return;

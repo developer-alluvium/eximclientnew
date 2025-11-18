@@ -25,6 +25,7 @@ import {
   Divider,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import { getJsonCookie } from "../utils/cookies";
 import ContainerDetailsModal from "./ContainerDetailsModal";
 
 // Styled components for better visual presentation
@@ -95,12 +96,12 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
   const [detailsModalSize, setDetailsModalSize] = useState("");
   const [detailsModalYear, setDetailsModalYear] = useState("");
 
-  // Get user IE codes from localStorage - supporting multiple IE codes
+  // Get user IE codes from cookie-stored exim_user (supports multiple IE codes)
   const getUserIeCodes = () => {
     try {
-      const userData = localStorage.getItem("exim_user");
+      const userData = getJsonCookie("exim_user");
       if (userData) {
-        const parsedUser = JSON.parse(userData);
+        const parsedUser = userData;
 
         // Check for multiple IE code assignments first
         if (

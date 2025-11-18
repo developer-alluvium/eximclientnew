@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Button, List, ListItem, ListItemText, Alert } from '@mui/material';
-import { getUserAssignedModules } from '../utils/moduleAccess';
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Typography,
+  Paper,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Alert,
+} from "@mui/material";
+import { getUserAssignedModules } from "../utils/moduleAccess";
+import { getJsonCookie } from "../utils/cookies";
 
 /**
  * Debug component to test module assignment synchronization
@@ -12,13 +22,13 @@ const ModuleDebugger = () => {
 
   const loadModules = () => {
     const currentModules = getUserAssignedModules();
-    const currentUserData = localStorage.getItem("exim_user");
-    
+    const currentUserData = getJsonCookie("exim_user");
+
     setModules(currentModules);
-    setUserData(currentUserData ? JSON.parse(currentUserData) : null);
-    
-    console.log('🔍 Debug - Current modules:', currentModules);
-    console.log('🔍 Debug - User data:', currentUserData);
+    setUserData(currentUserData || null);
+
+    console.log("🔍 Debug - Current modules:", currentModules);
+    console.log("🔍 Debug - User data:", currentUserData);
   };
 
   useEffect(() => {
@@ -30,17 +40,22 @@ const ModuleDebugger = () => {
       <Typography variant="h6" gutterBottom>
         Module Assignment Debugger
       </Typography>
-      
+
       <Alert severity="info" sx={{ mb: 2 }}>
-        This component shows the current user's assigned modules and updates in real-time
+        This component shows the current user's assigned modules and updates in
+        real-time
       </Alert>
 
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1">
-          Current User: {userData?.name || userData?.data?.user?.name || 'Not found'}
+          Current User:{" "}
+          {userData?.name || userData?.data?.user?.name || "Not found"}
         </Typography>
         <Typography variant="subtitle2" color="text.secondary">
-          IE Code: {userData?.ie_code_no || userData?.data?.user?.ie_code_no || 'Not found'}
+          IE Code:{" "}
+          {userData?.ie_code_no ||
+            userData?.data?.user?.ie_code_no ||
+            "Not found"}
         </Typography>
       </Box>
 
@@ -52,10 +67,7 @@ const ModuleDebugger = () => {
           <List dense>
             {modules.map((module, index) => (
               <ListItem key={index}>
-                <ListItemText
-                  primary={module}
-                  secondary={`Index: ${index}`}
-                />
+                <ListItemText primary={module} secondary={`Index: ${index}`} />
               </ListItem>
             ))}
           </List>
@@ -64,9 +76,9 @@ const ModuleDebugger = () => {
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2 }}>
+      <Box sx={{ display: "flex", gap: 2 }}>
         <Button variant="outlined" onClick={loadModules}>
-          Reload from localStorage
+          Reload from cookies
         </Button>
       </Box>
     </Paper>

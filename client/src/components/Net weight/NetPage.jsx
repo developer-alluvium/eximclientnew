@@ -3,6 +3,7 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import { Box, Typography, AppBar, Toolbar, TextField } from "@mui/material";
 import axios from "axios";
+import { getJsonCookie, removeCookie } from "../../utils/cookies";
 import { ThemeProvider, styled, alpha } from "@mui/material/styles";
 
 import {
@@ -31,11 +32,11 @@ import { useNavigate } from "react-router-dom";
 const NetPage = () => {
   // Tabs for Jobs/Gandhidham
 
-  const userDataFromStorage = localStorage.getItem("exim_user");
+  const userDataFromStorage = getJsonCookie("exim_user");
   const getTabVisibility = () => {
     if (userDataFromStorage) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
+        const parsedUser = userDataFromStorage;
         return {
           showJobsTab: !!parsedUser?.jobsTabVisible,
           showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
@@ -194,10 +195,10 @@ const NetPage = () => {
         }
       );
 
-      localStorage.removeItem("exim_user");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("sso_token");
+      removeCookie("exim_user");
+      removeCookie("access_token");
+      removeCookie("refresh_token");
+      removeCookie("sso_token");
       setUser(null);
       navigate("/login");
     } catch (error) {
@@ -369,19 +370,19 @@ const NetPage = () => {
   };
 
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
+    const userDataFromStorage = getJsonCookie("exim_user");
     if (userDataFromStorage) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        // Set tab visibility according to localStorage values
+        const parsedUser = userDataFromStorage;
+        // Set tab visibility according to cookie values
 
         // Set user name and initial for header
         const name = parsedUser?.name;
         setUserName(name);
-        setUserInitial(name.charAt(0).toUpperCase());
+        setUserInitial(name?.charAt(0).toUpperCase() || "U");
         setUserId(parsedUser?.ie_code_no);
       } catch (e) {
-        console.error("Error parsing user data from storage:", e);
+        console.error("Error parsing user data from cookies:", e);
       }
     }
   }, []);
@@ -500,9 +501,9 @@ const NetPage = () => {
 
   const getUserIeCodes = useCallback(() => {
     try {
-      const userData = localStorage.getItem("exim_user");
+      const userData = getJsonCookie("exim_user");
       if (!userData) return [];
-      const parsed = JSON.parse(userData);
+      const parsed = userData;
       return parsed?.ie_code_assignments?.map((a) => a.ie_code_no) || [];
     } catch {
       return [];

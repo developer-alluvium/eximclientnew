@@ -2,12 +2,14 @@
 // Usage: import { superAdminApi } from './api';
 // superAdminApi('/your-endpoint', { method: 'GET' })
 
+import { getCookie } from "./cookies";
+
 export async function superAdminApi(endpoint, options = {}) {
-  const token = localStorage.getItem('superadmin_token');
+  const token = getCookie("superadmin_token");
   const headers = {
     ...(options.headers || {}),
-    'Authorization': token ? `Bearer ${token}` : '',
-    'Content-Type': 'application/json',
+    Authorization: token ? `Bearer ${token}` : "",
+    "Content-Type": "application/json",
   };
   const response = await fetch(endpoint, {
     ...options,

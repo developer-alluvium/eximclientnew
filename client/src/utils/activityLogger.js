@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 
 /**
  * Client-side activity logger
@@ -17,7 +17,9 @@ class ActivityLogger {
 
   // Generate a session ID for tracking
   generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return (
+      "session_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9)
+    );
   }
 
   // Get user ID from context or localStorage
@@ -29,18 +31,16 @@ class ActivityLogger {
     if (this.user?.data?.user?.id) {
       return this.user.data.user.id;
     }
-    
+
     try {
-      const userData = localStorage.getItem('exim_user');
-      if (userData) {
-        const parsed = JSON.parse(userData);
-        // Handle both old and new user data structures
-        return parsed?.id || parsed?.data?.user?.id;
-      }
+      // Read from cookies (migrated from localStorage)
+      const { getJsonCookie } = require("./cookies");
+      const parsed = getJsonCookie("exim_user");
+      if (parsed) return parsed?.id || parsed?.data?.user?.id;
     } catch (error) {
-      console.error('Error getting user ID:', error);
+      console.error("Error getting user ID:", error);
     }
-    
+
     return null;
   }
 
@@ -52,7 +52,7 @@ class ActivityLogger {
     try {
       const userId = this.getUserId();
       if (!userId) {
-        console.warn('No user ID available for activity logging');
+        console.warn("No user ID available for activity logging");
         return;
       }
 
@@ -60,98 +60,98 @@ class ActivityLogger {
         user_id: userId,
         activity_type: activity.type,
         description: activity.description,
-        severity: activity.severity || 'low',
+        severity: activity.severity || "low",
         details: {
           ...activity.details,
           session_id: this.sessionId,
           timestamp: new Date().toISOString(),
           page_url: window.location.href,
-          referrer: document.referrer
+          referrer: document.referrer,
         },
         related_job_id: activity.jobId,
-        related_job_no: activity.jobNo
+        related_job_no: activity.jobNo,
       };
 
       await axios.post(`${this.apiUrl}/activity/log`, activityData);
     } catch (error) {
-      console.error('Error logging activity:', error);
+      console.error("Error logging activity:", error);
     }
   }
 
   // Pre-defined activity methods
   async logPageView(page) {
     await this.logActivity({
-      type: 'page_view',
+      type: "page_view",
       description: `Viewed ${page} page`,
-      details: { page }
+      details: { page },
     });
   }
 
   async logJobView(jobNo, jobId) {
     await this.logActivity({
-      type: 'job_view',
+      type: "job_view",
       description: `Viewed job ${jobNo}`,
       jobId,
       jobNo,
-      details: { action: 'view' }
+      details: { action: "view" },
     });
   }
 
   async logSearch(query, searchType, resultsCount) {
     await this.logActivity({
-      type: 'search',
+      type: "search",
       description: `Searched for "${query}" in ${searchType}`,
       details: {
         search_query: query,
         search_type: searchType,
-        results_count: resultsCount
-      }
+        results_count: resultsCount,
+      },
     });
   }
 
   async logExport(exportType, recordCount) {
     await this.logActivity({
-      type: 'export_data',
+      type: "export_data",
       description: `Exported ${recordCount} records as ${exportType}`,
       details: {
         export_type: exportType,
-        record_count: recordCount
-      }
+        record_count: recordCount,
+      },
     });
   }
 
   async logFilterApply(filters) {
     await this.logActivity({
-      type: 'filter_applied',
-      description: `Applied filters: ${Object.keys(filters).join(', ')}`,
+      type: "filter_applied",
+      description: `Applied filters: ${Object.keys(filters).join(", ")}`,
       details: {
         filters: filters,
-        filter_count: Object.keys(filters).length
-      }
+        filter_count: Object.keys(filters).length,
+      },
     });
   }
 
   async logDocumentDownload(filename, documentType) {
     await this.logActivity({
-      type: 'document_download',
+      type: "document_download",
       description: `Downloaded document: ${filename}`,
       details: {
         filename,
-        document_type: documentType
-      }
+        document_type: documentType,
+      },
     });
   }
 
   async logError(error, context) {
     await this.logActivity({
-      type: 'error',
+      type: "error",
       description: `Error occurred: ${error.message}`,
-      severity: 'high',
+      severity: "high",
       details: {
         error_message: error.message,
         error_stack: error.stack,
-        context
-      }
+        context,
+      },
     });
   }
 }
@@ -164,6 +164,7 @@ export const logActivity = (activity) => activityLogger.logActivity(activity);
 
 // Export other methods if needed
 export const setUser = (userData) => activityLogger.setUser(userData);
-export const logError = (error, context) => activityLogger.logError(error, context);
+export const logError = (error, context) =>
+  activityLogger.logError(error, context);
 
 export default activityLogger;

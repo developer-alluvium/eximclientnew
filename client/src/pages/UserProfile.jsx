@@ -14,6 +14,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 
 import { UserContext } from "../context/UserContext";
+import { getCookie } from "../utils/cookies";
 import BackButton from "../components/BackButton";
 import { useAEOIntegration } from "../hooks/useAEOIntegration";
 import ProfileHeader from "../components/UserProfile/ProfileHeader";
@@ -44,11 +45,12 @@ const UserProfile = () => {
 
   const fetchUserProfile = async () => {
     try {
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/user/profile`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -81,7 +83,7 @@ const UserProfile = () => {
 
   const handleUpdateReminderSettings = async (settings) => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/api/aeo/reminder-settings`,
         {

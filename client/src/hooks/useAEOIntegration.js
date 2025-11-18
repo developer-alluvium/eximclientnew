@@ -1,6 +1,7 @@
 // hooks/useAEOIntegration.js
 import { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
+import { getCookie, getJsonCookie } from "../utils/cookies";
 
 export const useAEOIntegration = () => {
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export const useAEOIntegration = () => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
             "Content-Type": "application/json",
           },
         }
@@ -53,7 +54,7 @@ export const useAEOIntegration = () => {
         `${process.env.REACT_APP_API_STRING}/aeo/kyc-summary`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
           },
         }
       );
@@ -88,7 +89,7 @@ export const useAEOIntegration = () => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ importerName }),
@@ -115,7 +116,7 @@ export const useAEOIntegration = () => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ importerName, ieCode }),
@@ -131,7 +132,7 @@ export const useAEOIntegration = () => {
       setLoading(false);
     }
   };
-  const userData = JSON.parse(localStorage.getItem("exim_user"));
+  const userData = getJsonCookie("exim_user");
   const userId = userData?.id;
 
   const updateImporterName = async (ieCode, newImporterName) => {
@@ -148,7 +149,7 @@ export const useAEOIntegration = () => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

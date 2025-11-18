@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Box, ThemeProvider, Alert } from "@mui/material";
 import { UserContext } from "../../context/UserContext";
+import { getJsonCookie, removeCookie } from "../../utils/cookies";
 import { useSuperAdminApi } from "../../hooks/useSuperAdminApi";
 
 // Import modern theme and components
@@ -41,8 +42,8 @@ const SuperAdminLayout = () => {
   // Authentication check
   useEffect(() => {
     const checkSuperAdminAuth = () => {
-      const token = localStorage.getItem("superadmin_token");
-      const user = localStorage.getItem("superadmin_user");
+      const token = getJsonCookie("superadmin_token");
+      const user = getJsonCookie("superadmin_user");
 
       if (!token || !user) {
         navigate("/login");
@@ -167,16 +168,16 @@ const SuperAdminLayout = () => {
         }
       }
 
-      // Clear localStorage and redirect
-      localStorage.removeItem("superadmin_token");
-      localStorage.removeItem("superadmin_user");
-      localStorage.removeItem("user_access_token");
+      // Clear cookies and redirect
+      removeCookie("superadmin_token");
+      removeCookie("superadmin_user");
+      removeCookie("user_access_token");
       navigate("/login");
     } catch (error) {
       console.error("Error during SuperAdmin logout:", error);
       // Still clear localStorage and redirect even if API call fails
-      localStorage.removeItem("superadmin_token");
-      localStorage.removeItem("superadmin_user");
+      removeCookie("superadmin_token");
+      removeCookie("superadmin_user");
       navigate("/login");
     }
   };

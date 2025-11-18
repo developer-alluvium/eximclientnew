@@ -54,6 +54,7 @@ import {
   AccountBox,
 } from "@mui/icons-material";
 import axios from "axios";
+import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
 import { Autocomplete } from "@mui/material";
 import IeCodeDialog from "./IeCodeDialog";
 
@@ -159,8 +160,8 @@ const AdminManagement = ({ onRefresh }) => {
     setLoading(true);
     setError(null);
     try {
-      const superadminToken = localStorage.getItem("superadmin_token");
-      const superadminUser = localStorage.getItem("superadmin_user");
+      const superadminToken = getCookie("superadmin_token");
+      const superadminUser = getJsonCookie("superadmin_user");
 
       if (!superadminToken || !superadminUser) {
         setError("SuperAdmin authentication required. Please login again.");
@@ -217,8 +218,8 @@ const AdminManagement = ({ onRefresh }) => {
       console.error("Error fetching data:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("SuperAdmin authentication expired. Please login again.");
-        localStorage.removeItem("superadmin_token");
-        localStorage.removeItem("superadmin_user");
+        removeCookie("superadmin_token");
+        removeCookie("superadmin_user");
       } else {
         setError("Failed to fetch data. Please try again.");
       }
@@ -230,7 +231,7 @@ const AdminManagement = ({ onRefresh }) => {
   // Search IE codes with autocomplete
   const searchIeCodes = async (searchTerm) => {
     try {
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) return;
 
       const config = {
@@ -275,7 +276,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
@@ -292,7 +293,7 @@ const AdminManagement = ({ onRefresh }) => {
       let response;
       if (isRemovingIeCode) {
         const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`;
-        
+
         response = await axios.delete(endpoint, {
           ...config,
           data: {
@@ -343,7 +344,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
@@ -420,7 +421,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
@@ -465,7 +466,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
@@ -515,7 +516,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
@@ -557,7 +558,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;

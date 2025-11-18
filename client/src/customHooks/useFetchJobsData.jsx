@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
 
 // Helper function to extract IE codes from user data (same as backend)
 const extractUserIECodes = (user) => {
@@ -92,10 +93,7 @@ function useFetchJobsData(
     setError(null);
 
     try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
-      const userData = userDataFromStorage
-        ? JSON.parse(userDataFromStorage)
-        : null;
+      const userData = getJsonCookie("exim_user");
 
       // Extract IE codes and importers using helper functions
       const userIECodes = extractUserIECodes(userData);

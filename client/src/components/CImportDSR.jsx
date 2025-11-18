@@ -4,6 +4,7 @@ import Tab from "@mui/material/Tab";
 import { Box, Typography } from "@mui/material";
 import "../styles/import-dsr.scss";
 import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
 import { SelectedYearContext } from "../context/SelectedYearContext";
 import Snackbar from "@mui/material/Snackbar";
 import useTabs from "../customHooks/useTabs";
@@ -48,12 +49,11 @@ function CImportDSR() {
   });
 
   React.useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
-    if (userDataFromStorage) {
+    const parsedUser = getJsonCookie("exim_user");
+    if (parsedUser) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
         setTabVisibility({
-          analyticsTabVisible: 
+          analyticsTabVisible:
             parsedUser.analyticsTabVisible !== undefined
               ? parsedUser.analyticsTabVisible
               : true,
@@ -67,10 +67,10 @@ function CImportDSR() {
               : false,
         });
       } catch (e) {
-        setTabVisibility({ 
+        setTabVisibility({
           analyticsTabVisible: true,
-          jobsTabVisible: true, 
-          gandhidhamTabVisible: false 
+          jobsTabVisible: true,
+          gandhidhamTabVisible: false,
         });
       }
     }

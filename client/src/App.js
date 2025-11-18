@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { getJsonCookie, getCookie } from "./utils/cookies";
 import {
   BrowserRouter,
   Routes,
@@ -32,7 +33,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import MainLayout from "./pages/MainLayout.jsx";
 import CImportDSR from "./components/CImportDSR.jsx";
-import AnalyticsOverview from "./components/AnalyticsOverview.jsx";// Add this import
+import AnalyticsOverview from "./components/AnalyticsOverview.jsx"; // Add this import
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
@@ -70,17 +71,17 @@ const ProtectedRoute = ({ children, requiredAuth }) => {
     const checkAuth = () => {
       switch (requiredAuth) {
         case "superadmin":
-          if (!localStorage.getItem("superadmin_user")) {
+          if (!getJsonCookie("superadmin_user")) {
             navigate("/login", { replace: true });
           }
           break;
         case "admin":
-          if (!localStorage.getItem("exim_admin")) {
+          if (!getJsonCookie("exim_admin")) {
             navigate("/admin/login", { replace: true });
           }
           break;
         case "user":
-          if (!localStorage.getItem("exim_user")) {
+          if (!getJsonCookie("exim_user")) {
             navigate("/login", { replace: true });
           }
           break;
@@ -97,9 +98,9 @@ const ProtectedRoute = ({ children, requiredAuth }) => {
 
 function App() {
   const [user, setUser] = React.useState(() => {
-    // Initialize user state from localStorage if available
-    const savedUser = localStorage.getItem("exim_user");
-    return savedUser ? JSON.parse(savedUser) : null;
+    // Initialize user state from cookies if available
+    const savedUser = getJsonCookie("exim_user");
+    return savedUser ? savedUser : null;
   });
   const [selectedYear, setSelectedYear] = React.useState("");
 
@@ -227,17 +228,17 @@ function App() {
                   <Route
                     path="/user-management"
                     element={(() => {
-                      const user = localStorage.getItem("exim_user");
+                      const user = getJsonCookie("exim_user");
                       if (!user) return <LoginPage />;
 
                       try {
-                        const userData = JSON.parse(user);
+                        const userData = user;
                         const isAdmin =
                           userData.role === "admin" ||
                           userData.role === "superadmin";
                         return isAdmin ? <UserManagement /> : <LoginPage />;
                       } catch (error) {
-                        console.error("Error parsing user data:", error);
+                        console.error("Error reading user data:", error);
                         return <LoginPage />;
                       }
                     })()}

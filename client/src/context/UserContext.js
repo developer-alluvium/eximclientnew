@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect } from "react";
+import { getJsonCookie, removeCookie } from "../utils/cookies";
 
 export const UserContext = createContext();
 
@@ -6,15 +7,10 @@ export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check for stored user data on component mount
-    const storedUser = localStorage.getItem("exim_user");
+    // Check for stored user data on component mount (migrated to cookies)
+    const storedUser = getJsonCookie("exim_user");
     if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        localStorage.removeItem("exim_user");
-      }
+      setUser(storedUser);
     }
   }, []);
 

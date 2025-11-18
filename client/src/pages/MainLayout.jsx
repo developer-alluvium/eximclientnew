@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { getJsonCookie, removeCookie } from "../utils/cookies";
 import { Toolbar, Box, Typography } from "@mui/material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -37,7 +38,7 @@ const HeaderBar = ({
     };
   }, []);
 
-  const userDataFromStorage = localStorage.getItem("exim_user");
+  const userDataFromStorage = getJsonCookie("exim_user");
 
   return (
     <Box
@@ -136,7 +137,7 @@ const HeaderBar = ({
                 <Typography variant="body2">Profile</Typography>
               </Box>
 
-              {JSON.parse(userDataFromStorage || "{}")?.role === "admin" && (
+              {userDataFromStorage?.role === "admin" && (
                 <Box
                   sx={{
                     px: 2,
@@ -185,7 +186,7 @@ const MainLayout = ({ children }) => {
   const navigate = useNavigate();
 
   // Example user data, formattedTime, formattedDate & logout handler
-  const userData = JSON.parse(localStorage.getItem("exim_user") || "{}");
+  const userData = getJsonCookie("exim_user") || {};
   const userName =
     userData.name || userData.username || userData.email || "User";
 
@@ -197,8 +198,10 @@ const MainLayout = ({ children }) => {
   const formattedDate = now.toLocaleDateString();
 
   const handleLogout = () => {
-    // Example logout logic: clear localStorage and navigate to login
-    localStorage.clear();
+    // Example logout logic: clear cookies and navigate to login
+    removeCookie("exim_user");
+    removeCookie("access_token");
+    removeCookie("refresh_token");
     navigate("/login");
   };
 

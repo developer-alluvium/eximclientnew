@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from "react";
 import FileUpload from "../utils/FileUpload";
 import { FaUpload } from "react-icons/fa";
 import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
 import { IconButton } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import BEStatusModal from "../customHooks/BeStatus"; // Import the modal component
@@ -106,8 +107,8 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
 
     // Update the database with the complete array
     try {
-      // Get user info from localStorage for audit trail
-      const user = JSON.parse(localStorage.getItem("exim_user") || "{}");
+      // Get user info from cookies for audit trail
+      const user = getJsonCookie("exim_user") || {};
       const headers = {
         "Content-Type": "application/json",
         "user-id": user.username || "unknown",

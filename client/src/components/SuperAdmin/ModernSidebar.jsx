@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Drawer,
   List,
@@ -8,7 +8,8 @@ import {
   Box,
   Typography,
   Divider,
-} from '@mui/material';
+} from "@mui/material";
+import { removeCookie } from "../../utils/cookies";
 import {
   Dashboard,
   People,
@@ -19,21 +20,21 @@ import {
   Logout,
   AdminPanelSettings,
   ChevronRight,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 64;
 
-const ModernSidebar = ({ 
-  open, 
-  collapsed, 
+const ModernSidebar = ({
+  open,
+  collapsed,
   onToggleCollapse,
-  activeTab, 
-  onTabChange, 
-  tabs, 
+  activeTab,
+  onTabChange,
+  tabs,
   onLogout,
   mobileOpen,
-  onMobileToggle
+  onMobileToggle,
 }) => {
   const [hoverExpanded, setHoverExpanded] = useState(false);
 
@@ -59,39 +60,39 @@ const ModernSidebar = ({
       <Box
         sx={{
           height: 64,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: isExpanded ? 'space-between' : 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: isExpanded ? "space-between" : "center",
           px: isExpanded ? 2 : 1,
-          borderBottom: '1px solid #1F1F1F',
+          borderBottom: "1px solid #1F1F1F",
         }}
       >
         {isExpanded && (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <AdminPanelSettings 
-              sx={{ 
-                color: '#FFFFFF', 
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <AdminPanelSettings
+              sx={{
+                color: "#FFFFFF",
                 fontSize: 20,
-                mr: 1
-              }} 
+                mr: 1,
+              }}
             />
             <Box>
-              <Typography 
-                variant="body1" 
-                sx={{ 
+              <Typography
+                variant="body1"
+                sx={{
                   fontWeight: 600,
-                  fontSize: '0.8125rem',
-                  color: '#FFFFFF',
+                  fontSize: "0.8125rem",
+                  color: "#FFFFFF",
                   lineHeight: 1.2,
                 }}
               >
                 SuperAdmin
               </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  fontSize: '0.6875rem',
-                  color: '#A1A1AA',
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: "0.6875rem",
+                  color: "#A1A1AA",
                   lineHeight: 1,
                 }}
               >
@@ -100,13 +101,13 @@ const ModernSidebar = ({
             </Box>
           </Box>
         )}
-        
+
         {!isExpanded && (
-          <AdminPanelSettings 
-            sx={{ 
-              color: '#FFFFFF', 
+          <AdminPanelSettings
+            sx={{
+              color: "#FFFFFF",
               fontSize: 20,
-            }} 
+            }}
           />
         )}
       </Box>
@@ -114,7 +115,7 @@ const ModernSidebar = ({
       {/* Navigation */}
       <List sx={{ py: 2, px: 1 }}>
         {tabs.map((tab, index) => {
-          const iconElement = getIcon(tab.icon || 'dashboard');
+          const iconElement = getIcon(tab.icon || "dashboard");
           const isActive = activeTab === index;
 
           return (
@@ -124,35 +125,35 @@ const ModernSidebar = ({
               sx={{
                 mb: 0.5,
                 borderRadius: 2,
-                cursor: 'pointer',
-                backgroundColor: isActive ? '#2D2D2D' : 'transparent',
-                '&:hover': {
-                  backgroundColor: isActive ? '#2D2D2D' : '#1F1F1F',
+                cursor: "pointer",
+                backgroundColor: isActive ? "#2D2D2D" : "transparent",
+                "&:hover": {
+                  backgroundColor: isActive ? "#2D2D2D" : "#1F1F1F",
                 },
-                transition: 'background-color 0.2s ease',
+                transition: "background-color 0.2s ease",
                 minHeight: 40,
                 px: isExpanded ? 2 : 1.5,
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: isActive ? '#FFFFFF' : '#A1A1AA',
-                  minWidth: isExpanded ? 40 : 'auto',
+                  color: isActive ? "#FFFFFF" : "#A1A1AA",
+                  minWidth: isExpanded ? 40 : "auto",
                   mr: isExpanded ? 1 : 0,
-                  transition: 'color 0.2s ease',
+                  transition: "color 0.2s ease",
                 }}
               >
-                {React.cloneElement(iconElement, { fontSize: 'small' })}
+                {React.cloneElement(iconElement, { fontSize: "small" })}
               </ListItemIcon>
               {isExpanded && (
                 <ListItemText
                   primary={tab.label}
                   sx={{
-                    '& .MuiListItemText-primary': {
-                      fontSize: '0.8125rem',
+                    "& .MuiListItemText-primary": {
+                      fontSize: "0.8125rem",
                       fontWeight: isActive ? 600 : 400,
-                      color: isActive ? '#FFFFFF' : '#A1A1AA',
-                      transition: 'color 0.2s ease',
+                      color: isActive ? "#FFFFFF" : "#A1A1AA",
+                      transition: "color 0.2s ease",
                     },
                   }}
                 />
@@ -163,25 +164,25 @@ const ModernSidebar = ({
       </List>
 
       {/* Bottom Section - Logout */}
-      <Box sx={{ mt: 'auto', p: 1 }}>
-        <Divider sx={{ borderColor: '#1F1F1F', mb: 1 }} />
+      <Box sx={{ mt: "auto", p: 1 }}>
+        <Divider sx={{ borderColor: "#1F1F1F", mb: 1 }} />
         <ListItem
           onClick={handleLogout}
           sx={{
             borderRadius: 2,
-            cursor: 'pointer',
-            '&:hover': {
-              backgroundColor: '#1F1F1F',
+            cursor: "pointer",
+            "&:hover": {
+              backgroundColor: "#1F1F1F",
             },
-            transition: 'background-color 0.2s ease',
+            transition: "background-color 0.2s ease",
             minHeight: 40,
             px: isExpanded ? 2 : 1.5,
           }}
         >
           <ListItemIcon
             sx={{
-              color: '#A1A1AA',
-              minWidth: isExpanded ? 40 : 'auto',
+              color: "#A1A1AA",
+              minWidth: isExpanded ? 40 : "auto",
               mr: isExpanded ? 1 : 0,
             }}
           >
@@ -191,10 +192,10 @@ const ModernSidebar = ({
             <ListItemText
               primary="Logout"
               sx={{
-                '& .MuiListItemText-primary': {
-                  fontSize: '0.8125rem',
+                "& .MuiListItemText-primary": {
+                  fontSize: "0.8125rem",
                   fontWeight: 400,
-                  color: '#A1A1AA',
+                  color: "#A1A1AA",
                 },
               }}
             />
@@ -207,24 +208,24 @@ const ModernSidebar = ({
             onClick={onToggleCollapse}
             sx={{
               borderRadius: 2,
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: '#1F1F1F',
+              cursor: "pointer",
+              "&:hover": {
+                backgroundColor: "#1F1F1F",
               },
-              transition: 'background-color 0.2s ease',
+              transition: "background-color 0.2s ease",
               minHeight: 40,
               px: 1.5,
-              justifyContent: 'center',
+              justifyContent: "center",
               mt: 1,
             }}
           >
             <ListItemIcon
               sx={{
-                color: '#A1A1AA',
-                minWidth: 'auto',
+                color: "#A1A1AA",
+                minWidth: "auto",
                 mr: 0,
-                '&:hover': {
-                  color: '#FFFFFF',
+                "&:hover": {
+                  color: "#FFFFFF",
                 },
               }}
             >
@@ -237,10 +238,9 @@ const ModernSidebar = ({
   );
 
   const handleLogout = () => {
-    localStorage.removeItem('superadmin_token');
-    localStorage.removeItem('superadmin_user');
-            localStorage.clear();
-    if (typeof onLogout === 'function') {
+    removeCookie("superadmin_token");
+    removeCookie("superadmin_user");
+    if (typeof onLogout === "function") {
       onLogout();
     }
   };
@@ -256,12 +256,12 @@ const ModernSidebar = ({
           keepMounted: true, // Better open performance on mobile.
         }}
         sx={{
-          display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': {
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
             width: DRAWER_WIDTH_EXPANDED,
-            backgroundColor: '#000000',
-            color: '#FFFFFF',
-            borderRight: 'none',
+            backgroundColor: "#000000",
+            color: "#FFFFFF",
+            borderRight: "none",
           },
         }}
       >
@@ -277,14 +277,14 @@ const ModernSidebar = ({
         sx={{
           width: isExpanded ? DRAWER_WIDTH_EXPANDED : DRAWER_WIDTH_COLLAPSED,
           flexShrink: 0,
-          display: { xs: 'none', md: 'block' },
-          '& .MuiDrawer-paper': {
+          display: { xs: "none", md: "block" },
+          "& .MuiDrawer-paper": {
             width: isExpanded ? DRAWER_WIDTH_EXPANDED : DRAWER_WIDTH_COLLAPSED,
-            backgroundColor: '#000000',
-            color: '#FFFFFF',
-            borderRight: 'none',
-            transition: 'width 0.2s ease',
-            overflow: 'hidden',
+            backgroundColor: "#000000",
+            color: "#FFFFFF",
+            borderRight: "none",
+            transition: "width 0.2s ease",
+            overflow: "hidden",
             zIndex: 1100,
           },
         }}

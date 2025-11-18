@@ -33,22 +33,37 @@ dotenv.config();
 const app = express();
 const PORT = config.port;
 
+// When running behind a proxy (e.g., nginx, load balancer), enable trust proxy
+if (config.nodeEnv === "production" || process.env.TRUST_PROXY === "1") {
+  app.set("trust proxy", 1);
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // CORS configuration
+// Build allowed origins list using configured client URLs (env) and common dev hosts
+const defaultOrigins = [
+  "http://localhost:3001",
+  "http://43.205.59.159",
+  "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
+  "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
+  "http://localhost:3005",
+  "http://eximdev.s3-website.ap-south-1.amazonaws.com",
+];
+
+const allowedOrigins = [
+  config.client.development,
+  config.client.server,
+  config.client.production,
+  ...defaultOrigins,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:3001",
-      "http://43.205.59.159",
-      "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
-      "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
-      "http://localhost:3005",
-      "http://eximdev.s3-website.ap-south-1.amazonaws.com",
-    ], // Your React app's URL
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: [

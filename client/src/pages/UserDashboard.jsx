@@ -38,6 +38,13 @@ import { modernTheme } from "../styles/modernTheme";
 import { useUserData } from "../customHooks/useUserData";
 import { filterModulesByAccess } from "../utils/moduleAccess";
 import axios from "axios";
+import {
+  getCookie,
+  setJsonCookie,
+  setCookie,
+  removeCookie,
+  getJsonCookie,
+} from "../utils/cookies";
 
 // --- Styled Components ---
 
@@ -183,7 +190,7 @@ function UserDashboard() {
 
   const fetchAndUpdateUserData = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await axios.get(
         `${process.env.REACT_APP_API_STRING}/users/current`,
         {
@@ -194,7 +201,7 @@ function UserDashboard() {
 
       if (response.data.success) {
         const userData = response.data.data.user;
-        localStorage.setItem("exim_user", JSON.stringify(userData));
+        setJsonCookie("exim_user", userData);
         setDashboardData((prevData) => ({
           ...prevData,
           user: userData,
@@ -316,7 +323,7 @@ function UserDashboard() {
 
   const fetchAEOCertificateData = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/aeo/kyc-summary`,
         {
@@ -366,8 +373,8 @@ function UserDashboard() {
     }
   };
 
-  const eximUser = localStorage.getItem("exim_user");
-  const parsedUser = userData;
+  const eximUser = userData || getJsonCookie("exim_user");
+  const parsedUser = userData || eximUser;
   const ieCodeAssignments = parsedUser?.ie_code_assignments || [];
   const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
   const userImporterName =
@@ -432,12 +439,12 @@ function UserDashboard() {
     if (isLocked) return;
     if (moduleName === "E-Lock") {
       try {
-        let token = localStorage.getItem("access_token");
+        let token = getCookie("access_token");
         if (!eximUser || !token) {
           navigate("/login");
           return;
         }
-        const parsedUser = JSON.parse(eximUser);
+        const parsedUser = parsedUser || eximUser;
         let selectedIeCode = "";
         if (
           parsedUser?.ie_code_assignments &&
@@ -466,7 +473,7 @@ function UserDashboard() {
         );
         const ssoToken = res.data?.data?.token;
         if (ssoToken) {
-          localStorage.setItem("sso_token", ssoToken);
+          setCookie("sso_token", ssoToken, 1);
           window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
         } else alert("Failed to generate SSO token for E-Lock.");
       } catch (err) {
@@ -494,13 +501,13 @@ function UserDashboard() {
         logoutData,
         { withCredentials: true }
       );
-      localStorage.removeItem("exim_user");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("sso_token");
+      removeCookie("exim_user");
+      removeCookie("access_token");
+      removeCookie("refresh_token");
+      removeCookie("sso_token");
       navigate("/login", { replace: true });
     } catch (error) {
-      localStorage.removeItem("exim_user");
+      removeCookie("exim_user");
       navigate("/login", { replace: true });
     }
   };
@@ -599,39 +606,39 @@ function UserDashboard() {
               flexWrap="wrap"
               sx={{ mt: 1, width: "100%" }}
             >
-                {ieCodeAssignments.map((assignment, index) => (
-                    <Box
-                      key={index}
-                      display="flex"
-                      flexDirection="column"
-                      sx={{ mr: 2 }}
-                    >
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 400,
-                          fontSize: "0.875rem",
-                          color: "#000000ff",
-                        }}
-                      >
-                        {assignment.ie_code_no
-                          ? `IE Code: ${assignment.ie_code_no}`
-                          : ""}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 400,
-                          fontSize: "0.875rem",
-                          color: "#000000ff",
-                        }}
-                      >
-                        {assignment.importer_name
-                          ? `Importer: ${assignment.importer_name}`
-                          : ""}
-                      </Typography>
-                    </Box>
-                  ))}
+              {ieCodeAssignments.map((assignment, index) => (
+                <Box
+                  key={index}
+                  display="flex"
+                  flexDirection="column"
+                  sx={{ mr: 2 }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      fontSize: "0.875rem",
+                      color: "#000000ff",
+                    }}
+                  >
+                    {assignment.ie_code_no
+                      ? `IE Code: ${assignment.ie_code_no}`
+                      : ""}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      fontSize: "0.875rem",
+                      color: "#000000ff",
+                    }}
+                  >
+                    {assignment.importer_name
+                      ? `Importer: ${assignment.importer_name}`
+                      : ""}
+                  </Typography>
+                </Box>
+              ))}
             </Box>
           </WelcomeBanner>
 

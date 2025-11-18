@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { getJsonCookie, getCookie, removeCookie } from "../../utils/cookies";
 import {
   Box,
   Button,
@@ -47,8 +48,8 @@ import {
   Switch,
   Avatar,
   Container,
-  Autocomplete
-} from '@mui/material';
+  Autocomplete,
+} from "@mui/material";
 import {
   Edit as EditIcon,
   PersonAdd as PersonAddIcon,
@@ -67,11 +68,11 @@ import {
   Badge as BadgeIcon,
   Business as BusinessIcon,
   AccessTime as AccessTimeIcon,
-  Security as SecurityIcon
-} from '@mui/icons-material';
-import InviteUserDialog from './components/InviteUserDialog';
-import EditUserDialog from './components/EditUserDialog';
-import BackButton from '../../components/BackButton';
+  Security as SecurityIcon,
+} from "@mui/icons-material";
+import InviteUserDialog from "./components/InviteUserDialog";
+import EditUserDialog from "./components/EditUserDialog";
+import BackButton from "../../components/BackButton";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -79,9 +80,9 @@ const UserManagement = () => {
   const [actionLoading, setActionLoading] = useState({});
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [columnPermissionDialog, setColumnPermissionDialog] = useState({ 
-    open: false, 
-    user: null 
+  const [columnPermissionDialog, setColumnPermissionDialog] = useState({
+    open: false,
+    user: null,
   });
   // Commented out bulk column dialog state
   // const [bulkColumnDialog, setBulkColumnDialog] = useState(false);
@@ -89,46 +90,53 @@ const UserManagement = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuUserId, setMenuUserId] = useState(null);
-  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
-  const [statusUpdateDialog, setStatusUpdateDialog] = useState({ open: false, user: null });
+  const [toast, setToast] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+  const [statusUpdateDialog, setStatusUpdateDialog] = useState({
+    open: false,
+    user: null,
+  });
   const [availableColumns, setAvailableColumns] = useState([]);
   const [userColumns, setUserColumns] = useState([]);
   const [currentTab, setCurrentTab] = useState(0);
-  
+
   // Add importer filtering states
   const [availableImporters, setAvailableImporters] = useState([]);
-  const [selectedImporter, setSelectedImporter] = useState('All Importers');
+  const [selectedImporter, setSelectedImporter] = useState("All Importers");
   const [selectedIeCodes, setSelectedIeCodes] = useState([]);
   const [pagination, setPagination] = useState({
     current_page: 1,
     per_page: 50,
     total_count: 0,
-    total_pages: 0
+    total_pages: 0,
   });
-  
+
   const theme = useTheme();
   const navigate = useNavigate();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
-  // Get user data from localStorage with multiple IE codes support
-  const currentUser = JSON.parse(localStorage.getItem('exim_user') || '{}');
-  
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Get user data from cookies with multiple IE codes support
+  const currentUser = getJsonCookie("exim_user") || {};
+
   useEffect(() => {
     if (!currentUser || !currentUser.ie_code_assignments?.length) {
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
       return;
     }
-    
+
     // Extract IE codes from assignments
-    const ieCodes = currentUser.ie_code_assignments.map(a => a.ie_code_no);
+    const ieCodes = currentUser.ie_code_assignments.map((a) => a.ie_code_no);
     setSelectedIeCodes(ieCodes);
-    
+
     fetchUsers(ieCodes);
     fetchAvailableColumns();
     fetchAvailableImporters(ieCodes);
   }, [navigate]);
 
-  const showToast = (message, severity = 'success') => {
+  const showToast = (message, severity = "success") => {
     setToast({ open: true, message, severity });
   };
 
@@ -137,16 +145,18 @@ const UserManagement = () => {
   };
 
   const getToken = () => {
-    return localStorage.getItem('access_token') || 
-           localStorage.getItem('refresh_token') || 
-           sessionStorage.getItem('jwt_token');
+    return (
+      getCookie("access_token") ||
+      getCookie("refresh_token") ||
+      sessionStorage.getItem("jwt_token")
+    );
   };
 
   const getAuthHeaders = () => {
     const token = getToken();
     return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     };
   };
 
@@ -168,80 +178,100 @@ const UserManagement = () => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        localStorage.removeItem('exim_user');
-        localStorage.removeItem('exim_token');
-        localStorage.removeItem('jwt_token');
-        navigate('/login', { replace: true });
+        removeCookie("exim_user");
+        removeCookie("exim_token");
+        removeCookie("jwt_token");
+        navigate("/login", { replace: true });
       }
       return Promise.reject(error);
     }
   );
 
   // Updated fetchUsers to support multiple IE codes and importer filtering
-  const fetchUsers = useCallback(async (ieCodes = selectedIeCodes, importer = selectedImporter, page = 1) => {
-    try {
-      if (!ieCodes?.length) {
-        showToast('No IE codes available', 'error');
-        return;
-      }
+  const fetchUsers = useCallback(
+    async (
+      ieCodes = selectedIeCodes,
+      importer = selectedImporter,
+      page = 1
+    ) => {
+      try {
+        if (!ieCodes?.length) {
+          showToast("No IE codes available", "error");
+          return;
+        }
 
-      setLoading(true);
-      
-      const params = new URLSearchParams({
-        ie_code_nos: ieCodes.join(','),
-        page: page.toString(),
-        limit: pagination.per_page.toString()
-      });
+        setLoading(true);
 
-      if (importer && importer !== 'All Importers') {
-        params.append('importer', importer);
-      }
-
-      const response = await apiClient.get(`/user-management/users?${params}`);
-
-      if (response.data.success) {
-        setUsers(response.data.data);
-        setPagination(response.data.pagination || {
-          current_page: 1,
-          per_page: 50,
-          total_count: response.data.data.length,
-          total_pages: 1
+        const params = new URLSearchParams({
+          ie_code_nos: ieCodes.join(","),
+          page: page.toString(),
+          limit: pagination.per_page.toString(),
         });
-      } else {
-        showToast(response.data.message || 'Error fetching users', 'error');
+
+        if (importer && importer !== "All Importers") {
+          params.append("importer", importer);
+        }
+
+        const response = await apiClient.get(
+          `/user-management/users?${params}`
+        );
+
+        if (response.data.success) {
+          setUsers(response.data.data);
+          setPagination(
+            response.data.pagination || {
+              current_page: 1,
+              per_page: 50,
+              total_count: response.data.data.length,
+              total_pages: 1,
+            }
+          );
+        } else {
+          showToast(response.data.message || "Error fetching users", "error");
+        }
+      } catch (error) {
+        console.error("Fetch users error:", error);
+        showToast(
+          error.response?.data?.message || "Error fetching users",
+          "error"
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Fetch users error:', error);
-      showToast(error.response?.data?.message || 'Error fetching users', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedIeCodes, selectedImporter, pagination.per_page]);
+    },
+    [selectedIeCodes, selectedImporter, pagination.per_page]
+  );
 
   // Fetch available importers for filtering
   const fetchAvailableImporters = useCallback(async (ieCodes) => {
     try {
       if (!ieCodes?.length) return;
 
-      const response = await apiClient.get(`/user-management/importers?ie_code_nos=${ieCodes.join(',')}`);
-      
+      const response = await apiClient.get(
+        `/user-management/importers?ie_code_nos=${ieCodes.join(",")}`
+      );
+
       if (response.data.success) {
-        const importerNames = response.data.data.map(imp => imp.importer_name);
-        setAvailableImporters(['All Importers', ...importerNames]);
+        const importerNames = response.data.data.map(
+          (imp) => imp.importer_name
+        );
+        setAvailableImporters(["All Importers", ...importerNames]);
       }
     } catch (error) {
-      console.error('Error fetching importers:', error);
+      console.error("Error fetching importers:", error);
     }
   }, []);
 
   const fetchAvailableColumns = useCallback(async () => {
     try {
-      const response = await apiClient.get(`/user-management/available-columns`);
+      const response = await apiClient.get(
+        `/user-management/available-columns`
+      );
       if (response.data.success) {
         setAvailableColumns(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching available columns:', error);
+      console.error("Error fetching available columns:", error);
     }
   }, []);
 
@@ -249,88 +279,109 @@ const UserManagement = () => {
   const handleInviteUser = async (userData) => {
     try {
       // Build IE code assignments from current user's assignments
-      const ie_code_assignments = currentUser.ie_code_assignments.map(assignment => ({
-        ie_code_no: assignment.ie_code_no,
-        importer_name: assignment.importer_name
-      }));
+      const ie_code_assignments = currentUser.ie_code_assignments.map(
+        (assignment) => ({
+          ie_code_no: assignment.ie_code_no,
+          importer_name: assignment.importer_name,
+        })
+      );
 
       const response = await apiClient.post(`/user-management/users/invite`, {
         ...userData,
-        ie_code_assignments // Use new structure instead of single ie_code_no
+        ie_code_assignments, // Use new structure instead of single ie_code_no
       });
 
       if (response.data.success) {
-        showToast('User invited successfully');
+        showToast("User invited successfully");
         fetchUsers();
       } else {
-        showToast(response.data.message || 'Error inviting user', 'error');
+        showToast(response.data.message || "Error inviting user", "error");
       }
     } catch (error) {
-      console.error('Invite user error:', error);
-      showToast(error.response?.data?.message || 'Error inviting user', 'error');
+      console.error("Invite user error:", error);
+      showToast(
+        error.response?.data?.message || "Error inviting user",
+        "error"
+      );
     }
     setInviteDialogOpen(false);
   };
 
   const handlePromoteUser = async (userId) => {
-    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    setActionLoading((prev) => ({ ...prev, [userId]: true }));
     try {
-      const response = await apiClient.patch(`/user-management/manage/${userId}/promote`);
-      
+      const response = await apiClient.patch(
+        `/user-management/manage/${userId}/promote`
+      );
+
       if (response.data.success) {
-        showToast('User promoted to admin successfully');
+        showToast("User promoted to admin successfully");
         fetchUsers();
       } else {
-        showToast(response.data.message || 'Error promoting user', 'error');
+        showToast(response.data.message || "Error promoting user", "error");
       }
     } catch (error) {
-      console.error('Promote user error:', error);
-      showToast(error.response?.data?.message || 'Error promoting user', 'error');
+      console.error("Promote user error:", error);
+      showToast(
+        error.response?.data?.message || "Error promoting user",
+        "error"
+      );
     } finally {
-      setActionLoading(prev => ({ ...prev, [userId]: false }));
+      setActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
     handleMenuClose();
   };
 
   const handleDemoteUser = async (userId) => {
-    setActionLoading(prev => ({ ...prev, [userId]: true }));
+    setActionLoading((prev) => ({ ...prev, [userId]: true }));
     try {
-      const response = await apiClient.patch(`/user-management/manage/${userId}/demote`);
-      
+      const response = await apiClient.patch(
+        `/user-management/manage/${userId}/demote`
+      );
+
       if (response.data.success) {
-        showToast('User demoted from admin successfully');
+        showToast("User demoted from admin successfully");
         fetchUsers();
       } else {
-        showToast(response.data.message || 'Error demoting user', 'error');
+        showToast(response.data.message || "Error demoting user", "error");
       }
     } catch (error) {
-      console.error('Demote user error:', error);
-      showToast(error.response?.data?.message || 'Error demoting user', 'error');
+      console.error("Demote user error:", error);
+      showToast(
+        error.response?.data?.message || "Error demoting user",
+        "error"
+      );
     } finally {
-      setActionLoading(prev => ({ ...prev, [userId]: false }));
+      setActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
     handleMenuClose();
   };
 
-  const handleStatusUpdate = async (userId, newStatus, reason = '') => {
-    setActionLoading(prev => ({ ...prev, [userId]: true }));
+  const handleStatusUpdate = async (userId, newStatus, reason = "") => {
+    setActionLoading((prev) => ({ ...prev, [userId]: true }));
     try {
       const response = await apiClient.patch(
         `/user-management/users/${userId}/status`,
         { status: newStatus, reason }
       );
-      
+
       if (response.data.success) {
         showToast(`User status updated successfully`);
         fetchUsers();
       } else {
-        showToast(response.data.message || 'Error updating user status', 'error');
+        showToast(
+          response.data.message || "Error updating user status",
+          "error"
+        );
       }
     } catch (error) {
-      console.error('Update user status error:', error);
-      showToast(error.response?.data?.message || 'Error updating user status', 'error');
+      console.error("Update user status error:", error);
+      showToast(
+        error.response?.data?.message || "Error updating user status",
+        "error"
+      );
     } finally {
-      setActionLoading(prev => ({ ...prev, [userId]: false }));
+      setActionLoading((prev) => ({ ...prev, [userId]: false }));
       setStatusUpdateDialog({ open: false, user: null });
     }
     handleMenuClose();
@@ -342,16 +393,22 @@ const UserManagement = () => {
         `/user-management/users/${userId}/column-permissions`,
         { allowedColumns }
       );
-      
+
       if (response.data.success) {
-        showToast('Column permissions updated successfully');
+        showToast("Column permissions updated successfully");
         fetchUsers();
       } else {
-        showToast(response.data.message || 'Error updating column permissions', 'error');
+        showToast(
+          response.data.message || "Error updating column permissions",
+          "error"
+        );
       }
     } catch (error) {
-      console.error('Update column permissions error:', error);
-      showToast(error.response?.data?.message || 'Error updating column permissions', 'error');
+      console.error("Update column permissions error:", error);
+      showToast(
+        error.response?.data?.message || "Error updating column permissions",
+        "error"
+      );
     }
     setColumnPermissionDialog({ open: false, user: null, localColumns: [] });
   };
@@ -395,9 +452,9 @@ const UserManagement = () => {
   };
 
   const handleUserSelection = (userId) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
+    setSelectedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
         : [...prev, userId]
     );
   };
@@ -406,15 +463,15 @@ const UserManagement = () => {
     if (selectedUsers.length === users.length) {
       setSelectedUsers([]);
     } else {
-      setSelectedUsers(users.map(user => user._id));
+      setSelectedUsers(users.map((user) => user._id));
     }
   };
 
   // Handle importer filter change
   const handleImporterChange = (event, newValue) => {
-    setSelectedImporter(newValue || 'All Importers');
-    fetchUsers(selectedIeCodes, newValue || 'All Importers', 1);
-    setPagination(prev => ({ ...prev, current_page: 1 }));
+    setSelectedImporter(newValue || "All Importers");
+    fetchUsers(selectedIeCodes, newValue || "All Importers", 1);
+    setPagination((prev) => ({ ...prev, current_page: 1 }));
   };
 
   // Handle pagination
@@ -423,52 +480,73 @@ const UserManagement = () => {
   };
 
   // Check if current user can manage other users
-  const canManageUsers = currentUser.role === 'admin' || currentUser.role === 'superadmin';
+  const canManageUsers =
+    currentUser.role === "admin" || currentUser.role === "superadmin";
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'admin': return 'warning';
-      case 'superadmin': return 'error';
-      default: return 'default';
+      case "admin":
+        return "warning";
+      case "superadmin":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   const getStatusColor = (status, isActive) => {
-    if (!isActive) return 'error';
+    if (!isActive) return "error";
     switch (status) {
-      case 'active': return 'success';
-      case 'pending': return 'warning';
-      case 'inactive': return 'error';
-      case 'suspended': return 'error';
-      default: return 'default';
+      case "active":
+        return "success";
+      case "pending":
+        return "warning";
+      case "inactive":
+        return "error";
+      case "suspended":
+        return "error";
+      default:
+        return "default";
     }
   };
 
   const formatRole = (role) => {
     switch (role) {
-      case 'admin': return 'Admin';
-      case 'superadmin': return 'Super Admin';
-      case 'user': return 'User';
-      default: return role || 'User';
+      case "admin":
+        return "Admin";
+      case "superadmin":
+        return "Super Admin";
+      case "user":
+        return "User";
+      default:
+        return role || "User";
     }
   };
 
   // Enhanced Column Permission Dialog Component
-  const ColumnPermissionDialog = ({ open, user, onClose, onSubmit, availableColumns, apiClient }) => {
+  const ColumnPermissionDialog = ({
+    open,
+    user,
+    onClose,
+    onSubmit,
+    availableColumns,
+    apiClient,
+  }) => {
     const [loading, setLoading] = useState(true);
     const [selectedColumns, setSelectedColumns] = useState([]);
 
     useEffect(() => {
       if (open && user) {
         setLoading(true);
-        apiClient.get(`/user-management/users/${user._id}/column-permissions`)
-          .then(response => {
+        apiClient
+          .get(`/user-management/users/${user._id}/column-permissions`)
+          .then((response) => {
             if (response.data.success) {
               setSelectedColumns(response.data.data.user.allowedColumns || []);
             }
           })
-          .catch(error => {
-            console.error('Error fetching permissions:', error);
+          .catch((error) => {
+            console.error("Error fetching permissions:", error);
           })
           .finally(() => {
             setLoading(false);
@@ -477,9 +555,9 @@ const UserManagement = () => {
     }, [open, user, apiClient]);
 
     const handleToggleColumn = (columnId) => {
-      setSelectedColumns(prev =>
+      setSelectedColumns((prev) =>
         prev.includes(columnId)
-          ? prev.filter(id => id !== columnId)
+          ? prev.filter((id) => id !== columnId)
           : [...prev, columnId]
       );
     };
@@ -506,7 +584,7 @@ const UserManagement = () => {
             </Box>
           ) : (
             <FormGroup>
-              {availableColumns.map(column => (
+              {availableColumns.map((column) => (
                 <FormControlLabel
                   key={column.id}
                   control={
@@ -534,11 +612,11 @@ const UserManagement = () => {
   if (loading) {
     return (
       <Container maxWidth="xl">
-        <Box 
-          display="flex" 
+        <Box
+          display="flex"
           flexDirection="column"
-          justifyContent="center" 
-          alignItems="center" 
+          justifyContent="center"
+          alignItems="center"
           minHeight="60vh"
           gap={2}
         >
@@ -557,28 +635,33 @@ const UserManagement = () => {
       <Box sx={{ mb: 2 }}>
         <BackButton />
       </Box>
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 3, 
-          mb: 3, 
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          mb: 3,
           borderRadius: 3,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white'
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          color: "white",
         }}
       >
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          justifyContent="space-between" 
-          alignItems={{ xs: 'flex-start', sm: 'center' }}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
           spacing={2}
         >
           <Box>
-            <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+            <Typography
+              variant="h4"
+              component="h1"
+              fontWeight={700}
+              gutterBottom
+            >
               User Management
             </Typography>
           </Box>
-          
+
           <Stack direction="row" spacing={2}>
             {/* Commented out bulk permissions button */}
             {/*
@@ -609,39 +692,44 @@ const UserManagement = () => {
       <Paper elevation={1} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Stack direction="row" spacing={3} alignItems="center">
           <Typography variant="h6">Filters:</Typography>
-          
+
           <Autocomplete
             value={selectedImporter}
             onChange={handleImporterChange}
             options={availableImporters}
             sx={{ minWidth: 250 }}
             renderInput={(params) => (
-              <TextField {...params} label="Filter by Importer" variant="outlined" size="small" />
+              <TextField
+                {...params}
+                label="Filter by Importer"
+                variant="outlined"
+                size="small"
+              />
             )}
           />
-          
-          <Chip 
-            label={`${pagination.total_count} users found`} 
-            color="primary" 
-            variant="outlined" 
+
+          <Chip
+            label={`${pagination.total_count} users found`}
+            color="primary"
+            variant="outlined"
           />
         </Stack>
       </Paper>
 
       {/* Enhanced Table */}
-      <Paper elevation={1} sx={{ borderRadius: 3, overflow: 'hidden' }}>
+      <Paper elevation={1} sx={{ borderRadius: 3, overflow: "hidden" }}>
         <Box sx={{ p: 3 }}>
           {/* Bulk Actions */}
           {canManageUsers && (
-            <Paper 
+            <Paper
               elevation={0}
-              sx={{ 
-                p: 2, 
-                mb: 3, 
+              sx={{
+                p: 2,
+                mb: 3,
                 borderRadius: 2,
-                bgcolor: 'grey.50',
-                border: '1px solid',
-                borderColor: 'grey.200'
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "grey.200",
               }}
             >
               {/* <Stack direction="row" alignItems="center" spacing={3}>
@@ -666,36 +754,42 @@ const UserManagement = () => {
             </Paper>
           )}
 
-          <TableContainer 
-            sx={{ 
+          <TableContainer
+            sx={{
               borderRadius: 2,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-              overflow: 'hidden'
+              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              overflow: "hidden",
             }}
           >
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                <TableRow sx={{ bgcolor: "grey.50" }}>
                   {canManageUsers && <TableCell padding="checkbox" />}
                   <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>IE Codes & Importers</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>
+                    IE Codes & Importers
+                  </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Last Login</TableCell>
-                  {canManageUsers && <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>}
+                  {canManageUsers && (
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                      Actions
+                    </TableCell>
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow 
-                    key={user._id} 
+                  <TableRow
+                    key={user._id}
                     hover
-                    sx={{ 
-                      '&:hover': { 
-                        bgcolor: 'action.hover',
-                        transform: 'translateY(-1px)',
-                        transition: 'all 0.2s ease'
-                      }
+                    sx={{
+                      "&:hover": {
+                        bgcolor: "action.hover",
+                        transform: "translateY(-1px)",
+                        transition: "all 0.2s ease",
+                      },
                     }}
                   >
                     {canManageUsers && (
@@ -708,25 +802,27 @@ const UserManagement = () => {
                     )}
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={2}>
-                        <Avatar 
-                          sx={{ 
-                            bgcolor: user.role === 'admin' ? 'warning.main' : 'primary.main',
+                        <Avatar
+                          sx={{
+                            bgcolor:
+                              user.role === "admin"
+                                ? "warning.main"
+                                : "primary.main",
                             width: 40,
-                            height: 40
+                            height: 40,
                           }}
                         >
-                          {user.role === 'admin' ? (
-                            <AdminIcon />
-                          ) : (
-                            <UserIcon />
-                          )}
+                          {user.role === "admin" ? <AdminIcon /> : <UserIcon />}
                         </Avatar>
                         <Box>
                           <Typography variant="subtitle2" fontWeight={600}>
                             {user.name}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            <EmailIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                            <EmailIcon
+                              fontSize="small"
+                              sx={{ mr: 0.5, verticalAlign: "middle" }}
+                            />
                             {user.email}
                           </Typography>
                         </Box>
@@ -743,17 +839,24 @@ const UserManagement = () => {
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <Chip
-                          label={user.isActive ? (user.status || 'Active') : 'Inactive'}
+                          label={
+                            user.isActive ? user.status || "Active" : "Inactive"
+                          }
                           color={getStatusColor(user.status, user.isActive)}
                           size="small"
                           sx={{ fontWeight: 500 }}
                         />
                         <Switch
                           checked={user.isActive}
-                          onChange={() => handleStatusUpdate(user._id, user.isActive ? 'inactive' : 'active')}
+                          onChange={() =>
+                            handleStatusUpdate(
+                              user._id,
+                              user.isActive ? "inactive" : "active"
+                            )
+                          }
                           disabled={actionLoading[user._id]}
                           size="small"
-                          inputProps={{ 'aria-label': 'toggle user status' }}
+                          inputProps={{ "aria-label": "toggle user status" }}
                           sx={{ ml: 1 }}
                         />
                       </Stack>
@@ -762,18 +865,32 @@ const UserManagement = () => {
                       <Box>
                         {user.ie_code_assignments?.length > 0 ? (
                           user.ie_code_assignments.map((assignment, index) => (
-                            <Stack key={index} direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                            <Stack
+                              key={index}
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                              sx={{ mb: 0.5 }}
+                            >
                               <BusinessIcon fontSize="small" color="action" />
-                              <Typography variant="body2" color="text.secondary">
-                                {assignment.ie_code_no}: {assignment.importer_name}
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {assignment.ie_code_no}:{" "}
+                                {assignment.importer_name}
                               </Typography>
                             </Stack>
                           ))
                         ) : (
-                          <Stack direction="row" alignItems="center" spacing={1}>
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                          >
                             <BusinessIcon fontSize="small" color="action" />
                             <Typography variant="body2" color="text.secondary">
-                              {user.ie_code_no || 'No IE Code'}
+                              {user.ie_code_no || "No IE Code"}
                             </Typography>
                           </Stack>
                         )}
@@ -783,21 +900,30 @@ const UserManagement = () => {
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <AccessTimeIcon fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                          {user.lastLogin
+                            ? new Date(user.lastLogin).toLocaleDateString()
+                            : "Never"}
                         </Typography>
                       </Stack>
                     </TableCell>
                     {canManageUsers && (
                       <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="flex-end"
+                        >
                           <Tooltip title="Column Permissions">
                             <IconButton
                               size="small"
                               onClick={() => handleColumnPermissionClick(user)}
                               color="primary"
-                              sx={{ 
+                              sx={{
                                 borderRadius: 2,
-                                '&:hover': { bgcolor: 'primary.light', color: 'white' }
+                                "&:hover": {
+                                  bgcolor: "primary.light",
+                                  color: "white",
+                                },
                               }}
                             >
                               <ColumnIcon />
@@ -806,10 +932,12 @@ const UserManagement = () => {
                           <Tooltip title="More Actions">
                             <IconButton
                               size="small"
-                              onClick={(event) => handleMenuClick(event, user._id)}
-                              sx={{ 
+                              onClick={(event) =>
+                                handleMenuClick(event, user._id)
+                              }
+                              sx={{
                                 borderRadius: 2,
-                                '&:hover': { bgcolor: 'grey.200' }
+                                "&:hover": { bgcolor: "grey.200" },
                               }}
                               id={`menu-button-${user._id}`}
                             >
@@ -827,14 +955,16 @@ const UserManagement = () => {
 
           {/* Pagination */}
           {pagination.total_pages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
               <Button
                 disabled={pagination.current_page <= 1}
-                onClick={() => handlePageChange(null, pagination.current_page - 2)}
+                onClick={() =>
+                  handlePageChange(null, pagination.current_page - 2)
+                }
               >
                 Previous
               </Button>
-              <Typography sx={{ mx: 2, alignSelf: 'center' }}>
+              <Typography sx={{ mx: 2, alignSelf: "center" }}>
                 Page {pagination.current_page} of {pagination.total_pages}
               </Typography>
               <Button
@@ -854,45 +984,61 @@ const UserManagement = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
         anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
+          vertical: "bottom",
+          horizontal: "right",
         }}
         transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
+          vertical: "top",
+          horizontal: "right",
         }}
         PaperProps={{
           elevation: 3,
           sx: {
-            overflow: 'visible',
-            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.2))',
+            overflow: "visible",
+            filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.2))",
             mt: 1.5,
           },
         }}
       >
-        {menuUserId && (() => {
-          const user = users.find(u => u._id === menuUserId);
-          if (!user) return null;
+        {menuUserId &&
+          (() => {
+            const user = users.find((u) => u._id === menuUserId);
+            if (!user) return null;
 
-          return [
-            user.role !== 'admin' ? (
-              <MenuItem key="promote" onClick={() => handlePromoteUser(menuUserId)}>
-                <ListItemIcon><PromoteIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Promote to Admin</ListItemText>
-              </MenuItem>
-            ) : (
-              <MenuItem key="demote" onClick={() => handleDemoteUser(menuUserId)}>
-                <ListItemIcon><DemoteIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Demote from Admin</ListItemText>
-              </MenuItem>
-            ),
-            <Divider key="d1" />,
-            <MenuItem key="permissions" onClick={() => handleColumnPermissionClick(user)}>
-              <ListItemIcon><ColumnIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Column Permissions</ListItemText>
-            </MenuItem>
-          ];
-        })()}
+            return [
+              user.role !== "admin" ? (
+                <MenuItem
+                  key="promote"
+                  onClick={() => handlePromoteUser(menuUserId)}
+                >
+                  <ListItemIcon>
+                    <PromoteIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Promote to Admin</ListItemText>
+                </MenuItem>
+              ) : (
+                <MenuItem
+                  key="demote"
+                  onClick={() => handleDemoteUser(menuUserId)}
+                >
+                  <ListItemIcon>
+                    <DemoteIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Demote from Admin</ListItemText>
+                </MenuItem>
+              ),
+              <Divider key="d1" />,
+              <MenuItem
+                key="permissions"
+                onClick={() => handleColumnPermissionClick(user)}
+              >
+                <ListItemIcon>
+                  <ColumnIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Column Permissions</ListItemText>
+              </MenuItem>,
+            ];
+          })()}
       </Menu>
 
       {/* All Dialogs */}
@@ -933,15 +1079,15 @@ const UserManagement = () => {
         open={toast.open}
         autoHideDuration={6000}
         onClose={handleCloseToast}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
           onClose={handleCloseToast}
           severity={toast.severity}
-          sx={{ 
-            width: '100%',
+          sx={{
+            width: "100%",
             borderRadius: 2,
-            fontWeight: 500
+            fontWeight: 500,
           }}
         >
           {toast.message}

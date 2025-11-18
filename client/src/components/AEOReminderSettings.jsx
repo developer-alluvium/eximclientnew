@@ -16,6 +16,7 @@ import {
   Chip,
   Paper,
 } from "@mui/material";
+import { getCookie } from "../utils/cookies";
 import { Settings as SettingsIcon } from "@mui/icons-material";
 
 const AEOReminderSettings = ({ open, onClose, user }) => {
@@ -37,7 +38,7 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/aeo/reminder-settings`,
         {
@@ -58,9 +59,9 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
   const updateSettings = async () => {
     setLoading(true);
     setMessage({ type: "", text: "" });
-    
+
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/aeo/reminder-settings`,
         {
@@ -72,7 +73,7 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
           body: JSON.stringify(settings),
         }
       );
-      
+
       const data = await response.json();
       if (data.success) {
         setMessage({ type: "success", text: "Settings updated successfully!" });
@@ -91,26 +92,26 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
   };
 
   const handleSliderChange = (event, newValue) => {
-    setSettings(prev => ({ ...prev, reminder_days: newValue }));
+    setSettings((prev) => ({ ...prev, reminder_days: newValue }));
   };
 
   const handleInputChange = (event) => {
     const value = Math.min(365, Math.max(1, Number(event.target.value)));
-    setSettings(prev => ({ ...prev, reminder_days: value }));
+    setSettings((prev) => ({ ...prev, reminder_days: value }));
   };
 
   const handleBlur = () => {
     if (settings.reminder_days < 1) {
-      setSettings(prev => ({ ...prev, reminder_days: 1 }));
+      setSettings((prev) => ({ ...prev, reminder_days: 1 }));
     } else if (settings.reminder_days > 365) {
-      setSettings(prev => ({ ...prev, reminder_days: 365 }));
+      setSettings((prev) => ({ ...prev, reminder_days: 365 }));
     }
   };
 
   const testReminder = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       const response = await fetch(
         `${process.env.REACT_APP_API_STRING}/aeo/test-reminder`,
         {
@@ -120,10 +121,13 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
           },
         }
       );
-      
+
       const data = await response.json();
       if (data.success) {
-        setMessage({ type: "success", text: "Test reminder sent successfully!" });
+        setMessage({
+          type: "success",
+          text: "Test reminder sent successfully!",
+        });
       } else {
         setMessage({ type: "error", text: data.message });
       }
@@ -142,7 +146,7 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
           AEO Certificate Reminder Settings
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         {message.text && (
           <Alert severity={message.type} sx={{ mb: 2 }}>
@@ -154,10 +158,12 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
           control={
             <Switch
               checked={settings.reminder_enabled}
-              onChange={(e) => setSettings(prev => ({ 
-                ...prev, 
-                reminder_enabled: e.target.checked 
-              }))}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  reminder_enabled: e.target.checked,
+                }))
+              }
               color="primary"
             />
           }
@@ -167,10 +173,8 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
 
         {settings.reminder_enabled && (
           <Box>
-            <Typography gutterBottom>
-              Remind me before expiry:
-            </Typography>
-            
+            <Typography gutterBottom>Remind me before expiry:</Typography>
+
             <Box sx={{ mb: 2 }}>
               <Slider
                 value={settings.reminder_days}
@@ -194,23 +198,24 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
                 size="small"
                 sx={{ width: 120 }}
               />
-              <Chip 
-                label={`${settings.reminder_days} days`} 
-                color="primary" 
-                variant="outlined" 
+              <Chip
+                label={`${settings.reminder_days} days`}
+                color="primary"
+                variant="outlined"
               />
             </Box>
 
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box sx={{ mt: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                <strong>Current Setting:</strong> You will receive email reminders{' '}
-                {settings.reminder_days} days before your AEO certificates expire.
+                <strong>Current Setting:</strong> You will receive email
+                reminders {settings.reminder_days} days before your AEO
+                certificates expire.
               </Typography>
             </Box>
 
             <Box sx={{ mt: 2 }}>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 onClick={testReminder}
                 disabled={loading}
                 size="small"
@@ -221,16 +226,12 @@ const AEOReminderSettings = ({ open, onClose, user }) => {
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
-        <Button 
-          onClick={updateSettings} 
-          variant="contained"
-          disabled={loading}
-        >
+        <Button onClick={updateSettings} variant="contained" disabled={loading}>
           {loading ? "Saving..." : "Save Settings"}
         </Button>
       </DialogActions>

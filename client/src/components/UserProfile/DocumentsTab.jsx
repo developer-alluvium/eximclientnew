@@ -39,6 +39,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import FileUpload from "../../utils/FileUpload";
+import { getCookie } from "../../utils/cookies";
 
 const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -105,7 +106,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
           },
           body: JSON.stringify({
             title: documentTitle,
@@ -175,7 +176,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${getCookie("access_token")}`,
           },
         }
       );

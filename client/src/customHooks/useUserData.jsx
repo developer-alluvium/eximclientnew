@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { getCookie, setJsonCookie, removeCookie } from "../utils/cookies";
+import { useNavigate } from "react-router-dom";
 
 export const useUserData = () => {
   const [userData, setUserData] = useState(null);
@@ -10,7 +11,7 @@ export const useUserData = () => {
 
   const fetchUserData = async () => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getCookie("access_token");
       if (!token) {
         navigate("/login");
         return;
@@ -22,13 +23,13 @@ export const useUserData = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-          withCredentials: true
+          withCredentials: true,
         }
       );
 
       if (response.data.success) {
         const userData = response.data.data.user;
-        localStorage.setItem("exim_user", JSON.stringify(userData));
+        setJsonCookie("exim_user", userData);
         setUserData(userData);
         return userData;
       }
@@ -53,10 +54,10 @@ export const useUserData = () => {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      localStorage.removeItem("exim_user");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("sso_token");
+      removeCookie("exim_user");
+      removeCookie("access_token");
+      removeCookie("refresh_token");
+      removeCookie("sso_token");
       navigate("/login", { replace: true });
     }
   };

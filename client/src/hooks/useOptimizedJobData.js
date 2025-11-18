@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
 
 const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
   const [jobData, setJobData] = useState([]);
@@ -9,18 +10,19 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
     currentPage: 1,
     totalPages: 0,
     total: 0,
-    limit: 50
+    limit: 50,
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [hasMore, setHasMore] = useState(true);
 
   // Get user's IE code from localStorage
   const getUserIECode = useCallback(() => {
     try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
-      if (userDataFromStorage) {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        return parsedUser?.data?.user?.ie_code_no || null;
+      const parsedUser = getJsonCookie("exim_user");
+      if (parsedUser) {
+        return (
+          parsedUser?.data?.user?.ie_code_no || parsedUser?.ie_code_no || null
+        );
       }
     } catch (error) {
       console.error("Error parsing user data:", error);
@@ -48,63 +50,70 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   // Optimized fetch function using the new backend endpoints
-  const fetchJobData = useCallback(async (page = 1, append = false) => {
-    const ieCode = getUserIECode();
-    if (!ieCode || !selectedYear) {
-      console.log('Missing IE code or selected year');
-      return;
-    }
-
-    setLoading(true);
-    if (!append) {
-      setError(null);
-    }
-
-    try {
-      let endpoint;
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: pagination.limit.toString(),
-        search: debouncedSearchQuery
-      });
-
-      if (selectedStatus === 'all') {
-        endpoint = `${process.env.REACT_APP_API_STRING}/optimized/${selectedYear}/jobs/${ieCode}/all?${params}`;
-      } else {
-        endpoint = `${process.env.REACT_APP_API_STRING}/optimized/${selectedYear}/jobs/${ieCode}/${selectedStatus}?${params}`;
+  const fetchJobData = useCallback(
+    async (page = 1, append = false) => {
+      const ieCode = getUserIECode();
+      if (!ieCode || !selectedYear) {
+        console.log("Missing IE code or selected year");
+        return;
       }
 
-      console.log('Fetching from optimized endpoint:', endpoint);
-
-      const response = await axios.get(endpoint);
-      const { data, pagination: paginationData } = response.data;
-
-      if (append) {
-        setJobData(prevData => [...prevData, ...data]);
-      } else {
-        setJobData(data);
+      setLoading(true);
+      if (!append) {
+        setError(null);
       }
 
-      setPagination(paginationData);
-      setHasMore(paginationData.currentPage < paginationData.totalPages);
+      try {
+        let endpoint;
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: pagination.limit.toString(),
+          search: debouncedSearchQuery,
+        });
 
-      console.log('Optimized fetch successful:', {
-        page: paginationData.currentPage,
-        total: paginationData.total,
-        fetched: data.length
-      });
+        if (selectedStatus === "all") {
+          endpoint = `${process.env.REACT_APP_API_STRING}/optimized/${selectedYear}/jobs/${ieCode}/all?${params}`;
+        } else {
+          endpoint = `${process.env.REACT_APP_API_STRING}/optimized/${selectedYear}/jobs/${ieCode}/${selectedStatus}?${params}`;
+        }
 
-    } catch (error) {
-      console.error('Error fetching optimized job data:', error);
-      
-      // Fallback to original API if optimized endpoint fails
-      console.log('Falling back to original API...');
-      await fetchJobDataFallback();
-      
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedYear, selectedStatus, debouncedSearchQuery, pagination.limit, getUserIECode]);
+        console.log("Fetching from optimized endpoint:", endpoint);
+
+        const response = await axios.get(endpoint);
+        const { data, pagination: paginationData } = response.data;
+
+        if (append) {
+          setJobData((prevData) => [...prevData, ...data]);
+        } else {
+          setJobData(data);
+        }
+
+        setPagination(paginationData);
+        setHasMore(paginationData.currentPage < paginationData.totalPages);
+
+        console.log("Optimized fetch successful:", {
+          page: paginationData.currentPage,
+          total: paginationData.total,
+          fetched: data.length,
+        });
+      } catch (error) {
+        console.error("Error fetching optimized job data:", error);
+
+        // Fallback to original API if optimized endpoint fails
+        console.log("Falling back to original API...");
+        await fetchJobDataFallback();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      selectedYear,
+      selectedStatus,
+      debouncedSearchQuery,
+      pagination.limit,
+      getUserIECode,
+    ]
+  );
 
   // Fallback to original API structure
   const fetchJobDataFallback = useCallback(async () => {
@@ -115,18 +124,25 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
 
     try {
       let allJobs = [];
-      
-      if (selectedStatus === 'all') {
-        const [pendingResponse, completedResponse, cancelledResponse] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/pending/all/all?limit=1000`),
-          axios.get(`${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/completed/all/all?limit=1000`),
-          axios.get(`${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/cancelled/all/all?limit=1000`)
-        ]);
-        
+
+      if (selectedStatus === "all") {
+        const [pendingResponse, completedResponse, cancelledResponse] =
+          await Promise.all([
+            axios.get(
+              `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/pending/all/all?limit=1000`
+            ),
+            axios.get(
+              `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/completed/all/all?limit=1000`
+            ),
+            axios.get(
+              `${process.env.REACT_APP_API_STRING}/${selectedYear}/jobs/cancelled/all/all?limit=1000`
+            ),
+          ]);
+
         allJobs = [
           ...(pendingResponse.data.data || []),
           ...(completedResponse.data.data || []),
-          ...(cancelledResponse.data.data || [])
+          ...(cancelledResponse.data.data || []),
         ];
       } else {
         const response = await axios.get(
@@ -136,32 +152,32 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
       }
 
       // Filter by IE code and search query
-      let userJobs = allJobs.filter(job => job.ie_code_no == ieCode);
-      
+      let userJobs = allJobs.filter((job) => job.ie_code_no == ieCode);
+
       if (debouncedSearchQuery) {
         const searchLower = debouncedSearchQuery.toLowerCase();
-        userJobs = userJobs.filter(job => 
-          job.job_no?.toLowerCase().includes(searchLower) ||
-          job.supplier_exporter?.toLowerCase().includes(searchLower) ||
-          job.importer?.toLowerCase().includes(searchLower) ||
-          job.custom_house?.toLowerCase().includes(searchLower) ||
-          job.awb_bl_no?.toLowerCase().includes(searchLower) ||
-          job.origin_country?.toLowerCase().includes(searchLower) ||
-          job.description?.toLowerCase().includes(searchLower)
+        userJobs = userJobs.filter(
+          (job) =>
+            job.job_no?.toLowerCase().includes(searchLower) ||
+            job.supplier_exporter?.toLowerCase().includes(searchLower) ||
+            job.importer?.toLowerCase().includes(searchLower) ||
+            job.custom_house?.toLowerCase().includes(searchLower) ||
+            job.awb_bl_no?.toLowerCase().includes(searchLower) ||
+            job.origin_country?.toLowerCase().includes(searchLower) ||
+            job.description?.toLowerCase().includes(searchLower)
         );
       }
-      
+
       setJobData(userJobs);
       setPagination({
         currentPage: 1,
         totalPages: 1,
         total: userJobs.length,
-        limit: userJobs.length
+        limit: userJobs.length,
       });
       setHasMore(false);
-      
     } catch (error) {
-      setError('Failed to fetch job data');
+      setError("Failed to fetch job data");
     }
   }, [selectedYear, selectedStatus, debouncedSearchQuery, getUserIECode]);
 
@@ -175,7 +191,7 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
   // Reset and fetch data when dependencies change
   useEffect(() => {
     setJobData([]);
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
     setHasMore(true);
     fetchJobData(1, false);
   }, [selectedYear, selectedStatus, debouncedSearchQuery]);
@@ -193,7 +209,7 @@ const useOptimizedJobData = (selectedYear, selectedStatus, userId) => {
     hasMore,
     loadMore,
     handleSearch,
-    searchQuery
+    searchQuery,
   };
 };
 

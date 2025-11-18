@@ -7,6 +7,7 @@ import Button from "@mui/material/Button";
 import JobList from "./CJobList";
 import ContainerSummaryModal from "./ContainerSummaryModal";
 import { useImportersContext } from "../context/importersContext";
+import { getJsonCookie } from "../utils/cookies";
 import Typography from "@mui/material/Typography";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney"; // Added for new button
@@ -44,24 +45,17 @@ function a11yProps(index) {
 function CJobTabs({ gandhidham = false }) {
   const [value, setValue] = React.useState(0);
   const [containerSummaryOpen, setContainerSummaryOpen] = React.useState(false);
-  
+
   // --- New State for Currency Dialog ---
   const [currencyDialogOpen, setCurrencyDialogOpen] = React.useState(false);
-  
+
   const { importers } = React.useContext(useImportersContext) || {};
   const [userImporterName, setUserImporterName] = React.useState(null);
 
   React.useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
-    if (userDataFromStorage) {
-      try {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        if (parsedUser && parsedUser.name) {
-          setUserImporterName(parsedUser.name);
-        }
-      } catch (e) {
-        console.error("Error parsing user data from storage:", e);
-      }
+    const parsedUser = getJsonCookie("exim_user");
+    if (parsedUser && parsedUser.name) {
+      setUserImporterName(parsedUser.name);
     }
   }, []);
 
@@ -88,21 +82,30 @@ function CJobTabs({ gandhidham = false }) {
 
   return (
     <Box sx={{ width: "100%" }}>
-      <Box sx={{ borderBottom: 1, borderColor: "divider", display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '-16px' }}>
+      <Box
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: "-16px",
+        }}
+      >
         <Tabs
           value={value}
           onChange={handleChange}
           aria-label="basic tabs example"
         >
           [
-            <Tab label="Pending" {...a11yProps(0)} key={0} />,
-            <Tab label="Completed" {...a11yProps(1)} key={1} />,
-            <Tab label="Cancelled" {...a11yProps(2)} key={2} />
+          <Tab label="Pending" {...a11yProps(0)} key={0} />,
+          <Tab label="Completed" {...a11yProps(1)} key={1} />,
+          <Tab label="Cancelled" {...a11yProps(2)} key={2} />
           ,]
         </Tabs>
 
         {/* --- Grouped Buttons --- */}
-        <Box sx={{ display: 'flex', gap: 2, mr: 2 }}>
+        <Box sx={{ display: "flex", gap: 2, mr: 2 }}>
           {/* New Currency Rate Dialog Button */}
           <Button
             variant="contained"
@@ -110,15 +113,15 @@ function CJobTabs({ gandhidham = false }) {
             startIcon={<AttachMoneyIcon />}
             onClick={handleCurrencyDialogOpen}
             sx={{
-              textTransform: 'none',
-              fontWeight: 'bold',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
-              '&:hover': {
-                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)',
-                transform: 'translateY(-1px)',
+              textTransform: "none",
+              fontWeight: "bold",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(25, 118, 210, 0.3)",
+              "&:hover": {
+                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.4)",
+                transform: "translateY(-1px)",
               },
-              transition: 'all 0.2s ease-in-out'
+              transition: "all 0.2s ease-in-out",
             }}
           >
             Currency Rates
@@ -132,15 +135,15 @@ function CJobTabs({ gandhidham = false }) {
             onClick={handleContainerSummaryOpen}
             sx={{
               // mr: 2, // Removed mr, using gap on parent Box now
-              textTransform: 'none',
-              fontWeight: 'bold',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
-              '&:hover': {
-                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)',
-                transform: 'translateY(-1px)',
+              textTransform: "none",
+              fontWeight: "bold",
+              borderRadius: "8px",
+              boxShadow: "0 2px 8px rgba(25, 118, 210, 0.3)",
+              "&:hover": {
+                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.4)",
+                transform: "translateY(-1px)",
               },
-              transition: 'all 0.2s ease-in-out'
+              transition: "all 0.2s ease-in-out",
             }}
           >
             Container Summary
@@ -167,10 +170,10 @@ function CJobTabs({ gandhidham = false }) {
       </CustomTabPanel>
 
       {/* Container Summary Modal */}
-      <ContainerSummaryModal 
+      <ContainerSummaryModal
         open={containerSummaryOpen}
         onClose={handleContainerSummaryClose}
-        gandhidham={gandhidham} 
+        gandhidham={gandhidham}
       />
 
       {/* --- New Currency Rate Dialog --- */}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Box,
   Typography,
@@ -18,7 +18,8 @@ import {
   MenuItem,
   CircularProgress,
   Alert,
-} from '@mui/material';
+} from "@mui/material";
+import { getCookie } from "../../utils/cookies";
 import {
   Analytics,
   TrendingUp,
@@ -28,7 +29,7 @@ import {
   Timeline,
   Refresh,
   DateRange,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 import {
   LineChart,
   Line,
@@ -45,26 +46,38 @@ import {
   Legend,
   AreaChart,
   Area,
-} from 'recharts';
+} from "recharts";
 
-const COLORS = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
+const COLORS = [
+  "#667eea",
+  "#764ba2",
+  "#f093fb",
+  "#f5576c",
+  "#4facfe",
+  "#00f2fe",
+];
 
 const MetricCard = ({ title, value, change, changeType, icon, color }) => {
   const theme = useTheme();
-  const isPositive = changeType === 'positive';
+  const isPositive = changeType === "positive";
 
   return (
-    <Card sx={{ borderRadius: 3, height: '100%' }}>
+    <Card sx={{ borderRadius: 3, height: "100%" }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Avatar sx={{ bgcolor: alpha(color, 0.1), color }}>
-            {icon}
-          </Avatar>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            mb: 2,
+          }}
+        >
+          <Avatar sx={{ bgcolor: alpha(color, 0.1), color }}>{icon}</Avatar>
           <Chip
             icon={isPositive ? <TrendingUp /> : <TrendingDown />}
             label={`${change}%`}
             size="small"
-            color={isPositive ? 'success' : 'error'}
+            color={isPositive ? "success" : "error"}
             variant="outlined"
           />
         </Box>
@@ -82,7 +95,7 @@ const MetricCard = ({ title, value, change, changeType, icon, color }) => {
 const SystemAnalytics = ({ data }) => {
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
-  const [timeRange, setTimeRange] = useState('7d');
+  const [timeRange, setTimeRange] = useState("7d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
@@ -90,11 +103,11 @@ const SystemAnalytics = ({ data }) => {
 
   // Get SuperAdmin token for API requests
   const getSuperAdminHeaders = () => {
-    const token = localStorage.getItem("superadmin_token");
+    const token = getCookie("superadmin_token");
     return {
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       withCredentials: true,
     };
@@ -114,7 +127,7 @@ const SystemAnalytics = ({ data }) => {
         axios.get(
           `${process.env.REACT_APP_API_STRING}/dashboard/historical?timeRange=${timeRange}`,
           getSuperAdminHeaders()
-        )
+        ),
       ]);
 
       if (analyticsResponse.data.success) {
@@ -125,8 +138,8 @@ const SystemAnalytics = ({ data }) => {
         setHistoricalData(historicalResponse.data.data);
       }
     } catch (err) {
-      console.error('Error fetching analytics data:', err);
-      setError('Failed to load analytics data. Please check your permissions.');
+      console.error("Error fetching analytics data:", err);
+      setError("Failed to load analytics data. Please check your permissions.");
     } finally {
       setLoading(false);
     }
@@ -145,9 +158,18 @@ const SystemAnalytics = ({ data }) => {
   // Show loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
         <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ ml: 2 }}>Loading analytics...</Typography>
+        <Typography variant="h6" sx={{ ml: 2 }}>
+          Loading analytics...
+        </Typography>
       </Box>
     );
   }
@@ -167,60 +189,66 @@ const SystemAnalytics = ({ data }) => {
   }
 
   // Prepare metrics from real data
-  const metrics = analyticsData ? [
-    {
-      title: 'Total Users',
-      value: analyticsData.users.total.toLocaleString(),
-      change: analyticsData.users.growthTrend,
-      changeType: 'positive',
-      icon: <People />,
-      color: theme.palette.primary.main,
-    },
-    {
-      title: 'Active Sessions',
-      value: analyticsData.users.recentLogins.toLocaleString(),
-      change: analyticsData.activity.trend,
-      changeType: 'positive',
-      icon: <Timeline />,
-      color: theme.palette.success.main,
-    },
-    {
-      title: 'System Uptime',
-      value: analyticsData.system.uptimePercent + '%',
-      change: 0.1,
-      changeType: 'positive',
-      icon: <Security />,
-      color: theme.palette.warning.main,
-    },
-    {
-      title: 'Error Rate',
-      value: (analyticsData.system.errorRate * 100).toFixed(3) + '%',
-      change: -15.3,
-      changeType: 'positive',
-      icon: <Analytics />,
-      color: theme.palette.error.main,
-    },
-  ] : [];
+  const metrics = analyticsData
+    ? [
+        {
+          title: "Total Users",
+          value: analyticsData.users.total.toLocaleString(),
+          change: analyticsData.users.growthTrend,
+          changeType: "positive",
+          icon: <People />,
+          color: theme.palette.primary.main,
+        },
+        {
+          title: "Active Sessions",
+          value: analyticsData.users.recentLogins.toLocaleString(),
+          change: analyticsData.activity.trend,
+          changeType: "positive",
+          icon: <Timeline />,
+          color: theme.palette.success.main,
+        },
+        {
+          title: "System Uptime",
+          value: analyticsData.system.uptimePercent + "%",
+          change: 0.1,
+          changeType: "positive",
+          icon: <Security />,
+          color: theme.palette.warning.main,
+        },
+        {
+          title: "Error Rate",
+          value: (analyticsData.system.errorRate * 100).toFixed(3) + "%",
+          change: -15.3,
+          changeType: "positive",
+          icon: <Analytics />,
+          color: theme.palette.error.main,
+        },
+      ]
+    : [];
 
   // Use historical data or fallback to mock data
   const userGrowthData = historicalData?.userGrowth || [];
   const activityData = historicalData?.activity || [];
-  
+
   // Transform system health data for pie chart
-  const systemHealthData = analyticsData ? [
-    { name: 'CPU Usage', value: Math.floor(Math.random() * 20) + 25 },
-    { name: 'Memory', value: analyticsData.system.memory.percentage },
-    { name: 'Storage', value: 20 },
-    { name: 'Network', value: 5 },
-  ] : [];
+  const systemHealthData = analyticsData
+    ? [
+        { name: "CPU Usage", value: Math.floor(Math.random() * 20) + 25 },
+        { name: "Memory", value: analyticsData.system.memory.percentage },
+        { name: "Storage", value: 20 },
+        { name: "Network", value: 5 },
+      ]
+    : [];
 
   // Customer distribution mock data (you can enhance this with real data)
-  const customerTypeData = analyticsData ? [
-    { name: 'Active', value: analyticsData.users.active },
-    { name: 'Inactive', value: analyticsData.users.inactive },
-    { name: 'Recent', value: analyticsData.users.newRegistrations },
-    { name: 'Total Jobs', value: Math.floor(analyticsData.jobs.total / 4) },
-  ] : [];
+  const customerTypeData = analyticsData
+    ? [
+        { name: "Active", value: analyticsData.users.active },
+        { name: "Inactive", value: analyticsData.users.inactive },
+        { name: "Recent", value: analyticsData.users.newRegistrations },
+        { name: "Total Jobs", value: Math.floor(analyticsData.jobs.total / 4) },
+      ]
+    : [];
 
   const renderChart = () => {
     switch (activeTab) {
@@ -228,7 +256,7 @@ const SystemAnalytics = ({ data }) => {
         return (
           <Grid container spacing={3}>
             <Grid item xs={12} lg={8}>
-              <Card sx={{ borderRadius: 3, height: '400px' }}>
+              <Card sx={{ borderRadius: 3, height: "400px" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                     User Growth Trends
@@ -261,7 +289,7 @@ const SystemAnalytics = ({ data }) => {
               </Card>
             </Grid>
             <Grid item xs={12} lg={4}>
-              <Card sx={{ borderRadius: 3, height: '400px' }}>
+              <Card sx={{ borderRadius: 3, height: "400px" }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                     Customer Distribution
@@ -276,10 +304,15 @@ const SystemAnalytics = ({ data }) => {
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
                       >
                         {customerTypeData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
                         ))}
                       </Pie>
                       <Tooltip />
@@ -292,7 +325,7 @@ const SystemAnalytics = ({ data }) => {
         );
       case 1:
         return (
-          <Card sx={{ borderRadius: 3, height: '400px' }}>
+          <Card sx={{ borderRadius: 3, height: "400px" }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                 Daily Activity
@@ -312,7 +345,7 @@ const SystemAnalytics = ({ data }) => {
         );
       case 2:
         return (
-          <Card sx={{ borderRadius: 3, height: '400px' }}>
+          <Card sx={{ borderRadius: 3, height: "400px" }}>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
                 System Resources
@@ -330,7 +363,10 @@ const SystemAnalytics = ({ data }) => {
                     label={({ name, value }) => `${name}: ${value}%`}
                   >
                     {systemHealthData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -348,7 +384,14 @@ const SystemAnalytics = ({ data }) => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 4,
+        }}
+      >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             System Analytics
@@ -357,12 +400,14 @@ const SystemAnalytics = ({ data }) => {
             Monitor system performance, user activity, and business metrics.
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
           <FormControl size="small">
             <Select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              startAdornment={<DateRange sx={{ mr: 1, color: 'text.secondary' }} />}
+              startAdornment={
+                <DateRange sx={{ mr: 1, color: "text.secondary" }} />
+              }
             >
               <MenuItem value="1d">Last 24 Hours</MenuItem>
               <MenuItem value="7d">Last 7 Days</MenuItem>
@@ -374,8 +419,8 @@ const SystemAnalytics = ({ data }) => {
             onClick={handleRefresh}
             sx={{
               bgcolor: theme.palette.primary.main,
-              color: 'white',
-              '&:hover': {
+              color: "white",
+              "&:hover": {
                 bgcolor: theme.palette.primary.dark,
               },
             }}
@@ -397,7 +442,7 @@ const SystemAnalytics = ({ data }) => {
       {/* Charts Section */}
       <Card sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: 0 }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs
               value={activeTab}
               onChange={(e, newValue) => setActiveTab(newValue)}
@@ -408,9 +453,7 @@ const SystemAnalytics = ({ data }) => {
               <Tab label="System Health" />
             </Tabs>
           </Box>
-          <Box sx={{ p: 3 }}>
-            {renderChart()}
-          </Box>
+          <Box sx={{ p: 3 }}>{renderChart()}</Box>
         </CardContent>
       </Card>
     </Box>

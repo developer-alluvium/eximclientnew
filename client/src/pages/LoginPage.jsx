@@ -1,5 +1,6 @@
 import React, { useState, useContext, useEffect } from "react";
 import axios from "axios";
+import { setJsonCookie, setCookie } from "../utils/cookies";
 import { Container, Row, Col } from "react-bootstrap";
 import {
   TextField,
@@ -75,12 +76,9 @@ function LoginPage() {
       if (res.data.success) {
         if (isSuperAdminLogin) {
           // Handle SuperAdmin successful login
-          localStorage.setItem("superadmin_token", res.data.token);
-          localStorage.setItem("user_access_token", res.data.token);
-          localStorage.setItem(
-            "superadmin_user",
-            JSON.stringify(res.data.superAdmin)
-          );
+          setCookie("superadmin_token", res.data.token, 7);
+          setCookie("user_access_token", res.data.token, 7);
+          setJsonCookie("superadmin_user", res.data.superAdmin, 7);
           navigate("/superadmin-dashboard", { replace: true });
         } else {
           // Handle User successful login
@@ -96,9 +94,9 @@ function LoginPage() {
             return;
           }
 
-          localStorage.setItem("exim_user", JSON.stringify(userData));
-          localStorage.setItem("access_token", accessToken);
-          localStorage.setItem("refresh_token", refreshToken);
+          setJsonCookie("exim_user", userData, 7);
+          setCookie("access_token", accessToken, 7);
+          setCookie("refresh_token", refreshToken, 7);
 
           setUser(userData);
           navigate("/", { replace: true });

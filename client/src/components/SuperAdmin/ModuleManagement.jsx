@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -31,7 +31,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Settings,
   Person,
@@ -50,8 +50,9 @@ import {
   Extension,
   Group,
   Refresh,
-} from '@mui/icons-material';
-import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
+} from "@mui/icons-material";
+import { useSuperAdminApi } from "../../hooks/useSuperAdminApi";
+import { getJsonCookie } from "../../utils/cookies";
 // import { forceRefreshUserModules } from '../../utils/moduleAccess';
 
 const ModuleManagement = () => {
@@ -69,14 +70,17 @@ const ModuleManagement = () => {
   const [availableModules, setAvailableModules] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [tempModuleAssignments, setTempModuleAssignments] = useState([]);
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
   const [bulkSelectedCustomers, setBulkSelectedCustomers] = useState([]);
-  const [notification, setNotification] = useState({ message: '', type: 'success' });
+  const [notification, setNotification] = useState({
+    message: "",
+    type: "success",
+  });
 
   useEffect(() => {
     loadData();
@@ -89,18 +93,17 @@ const ModuleManagement = () => {
   const loadData = async () => {
     try {
       setError(null);
-      
+
       // Load available modules
       const modulesResponse = await getAvailableModules();
       setAvailableModules(modulesResponse.data || []);
-      
+
       // Load customers with their module assignments
       const customersResponse = await getAllCustomersWithModules();
       setCustomers(customersResponse.data || []);
-      
     } catch (error) {
-      console.error('Error loading data:', error);
-      setError('Failed to load module management data');
+      console.error("Error loading data:", error);
+      setError("Failed to load module management data");
     }
   };
 
@@ -110,16 +113,17 @@ const ModuleManagement = () => {
       return;
     }
 
-    const filtered = customers.filter(customer =>
-      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.ie_code_no?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filtered = customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.ie_code_no?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredCustomers(filtered);
   };
 
-  const showNotification = (message, type = 'success') => {
+  const showNotification = (message, type = "success") => {
     setNotification({ message, type });
-    setTimeout(() => setNotification({ message: '', type: 'success' }), 3000);
+    setTimeout(() => setNotification({ message: "", type: "success" }), 3000);
   };
 
   const handleEditCustomer = (customer) => {
@@ -130,31 +134,36 @@ const ModuleManagement = () => {
   const handleSaveCustomerModules = async () => {
     try {
       setError(null);
-      await updateCustomerModuleAssignments(editingCustomer._id, tempModuleAssignments);
-      
+      await updateCustomerModuleAssignments(
+        editingCustomer._id,
+        tempModuleAssignments
+      );
+
       // Update local state
-      setCustomers(prev => prev.map(c => 
-        c._id === editingCustomer._id 
-          ? { ...c, assignedModules: tempModuleAssignments }
-          : c
-      ));
-      
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c._id === editingCustomer._id
+            ? { ...c, assignedModules: tempModuleAssignments }
+            : c
+        )
+      );
+
       // Refresh user data in localStorage if this is the current user
-      const currentUser = localStorage.getItem("exim_user");
+      const currentUser = getJsonCookie("exim_user");
       if (currentUser) {
-        const userData = JSON.parse(currentUser);
+        const userData = currentUser;
         const currentUserId = userData.id || userData.data?.user?.id;
         // if (currentUserId === editingCustomer._id) {
         //   await forceRefreshUserModules();
         // }
       }
-      
+
       setEditingCustomer(null);
       setTempModuleAssignments([]);
-      showNotification('Module assignments updated successfully');
+      showNotification("Module assignments updated successfully");
     } catch (error) {
-      console.error('Error updating module assignments:', error);
-      setError('Failed to update module assignments');
+      console.error("Error updating module assignments:", error);
+      setError("Failed to update module assignments");
     }
   };
 
@@ -165,9 +174,9 @@ const ModuleManagement = () => {
   };
 
   const handleModuleToggle = (moduleId) => {
-    setTempModuleAssignments(prev => 
-      prev.includes(moduleId) 
-        ? prev.filter(id => id !== moduleId)
+    setTempModuleAssignments((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((id) => id !== moduleId)
         : [...prev, moduleId]
     );
   };
@@ -175,67 +184,76 @@ const ModuleManagement = () => {
   const handleBulkAssign = async () => {
     try {
       setError(null);
-      
-      const assignments = bulkSelectedCustomers.map(customerId => ({
+
+      const assignments = bulkSelectedCustomers.map((customerId) => ({
         customerId,
-        moduleIds: bulkSelectedModules
+        moduleIds: bulkSelectedModules,
       }));
-      
+
       await bulkAssignModules({ assignments });
-      
+
       // Check if any of the bulk assigned customers is the current user
-      const currentUser = localStorage.getItem("exim_user");
+      const currentUser = getJsonCookie("exim_user");
       if (currentUser) {
-        const userData = JSON.parse(currentUser);
+        const userData = currentUser;
         const currentUserId = userData.id || userData.data?.user?.id;
         // if (bulkSelectedCustomers.includes(currentUserId)) {
         //   await forceRefreshUserModules();
         // }
       }
-      
+
       // Refresh data
       await loadData();
-      
+
       setBulkSelectedModules([]);
       setBulkSelectedCustomers([]);
       setShowBulkAssign(false);
-      showNotification(`Bulk assigned modules to ${bulkSelectedCustomers.length} customers`);
+      showNotification(
+        `Bulk assigned modules to ${bulkSelectedCustomers.length} customers`
+      );
     } catch (error) {
-      console.error('Error with bulk assignment:', error);
-      setError('Failed to perform bulk assignment');
+      console.error("Error with bulk assignment:", error);
+      setError("Failed to perform bulk assignment");
     }
   };
 
   const getModuleIcon = (moduleId) => {
-    if (moduleId.includes('importdsr')) return <Assignment />;
-    if (moduleId.includes('netpage')) return <Business />;
-    if (moduleId.includes('snapcheck')) return <CheckCircle />;
-    if (moduleId.includes('qrlocker')) return <Lock />;
-    if (moduleId.includes('task-flow')) return <Settings />;
+    if (moduleId.includes("importdsr")) return <Assignment />;
+    if (moduleId.includes("netpage")) return <Business />;
+    if (moduleId.includes("snapcheck")) return <CheckCircle />;
+    if (moduleId.includes("qrlocker")) return <Lock />;
+    if (moduleId.includes("task-flow")) return <Settings />;
     return <Extension />;
   };
 
   const getModuleCategoryColor = (category) => {
     switch (category) {
-      case 'core': return 'primary';
-      case 'beta': return 'warning';
-      default: return 'default';
+      case "core":
+        return "primary";
+      case "beta":
+        return "warning";
+      default:
+        return "default";
     }
   };
 
   const getModuleStats = () => {
-    const totalAssignments = customers.reduce((sum, customer) => 
-      sum + (customer.assignedModules?.length || 0), 0
+    const totalAssignments = customers.reduce(
+      (sum, customer) => sum + (customer.assignedModules?.length || 0),
+      0
     );
-    const averageModulesPerCustomer = customers.length > 0 
-      ? Math.round(totalAssignments / customers.length * 10) / 10 
-      : 0;
-    
+    const averageModulesPerCustomer =
+      customers.length > 0
+        ? Math.round((totalAssignments / customers.length) * 10) / 10
+        : 0;
+
     return {
       totalModules: availableModules.length,
       totalAssignments,
       averageModulesPerCustomer,
-      customersWithModules: customers.filter(c => c.assignedModules?.length > 0).length
+      customersWithModules: customers.filter(
+        (c) => c.assignedModules?.length > 0
+      ).length,
     };
   };
 
@@ -243,7 +261,7 @@ const ModuleManagement = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
         <CircularProgress />
       </Box>
     );
@@ -252,7 +270,14 @@ const ModuleManagement = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 4,
+        }}
+      >
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             Module Management
@@ -261,7 +286,7 @@ const ModuleManagement = () => {
             Manage customer access to different modules and features
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: "flex", gap: 2 }}>
           <Button
             variant="outlined"
             startIcon={<Group />}
@@ -283,8 +308,8 @@ const ModuleManagement = () => {
 
       {/* Error Display */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           sx={{ mb: 3, borderRadius: 2 }}
           onClose={() => setError(null)}
         >
@@ -294,10 +319,10 @@ const ModuleManagement = () => {
 
       {/* Success Notification */}
       {notification.message && (
-        <Alert 
+        <Alert
           severity={notification.type}
           sx={{ mb: 3, borderRadius: 2 }}
-          onClose={() => setNotification({ message: '', type: 'success' })}
+          onClose={() => setNotification({ message: "", type: "success" })}
         >
           {notification.message}
         </Alert>
@@ -308,7 +333,13 @@ const ModuleManagement = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {stats.totalModules}
@@ -317,7 +348,12 @@ const ModuleManagement = () => {
                     Available Modules
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                    color: "primary.main",
+                  }}
+                >
                   <Extension />
                 </Avatar>
               </Box>
@@ -327,7 +363,13 @@ const ModuleManagement = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {stats.totalAssignments}
@@ -336,7 +378,12 @@ const ModuleManagement = () => {
                     Total Assignments
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: 'success.main' }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(theme.palette.success.main, 0.1),
+                    color: "success.main",
+                  }}
+                >
                   <Assignment />
                 </Avatar>
               </Box>
@@ -346,7 +393,13 @@ const ModuleManagement = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {stats.averageModulesPerCustomer}
@@ -355,7 +408,12 @@ const ModuleManagement = () => {
                     Avg per Customer
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1), color: 'info.main' }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                    color: "info.main",
+                  }}
+                >
                   <Person />
                 </Avatar>
               </Box>
@@ -365,7 +423,13 @@ const ModuleManagement = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ borderRadius: 3 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
                 <Box>
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {stats.customersWithModules}
@@ -374,7 +438,12 @@ const ModuleManagement = () => {
                     Customers w/ Modules
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: 'warning.main' }}>
+                <Avatar
+                  sx={{
+                    bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    color: "warning.main",
+                  }}
+                >
                   <Security />
                 </Avatar>
               </Box>
@@ -387,7 +456,7 @@ const ModuleManagement = () => {
       <Card sx={{ borderRadius: 3 }}>
         <CardContent sx={{ p: 0 }}>
           {/* Search Controls */}
-          <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ p: 3, borderBottom: 1, borderColor: "divider" }}>
             <TextField
               fullWidth
               placeholder="Search customers..."
@@ -411,7 +480,9 @@ const ModuleManagement = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Assigned Modules</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>
+                    Assigned Modules
+                  </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -419,30 +490,35 @@ const ModuleManagement = () => {
                 {filteredCustomers.map((customer) => (
                   <TableRow key={customer._id} hover>
                     <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                          {customer.name?.charAt(0) || 'C'}
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Avatar sx={{ mr: 2, bgcolor: "primary.main" }}>
+                          {customer.name?.charAt(0) || "C"}
                         </Avatar>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {customer.name || 'N/A'}
+                            {customer.name || "N/A"}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {customer.isActive ? 'Active' : 'Inactive'}
+                            {customer.isActive ? "Active" : "Inactive"}
                           </Typography>
                         </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontFamily: "monospace", fontWeight: 600 }}
+                      >
                         {customer.ie_code_no}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                         {customer.assignedModules?.length > 0 ? (
                           customer.assignedModules.map((moduleId) => {
-                            const module = availableModules.find(m => m.id === moduleId);
+                            const module = availableModules.find(
+                              (m) => m.id === moduleId
+                            );
                             return (
                               <Chip
                                 key={moduleId}
@@ -479,8 +555,8 @@ const ModuleManagement = () => {
       </Card>
 
       {/* Edit Customer Modules Dialog */}
-      <Dialog 
-        open={!!editingCustomer} 
+      <Dialog
+        open={!!editingCustomer}
         onClose={handleCancelEdit}
         maxWidth="md"
         fullWidth
@@ -503,7 +579,9 @@ const ModuleManagement = () => {
                       />
                     }
                     label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
                         {getModuleIcon(module.id)}
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -523,34 +601,35 @@ const ModuleManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelEdit}>Cancel</Button>
-          <Button 
+          <Button
             onClick={handleSaveCustomerModules}
             variant="contained"
             disabled={loading}
           >
-            {loading ? 'Saving...' : 'Save Changes'}
+            {loading ? "Saving..." : "Save Changes"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Bulk Assignment Dialog */}
-      <Dialog 
-        open={showBulkAssign} 
+      <Dialog
+        open={showBulkAssign}
         onClose={() => setShowBulkAssign(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          Bulk Assign Modules
-        </DialogTitle>
+        <DialogTitle>Bulk Assign Modules</DialogTitle>
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Select modules and customers to assign them to multiple customers at once.
+            Select modules and customers to assign them to multiple customers at
+            once.
           </Alert>
-          
+
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMore />}>
-              <Typography>Select Modules ({bulkSelectedModules.length} selected)</Typography>
+              <Typography>
+                Select Modules ({bulkSelectedModules.length} selected)
+              </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={1}>
@@ -562,15 +641,22 @@ const ModuleManagement = () => {
                           checked={bulkSelectedModules.includes(module.id)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setBulkSelectedModules(prev => [...prev, module.id]);
+                              setBulkSelectedModules((prev) => [
+                                ...prev,
+                                module.id,
+                              ]);
                             } else {
-                              setBulkSelectedModules(prev => prev.filter(id => id !== module.id));
+                              setBulkSelectedModules((prev) =>
+                                prev.filter((id) => id !== module.id)
+                              );
                             }
                           }}
                         />
                       }
                       label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           {getModuleIcon(module.id)}
                           <Typography variant="body2">{module.name}</Typography>
                         </Box>
@@ -584,7 +670,9 @@ const ModuleManagement = () => {
 
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMore />}>
-              <Typography>Select Customers ({bulkSelectedCustomers.length} selected)</Typography>
+              <Typography>
+                Select Customers ({bulkSelectedCustomers.length} selected)
+              </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={1}>
@@ -596,19 +684,35 @@ const ModuleManagement = () => {
                           checked={bulkSelectedCustomers.includes(customer._id)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setBulkSelectedCustomers(prev => [...prev, customer._id]);
+                              setBulkSelectedCustomers((prev) => [
+                                ...prev,
+                                customer._id,
+                              ]);
                             } else {
-                              setBulkSelectedCustomers(prev => prev.filter(id => id !== customer._id));
+                              setBulkSelectedCustomers((prev) =>
+                                prev.filter((id) => id !== customer._id)
+                              );
                             }
                           }}
                         />
                       }
                       label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
-                            {customer.name?.charAt(0) || 'C'}
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Avatar
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              bgcolor: "primary.main",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            {customer.name?.charAt(0) || "C"}
                           </Avatar>
-                          <Typography variant="body2">{customer.name} ({customer.ie_code_no})</Typography>
+                          <Typography variant="body2">
+                            {customer.name} ({customer.ie_code_no})
+                          </Typography>
                         </Box>
                       }
                     />
@@ -620,12 +724,16 @@ const ModuleManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowBulkAssign(false)}>Cancel</Button>
-          <Button 
+          <Button
             onClick={handleBulkAssign}
             variant="contained"
-            disabled={bulkSelectedModules.length === 0 || bulkSelectedCustomers.length === 0 || loading}
+            disabled={
+              bulkSelectedModules.length === 0 ||
+              bulkSelectedCustomers.length === 0 ||
+              loading
+            }
           >
-            {loading ? 'Assigning...' : 'Assign Modules'}
+            {loading ? "Assigning..." : "Assign Modules"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,18 +1,13 @@
 import React, { createContext, useState, useEffect } from "react";
 import axios from "axios";
+import { getJsonCookie, setJsonCookie, removeCookie } from "../utils/cookies";
 
 export const UserContext = createContext(null);
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem("exim_user");
-    try {
-      return storedUser ? JSON.parse(storedUser) : null;
-    } catch (error) {
-      console.error("Failed to parse stored user data:", error);
-      localStorage.removeItem("exim_user"); // Remove corrupt data
-      return null;
-    }
+    const storedUser = getJsonCookie("exim_user");
+    return storedUser ? storedUser : null;
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -38,14 +33,15 @@ export const UserProvider = ({ children }) => {
             },
           }
         );
-        // localStorage.setItem("exim_user", JSON.stringify(response.data));
+        // migrate: store user data in cookie (if desired)
+        // setJsonCookie('exim_user', response.data);
         setUser(response.data);
       } catch (error) {
         console.error("Authentication check failed:", error.message);
         // Don't immediately clear localStorage on failure
         // Only clear if the server explicitly says the session is invalid
         if (error.response && error.response.status === 401) {
-          localStorage.removeItem("exim_user");
+          removeCookie("exim_user");
           setUser(null);
         }
       } finally {
@@ -68,7 +64,7 @@ export const UserProvider = ({ children }) => {
           },
         }
       );
-      localStorage.removeItem("exim_user");
+      removeCookie("exim_user");
       setUser(null);
     } catch (error) {
       console.error("Logout failed", error);

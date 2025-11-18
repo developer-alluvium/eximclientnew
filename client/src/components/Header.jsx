@@ -18,6 +18,7 @@ import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import { styled, alpha } from "@mui/material/styles";
 import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
 
 // Import icons
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -46,7 +47,7 @@ const DateTimeContainer = styled(Box)(({ theme }) => ({
   "& svg": {
     marginRight: theme.spacing(1),
     color: theme.palette.warning.main, // Orange icon
-  }
+  },
 }));
 
 const UserMenu = styled(Box)(({ theme }) => ({
@@ -58,19 +59,19 @@ const UserMenu = styled(Box)(({ theme }) => ({
   transition: "background-color 0.2s ease",
   "&:hover": {
     backgroundColor: alpha(theme.palette.grey[100], 0.8),
-  }
+  },
 }));
 
-function Header({ 
-  formattedDate, 
-  formattedTime, 
-  userName, 
-  userInitial, 
-  anchorEl, 
-  open, 
+function Header({
+  formattedDate,
+  formattedTime,
+  userName,
+  userInitial,
+  anchorEl,
+  open,
   handleUserMenuOpen,
   handleUserMenuClose,
-  handleLogout
+  handleLogout,
 }) {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -85,21 +86,21 @@ function Header({
   // Get user data from localStorage or context
   const getUserData = () => {
     try {
-      const userData = localStorage.getItem("exim_user");
+      const userData = getJsonCookie("exim_user");
       if (!userData) return null;
-      
-      const parsedData = JSON.parse(userData);
-      
+
+      const parsedData = userData;
+
       // Handle different user data structures
       if (parsedData.id || parsedData.ie_code_no) {
         return parsedData; // New structure: direct user data
       } else if (parsedData.data && parsedData.data.user) {
         return parsedData.data.user; // Old structure: { data: { user: {...} } }
       }
-      
+
       return null;
     } catch (error) {
-      console.error("Error parsing user data:", error);
+      console.error("Error parsing user data from cookies:", error);
       return null;
     }
   };
@@ -161,9 +162,9 @@ function Header({
       // First verify current password by attempting login
       const loginResponse = await axios.post(
         `${process.env.REACT_APP_API_STRING}/login`,
-        { 
-          ie_code_no: userData.ie_code_no, 
-          password: currentPassword 
+        {
+          ie_code_no: userData.ie_code_no,
+          password: currentPassword,
         },
         { withCredentials: true }
       );
@@ -178,7 +179,7 @@ function Header({
 
         if (updateResponse.data.success) {
           setPasswordSuccess("Password updated successfully!");
-          
+
           // Clear form after success
           setTimeout(() => {
             handlePasswordDialogClose();
@@ -199,7 +200,9 @@ function Header({
             setPasswordError("Server error. Please try again later.");
             break;
           default:
-            setPasswordError(error.response.data?.message || "Failed to update password");
+            setPasswordError(
+              error.response.data?.message || "Failed to update password"
+            );
         }
       } else {
         setPasswordError("Network error. Please check your connection.");
@@ -217,15 +220,15 @@ function Header({
             {formattedDate} | {formattedTime}
           </Typography>
         </DateTimeContainer>
-        
+
         <UserMenu onClick={handleUserMenuOpen}>
-          <Avatar 
-            sx={{ 
-              width: 38, 
-              height: 38, 
+          <Avatar
+            sx={{
+              width: 38,
+              height: 38,
               bgcolor: "warning.main",
               marginRight: 1,
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
             }}
           >
             {userInitial}
@@ -237,15 +240,16 @@ function Header({
           </Box>
           <KeyboardArrowDownIcon sx={{ ml: 0.5 }} />
         </UserMenu>
-        
+
         <Menu
           anchorEl={anchorEl}
           open={open}
           onClose={handleUserMenuClose}
           PaperProps={{
             elevation: 3,
-            sx: { minWidth: 200, mt: 1, borderRadius: 2 }
-          }}        >
+            sx: { minWidth: 200, mt: 1, borderRadius: 2 },
+          }}
+        >
           <MenuItem onClick={handleUserMenuClose} sx={{ py: 1 }}>
             <AccountCircleIcon sx={{ mr: 1.5 }} fontSize="small" />
             <Typography variant="body2">My Profile</Typography>
@@ -262,13 +266,13 @@ function Header({
         </Menu>
 
         {/* Password Reset Dialog */}
-        <Dialog 
-          open={showPasswordDialog} 
-          onClose={handlePasswordDialogClose} 
-          maxWidth="sm" 
+        <Dialog
+          open={showPasswordDialog}
+          onClose={handlePasswordDialogClose}
+          maxWidth="sm"
           fullWidth
           PaperProps={{
-            sx: { borderRadius: 2 }
+            sx: { borderRadius: 2 },
           }}
         >
           <DialogTitle sx={{ pb: 1 }}>
@@ -279,7 +283,7 @@ function Header({
               </Typography>
             </Box>
           </DialogTitle>
-          
+
           <form onSubmit={handlePasswordSubmit}>
             <DialogContent sx={{ pt: 1 }}>
               {passwordError && (
@@ -287,7 +291,7 @@ function Header({
                   {passwordError}
                 </Alert>
               )}
-              
+
               {passwordSuccess && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   {passwordSuccess}
@@ -315,11 +319,17 @@ function Header({
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
-                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        onClick={() =>
+                          setShowCurrentPassword(!showCurrentPassword)
+                        }
                         edge="end"
                         size="small"
                       >
-                        {showCurrentPassword ? <VisibilityOff /> : <Visibility />}
+                        {showCurrentPassword ? (
+                          <VisibilityOff />
+                        ) : (
+                          <Visibility />
+                        )}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -363,11 +373,17 @@ function Header({
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
                         edge="end"
                         size="small"
                       >
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                        {showConfirmPassword ? (
+                          <VisibilityOff />
+                        ) : (
+                          <Visibility />
+                        )}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -376,14 +392,14 @@ function Header({
             </DialogContent>
 
             <DialogActions sx={{ p: 3, pt: 1 }}>
-              <Button 
-                onClick={handlePasswordDialogClose} 
+              <Button
+                onClick={handlePasswordDialogClose}
                 variant="outlined"
                 disabled={isUpdatingPassword}
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 type="submit"
                 variant="contained"
                 disabled={isUpdatingPassword}

@@ -1,23 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Box, Drawer, List, ListItem, ListItemIcon, ListItemText, Typography, FormControl, Select, MenuItem } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { getJsonCookie } from "../utils/cookies";
+import {
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  FormControl,
+  Select,
+  MenuItem,
+} from "@mui/material";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 // Import for pie chart
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from "recharts";
 
 const drawerWidth = 280;
 
 const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
-  // Tab visibility logic from localStorage
+  // Tab visibility logic from cookies
   const getTabVisibility = () => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
+    const userDataFromStorage = getJsonCookie("exim_user");
     if (userDataFromStorage) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
+        const parsedUser = userDataFromStorage;
         return {
           showJobsTab: !!parsedUser?.jobsTabVisible,
           showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
@@ -32,7 +51,7 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
   const { showJobsTab, showGandhidhamTab } = getTabVisibility();
   const [selectedView, setSelectedView] = useState("jobs"); // "jobs" or "gandhidham"
   // If initial job counts are provided, use them, otherwise default to zeros
-  const [jobCounts, setJobCounts] = useState(initialJobCounts || [0, 0, 0, 0]); 
+  const [jobCounts, setJobCounts] = useState(initialJobCounts || [0, 0, 0, 0]);
   const [totalJobs, pendingJobs, completedJobs, cancelledJobs] = jobCounts;
   const [years, setYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
@@ -40,20 +59,19 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
 
   // Get user data from localStorage
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
-  
+    const userDataFromStorage = getJsonCookie("exim_user");
+
     if (userDataFromStorage) {
       try {
-        const parsedUser = JSON.parse(userDataFromStorage);
-        
+        const parsedUser = userDataFromStorage;
+
         // Handle both old and new user data structures
         const userName = parsedUser?.name || parsedUser?.data?.user?.name;
         if (userName) {
           setSelectedImporter(userName);
-          // console.log("Selected importer:", userName);
         }
       } catch (e) {
-        console.error("Error parsing user data from storage:", e);
+        console.error("Error parsing user data from cookies:", e);
       }
     }
   }, []);
@@ -81,8 +99,8 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
             : `${prevTwoDigits}-${currentTwoDigits}`;
 
         // Prioritize 25-26 if it exists
-        if (filteredYears.includes('25-26')) {
-          setSelectedYear('25-26');
+        if (filteredYears.includes("25-26")) {
+          setSelectedYear("25-26");
         } else if (!selectedYear && filteredYears.length > 0) {
           const yearToSet = filteredYears.includes(defaultYearPair)
             ? defaultYearPair
@@ -98,7 +116,11 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
 
   // Update jobCounts if initialJobCounts changes
   useEffect(() => {
-    if (initialJobCounts && Array.isArray(initialJobCounts) && initialJobCounts.length === 4) {
+    if (
+      initialJobCounts &&
+      Array.isArray(initialJobCounts) &&
+      initialJobCounts.length === 4
+    ) {
       setJobCounts(initialJobCounts);
     }
   }, [initialJobCounts]);
@@ -108,18 +130,18 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
     async function getImporterData() {
       if (selectedImporter && selectedYear) {
         try {
-          const sanitizedImporter = selectedImporter
-            // .toLowerCase()
-            // .replace(/ /g, "_")
-            // .replace(/\./g, "")
-            // .replace(/\//g, "_")
-            // .replace(/-/g, "")
-            // .replace(/_+/g, "_")
-            // .replace(/\(/g, "")
-            // .replace(/\)/g, "")
-            // .replace(/\[/g, "")
-            // .replace(/\]/g, "")
-            // .replace(/,/g, "");
+          const sanitizedImporter = selectedImporter;
+          // .toLowerCase()
+          // .replace(/ /g, "_")
+          // .replace(/\./g, "")
+          // .replace(/\//g, "_")
+          // .replace(/-/g, "")
+          // .replace(/_+/g, "_")
+          // .replace(/\(/g, "")
+          // .replace(/\)/g, "")
+          // .replace(/\[/g, "")
+          // .replace(/\]/g, "")
+          // .replace(/,/g, "");
 
           let apiUrl = "";
           if (showJobsTab && !showGandhidhamTab) {
@@ -127,9 +149,10 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
           } else if (!showJobsTab && showGandhidhamTab) {
             apiUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
           } else if (showJobsTab && showGandhidhamTab) {
-            apiUrl = selectedView === "jobs"
-              ? `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
-              : `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
+            apiUrl =
+              selectedView === "jobs"
+                ? `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
+                : `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
           }
 
           if (!apiUrl) return;
@@ -148,7 +171,14 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       }
     }
     getImporterData();
-  }, [selectedImporter, selectedYear, setParentJobCounts, showJobsTab, showGandhidhamTab, selectedView]);
+  }, [
+    selectedImporter,
+    selectedYear,
+    setParentJobCounts,
+    showJobsTab,
+    showGandhidhamTab,
+    selectedView,
+  ]);
 
   // Handle year change
   const handleYearChange = (event) => {
@@ -157,14 +187,14 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
 
   // Prepare data for pie chart
   const pieChartData = [
-    { name: 'Pending Jobs', value: pendingJobs, color: '#FEAF1A' },
-    { name: 'Completed Jobs', value: completedJobs, color: '#00E4C5' },
-    { name: 'Cancelled Jobs', value: cancelledJobs, color: '#FF6378' }
-  ].filter(item => item.value > 0); // Only show segments with values
+    { name: "Pending Jobs", value: pendingJobs, color: "#FEAF1A" },
+    { name: "Completed Jobs", value: completedJobs, color: "#00E4C5" },
+    { name: "Cancelled Jobs", value: cancelledJobs, color: "#FF6378" },
+  ].filter((item) => item.value > 0); // Only show segments with values
 
   // If all jobs are of one type, add a dummy segment to create a complete circle
   if (pieChartData.length === 1) {
-    pieChartData.push({ name: 'Other', value: 0, color: '#f5f5f5' });
+    pieChartData.push({ name: "Other", value: 0, color: "#f5f5f5" });
   }
 
   return (
@@ -173,23 +203,27 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-        '& .MuiDrawer-paper': {
+        "& .MuiDrawer-paper": {
           width: drawerWidth,
-          boxSizing: 'border-box',
-          backgroundColor: '#f5f5f5',
+          boxSizing: "border-box",
+          backgroundColor: "#f5f5f5",
         },
       }}
     >
-      <Box sx={{ overflow: 'auto', p: 2, pb: 6 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Job Analytics</Typography>
-        
+      <Box sx={{ overflow: "auto", p: 2, pb: 6 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Job Analytics
+        </Typography>
+
         {/* Dropdown/toggle for jobs/gandhidham if both are visible */}
         {showJobsTab && showGandhidhamTab && (
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Select View</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Select View
+            </Typography>
             <Select
               value={selectedView}
-              onChange={e => setSelectedView(e.target.value)}
+              onChange={(e) => setSelectedView(e.target.value)}
               size="small"
             >
               <MenuItem value="jobs">Jobs</MenuItem>
@@ -197,13 +231,15 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
             </Select>
           </FormControl>
         )}
-        
+
         {/* Year Selection */}
         {years.length > 0 && (
           <FormControl fullWidth sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Financial Year</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Financial Year
+            </Typography>
             <Select
-              value={selectedYear || ''}
+              value={selectedYear || ""}
               onChange={handleYearChange}
               displayEmpty
               size="small"
@@ -216,10 +252,10 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
             </Select>
           </FormControl>
         )}
-        
+
         {/* Pie Chart */}
         {totalJobs > 0 && (
-          <Box sx={{ width: '100%', height: 250, mb: 2, position: 'relative' }}>
+          <Box sx={{ width: "100%", height: 250, mb: 2, position: "relative" }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -235,79 +271,83 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value, entry) => [`${value}`, `${entry}`, '  Count']} />
+                <Tooltip
+                  formatter={(value, entry) => [
+                    `${value}`,
+                    `${entry}`,
+                    "  Count",
+                  ]}
+                />
               </PieChart>
             </ResponsiveContainer>
             {/* Center text overlay */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center'
-            }}>
-              <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1F2937' }}>
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+              }}
+            >
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: "bold", color: "#1F2937" }}
+              >
                 {totalJobs}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#6B7280' }}>
+              <Typography variant="body2" sx={{ color: "#6B7280" }}>
                 Total Jobs
               </Typography>
             </div>
           </Box>
         )}
-        
+
         {/* Job Statistics */}
         <List>
           <ListItem>
             <ListItemIcon>
               <DashboardIcon color="primary" />
             </ListItemIcon>
-            <ListItemText 
-              primary="Total Jobs"
-              secondary={totalJobs}
-            />
+            <ListItemText primary="Total Jobs" secondary={totalJobs} />
           </ListItem>
           <ListItem>
             <ListItemIcon>
-              <PendingActionsIcon sx={{ color: '#FEAF1A' }} />
+              <PendingActionsIcon sx={{ color: "#FEAF1A" }} />
             </ListItemIcon>
-            <ListItemText 
-              primary="Pending Jobs"
-              secondary={pendingJobs}
-            />
+            <ListItemText primary="Pending Jobs" secondary={pendingJobs} />
           </ListItem>
           <ListItem>
             <ListItemIcon>
-              <CheckCircleIcon sx={{ color: '#00E4C5' }} />
+              <CheckCircleIcon sx={{ color: "#00E4C5" }} />
             </ListItemIcon>
-            <ListItemText 
-              primary="Completed Jobs"
-              secondary={completedJobs}
-            />
+            <ListItemText primary="Completed Jobs" secondary={completedJobs} />
           </ListItem>
           <ListItem>
             <ListItemIcon>
-              <CancelIcon sx={{ color: '#FF6378' }} />
+              <CancelIcon sx={{ color: "#FF6378" }} />
             </ListItemIcon>
-            <ListItemText 
-              primary="Cancelled Jobs"
-              secondary={cancelledJobs}
-            />
+            <ListItemText primary="Cancelled Jobs" secondary={cancelledJobs} />
           </ListItem>
         </List>
-        
+
         {/* App Version */}
-        <Box sx={{ 
-          position: 'absolute', 
-          bottom: 16, 
-          left: 16, 
-          right: 16,
-          textAlign: 'center',
-          borderTop: '1px solid #e0e0e0',
-          pt: 2
-        }}>
-          <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
-            Version {process.env.REACT_APP_VERSION || '06.02.01'}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 16,
+            left: 16,
+            right: 16,
+            textAlign: "center",
+            borderTop: "1px solid #e0e0e0",
+            pt: 2,
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{ color: "#6B7280", fontSize: "0.75rem" }}
+          >
+            Version {process.env.REACT_APP_VERSION || "06.02.01"}
           </Typography>
         </Box>
       </Box>

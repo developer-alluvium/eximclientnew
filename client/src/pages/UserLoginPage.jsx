@@ -14,17 +14,23 @@ import {
   Switch,
   FormControlLabel,
 } from "@mui/material";
-import { Visibility, VisibilityOff, Login, SupervisorAccount } from "@mui/icons-material";
+import {
+  Visibility,
+  VisibilityOff,
+  Login,
+  SupervisorAccount,
+} from "@mui/icons-material";
 import { useNavigate, Link } from "react-router-dom";
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider } from "@mui/material/styles";
 import { modernTheme } from "../styles/modernTheme";
 import axios from "axios";
+import { setJsonCookie, setCookie, getCookie } from "../utils/cookies";
 import "../styles/auth.scss";
 
 function UserLoginPage() {
   const [formData, setFormData] = useState({
     email: "",
-    password: ""
+    password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,8 +42,8 @@ function UserLoginPage() {
 
   // Updated useEffect to check for both user and superadmin sessions
   useEffect(() => {
-    const superAdminToken = localStorage.getItem("superadmin_token");
-    const userToken = localStorage.getItem("access_token");
+    const superAdminToken = getCookie("superadmin_token");
+    const userToken = getCookie("access_token");
 
     if (superAdminToken) {
       navigate("/superadmin-dashboard", { replace: true });
@@ -48,9 +54,9 @@ function UserLoginPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     if (error) setError(null);
   };
@@ -71,17 +77,19 @@ function UserLoginPage() {
     const endpoint = isSuperAdminLogin
       ? `${process.env.REACT_APP_API_STRING}/superadmin/login`
       : `${process.env.REACT_APP_API_STRING}/users/login`;
-    
+
     const payload = { email: formData.email, password: formData.password };
 
     try {
-      const response = await axios.post(endpoint, payload, { withCredentials: true });
+      const response = await axios.post(endpoint, payload, {
+        withCredentials: true,
+      });
 
       if (response.data.success) {
         if (isSuperAdminLogin) {
           // Handle SuperAdmin successful login
-          localStorage.setItem("superadmin_token", response.data.token);
-          localStorage.setItem("superadmin_user", JSON.stringify(response.data.superAdmin));
+          setCookie("superadmin_token", response.data.token, 7);
+          setJsonCookie("superadmin_user", response.data.superAdmin, 7);
           navigate("/superadmin-dashboard", { replace: true });
         } else {
           // Handle User successful login
@@ -94,22 +102,27 @@ function UserLoginPage() {
             auth: {
               accessToken,
               refreshToken,
-              lastLogin: new Date().toISOString()
+              lastLogin: new Date().toISOString(),
             },
             preferences: {
-              defaultIeCode: user.primary_ie_code || (user.ie_code_assignments?.[0]?.ie_code_no),
-              lastActiveModule: null
-            }
+              defaultIeCode:
+                user.primary_ie_code ||
+                user.ie_code_assignments?.[0]?.ie_code_no,
+              lastActiveModule: null,
+            },
           };
 
           // Fixed the localStorage calls here - replaced 'storage' with 'localStorage'
-          localStorage.setItem("exim_user", JSON.stringify(enhancedUserData));
-          localStorage.setItem("access_token", accessToken);
-          localStorage.setItem("refresh_token", refreshToken);
-          
+          setJsonCookie("exim_user", enhancedUserData, 7);
+          setCookie("access_token", accessToken, 7);
+          setCookie("refresh_token", refreshToken, 7);
           // Store IE code assignments separately for quick access
-          localStorage.setItem("ie_code_assignments", JSON.stringify(user.ie_code_assignments || []));
-          
+          setJsonCookie(
+            "ie_code_assignments",
+            user.ie_code_assignments || [],
+            7
+          );
+
           navigate("/user/dashboard", { replace: true });
         }
       }
@@ -121,13 +134,16 @@ function UserLoginPage() {
             errorMessage = "Invalid email or password.";
             break;
           case 423:
-            errorMessage = "Account is temporarily locked. Please try again later.";
+            errorMessage =
+              "Account is temporarily locked. Please try again later.";
             break;
           case 403: // Specific to user login
-            errorMessage = err.response.data.message || "Account pending verification.";
+            errorMessage =
+              err.response.data.message || "Account pending verification.";
             break;
           default:
-            errorMessage = err.response.data.message || "An unexpected error occurred.";
+            errorMessage =
+              err.response.data.message || "An unexpected error occurred.";
             break;
         }
       }
@@ -151,22 +167,28 @@ function UserLoginPage() {
               </Typography>
               <div className="auth-left-features">
                 <Typography variant="body2">✓ Access your modules</Typography>
-                <Typography variant="body2">✓ View analytics & reports</Typography>
+                <Typography variant="body2">
+                  ✓ View analytics & reports
+                </Typography>
                 <Typography variant="body2">✓ Manage documents</Typography>
                 <Typography variant="body2">✓ Track compliance</Typography>
               </div>
             </div>
           </Col>
-          
+
           <Col lg={6} className="auth-right-col">
             <div className="auth-right-content">
               <Card className="auth-card">
                 <CardContent>
                   <Box className="auth-header">
                     {isSuperAdminLogin ? (
-                       <SupervisorAccount sx={{ fontSize: 40, color: 'error.main', mb: 2 }} />
+                      <SupervisorAccount
+                        sx={{ fontSize: 40, color: "error.main", mb: 2 }}
+                      />
                     ) : (
-                       <Login sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
+                      <Login
+                        sx={{ fontSize: 40, color: "primary.main", mb: 2 }}
+                      />
                     )}
                     <Typography variant="h4" className="auth-title">
                       {isSuperAdminLogin ? "SuperAdmin Login" : "User Login"}
@@ -177,15 +199,19 @@ function UserLoginPage() {
                   </Box>
 
                   {error && (
-                    <Alert 
-                      severity={error.includes("pending") ? "warning" : "error"} 
+                    <Alert
+                      severity={error.includes("pending") ? "warning" : "error"}
                       sx={{ mb: 2 }}
                     >
                       {error}
                     </Alert>
                   )}
 
-                  <Box component="form" onSubmit={handleSubmit} className="auth-form">
+                  <Box
+                    component="form"
+                    onSubmit={handleSubmit}
+                    className="auth-form"
+                  >
                     <TextField
                       fullWidth
                       label="Email Address"
@@ -219,7 +245,11 @@ function UserLoginPage() {
                               onClick={() => setShowPassword(!showPassword)}
                               edge="end"
                             >
-                              {showPassword ? <VisibilityOff /> : <Visibility />}
+                              {showPassword ? (
+                                <VisibilityOff />
+                              ) : (
+                                <Visibility />
+                              )}
                             </IconButton>
                           </InputAdornment>
                         ),
@@ -231,13 +261,15 @@ function UserLoginPage() {
                       control={
                         <Switch
                           checked={isSuperAdminLogin}
-                          onChange={(e) => setIsSuperAdminLogin(e.target.checked)}
+                          onChange={(e) =>
+                            setIsSuperAdminLogin(e.target.checked)
+                          }
                           name="superAdminToggle"
                           color="primary"
                         />
                       }
                       label="Log in as SuperAdmin"
-                      sx={{ mt: 1, mb: 1, color: 'text.secondary' }}
+                      sx={{ mt: 1, mb: 1, color: "text.secondary" }}
                     />
 
                     <Button
@@ -254,11 +286,15 @@ function UserLoginPage() {
                   </Box>
 
                   <Box className="auth-footer">
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 1 }}
+                    >
                       Don't have an account?{" "}
-                      <MuiLink 
-                        component={Link} 
-                        to="/user/register" 
+                      <MuiLink
+                        component={Link}
+                        to="/user/register"
                         color="primary"
                         underline="hover"
                       >

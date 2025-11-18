@@ -1,5 +1,6 @@
 import { SimpleHeader } from "./SharedComponents";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getJsonCookie } from "../../utils/cookies";
 
 const JobDetailsPanel = ({
   years,
@@ -34,13 +35,13 @@ const JobDetailsPanel = ({
   // Get IE code assignments from localStorage
   const getUserIeCodeAssignments = useCallback(() => {
     try {
-      const userDataFromStorage = localStorage.getItem("exim_user");
+      const userDataFromStorage = getJsonCookie("exim_user");
       if (userDataFromStorage) {
-        const parsedUser = JSON.parse(userDataFromStorage);
+        const parsedUser = userDataFromStorage;
         return parsedUser?.ie_code_assignments || [];
       }
     } catch (error) {
-      console.error("Error parsing user data from storage:", error);
+      console.error("Error parsing user data from cookies:", error);
     }
     return [];
   }, []);

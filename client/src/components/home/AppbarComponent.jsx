@@ -8,6 +8,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { Box, Typography } from "@mui/material";
 import CImportDSR from "../CImportDSR";
 import { useImportersContext } from "../../context/importersContext";
+import { getJsonCookie } from "../../utils/cookies";
 
 const drawerWidth = 60;
 
@@ -15,10 +16,8 @@ function AppbarComponent(props) {
   const navigate = useNavigate();
 
   const { selectedImporter } = useImportersContext();
-  // Get user data from localStorage
-  const userData = localStorage.getItem("exim_user")
-    ? JSON.parse(localStorage.getItem("exim_user"))
-    : { name: "User" };
+  // Get user data from cookies
+  const userData = getJsonCookie("exim_user") || { name: "User" };
 
   // Extract name (handle both old and new user data structures)
   const userName =
