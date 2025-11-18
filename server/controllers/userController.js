@@ -598,48 +598,63 @@ export const generateSSOToken = async (req, res) => {
       });
     }
 
-    console.log(`Generating SSO token for user: ${req.user.id} (${req.user.name})`);
-    console.log('User IE code assignments:', req.user.ie_code_assignments);
+    console.log(
+      `Generating SSO token for user: ${req.user.id} (${req.user.name})`
+    );
+    console.log("User IE code assignments:", req.user.ie_code_assignments);
 
     // Extract all assigned IE codes from user's assignments
     let userIeCodes = [];
     let ieCodeAssignments = [];
-    
-    if (Array.isArray(req.user.ie_code_assignments) && req.user.ie_code_assignments.length > 0) {
+
+    if (
+      Array.isArray(req.user.ie_code_assignments) &&
+      req.user.ie_code_assignments.length > 0
+    ) {
       userIeCodes = req.user.ie_code_assignments.map((a) => a.ie_code_no);
-      ieCodeAssignments = req.user.ie_code_assignments.map(assignment => ({
+      ieCodeAssignments = req.user.ie_code_assignments.map((assignment) => ({
         ie_code_no: assignment.ie_code_no,
-        importer_name: assignment.importer_name
+        importer_name: assignment.importer_name,
       }));
     } else if (req.user.ie_code_no) {
       userIeCodes = [req.user.ie_code_no];
-      ieCodeAssignments = [{
-        ie_code_no: req.user.ie_code_no,
-        importer_name: req.user.assignedImporterName || 'Unknown'
-      }];
+      ieCodeAssignments = [
+        {
+          ie_code_no: req.user.ie_code_no,
+          importer_name: req.user.assignedImporterName || "Unknown",
+        },
+      ];
     }
 
     // If no specific IE code requested, include all assigned IE codes
-    const requestedIeCode = req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
-    
+    const requestedIeCode =
+      req.query.ie_code_no || req.body.ie_code_no || req.params.ie_code_no;
+
     let tokenIeCodes = userIeCodes;
     let primaryIeCode = requestedIeCode || userIeCodes[0];
-    
+
     // If specific IE code requested, validate it's assigned to user
     if (requestedIeCode && !userIeCodes.includes(requestedIeCode)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden: IE code not assigned to user",
-        available_ie_codes: userIeCodes
+        available_ie_codes: userIeCodes,
       });
     }
 
-    console.log(`User IE codes: ${userIeCodes.join(", ")}, token will include all assigned IE codes`);
+    console.log(
+      `User IE codes: ${userIeCodes.join(
+        ", "
+      )}, token will include all assigned IE codes`
+    );
 
     // Generate SSO token with ALL assigned IE codes
     const ssoToken = jwt.sign(
       {
         sub: req.user.id,
+        user_id: req.user.id, // Add this for consistency
+        userId: req.user.id, // Add this for your routes
+        id: req.user.id, // Add this as alternative
         ie_code_no: primaryIeCode, // Primary IE code for backward compatibility
         ie_codes: userIeCodes, // Array of all assigned IE codes
         ie_code_assignments: ieCodeAssignments, // Full assignment details
