@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Box, ThemeProvider, Alert } from "@mui/material";
 import { UserContext } from "../../context/UserContext";
-import { getJsonCookie, removeCookie } from "../../utils/cookies";
+import { getJsonCookie, removeCookie, getCookie } from "../../utils/cookies";
 import { useSuperAdminApi } from "../../hooks/useSuperAdminApi";
 
 // Import modern theme and components
@@ -42,7 +42,7 @@ const SuperAdminLayout = () => {
   // Authentication check
   useEffect(() => {
     const checkSuperAdminAuth = () => {
-      const token = getJsonCookie("superadmin_token");
+      const token = getCookie("superadmin_token");
       const user = getJsonCookie("superadmin_user");
 
       if (!token || !user) {
@@ -148,20 +148,18 @@ const SuperAdminLayout = () => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      // Get SuperAdmin user data from localStorage
-      const superAdminUser = localStorage.getItem("superadmin_user");
+      // Get SuperAdmin user data from cookies (JSON cookie)
+      const superAdminUser = getJsonCookie("superadmin_user");
 
       if (superAdminUser) {
         try {
-          const userData = JSON.parse(superAdminUser);
-
           // Call logout API to update logout time
           await fetch(`${process.env.REACT_APP_API_STRING}/superadmin/logout`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ userId: userData.id }),
+            body: JSON.stringify({ userId: superAdminUser.id }),
           });
         } catch (error) {
           console.error("Error calling SuperAdmin logout API:", error);

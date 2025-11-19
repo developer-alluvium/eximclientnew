@@ -610,7 +610,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(true);
       setError(null);
 
-      const superadminToken = localStorage.getItem("superadmin_token");
+      const superadminToken = getCookie("superadmin_token");
       if (!superadminToken) {
         setError("SuperAdmin authentication required. Please login again.");
         return;
