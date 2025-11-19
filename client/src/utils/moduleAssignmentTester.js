@@ -24,7 +24,7 @@ class ModuleAssignmentFrontendTester {
   getCurrentUser() {
     try {
       const { getJsonCookie } = require("./cookies");
-      const userData = getJsonCookie("userData");
+      const userData = getJsonCookie("exim_user");
       if (userData) {
         this.currentUser = userData;
         this.log(
@@ -43,11 +43,11 @@ class ModuleAssignmentFrontendTester {
 
   // Test 1: Check localStorage user data
   testLocalStorageUserData() {
-    this.log("Test 1: Checking localStorage user data...");
+    this.log("Test 1: Checking cookie-based user data...");
 
     const userData = this.getCurrentUser();
     if (!userData) {
-      this.log("❌ No user data in localStorage", "error");
+      this.log("❌ No user data in cookies", "error");
       return false;
     }
 

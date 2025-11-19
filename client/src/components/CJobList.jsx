@@ -394,12 +394,11 @@ function CJobList(props) {
     };
   }, [searchQuery]);
 
-  // Load IE code assignments from localStorage
+  // Load IE code assignments from cookies
   useEffect(() => {
-    const userDataFromStorage = localStorage.getItem("exim_user");
+    const userDataFromStorage = getJsonCookie("exim_user");
     if (userDataFromStorage) {
-      const userData = JSON.parse(userDataFromStorage);
-      setIeCodeAssignments(userData?.ie_code_assignments || []);
+      setIeCodeAssignments(userDataFromStorage?.ie_code_assignments || []);
     }
   }, []);
 

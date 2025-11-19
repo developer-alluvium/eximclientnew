@@ -406,8 +406,8 @@ const AdminManagement = ({ onRefresh }) => {
       console.error("Error promoting to admin:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("SuperAdmin authentication expired. Please login again.");
-        localStorage.removeItem("superadmin_token");
-        localStorage.removeItem("superadmin_user");
+        removeCookie("superadmin_token");
+        removeCookie("superadmin_user");
       } else {
         setError(error.response?.data?.message || "Failed to promote to admin");
       }
@@ -449,8 +449,8 @@ const AdminManagement = ({ onRefresh }) => {
       console.error("Error revoking admin:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("SuperAdmin authentication expired. Please login again.");
-        localStorage.removeItem("superadmin_token");
-        localStorage.removeItem("superadmin_user");
+        removeCookie("superadmin_token");
+        removeCookie("superadmin_user");
       } else {
         setError(
           error.response?.data?.message || "Failed to revoke admin access"
@@ -498,8 +498,8 @@ const AdminManagement = ({ onRefresh }) => {
       console.error("Error changing user status:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("SuperAdmin authentication expired. Please login again.");
-        localStorage.removeItem("superadmin_token");
-        localStorage.removeItem("superadmin_user");
+        removeCookie("superadmin_token");
+        removeCookie("superadmin_user");
       } else {
         setError(
           error.response?.data?.message || "Failed to change user status"
