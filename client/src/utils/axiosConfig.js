@@ -15,3 +15,8 @@ axios.interceptors.request.use(
 );
 
 // You can add more global axios config here if needed
+
+// Ensure axios sends cookies (HttpOnly or not) with requests
+axios.defaults.withCredentials = true;
+
+export default axios;

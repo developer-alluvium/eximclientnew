@@ -234,13 +234,24 @@ export const getSuperAdminProfile = async (req, res) => {
  */
 export const protectSuperAdmin = async (req, res, next) => {
   try {
-    // Get token from Authorization header
-    let token;
+    // Get token from Authorization header or cookies (support several cookie names)
+    let token = null;
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
     ) {
       token = req.headers.authorization.split(" ")[1];
+    }
+
+    // Check cookies for common token names if header not present
+    if (!token && req.cookies) {
+      token =
+        req.cookies.access_token ||
+        req.cookies.refresh_token ||
+        req.cookies.superadmin_access_token ||
+        req.cookies.superadmin_token ||
+        req.cookies.user_access_token ||
+        null;
     }
 
     if (!token) {
