@@ -882,8 +882,7 @@ const AEOCertificatesTab = ({
                   AEO data not found
                 </Typography>
                 <Typography variant="body2">
-                  The importer name might be different in AEO records. Try
-                  updating the name to match AEO directory records.
+                  The importer name might be different in AEO records. Ensure the name matches the registered company name.
                 </Typography>
               </Alert>
               <Button
