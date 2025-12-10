@@ -78,12 +78,13 @@ function CImportDSR() {
 
   // Tabs config - Analytics comes first
   const visibleTabs = [];
-  if (tabVisibility.analyticsTabVisible)
-    visibleTabs.push({ label: "Analytics", key: "analytics" });
+
   if (tabVisibility.jobsTabVisible)
     visibleTabs.push({ label: "Jobs", key: "jobs" });
   if (tabVisibility.gandhidhamTabVisible)
     visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
+    // if (tabVisibility.analyticsTabVisible)
+    // visibleTabs.push({ label: "Analytics", key: "analytics" });
 
   return (
     <Box
