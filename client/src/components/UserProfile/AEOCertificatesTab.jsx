@@ -32,9 +32,9 @@ import {
   VerifiedUser as VerifiedIcon,
   NotificationsActive as NotificationsIcon,
 } from "@mui/icons-material";
+import axios from "axios";
 
-// --- Dialog Component ---
-// This is the fully integrated dialog, now controlled by the parent.
+// --- Reminder Settings Dialog Component ---
 const AEOReminderSettingsDialog = ({
   open,
   onClose,
@@ -45,8 +45,6 @@ const AEOReminderSettingsDialog = ({
   aeoCertificates = [],
   message,
 }) => {
-  // --- Certificate Statistics ---
-  // Calculates stats based on the *current* settings in the dialog
   const getCertificateStats = () => {
     const today = new Date();
     const currentReminderDays = settings?.reminder_days || 90;
@@ -81,7 +79,6 @@ const AEOReminderSettingsDialog = ({
     ? getCertificateStats()
     : { expiringSoon: 0, expired: 0, active: 0, total: 0 };
 
-  // --- Event Handlers ---
   const handleEnabledChange = (event) => {
     onSettingsChange({
       ...settings,
@@ -171,7 +168,6 @@ const AEOReminderSettingsDialog = ({
         )}
 
         <Grid container spacing={4}>
-          {/* Left Column - Settings */}
           <Grid item xs={12} md={6}>
             <Paper
               elevation={0}
@@ -277,7 +273,6 @@ const AEOReminderSettingsDialog = ({
             </Paper>
           </Grid>
 
-          {/* Right Column - Preview & Stats */}
           <Grid item xs={12} md={6}>
             <Paper
               sx={{
@@ -465,26 +460,24 @@ const AEOReminderSettingsDialog = ({
 };
 
 // --- Main Tab Component ---
-// Refactored with a 2-column layout
-
 const AEOCertificatesTab = ({
   user,
   kycSummary,
   aeoLoading,
-  onUpdateImporterName,
+  onUpdateCertificateNumber,
   onFetchKYCSummary,
   onSetError,
   onSetSuccess,
   onUpdateReminderSettings,
 }) => {
   const [selectedImporter, setSelectedImporter] = useState("");
-  const [updateImporterOpen, setUpdateImporterOpen] = useState(false);
+  const [updateCertificateOpen, setUpdateCertificateOpen] = useState(false);
   const [selectedImporterForUpdate, setSelectedImporterForUpdate] =
     useState(null);
-  const [newImporterName, setNewImporterName] = useState("");
+  const [newCertificateNumber, setNewCertificateNumber] = useState("");
   const [updateLoading, setUpdateLoading] = useState(false);
 
-  // --- Reminder Settings State ---
+  // Reminder Settings State
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
   const [savedReminderSettings, setSavedReminderSettings] = useState({
     reminder_enabled: true,
@@ -512,7 +505,6 @@ const AEOCertificatesTab = ({
     setSelectedImporter(event.target.value);
   };
 
-  // --- Dialog Management Functions ---
   const handleOpenReminderDialog = () => {
     setSettingsMessage({ type: "", text: "" });
     setTempReminderSettings(savedReminderSettings);
@@ -546,34 +538,51 @@ const AEOCertificatesTab = ({
       setSavingSettings(false);
     }
   };
-
-  const handleUpdateImporterName = async () => {
-    if (!selectedImporterForUpdate || !newImporterName.trim()) {
-      onSetError("Please enter a valid importer name");
+  // Fix 1: Move and properly define handleUpdateCertificateNumber
+  const handleUpdateCertificateNumber = async () => {
+    if (!newCertificateNumber.trim() || !selectedImporterForUpdate) {
       return;
     }
+
     setUpdateLoading(true);
     try {
-      await onUpdateImporterName(
-        selectedImporterForUpdate.ie_code_no,
-        newImporterName.trim()
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/aeo/update-certificate-number`,
+        {
+          ieCode: selectedImporterForUpdate.ie_code_no,
+          certificateNumber: newCertificateNumber.trim(),
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
-      onSetSuccess("Importer name updated successfully");
-      setUpdateImporterOpen(false);
-      setNewImporterName("");
-      setSelectedImporterForUpdate(null);
+
+      // Refresh KYC summary after successful update
       await onFetchKYCSummary();
+      onSetSuccess("Certificate updated successfully!");
+      setUpdateCertificateOpen(false);
     } catch (error) {
-      onSetError("Failed to update importer name: " + error.message);
+      console.error("Error updating certificate:", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update certificate";
+      onSetError(errorMsg);
     } finally {
       setUpdateLoading(false);
     }
   };
 
-  const openUpdateImporterDialog = (importerData) => {
+  const openUpdateCertificateDialog = (importerData) => {
     setSelectedImporterForUpdate(importerData);
-    setNewImporterName(importerData.importer_name);
-    setUpdateImporterOpen(true);
+    setNewCertificateNumber(
+      importerData.certificate_no === "Not Available"
+        ? ""
+        : importerData.certificate_no
+    );
+    setUpdateCertificateOpen(true);
   };
 
   const formatDate = (dateString) => {
@@ -607,7 +616,7 @@ const AEOCertificatesTab = ({
     return `Notify ${days} days before expiry`;
   };
 
-  // --- Reminder Summary Card ---
+  // Reminder Summary Card
   const ReminderSettingsCard = () => {
     const stats = kycSummary?.kyc_summaries || [];
 
@@ -649,7 +658,6 @@ const AEOCertificatesTab = ({
         }}
       >
         <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
-          {/* Header */}
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
             <Box
               sx={{
@@ -679,7 +687,6 @@ const AEOCertificatesTab = ({
             </Box>
           </Box>
 
-          {/* Quick Status */}
           <Box sx={{ mb: 3 }}>
             <Box
               sx={{
@@ -714,7 +721,6 @@ const AEOCertificatesTab = ({
             </Typography>
           </Box>
 
-          {/* Stats */}
           <Box sx={{ mb: 3 }}>
             <Typography
               variant="subtitle2"
@@ -768,7 +774,6 @@ const AEOCertificatesTab = ({
             </Grid>
           </Box>
 
-          {/* Action Button */}
           <Button
             variant="outlined"
             size="small"
@@ -794,7 +799,6 @@ const AEOCertificatesTab = ({
     );
   };
 
-  // --- Certificate Card ---
   const CertificateCard = ({ kyc }) => {
     const daysUntilExpiry = kyc.certificate_validity_date
       ? Math.ceil(
@@ -814,7 +818,7 @@ const AEOCertificatesTab = ({
             transform: "translateY(-2px)",
             boxShadow: "0 8px 25px rgba(0, 0, 0, 0.1)",
           },
-          height: "100%", // Added for consistent card height
+          height: "100%",
         }}
       >
         <CardContent>
@@ -835,17 +839,6 @@ const AEOCertificatesTab = ({
                 IE Code: {kyc.ie_code_no}
               </Typography>
             </Box>
-            {!kyc.has_aeo_data && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="warning"
-                onClick={() => openUpdateImporterDialog(kyc)}
-                sx={{ ml: 1, minWidth: "120px" }}
-              >
-                Update Name
-              </Button>
-            )}
           </Box>
 
           {daysUntilExpiry !== null &&
@@ -853,8 +846,7 @@ const AEOCertificatesTab = ({
               <Box sx={{ mb: 2 }}>
                 <Alert
                   severity={
-                    daysUntilExpiry <=
-                    (savedReminderSettings.reminder_days || 90)
+                    daysUntilExpiry <= savedReminderSettings.reminder_days
                       ? "info"
                       : "success"
                   }
@@ -866,8 +858,7 @@ const AEOCertificatesTab = ({
                   }}
                 >
                   <Typography variant="body2">
-                    {daysUntilExpiry <=
-                    (savedReminderSettings.reminder_days || 90)
+                    {daysUntilExpiry <= savedReminderSettings.reminder_days
                       ? `🔔 Alert: Expires in ${daysUntilExpiry} days`
                       : `✅ Safe: ${daysUntilExpiry} days remaining`}
                   </Typography>
@@ -875,23 +866,29 @@ const AEOCertificatesTab = ({
               </Box>
             )}
 
-          {!kyc.has_aeo_data ? (
+          {!kyc.has_certificate_no || !kyc.has_aeo_data ? (
             <Box sx={{ textAlign: "center", py: 2 }}>
               <Alert severity="warning" sx={{ mb: 2 }}>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  AEO data not found
+                  {!kyc.has_certificate_no
+                    ? "Certificate number not found"
+                    : "AEO data not found"}
                 </Typography>
                 <Typography variant="body2">
-                  The importer name might be different in AEO records. Ensure the name matches the registered company name.
+                  {!kyc.has_certificate_no
+                    ? "Add the AEO certificate number to verify credentials automatically."
+                    : "The certificate number might be invalid. Please verify and update."}
                 </Typography>
               </Alert>
               <Button
                 variant="contained"
                 color="warning"
-                onClick={() => openUpdateImporterDialog(kyc)}
+                onClick={() => openUpdateCertificateDialog(kyc)}
                 startIcon={<RefreshIcon />}
               >
-                Update & Retry Verification
+                {kyc.has_certificate_no
+                  ? "Update Certificate Number"
+                  : "Add Certificate Number"}
               </Button>
             </Box>
           ) : (
@@ -1008,27 +1005,22 @@ const AEOCertificatesTab = ({
     );
   };
 
-  // --- Main Render: 2-COLUMN LAYOUT ---
+  // --- Main Render ---
   return (
     <Box>
-      {/* --- This is the new Flexbox Parent Container --- */}
-      {/* It replaces your <Grid container> */}
       <Box
         sx={{
           display: "flex",
-          // On small screens (xs), stack vertically.
           flexDirection: { xs: "column", md: "row" },
-          // On medium screens (md) and up, display side-by-side.
-          gap: 4, // This replaces grid 'spacing={4}'
+          gap: 4,
         }}
       >
-        {/* --- Left Column (Certificates List) --- */}
-        {/* It replaces <Grid item xs={12} md={8}> */}
+        {/* --- Left Column: Certificates List --- */}
         <Box
           sx={{
-            flex: { md: 2 }, // On md+, take 2 "parts" of the space (2/3)
-            width: "100%", // Ensure it takes full width when stacked
-            minWidth: 0, // Prevents flex overflow issues
+            flex: { md: 2 },
+            width: "100%",
+            minWidth: 0,
           }}
         >
           <Box sx={{ mb: 2 }}>
@@ -1044,20 +1036,7 @@ const AEOCertificatesTab = ({
               </Typography>
             </Box>
 
-            {kycSummary?.kyc_summaries?.some(
-              (k) => !k.has_aeo_data && k.kyc_status === "not_found"
-            ) && (
-              <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Some certificates couldn't be verified automatically
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  Update importer names to match official AEO records for better
-                  verification results.
-                </Typography>
-              </Alert>
-            )}
-
+            {/* Filter Dropdown */}
             {user?.ie_code_assignments?.length > 1 && (
               <FormControl fullWidth sx={{ mb: 3, maxWidth: 400 }}>
                 <InputLabel>Select Importer</InputLabel>
@@ -1079,11 +1058,11 @@ const AEOCertificatesTab = ({
             )}
           </Box>
 
+          {/* Loading State */}
           {aeoLoading && <LinearProgress sx={{ mb: 3 }} />}
 
+          {/* Certificates Grid */}
           {kycSummary?.kyc_summaries?.length > 0 ? (
-            // Note: I'm keeping your internal Grid here for the *cards*
-            // This is fine, as it's only managing the layout *within* the left column
             <Grid container spacing={3}>
               {kycSummary.kyc_summaries
                 .filter(
@@ -1125,12 +1104,11 @@ const AEOCertificatesTab = ({
           )}
         </Box>
 
-        {/* --- Right Column (Reminder Card) --- */}
-        {/* It replaces <Grid item xs={12} md={4}> */}
+        {/* --- Right Column: Reminder Settings --- */}
         <Box
           sx={{
-            flex: { md: 1 }, // On md+, take 1 "part" of the space (1/3)
-            width: "100%", // Ensure it takes full width when stacked
+            flex: { md: 1 },
+            width: "100%",
             minWidth: 0,
           }}
         >
@@ -1138,64 +1116,61 @@ const AEOCertificatesTab = ({
         </Box>
       </Box>
 
-      {/* --- Dialogs (Modals) --- */}
-      {/* These are unaffected as they are outside the layout flow */}
+      {/* --- Dialog: Update Certificate Number --- */}
       <Dialog
-        open={updateImporterOpen}
-        onClose={() => setUpdateImporterOpen(false)}
+        open={updateCertificateOpen}
+        onClose={() => setUpdateCertificateOpen(false)}
         maxWidth="sm"
         fullWidth
       >
         <DialogTitle sx={{ fontWeight: "bold" }}>
-          Update Importer Name
+          Update Certificate Number
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Importer:{" "}
+              <strong>{selectedImporterForUpdate?.importer_name}</strong>
+            </Typography>
             <Typography variant="body2" color="text.secondary">
               IE Code: <strong>{selectedImporterForUpdate?.ie_code_no}</strong>
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Current Name:{" "}
-              <strong>{selectedImporterForUpdate?.importer_name}</strong>
-            </Typography>
           </Box>
+
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Please enter the valid AEO Certificate Number
+          </Alert>
+
           <TextField
             autoFocus
             margin="dense"
-            label="New Importer Name"
+            label="AEO Certificate Number"
             fullWidth
             variant="outlined"
-            value={newImporterName}
-            onChange={(e) => setNewImporterName(e.target.value)}
-            sx={{ mt: 1 }}
-            placeholder="Enter the exact importer name as in AEO records"
-            helperText="Enter the exact company name as registered in AEO directory."
+            value={newCertificateNumber}
+            onChange={(e) => setNewCertificateNumber(e.target.value)}
+            placeholder="Enter certificate number"
           />
-          <Alert severity="info" sx={{ mt: 2 }}>
-            <Typography variant="body2">
-              Updating the name will trigger a new AEO verification with the
-              updated name.
-            </Typography>
-          </Alert>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: 2 }}>
           <Button
-            onClick={() => setUpdateImporterOpen(false)}
+            onClick={() => setUpdateCertificateOpen(false)}
             disabled={updateLoading}
           >
             Cancel
           </Button>
           <Button
-            onClick={handleUpdateImporterName}
+            onClick={handleUpdateCertificateNumber} // ✅ Now correctly references the fixed function
             variant="contained"
-            disabled={updateLoading || !newImporterName.trim()}
-            color="warning"
+            disabled={updateLoading || !newCertificateNumber.trim()}
+            color="primary"
           >
-            {updateLoading ? "Updating..." : "Update & Verify"}
+            {updateLoading ? "Verifying..." : "Verify & Update"}
           </Button>
         </DialogActions>
       </Dialog>
 
+      {/* --- Dialog: Reminder Settings --- */}
       <AEOReminderSettingsDialog
         open={reminderSettingsOpen}
         onClose={handleCloseReminderDialog}

@@ -63,7 +63,7 @@ const UserProfile = () => {
         if (data.user.ie_code_assignments?.length > 0) {
           setTimeout(async () => {
             try {
-              await autoVerifyImporters();
+              // await autoVerifyImporters();
               await fetchKYCSummary();
             } catch (error) {
               console.error("AEO auto-verification failed:", error);
