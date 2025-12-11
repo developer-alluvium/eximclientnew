@@ -106,4 +106,41 @@ router.post("/api/aeo/update-importer-name", authenticateUser, async (req, res) 
   }
 });
 
+
+// ADD THIS ROUTE BEFORE export default router;
+router.post("/api/aeo/update-certificate-number", authenticateUser, async (req, res) => {
+  try {
+    // 1. Extract data from the request body
+    const { ieCode, certificateNumber,userId } = req.body;
+    
+    // 2. Validate input
+    if (!ieCode || !certificateNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "IE Code and Certificate Number are required"
+      });
+    }
+
+    // 3. Call the service method
+    // Note: req.user.id comes from your authenticateUser middleware
+    const result = await AEOIntegrationService.updateCertificateNumber(
+      ieCode, 
+      certificateNumber, 
+      userId
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error("Update certificate route error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update certificate number"
+    });
+  }
+});
+
+// Remove or correct the "update-importer-name" route if you aren't using it, 
+// as it seems you might have copy-pasted that by mistake instead of the certificate route.
+
 export default router;
