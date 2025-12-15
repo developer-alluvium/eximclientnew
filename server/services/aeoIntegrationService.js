@@ -223,7 +223,7 @@ export class AEOIntegrationService {
         `Starting complete AEO lookup from profile for certificate: ${certificateNumber}`
       );
       const cleanIeCode = ieCode.replace(/\s+/g, "").toUpperCase();
-console.log("Certificate Number:", certificateNumber);
+      console.log("Certificate Number:", certificateNumber);
       // Get official data from AEO India
       const aeoData = await this.fetchFromAEOIndia(certificateNumber);
 
@@ -300,76 +300,93 @@ console.log("Certificate Number:", certificateNumber);
   /**
    * Update certificate number and automatically fetch & update all AEO details
    */
+  /**
+   * Update certificate number: Pushes new cert or updates existing one in the array
+   */
   static async updateCertificateNumber(ieCode, newCertificateNumber, userId) {
-    let kycRecord = null;
-    console.log("User ID:", userId);
-
     try {
+      // 1. Clean Inputs
       const cleanIeCode = ieCode.replace(/\s+/g, "").toUpperCase();
       const cleanCertNumber = newCertificateNumber
         .replace(/\s+/g, "")
         .toUpperCase();
 
       console.log(
-        `Updating certificate number for ${cleanIeCode} to: ${cleanCertNumber}`
+        `Processing certificate update for ${cleanIeCode}: ${cleanCertNumber}`
       );
 
-      // Step 1: Fetch data from AEO India using the certificate number
+      // 2. Fetch official data from AEO India website
       const aeoData = await this.fetchFromAEOIndia(cleanCertNumber);
 
       if (!aeoData.company_name) {
         throw new Error("Certificate not found or invalid certificate number");
       }
 
-      // Step 2: Update CustomerKyc with ALL data from API response
-      kycRecord = await CustomerKycModel.findOneAndUpdate(
-        { iec_no: cleanIeCode },
-        {
-          $set: {
-            // Update from API response
-            name_of_individual: aeoData.company_name, // Company Name from API
-            principle_business_address_line_1: aeoData.company_address, // Company Address
-            certificate_no: aeoData.certificate_no, // Certificate Number
-            aeo_tier: aeoData.aeo_tier, // AEO Tier
-            certificate_issue_date: aeoData.certificate_issue_date, // Issue Date
-            certificate_validity_date: aeoData.certificate_validity_date, // Validity Date
-            certificate_present_validity_status:
-              aeoData.certificate_present_validity_status, // Status
-            status: "verified",
-            last_aeo_verification: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-        { new: true, runValidators: true, upsert: true } // upsert creates if not exists
-      );
-
-      console.log(`Successfully updated KYC record with AEO data:`, {
-        company_name: aeoData.company_name,
-        certificate_no: aeoData.certificate_no,
+      // 3. Create the certificate object for the array
+      const newCertObject = {
         aeo_tier: aeoData.aeo_tier,
-        status: aeoData.certificate_present_validity_status,
-      });
+        certificate_no: aeoData.certificate_no,
+        certificate_issue_date: aeoData.certificate_issue_date,
+        certificate_validity_date: aeoData.certificate_validity_date,
+        certificate_present_validity_status:
+          aeoData.certificate_present_validity_status,
+        addedAt: new Date(),
+      };
+
+      // 4. Find the KYC Document
+      let kycRecord = await CustomerKycModel.findOne({ iec_no: cleanIeCode });
+
+      if (kycRecord) {
+        // --- CASE A: Record Exists ---
+
+        // Ensure array exists (in case of old data)
+        if (!kycRecord.aeo_certificates) {
+          kycRecord.aeo_certificates = [];
+        }
+
+        // Check if THIS certificate number is already in the list
+        const certIndex = kycRecord.aeo_certificates.findIndex(
+          (c) => c.certificate_no === newCertObject.certificate_no
+        );
+
+        if (certIndex > -1) {
+          // Update existing entry
+          kycRecord.aeo_certificates[certIndex] = newCertObject;
+        } else {
+          // Add new entry
+          kycRecord.aeo_certificates.push(newCertObject);
+        }
+
+        // Update root level fields (General Info)
+        kycRecord.name_of_individual = aeoData.company_name;
+        kycRecord.principle_business_address_line_1 = aeoData.company_address;
+        kycRecord.last_aeo_verification = new Date();
+
+        await kycRecord.save();
+      } else {
+        // --- CASE B: New Record ---
+        kycRecord = await CustomerKycModel.create({
+          iec_no: cleanIeCode,
+          module: "AEO Verification",
+          category: "Importer",
+          name_of_individual: aeoData.company_name,
+          principle_business_address_line_1: aeoData.company_address,
+          status: "verified",
+          last_aeo_verification: new Date(),
+          aeo_certificates: [newCertObject], // Initialize array
+        });
+      }
 
       return {
         success: true,
-        message: "Certificate verified successfully and all details updated",
+        message: "Certificate verified and added successfully",
         kyc_record: kycRecord,
         aeo_data: aeoData,
       };
     } catch (error) {
-      console.error("Update certificate number error:", error);
-
-      if (error.message.includes("Certificate not found")) {
-        throw new Error(
-          "Invalid certificate number or certificate not found in AEO India database"
-        );
-      } else if (error.name === "ValidationError") {
-        throw new Error(`Validation failed: ${error.message}`);
-      } else if (error.code === 11000) {
-        throw new Error("Duplicate IE code found");
-      } else {
-        throw new Error(`Update failed: ${error.message}`);
-      }
+      console.error("Update certificate service error:", error);
+      // Re-throw to let the Route handle the 500/400 error
+      throw error;
     }
   }
 
@@ -480,8 +497,10 @@ console.log("Certificate Number:", certificateNumber);
   /**
    * Get KYC summary for user
    */
+
   static async getUserKYCSummary(userId) {
     try {
+      // 1. Fetch User Assignments
       const user = await EximclientUser.findById(userId).select(
         "ie_code_assignments name email"
       );
@@ -492,40 +511,49 @@ console.log("Certificate Number:", certificateNumber);
 
       const kycSummaries = [];
 
+      // 2. Loop through assigned importers
       for (const assignment of user.ie_code_assignments) {
         const cleanIeCode = assignment.ie_code_no
           .replace(/\s+/g, "")
           .toUpperCase();
+
+        // Fetch KYC record
         const kycRecord = await CustomerKycModel.findOne({
           iec_no: cleanIeCode,
         }).select(
-          "name_of_individual aeo_tier certificate_no certificate_issue_date certificate_validity_date certificate_present_validity_status status updatedAt last_aeo_verification"
+          "name_of_individual aeo_certificates status updatedAt last_aeo_verification iec_no"
         );
 
         const displayName =
           kycRecord?.name_of_individual || assignment.importer_name;
 
+        // 3. Determine "Primary" status for the card summary
+        // (We grab the most recently added certificate for the quick view)
+        const certs = kycRecord?.aeo_certificates || [];
+        const latestCert = certs.length > 0 ? certs[certs.length - 1] : null;
+
         kycSummaries.push({
           importer_name: displayName,
-          name_of_individual: displayName,
           ie_code_no: assignment.ie_code_no,
           kyc_status: kycRecord?.status || "not_found",
-          aeo_tier: kycRecord?.aeo_tier || "Not Available",
-          certificate_no: kycRecord?.certificate_no || "Not Available",
-          certificate_issue_date: kycRecord?.certificate_issue_date || null,
+
+          // --- NEW: Return the full array ---
+          aeo_certificates: certs,
+
+          // Legacy fields for backward compatibility (optional, uses latest cert)
+          aeo_tier: latestCert?.aeo_tier || "Not Available",
+          certificate_no: latestCert?.certificate_no || "Not Available",
           certificate_validity_date:
-            kycRecord?.certificate_validity_date || null,
+            latestCert?.certificate_validity_date || null,
           certificate_present_validity_status:
-            kycRecord?.certificate_present_validity_status || "Unknown",
+            latestCert?.certificate_present_validity_status || "Unknown",
+
           last_updated: kycRecord?.updatedAt || null,
           last_verification: kycRecord?.last_aeo_verification || null,
-          has_aeo_data: !!(
-            kycRecord?.aeo_tier && kycRecord.aeo_tier !== "Not Available"
-          ),
-          has_certificate_no: !!(
-            kycRecord?.certificate_no &&
-            kycRecord.certificate_no !== "Not Available"
-          ),
+
+          // Check if array has items
+          has_aeo_data: certs.length > 0,
+          has_certificate_no: certs.length > 0,
         });
       }
 

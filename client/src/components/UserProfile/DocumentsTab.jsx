@@ -1,50 +1,75 @@
-// components/UserProfile/DocumentsTab.jsx
 import React, { useState } from "react";
 import {
-  Box,
-  TextField,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Avatar,
-  Typography,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Menu,
-  Divider,
-  Tooltip,
-  alpha,
-} from "@mui/material";
-import {
-  Search as SearchIcon,
-  Add as AddIcon,
-  MoreVert as MoreVertIcon,
-  Visibility as VisibilityIcon,
-  Download as DownloadIcon,
-  Delete as DeleteIcon,
+  Search,
+  Add,
+  Visibility,
+  Download,
+  Delete,
+  Close,
 } from "@mui/icons-material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import FileUpload from "../../utils/FileUpload";
+
+// Simple Modal (duplicated for independence)
+const CustomModal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "24px",
+          borderRadius: "12px",
+          width: "90%",
+          maxWidth: "500px",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            <Close />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [addDocumentOpen, setAddDocumentOpen] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
-  const [expirationDate, setExpirationDate] = useState(null);
+  const [expirationDate, setExpirationDate] = useState("");
   const [reminderDays, setReminderDays] = useState(30);
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
@@ -66,30 +91,37 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
     return diffDays;
   };
 
-  const getExpirationChip = (expirationDate) => {
+  const getExpirationBadge = (expirationDate) => {
     const daysUntil = getDaysUntilExpiration(expirationDate);
     if (daysUntil === null)
-      return <Chip label="No Expiry" size="small" variant="outlined" />;
+      return <span className="badge badge-outline">No Expiry</span>;
 
-    let color = "success";
-    let label = `${daysUntil} days left`;
+    let className = "badge-success";
+    let label = `${daysUntil} days left`; // Using days left as clearer status
 
     if (daysUntil < 0) {
-      color = "error";
+      className = "badge-error";
       label = `Expired`;
     } else if (daysUntil <= 30) {
-      color = "warning";
-      label = `Expires soon`;
+      className = "badge-warning";
+      label = `Expires in ${daysUntil} days`;
     }
 
-    return (
-      <Chip
-        label={label}
-        color={color}
-        size="small"
-        sx={{ fontWeight: "600" }}
-      />
-    );
+    // We'll use inline styles for badges here or assume global pill classes were added to SCSS
+    // or just use inline styles for simplicity since I missed defining .badge in SCSS explicitly (only .cert-badge)
+    // I'll use inline styles to match the SCSS variables I know.
+    const styles = {
+      padding: "2px 8px",
+      borderRadius: "12px",
+      fontSize: "0.75rem",
+      fontWeight: 600,
+      backgroundColor:
+        daysUntil < 0 ? "#fee2e2" : daysUntil <= 30 ? "#ffedd5" : "#dcfce7",
+      color:
+        daysUntil < 0 ? "#ef4444" : daysUntil <= 30 ? "#F97316" : "#16A34A",
+    };
+
+    return <span style={styles}>{label}</span>;
   };
 
   const handleAddDocument = async () => {
@@ -110,7 +142,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
           body: JSON.stringify({
             title: documentTitle,
             url: uploadedFiles[0].url,
-            expirationDate: expirationDate,
+            expirationDate: expirationDate || null,
             reminderDays: reminderDays,
           }),
         }
@@ -122,7 +154,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
         setAddDocumentOpen(false);
         setDocumentTitle("");
         setUploadedFiles([]);
-        setExpirationDate(null);
+        setExpirationDate("");
         setReminderDays(30);
         onRefreshProfile();
       } else {
@@ -165,6 +197,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
       onSetError("Failed to download document");
     }
   };
+
   const handleDeleteDocument = async (documentId) => {
     if (!window.confirm("Are you sure you want to delete this document?")) {
       return;
@@ -193,287 +226,226 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
     }
   };
 
-  const filteredDocuments =
-    user?.documents?.filter((doc) =>
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
-
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-          }}
-        >
-          <TextField
-            size="small"
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "16px",
+        }}
+      >
+        <div style={{ position: "relative", width: "300px" }}>
+          <Search
+            style={{
+              position: "absolute",
+              left: "10px",
+              top: "10px",
+              color: "#94a3b8",
+              fontSize: 20,
+            }}
+          />
+          <input
+            type="text"
             placeholder="Search documents..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <SearchIcon sx={{ color: "text.secondary", mr: 1 }} />
-              ),
+            style={{
+              width: "100%",
+              padding: "10px 10px 10px 36px",
+              borderRadius: "8px",
+              border: "1px solid #e2e8f0",
+              fontSize: "0.9rem",
             }}
-            sx={{ width: 300 }}
           />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setAddDocumentOpen(true)}
-            sx={{
-              background: "linear-gradient(135deg, #667eea, #764ba2)",
-              "&:hover": {
-                background: "linear-gradient(135deg, #5a6fd8, #6a42a0)",
-              },
-            }}
-          >
-            Add Document
-          </Button>
-        </Box>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={() => setAddDocumentOpen(true)}
+        >
+          <Add style={{ fontSize: 18 }} /> Add Document
+        </button>
+      </div>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: "#f8f9fa" }}>
-                <TableCell sx={{ fontWeight: 600 }}>Document Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Upload Date</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Expiration Date</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Reminder</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {user?.documents?.length > 0 ? (
-                user.documents
-                  .filter((doc) =>
-                    doc.title.toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  .map((doc) => (
-                    <TableRow key={doc._id} hover>
-                      <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Avatar
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              mr: 1.5,
-                              bgcolor: "primary.light",
-                              color: "primary.dark",
-                            }}
-                          >
-                            {doc.title.charAt(0).toUpperCase()}
-                          </Avatar>
-                          <Box>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 500 }}
-                            >
-                              {doc.title}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{formatDate(doc.uploadDate)}</TableCell>
-                      <TableCell>{formatDate(doc.expirationDate)}</TableCell>
-                      <TableCell>
-                        {getExpirationChip(doc.expirationDate)}
-                      </TableCell>
-                      <TableCell>
-                        {doc.reminderDays ? (
-                          <Chip
-                            label={`${doc.reminderDays} days`}
-                            size="small"
-                            variant="outlined"
-                            color="info"
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            None
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Box
-                          sx={{
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Document Name</th>
+              <th>Upload Date</th>
+              <th>Expiration</th>
+              <th>Status</th>
+              <th>Reminder</th>
+              <th style={{ textAlign: "center" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {user?.documents?.length > 0 ? (
+              user.documents
+                .filter((doc) =>
+                  doc.title.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((doc) => (
+                  <tr key={doc._id}>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "32px",
+                            height: "32px",
+                            background: "#e0e7ff",
+                            color: "#4338ca",
+                            borderRadius: "50%",
                             display: "flex",
-                            justifyContent: "flex-end",
                             alignItems: "center",
-                            gap: 1, // spacing between buttons
+                            justifyContent: "center",
+                            fontWeight: "bold",
                           }}
                         >
-                          <Tooltip title="View Document" arrow>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleViewDocument(doc.url)}
-                              sx={{
-                                bgcolor: alpha("#2196f3", 0.1),
-                                color: "#2196f3",
-                                width: 36,
-                                height: 36,
-                                "&:hover": {
-                                  bgcolor: alpha("#2196f3", 0.2),
-                                  transform: "scale(1.05)",
-                                },
-                                transition: "all 0.2s ease",
-                              }}
-                            >
-                              <VisibilityIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download Document" arrow>
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                handleDownloadDocument(doc.url, doc.title)
-                              }
-                              sx={{
-                                bgcolor: alpha("#4caf50", 0.1),
-                                color: "#4caf50",
-                                width: 36,
-                                height: 36,
-                                "&:hover": {
-                                  bgcolor: alpha("#4caf50", 0.2),
-                                  transform: "scale(1.05)",
-                                },
-                                transition: "all 0.2s ease",
-                              }}
-                            >
-                              <DownloadIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete Document" arrow>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteDocument(doc._id)}
-                              sx={{
-                                bgcolor: alpha("#f44336", 0.1),
-                                color: "#f44336",
-                                width: 36,
-                                height: 36,
-                                "&:hover": {
-                                  bgcolor: alpha("#f44336", 0.2),
-                                  transform: "scale(1.05)",
-                                },
-                                transition: "all 0.2s ease",
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography
-                      color="text.secondary"
-                      sx={{ fontStyle: "italic" }}
-                    >
-                      No documents uploaded yet.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                          {doc.title.charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 500 }}>{doc.title}</span>
+                      </div>
+                    </td>
+                    <td>{formatDate(doc.uploadDate)}</td>
+                    <td>{formatDate(doc.expirationDate)}</td>
+                    <td>{getExpirationBadge(doc.expirationDate)}</td>
+                    <td>
+                      {doc.reminderDays ? `${doc.reminderDays} days` : "-"}
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => handleViewDocument(doc.url)}
+                          title="View"
+                          style={{ color: "#0ea5e9", background: "#e0f2fe" }}
+                        >
+                          <Visibility style={{ fontSize: 18 }} />
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() =>
+                            handleDownloadDocument(doc.url, doc.title)
+                          }
+                          title="Download"
+                          style={{ color: "#16a34a", background: "#dcfce7" }}
+                        >
+                          <Download style={{ fontSize: 18 }} />
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => handleDeleteDocument(doc._id)}
+                          title="Delete"
+                          style={{ color: "#ef4444", background: "#fee2e2" }}
+                        >
+                          <Delete style={{ fontSize: 18 }} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+            ) : (
+              <tr>
+                <td
+                  colSpan="6"
+                  style={{
+                    textAlign: "center",
+                    padding: "2rem",
+                    color: "#64748B",
+                  }}
+                >
+                  No documents uploaded yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-        {/* Add Document Dialog */}
-        <Dialog
-          open={addDocumentOpen}
-          onClose={() => setAddDocumentOpen(false)}
-          maxWidth="sm"
-          fullWidth
+      {/* Add Document Modal */}
+      <CustomModal
+        isOpen={addDocumentOpen}
+        onClose={() => setAddDocumentOpen(false)}
+        title="Add New Document"
+      >
+        <div className="form-group">
+          <label>Document Title</label>
+          <input
+            type="text"
+            value={documentTitle}
+            onChange={(e) => setDocumentTitle(e.target.value)}
+            placeholder="e.g. Passport"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Upload File</label>
+          <FileUpload
+            onFilesUploaded={setUploadedFiles}
+            onFileDeleted={() => setUploadedFiles([])}
+            bucketPath="user-documents"
+            multiple={false}
+            existingFiles={uploadedFiles}
+            acceptedFileTypes={[".pdf", ".jpg", ".jpeg", ".png"]}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Expiration Date (Optional)</label>
+          {/* Standard HTML date input instead of MUI DatePicker */}
+          <input
+            type="date"
+            value={expirationDate}
+            onChange={(e) => setExpirationDate(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Reminder</label>
+          <select
+            value={reminderDays}
+            onChange={(e) => setReminderDays(e.target.value)}
+          >
+            <option value={7}>7 days before</option>
+            <option value={15}>15 days before</option>
+            <option value={30}>30 days before</option>
+            <option value={60}>60 days before</option>
+          </select>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "1rem",
+            marginTop: "24px",
+          }}
         >
-          <DialogTitle sx={{ fontWeight: "bold" }}>
-            Add New Document
-          </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Document Title"
-              fullWidth
-              variant="outlined"
-              value={documentTitle}
-              onChange={(e) => setDocumentTitle(e.target.value)}
-              sx={{ mt: 1, mb: 2 }}
-              placeholder="e.g., Passport, PAN Card"
-            />
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Upload File
-              </Typography>
-              <FileUpload
-                onFilesUploaded={setUploadedFiles}
-                onFileDeleted={() => setUploadedFiles([])}
-                bucketPath="user-documents"
-                multiple={false}
-                existingFiles={uploadedFiles}
-                acceptedFileTypes={[".pdf", ".jpg", ".jpeg", ".png"]}
-              />
-            </Box>
-            <DatePicker
-              label="Expiration Date (Optional)"
-              value={expirationDate}
-              onChange={setExpirationDate}
-              renderInput={(params) => (
-                <TextField {...params} fullWidth sx={{ mb: 2 }} />
-              )}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Reminder</InputLabel>
-              <Select
-                value={reminderDays}
-                onChange={(e) => setReminderDays(e.target.value)}
-                label="Reminder"
-              >
-                <MenuItem value={7}>7 days before</MenuItem>
-                <MenuItem value={15}>15 days before</MenuItem>
-                <MenuItem value={30}>30 days before</MenuItem>
-                <MenuItem value={60}>60 days before</MenuItem>
-              </Select>
-            </FormControl>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3 }}>
-            <Button
-              onClick={() => setAddDocumentOpen(false)}
-              sx={{
-                textTransform: "none",
-                fontWeight: 600,
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddDocument}
-              variant="contained"
-              sx={{
-                background: "linear-gradient(135deg, #667eea, #764ba2)",
-                textTransform: "none",
-                fontWeight: 600,
-                px: 3,
-                "&:hover": {
-                  background: "linear-gradient(135deg, #5a6fd8, #6a42a0)",
-                },
-              }}
-            >
-              Add Document
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    </LocalizationProvider>
+          <button
+            className="btn btn-outline"
+            onClick={() => setAddDocumentOpen(false)}
+          >
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleAddDocument}>
+            Add Document
+          </button>
+        </div>
+      </CustomModal>
+    </div>
   );
 };
 
