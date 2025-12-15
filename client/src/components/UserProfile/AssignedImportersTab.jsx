@@ -1,17 +1,4 @@
-// components/UserProfile/AssignedImportersTab.jsx
 import React from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Avatar,
-  Typography,
-  Box,
-  Chip,
-} from "@mui/material";
 
 const AssignedImportersTab = ({ user, kycSummary }) => {
   const formatDate = (dateString) => {
@@ -24,17 +11,17 @@ const AssignedImportersTab = ({ user, kycSummary }) => {
   };
 
   return (
-    <TableContainer>
-      <Table>
-        <TableHead>
-          <TableRow sx={{ bgcolor: "#f8f9fa" }}>
-            <TableCell sx={{ fontWeight: 600 }}>Importer Name</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>AEO Status</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Last Verified</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+    <div className="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Importer Name</th>
+            <th>IE Code</th>
+            <th>AEO Status</th>
+            <th style={{ textAlign: "right" }}>Last Verified</th>
+          </tr>
+        </thead>
+        <tbody>
           {user?.ie_code_assignments?.length > 0 ? (
             user.ie_code_assignments.map((assignment, index) => {
               const kycData = kycSummary?.kyc_summaries?.find(
@@ -42,66 +29,89 @@ const AssignedImportersTab = ({ user, kycSummary }) => {
               );
 
               return (
-                <TableRow key={index} hover>
-                  <TableCell>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Avatar
-                        sx={{
+                <tr key={index}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <div
+                        style={{
                           width: 32,
                           height: 32,
-                          mr: 1.5,
-                          bgcolor: "secondary.light",
+                          marginRight: "10px",
+                          backgroundColor: "#f1f5f9",
+                          color: "#64748B",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: "bold",
                         }}
                       >
                         {assignment.importer_name.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {assignment.importer_name}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {assignment.ie_code_no}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
+                      </div>
+                      <span style={{ fontWeight: 500 }}>
+                        {assignment.importer_name}
+                      </span>
+                    </div>
+                  </td>
+                  <td>{assignment.ie_code_no}</td>
+                  <td>
                     {kycData ? (
-                      <Chip
-                        label={
-                          kycData.has_aeo_data ? "Verified" : "Not Found"
-                        }
-                        color={kycData.has_aeo_data ? "success" : "default"}
-                        size="small"
-                      />
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          backgroundColor: kycData.has_aeo_data
+                            ? "#dcfce7"
+                            : "#f1f5f9",
+                          color: kycData.has_aeo_data ? "#16A34A" : "#64748B",
+                        }}
+                      >
+                        {kycData.has_aeo_data ? "Verified" : "Not Found"}
+                      </span>
                     ) : (
-                      <Chip label="Pending" color="warning" size="small" />
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          backgroundColor: "#ffedd5",
+                          color: "#F97316",
+                        }}
+                      >
+                        Pending
+                      </span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <span style={{ color: "#64748B" }}>
                       {kycData?.last_verification
                         ? formatDate(kycData.last_verification)
                         : "Never"}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                    </span>
+                  </td>
+                </tr>
               );
             })
           ) : (
-            <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                <Typography color="text.secondary" sx={{ fontStyle: "italic" }}>
-                  No importers assigned
-                </Typography>
-              </TableCell>
-            </TableRow>
+            <tr>
+              <td
+                colSpan={4}
+                style={{
+                  textAlign: "center",
+                  padding: "2rem",
+                  color: "#64748B",
+                }}
+              >
+                No importers assigned
+              </td>
+            </tr>
           )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+        </tbody>
+      </table>
+    </div>
   );
 };
 
