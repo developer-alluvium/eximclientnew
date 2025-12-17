@@ -74,3 +74,4 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+eximserver-SFPL.pem
