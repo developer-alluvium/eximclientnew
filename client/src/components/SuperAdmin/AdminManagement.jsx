@@ -138,8 +138,8 @@ const AdminManagement = ({ onRefresh }) => {
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
 
   // Search states
-  const [userSearch, setUserSearch] = useState("");
-  const [ieCodeSearch, setIeCodeSearch] = useState(""); // New IE Code search
+  const [userSearch, setUserSearch] = useState({ value: "", options: [] });
+  const [ieCodeSearch, setIeCodeSearch] = useState({ value: "", options: [] }); // New IE Code search
   const [tabSettings, setTabSettings] = useState({
     jobsTabVisible: false,
     gandhidhamTabVisible: false,
@@ -208,7 +208,7 @@ const AdminManagement = ({ onRefresh }) => {
 
         // Pre-populate IE code search options
         const ieCodeOptions = ieCodesData.map((ieCode) => ({
-          label: `${ieCode.iecNo} - ${ieCode.importerName}`,
+          label: `${ieCode.iecNo}`,
           value: ieCode.iecNo,
           ieCode: ieCode,
         }));
@@ -720,18 +720,24 @@ const AdminManagement = ({ onRefresh }) => {
     if (!userSearch.value) return users;
 
     const searchTerm = userSearch.value.toLowerCase();
-    return users.filter(
-      (user) =>
+    return users.filter((user) => {
+      const userLabel = `${user.name} - ${user.email}${
+        user.ie_code_no ? ` (${user.ie_code_no})` : ""
+      }`.toLowerCase();
+
+      return (
         user.name?.toLowerCase().includes(searchTerm) ||
         user.email?.toLowerCase().includes(searchTerm) ||
         user.ie_code_no?.toLowerCase().includes(searchTerm) ||
         user.assignedImporterName?.toLowerCase().includes(searchTerm) ||
+        userLabel.includes(searchTerm) ||
         user.ie_code_assignments?.some(
           (assignment) =>
             assignment.ie_code_no?.toLowerCase().includes(searchTerm) ||
             assignment.importer_name?.toLowerCase().includes(searchTerm)
         )
-    );
+      );
+    });
   }, [users, userSearch.value]);
   // Filter IE codes based on search
   // Filter IE codes based on search
@@ -739,11 +745,15 @@ const AdminManagement = ({ onRefresh }) => {
     if (!ieCodeSearch.value) return availableIeCodes;
 
     const searchTerm = ieCodeSearch.value.toLowerCase();
-    return availableIeCodes.filter(
-      (ieCode) =>
+    return availableIeCodes.filter((ieCode) => {
+      const ieCodeLabel =
+        `${ieCode.iecNo} - ${ieCode.importerName}`.toLowerCase();
+      return (
         ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
-        ieCode.importerName?.toLowerCase().includes(searchTerm)
-    );
+        ieCode.importerName?.toLowerCase().includes(searchTerm) ||
+        ieCodeLabel.includes(searchTerm)
+      );
+    });
   }, [availableIeCodes, ieCodeSearch.value]);
 
   return (
