@@ -406,28 +406,66 @@ function UserDashboard() {
     });
   }, [parsedUser?.documents]);
 
+  // --- UPDATED LOGIC FOR MULTIPLE CERTIFICATES ---
   const expiringAeoCertificates = useMemo(() => {
     const today = new Date();
-    return aeoCertificates.filter((cert) => {
-      if (!cert.certificate_validity_date) return false;
-      const validityDate = new Date(cert.certificate_validity_date);
-      const daysUntilExpiry = Math.ceil(
-        (validityDate - today) / (1000 * 60 * 60 * 24)
-      );
-      return daysUntilExpiry > 0 && daysUntilExpiry <= 90;
+    const allExpiring = [];
+
+    // Loop through each Importer Summary
+    aeoCertificates.forEach((summary) => {
+      const certs = summary.aeo_certificates || [];
+
+      // Loop through each Certificate for that importer
+      certs.forEach((cert) => {
+        if (!cert.certificate_validity_date) return;
+
+        const validityDate = new Date(cert.certificate_validity_date);
+        const daysUntilExpiry = Math.ceil(
+          (validityDate - today) / (1000 * 60 * 60 * 24)
+        );
+
+        // Check condition (Expires in next 90 days)
+        if (daysUntilExpiry > 0 && daysUntilExpiry <= 90) {
+          allExpiring.push({
+            importer_name: summary.importer_name,
+            certificate_no: cert.certificate_no,
+            daysUntilExpiry: daysUntilExpiry,
+          });
+        }
+      });
     });
+
+    return allExpiring;
   }, [aeoCertificates]);
 
   const expiredAeoCertificates = useMemo(() => {
     const today = new Date();
-    return aeoCertificates.filter((cert) => {
-      if (!cert.certificate_validity_date) return false;
-      const validityDate = new Date(cert.certificate_validity_date);
-      const daysUntilExpiry = Math.ceil(
-        (validityDate - today) / (1000 * 60 * 60 * 24)
-      );
-      return daysUntilExpiry <= 0;
+    const allExpired = [];
+
+    // Loop through each Importer Summary
+    aeoCertificates.forEach((summary) => {
+      const certs = summary.aeo_certificates || [];
+
+      // Loop through each Certificate for that importer
+      certs.forEach((cert) => {
+        if (!cert.certificate_validity_date) return;
+
+        const validityDate = new Date(cert.certificate_validity_date);
+        const daysUntilExpiry = Math.ceil(
+          (validityDate - today) / (1000 * 60 * 60 * 24)
+        );
+
+        // Check condition (Already expired)
+        if (daysUntilExpiry <= 0) {
+          allExpired.push({
+            importer_name: summary.importer_name,
+            certificate_no: cert.certificate_no,
+          });
+        }
+      });
     });
+
+    return allExpired;
   }, [aeoCertificates]);
 
   const handleCardClick = async (
@@ -643,7 +681,9 @@ function UserDashboard() {
           </WelcomeBanner>
 
           {/* Alerts */}
+          {/* Alerts Section */}
           <Box sx={{ mb: 3 }}>
+            {/* Document Alert (Existing) */}
             {docAlertOpen &&
               (expiringDocs.length > 0 || expiredDocs.length > 0) && (
                 <Alert
@@ -655,6 +695,8 @@ function UserDashboard() {
                   Attention: You have documents expiring soon or expired.
                 </Alert>
               )}
+
+            {/* AEO Alert (Updated) */}
             {aeoAlertOpen &&
               (expiringAeoCertificates.length > 0 ||
                 expiredAeoCertificates.length > 0) && (
@@ -664,7 +706,10 @@ function UserDashboard() {
                   onClick={() => navigate("/user/profile")}
                   sx={{ cursor: "pointer" }}
                 >
-                  Attention: AEO Certificates expiring soon or expired.
+                  Attention:{" "}
+                  {expiredAeoCertificates.length > 0
+                    ? `${expiredAeoCertificates.length} AEO Certificate(s) have expired.`
+                    : `${expiringAeoCertificates.length} AEO Certificate(s) match your reminder settings.`}
                 </Alert>
               )}
           </Box>

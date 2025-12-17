@@ -1,26 +1,19 @@
 // pages/UserProfile.js
 import React, { useState, useEffect, useContext } from "react";
-import {
-  Container,
-  Typography,
-  Box,
-  Grid,
-  Paper,
-  LinearProgress,
-  Alert,
-} from "@mui/material";
-
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-
 import { UserContext } from "../context/UserContext";
 import { getCookie } from "../utils/cookies";
 import BackButton from "../components/BackButton";
 import { useAEOIntegration } from "../hooks/useAEOIntegration";
-import ProfileHeader from "../components/UserProfile/ProfileHeader";
-import ProfileTabs from "../components/UserProfile/ProfileTabs";
-// import AEOReminderSettingsDialog from "../components/UserProfile/AEOReminderSettingsDialog.jsx";
 import { useSnackbar } from "notistack";
+import { Refresh } from "@mui/icons-material";
+
+// Components
+import ProfileSummaryCard from "../components/UserProfile/ProfileSummaryCard";
+import AEOCertificatesCard from "../components/UserProfile/AEOCertificatesCard";
+import ProfileTabsContent from "../components/UserProfile/ProfileTabsContent";
+
+// Styles
+import "../styles/UserProfile.scss";
 
 const UserProfile = () => {
   const { user: contextUser } = useContext(UserContext);
@@ -37,7 +30,6 @@ const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetchUserProfile();
@@ -63,7 +55,6 @@ const UserProfile = () => {
         if (data.user.ie_code_assignments?.length > 0) {
           setTimeout(async () => {
             try {
-              await autoVerifyImporters();
               await fetchKYCSummary();
             } catch (error) {
               console.error("AEO auto-verification failed:", error);
@@ -114,6 +105,7 @@ const UserProfile = () => {
       throw error;
     }
   };
+
   const handleRefreshAEO = async () => {
     try {
       await autoVerifyImporters();
@@ -126,81 +118,123 @@ const UserProfile = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ width: "100%", mb: 2 }}>
-          <LinearProgress />
-        </Box>
-        <Typography variant="h6" color="text.secondary" align="center">
-          Loading your profile...
-        </Typography>
-      </Container>
+      <div
+        className="user-profile-container"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <div>Loading...</div>
+      </div>
     );
   }
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
-        {/* Alerts */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert
-            severity="success"
-            sx={{ mb: 2 }}
-            onClose={() => setSuccess("")}
-          >
-            {success}
-          </Alert>
-        )}
-
-        {aeoError && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            AEO Verification: {aeoError}
-          </Alert>
-        )}
-
-        <Box sx={{ mb: 3 }}>
+    <div className="user-profile-container">
+      {/* Compact Header Section */}
+      <div className="profile-header-compact">
+        <div className="header-left">
           <BackButton />
-        </Box>
+          <div className="header-text">
+            <h1 className="profile-header-title">User Profile</h1>
+            <span className="profile-header-subtitle">
+              Manage your profile, documents, and AEO certificate status
+            </span>
+          </div>
+        </div>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={handleRefreshAEO}
+          disabled={aeoLoading}
+        >
+          <Refresh style={{ fontSize: 16 }} /> Refresh AEO Data
+        </button>
+      </div>
 
-        {/* Header Section */}
-        <ProfileHeader
-          user={user}
-          kycSummary={kycSummary}
-          onRefreshAEO={handleRefreshAEO}
-          aeoLoading={aeoLoading}
-          // Removed onOpenReminderSettings from here
-        />
+      {/* Global Alerts */}
+      {error && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            background: "#fee2e2",
+            color: "#ef4444",
+            borderRadius: "8px",
+            border: "1px solid #fecaca",
+          }}
+        >
+          {error}{" "}
+          <button
+            onClick={() => setError("")}
+            style={{
+              float: "right",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            x
+          </button>
+        </div>
+      )}
+      {success && (
+        <div
+          style={{
+            padding: "1rem",
+            marginBottom: "1rem",
+            background: "#dcfce7",
+            color: "#16a34a",
+            borderRadius: "8px",
+            border: "1px solid #bbf7d0",
+          }}
+        >
+          {success}{" "}
+          <button
+            onClick={() => setSuccess("")}
+            style={{
+              float: "right",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            x
+          </button>
+        </div>
+      )}
 
-        {/* Tabs Section */}
-        <ProfileTabs
-          user={user}
-          kycSummary={kycSummary}
-          aeoLoading={aeoLoading}
-          onUpdateImporterName={updateImporterName}
-          onFetchKYCSummary={fetchKYCSummary}
-          onRefreshProfile={fetchUserProfile}
-          onSetError={setError}
-          onSetSuccess={setSuccess}
-          // Added onOpenReminderSettings here to be passed to the link
-          onOpenReminderSettings={() => setReminderSettingsOpen(true)}
-        />
+      {/* Main 2-Column Layout */}
+      <div className="profile-layout">
+        {/* Left Column: Profile Summary */}
+        <div className="left-column">
+          <ProfileSummaryCard user={user} />
+        </div>
 
-        {/* AEO Reminder Settings Dialog */}
-        {/* Uncommented the dialog and passed the handler */}
-        {/* <AEOReminderSettingsDialog
-          open={reminderSettingsOpen}
-          onClose={() => setReminderSettingsOpen(false)}
-          user={user}
-          aeoCertificates={kycSummary?.kyc_summaries || []}
-          onUpdate={handleUpdateReminderSettings}
-        /> */}
-      </Container>
-    </LocalizationProvider>
+        {/* Right Column: Content */}
+        <div className="right-column">
+          {/* Top Card: AEO Certificates */}
+          <AEOCertificatesCard
+            user={user}
+            kycSummary={kycSummary}
+            onFetchKYCSummary={fetchKYCSummary}
+            onSetError={setError}
+            onSetSuccess={setSuccess}
+            onUpdateReminderSettings={handleUpdateReminderSettings}
+          />
+
+          {/* Bottom Card: Tabs (Documents & Importers) */}
+          <ProfileTabsContent
+            user={user}
+            kycSummary={kycSummary}
+            onRefreshProfile={fetchUserProfile}
+            onSetError={setError}
+            onSetSuccess={setSuccess}
+          />
+        </div>
+      </div>
+    </div>
   );
 };
 
