@@ -1,4 +1,4 @@
-import AWS from "aws-sdk";
+import axios from "./axiosConfig";
 
 export const handleFileUpload = async (
   e,
@@ -13,27 +13,29 @@ export const handleFileUpload = async (
   }
 
   try {
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.REACT_APP_ACCESS_KEY,
-      secretAccessKey: process.env.REACT_APP_SECRET_ACCESS_KEY,
-      region: "ap-south-1",
-    });
-
     const uploadedFiles = [];
 
     for (let i = 0; i < e.target.files.length; i++) {
       const file = e.target.files[i];
-      const params = {
-        Bucket: process.env.REACT_APP_S3_BUCKET,
-        Key: `${folderName}/${file.name}`,
-        Body: file,
-      };
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folderName", folderName);
 
-      // Upload the file to S3 and wait for the promise to resolve
-      const data = await s3.upload(params).promise();
+      // Upload via backend API
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/upload`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       // Store the S3 URL in the uploadedFiles array
-      uploadedFiles.push(data.Location);
+      if (response.data && response.data.Location) {
+        uploadedFiles.push(response.data.Location);
+      }
     }
 
     // Update formik values with the uploaded file URLs
@@ -49,30 +51,25 @@ export const handleFileUpload = async (
     }, 3000);
   } catch (err) {
     console.error("Error uploading files:", err);
+    alert("Error uploading files. Please try again.");
   }
 };
 
-export const uploadFileToS3 = (file, folderName) => {
-  AWS.config.update({
-    region: "ap-south-1",
-    accessKeyId: process.env.REACT_APP_ACCESS_KEY,
-    secretAccessKey: process.env.REACT_APP_SECRET_ACCESS_KEY,
-  });
+export const uploadFileToS3 = async (file, folderName) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("folderName", folderName);
 
-  const s3 = new AWS.S3();
+  const response = await axios.post(
+    `${process.env.REACT_APP_API_STRING}/upload`,
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
 
-  const timestamp = Date.now(); // Unix timestamp in milliseconds
-  const fileExtension = file.name.substring(file.name.lastIndexOf('.')); // Get the file extension
-  const baseFileName = file.name.substring(0, file.name.lastIndexOf('.')); // Get base name without extension
-
-  const uniqueFileName = `${baseFileName}-${timestamp}${fileExtension}`;
-
-  const params = {
-    Bucket: process.env.REACT_APP_S3_BUCKET,
-    Key: `${folderName}/${uniqueFileName}`,
-    Body: file,
-    ContentType: file.type,
-  };
-
-  return s3.upload(params).promise();
+  // Return the data object which contains Location, matching the previous S3 promise result structure
+  return response.data;
 };

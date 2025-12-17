@@ -10,9 +10,13 @@ export function setCookie(name, value, days = 7, opts = {}) {
     `Path=/`,
   ];
 
-  // Security defaults for production
-  if (isProduction) {
+  // Security defaults
+  // Only set Secure if actually on HTTPS to avoid cookie rejection on localhost/http
+  if (window.location.protocol === "https:") {
     cookieParts.push("Secure");
+  }
+
+  if (isProduction) {
     cookieParts.push("SameSite=Lax");
   } else if (opts.sameSite) {
     cookieParts.push(`SameSite=${opts.sameSite}`);
