@@ -5,7 +5,13 @@ import { getCookie } from "./cookies";
 axios.interceptors.request.use(
   (config) => {
     const token = getCookie("access_token");
-    if (token) {
+    console.log("Token check:", {
+      token,
+      typeOfToken: typeof token,
+      isTokenNull: token === null,
+    });
+    // Ensure token is valid and not string "null"/"undefined"
+    if (token && token !== "null" && token !== "undefined") {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }

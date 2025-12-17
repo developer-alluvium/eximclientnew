@@ -511,20 +511,32 @@ export const generateUserToken = (user, userType = "user") => {
  */
 export const authenticateUser = async (req, res, next) => {
   try {
+    console.log('========== AUTH DEBUG ==========');
+    console.log('Cookies received:', req.cookies);
+    console.log('Authorization header:', req.headers.authorization);
+    console.log('================================');
+    
     // Get token from cookie or Authorization header
     const token =
-      (req.cookies && req.cookies.user_access_token) ||
-      (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+      (req.cookies && req.cookies.access_token) ||           // Standard cookie
+      (req.cookies && req.cookies.user_access_token) ||      // User-specific cookie
+      (req.cookies && req.cookies.customer_admin_access_token) || // Admin cookie
+      (req.headers.authorization && req.headers.authorization.split(" ")[1]) || // Bearer token
+      (req.headers.authorization && req.headers.authorization.replace("Bearer ", "")); // Bearer without space
 
     if (!token) {
+      console.log('❌ No token found in cookies or headers');
       return res.status(401).json({
         success: false,
         message: "Access denied. No token provided.",
       });
     }
 
+    console.log('✅ Token found, length:', token.length);
+
     // Verify token
     const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
+    console.log('✅ Token decoded, user ID:', decoded.id);
 
     // Get user based on type
     let user;
@@ -542,6 +554,7 @@ export const authenticateUser = async (req, res, next) => {
         user = await SuperAdminModel.findById(decoded.id);
         break;
       default:
+        console.log('❌ Invalid user type:', decoded.userType);
         return res.status(401).json({
           success: false,
           message: "Invalid user type.",
@@ -549,6 +562,7 @@ export const authenticateUser = async (req, res, next) => {
     }
 
     if (!user) {
+      console.log('❌ User not found in database');
       return res.status(401).json({
         success: false,
         message: "Invalid token. User not found.",
@@ -557,6 +571,7 @@ export const authenticateUser = async (req, res, next) => {
 
     // Check if user is active
     if (!user.isActive) {
+      console.log('❌ User account inactive');
       return res.status(401).json({
         success: false,
         message: "Account is inactive. Please contact support.",
@@ -565,6 +580,7 @@ export const authenticateUser = async (req, res, next) => {
 
     // For users, check if they're verified
     if (decoded.userType === "user" && user.status === "pending") {
+      console.log('❌ User account pending verification');
       return res.status(403).json({
         success: false,
         message:
@@ -572,12 +588,16 @@ export const authenticateUser = async (req, res, next) => {
       });
     }
 
+    console.log('✅ Authentication successful for user:', user.email);
+
     // Attach user to request
     req.user = user;
     req.userType = decoded.userType;
 
     next();
   } catch (error) {
+    console.log('❌ Authentication error:', error.message);
+    
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
@@ -599,6 +619,7 @@ export const authenticateUser = async (req, res, next) => {
     });
   }
 };
+
 
 /**
  * Authorization middleware to check user roles

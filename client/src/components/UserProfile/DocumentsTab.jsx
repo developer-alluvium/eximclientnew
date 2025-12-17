@@ -10,57 +10,21 @@ import {
 import FileUpload from "../../utils/FileUpload";
 import { getCookie } from "../../utils/cookies";
 
-// Simple Modal (duplicated for independence)
+import "../../styles/UserProfile.scss";
+
+// Simple Modal (updated with premium styles)
 const CustomModal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "24px",
-          borderRadius: "12px",
-          width: "90%",
-          maxWidth: "500px",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>
-            {title}
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-            }}
-          >
+    <div className="custom-modal-overlay">
+      <div className="custom-modal-content">
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button className="close-btn" onClick={onClose}>
             <Close />
           </button>
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );
@@ -383,7 +347,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
         title="Add New Document"
       >
         <div className="form-group">
-          <label>Document Title</label>
+          <label>Document Title*</label>
           <input
             type="text"
             value={documentTitle}
@@ -401,30 +365,49 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
             multiple={false}
             existingFiles={uploadedFiles}
             acceptedFileTypes={[".pdf", ".jpg", ".jpeg", ".png"]}
+            fullWidth={true}
+            buttonSx={{
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 600,
+              boxShadow: "0 4px 15px rgba(102, 126, 234, 0.3)",
+              "&:hover": {
+                background: "linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)",
+                boxShadow: "0 6px 20px rgba(102, 126, 234, 0.4)",
+              },
+            }}
           />
         </div>
 
-        <div className="form-group">
-          <label>Expiration Date (Optional)</label>
-          {/* Standard HTML date input instead of MUI DatePicker */}
-          <input
-            type="date"
-            value={expirationDate}
-            onChange={(e) => setExpirationDate(e.target.value)}
-          />
-        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "1rem",
+          }}
+        >
+          <div className="form-group">
+            <label>Expiration Date (Optional)</label>
+            <input
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+            />
+          </div>
 
-        <div className="form-group">
-          <label>Reminder</label>
-          <select
-            value={reminderDays}
-            onChange={(e) => setReminderDays(e.target.value)}
-          >
-            <option value={7}>7 days before</option>
-            <option value={15}>15 days before</option>
-            <option value={30}>30 days before</option>
-            <option value={60}>60 days before</option>
-          </select>
+          <div className="form-group">
+            <label>Reminder</label>
+            <select
+              value={reminderDays}
+              onChange={(e) => setReminderDays(e.target.value)}
+            >
+              <option value={7}>7 days before</option>
+              <option value={15}>15 days before</option>
+              <option value={30}>30 days before</option>
+              <option value={60}>60 days before</option>
+            </select>
+          </div>
         </div>
 
         <div
@@ -432,7 +415,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
             display: "flex",
             justifyContent: "flex-end",
             gap: "1rem",
-            marginTop: "24px",
+            marginTop: "16px",
           }}
         >
           <button

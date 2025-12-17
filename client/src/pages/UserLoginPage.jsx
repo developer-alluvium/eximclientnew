@@ -93,8 +93,16 @@ function UserLoginPage() {
           navigate("/superadmin-dashboard", { replace: true });
         } else {
           // Handle User successful login
+          console.log("Login Response Data:", response.data);
           const { user } = response.data.data;
           const { accessToken, refreshToken } = response.data;
+
+          console.log("Token check:", {
+            accessToken,
+            refreshToken,
+            typeOfAccess: typeof accessToken,
+            isAccessNull: accessToken === null,
+          });
 
           // Enhanced user data storage with IE code assignments
           const enhancedUserData = {
@@ -114,8 +122,18 @@ function UserLoginPage() {
 
           // Fixed the localStorage calls here - replaced 'storage' with 'localStorage'
           setJsonCookie("exim_user", enhancedUserData, 7);
-          setCookie("access_token", accessToken, 7);
-          setCookie("refresh_token", refreshToken, 7);
+
+          if (accessToken && accessToken !== "null") {
+            setCookie("access_token", accessToken, 7);
+          } else {
+            console.error(
+              "CRITICAL: Attempted to set null access token cookie"
+            );
+          }
+
+          if (refreshToken && refreshToken !== "null") {
+            setCookie("refresh_token", refreshToken, 7);
+          }
           // Store IE code assignments separately for quick access
           setJsonCookie(
             "ie_code_assignments",

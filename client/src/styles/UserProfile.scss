@@ -403,3 +403,155 @@ $border-color: #e2e8f0; // Slate 200
     }
   }
 }
+
+// Premium Modal Styles
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.custom-modal-content {
+  background: $white;
+  border-radius: 16px; // Slightly less rounded for "compact" feel
+  width: 95%;
+  max-width: 650px; // Wider
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  overflow: visible; // Allow dropdowns to overflow if needed, but hidden is safer for modal radius. Keep hidden.
+  overflow: hidden;
+  border: none;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+
+  .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem 1.5rem; // Reduced vertical padding
+    position: relative;
+    overflow: hidden;
+    color: $white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    // Decorative circles
+    &::before {
+      content: "";
+      position: absolute;
+      top: -30px;
+      right: 30px;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: 20px;
+      left: -20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    h3 {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: $white;
+    }
+
+    .close-btn {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: $white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+      }
+
+      svg {
+        font-size: 1.25rem;
+      }
+    }
+  }
+
+  .modal-body {
+    padding: 1.25rem 1.5rem; // Compact padding
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; // Reduced gap
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+// Enhance form elements for modal
+.modal-body {
+  .form-group {
+    margin-bottom: 0; // handled by flex gap
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: $text-primary;
+      margin-bottom: 0.5rem;
+    }
+
+    input,
+    select {
+      border: 2px solid $border-color;
+      padding: 0.75rem;
+      border-radius: 10px;
+      transition: all 0.2s;
+
+      &:focus {
+        border-color: #667eea; // match modal gradient primary
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+      }
+    }
+  }
+}
