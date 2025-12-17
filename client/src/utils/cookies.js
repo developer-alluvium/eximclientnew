@@ -17,7 +17,7 @@ export function setCookie(name, value, days = 7, opts = {}) {
   }
 
   if (isProduction) {
-    cookieParts.push("SameSite=Lax");
+    cookieParts.push("SameSite=None");
   } else if (opts.sameSite) {
     cookieParts.push(`SameSite=${opts.sameSite}`);
   }
@@ -47,7 +47,7 @@ export function removeCookie(name, opts = {}) {
   if (opts.domain) cookieParts.push(`Domain=${opts.domain}`);
   if (isProduction) {
     cookieParts.push("Secure");
-    cookieParts.push("SameSite=Lax");
+    cookieParts.push("SameSite=None");
   }
   document.cookie = cookieParts.join("; ");
 }

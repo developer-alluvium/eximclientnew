@@ -139,7 +139,7 @@ export const createSendTokens = (
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.COOKIE_SAMESITE || "lax",
+    sameSite: process.env.COOKIE_SAMESITE || "None",
     path: "/",
   };
 
@@ -323,7 +323,7 @@ export const refreshAccessToken = async (req, res) => {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.COOKIE_SAMESITE || "lax",
+      sameSite: process.env.COOKIE_SAMESITE || "None",
       path: "/",
     };
 
@@ -388,7 +388,7 @@ export const logout = (req, res) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.COOKIE_SAMESITE || "lax",
+    sameSite: process.env.COOKIE_SAMESITE || "None",
     path: "/",
   };
 
@@ -761,7 +761,7 @@ export const sendUserAuthResponse = (
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.COOKIE_SAMESITE || "lax",
+    sameSite: process.env.COOKIE_SAMESITE || "None",
     path: "/",
   };
 
