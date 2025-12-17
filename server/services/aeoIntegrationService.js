@@ -217,32 +217,133 @@ export class AEOIntegrationService {
   /**
    * Complete AEO lookup flow for profile click
    */
-  static async lookupAEOFromProfile(certificateNumber, ieCode) {
+  static async lookupAEOFromProfile(importerName, ieCode) {
+    const result = {
+      success: false,
+      source: null,
+      directory_data: null,
+      india_data: null,
+      final_data: null,
+      kyc_record: null,
+      errors: {},
+    };
+
     try {
       console.log(
-        `Starting complete AEO lookup from profile for certificate: ${certificateNumber}`
+        `Starting complete AEO lookup from profile for: ${importerName}`
       );
-      const cleanIeCode = ieCode.replace(/\s+/g, "").toUpperCase();
-      console.log("Certificate Number:", certificateNumber);
-      // Get official data from AEO India
-      const aeoData = await this.fetchFromAEOIndia(certificateNumber);
+      const cleanIeCode = ieCode ? ieCode.replace(/\s+/g, "").toUpperCase() : "";
 
-      // Save to CustomerKyc
-      const kycRecord = await this.saveToCustomerKyc(cleanIeCode, aeoData);
+      // STEP 1: Get certificate number from AEODirectory (non-fatal)
+      try {
+        result.directory_data = await this.searchAeodirectory(importerName);
+      } catch (err) {
+        console.error("AEODirectory lookup failed:", err?.message || err);
+        result.errors.directory = err?.message || String(err);
+      }
 
-      console.log("AEO profile lookup completed successfully");
+      // If no certificate number available from directory, return partial info (don't throw)
+      const certFromDirectory =
+        result.directory_data?.certificate_number ||
+        result.directory_data?.certificate_no;
+      if (!certFromDirectory) {
+        result.message =
+          "No certificate number found in AEODirectory for the importer";
+        // Still attempt to save minimal KYC using directory company name if present
+        const minimalAeo = {
+          company_name:
+            result.directory_data?.company_name || importerName || "",
+          company_address: result.directory_data?.company_address || "",
+          aeo_tier: result.directory_data?.aeo_tier || "",
+          certificate_no: "",
+          certificate_issue_date: null,
+          certificate_validity_date: null,
+          certificate_present_validity_status: "",
+        };
 
-      return {
-        success: true,
-        source: "aeoindia",
-        data: aeoData,
-        kyc_record: kycRecord,
+        result.final_data = minimalAeo;
+        try {
+          // saveToCustomerKyc is tolerant; returns record or throws — catch below
+          result.kyc_record = await this.saveToCustomerKyc(
+            cleanIeCode,
+            minimalAeo
+          );
+          result.success = true;
+          result.source = result.directory_data ? "directory" : "manual";
+        } catch (err) {
+          console.error("Save minimal KYC failed:", err);
+          result.errors.save = err?.message || String(err);
+        }
+
+        return result;
+      }
+
+      // Small delay between requests
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // STEP 2: Get official data from AEO India (non-fatal)
+      try {
+        result.india_data = await this.fetchFromAEOIndia(certFromDirectory);
+      } catch (err) {
+        console.error("AEO India fetch failed:", err?.message || err);
+        result.errors.india = err?.message || String(err);
+      }
+
+      // STEP 3: Merge data (AEO India authoritative when available)
+      const finalData = {
+        company_name:
+          result.india_data?.company_name ||
+          result.directory_data?.company_name ||
+          importerName ||
+          "",
+        company_address:
+          result.india_data?.company_address ||
+          result.directory_data?.company_address ||
+          "",
+        aeo_tier:
+          result.india_data?.aeo_tier ||
+          result.directory_data?.aeo_tier ||
+          "",
+        certificate_no:
+          result.india_data?.certificate_no ||
+          result.directory_data?.certificate_number ||
+          result.directory_data?.certificate_no ||
+          certFromDirectory ||
+          "",
+        certificate_issue_date:
+          result.india_data?.certificate_issue_date || null,
+        certificate_validity_date:
+          result.india_data?.certificate_validity_date || null,
+        certificate_present_validity_status:
+          result.india_data?.certificate_present_validity_status ||
+          result.directory_data?.certificate_present_validity_status ||
+          "",
       };
+
+      result.final_data = finalData;
+
+      // STEP 4: Save to CustomerKyc (non-fatal)
+      try {
+        result.kyc_record = await this.saveToCustomerKyc(cleanIeCode, finalData);
+        result.success = true;
+        result.source = result.india_data ? "aeoindia" : "directory";
+        result.message = "Lookup completed (partial results possible)";
+      } catch (err) {
+        console.error("Saving KYC failed:", err?.message || err);
+        result.errors.save = err?.message || String(err);
+        // Still return finalData and any fetched data
+        result.success = !!result.india_data || !!result.directory_data;
+        result.source = result.india_data ? "aeoindia" : "directory";
+        result.message =
+          "Lookup produced data but saving to KYC failed (see errors)";
+      }
+
+      return result;
     } catch (error) {
-      console.error("AEO profile lookup error:", error);
+      console.error("AEO profile lookup unexpected error:", error);
       return {
         success: false,
-        error: error.message,
+        error: error?.message || String(error),
       };
     }
   }
