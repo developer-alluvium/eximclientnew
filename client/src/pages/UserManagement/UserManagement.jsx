@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Typography as AntTypography, Button as AntButton, Space } from "antd";
+import { ArrowLeftOutlined, UserAddOutlined } from "@ant-design/icons";
 import axios from "axios";
 import { getJsonCookie, getCookie, removeCookie } from "../../utils/cookies";
 import {
@@ -573,36 +575,111 @@ const UserManagement = () => {
     }
 
     return (
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Typography variant="h6">Permissions for {user?.name}</Typography>
+      <Dialog 
+        open={open} 
+        onClose={onClose} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid #e2e8f0', 
+          pb: 2,
+          background: '#f8fafc',
+        }}>
+          <Typography variant="h6" fontWeight={600} color="#1e293b">
+            Column Permissions
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {user?.name || user?.email}
+          </Typography>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {loading ? (
             <Box display="flex" justifyContent="center" p={5}>
               <CircularProgress />
             </Box>
           ) : (
-            <FormGroup>
+            <Box sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: 1.5,
+              pt: 1,
+            }}>
               {availableColumns.map((column) => (
-                <FormControlLabel
+                <Box
                   key={column.id}
-                  control={
-                    <Checkbox
-                      checked={selectedColumns.includes(column.id)}
-                      onChange={() => handleToggleColumn(column.id)}
-                    />
-                  }
-                  label={column.name}
-                />
+                  onClick={() => handleToggleColumn(column.id)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    padding: '12px 16px',
+                    borderRadius: 2,
+                    border: '1px solid',
+                    borderColor: selectedColumns.includes(column.id) ? '#3b82f6' : '#e2e8f0',
+                    backgroundColor: selectedColumns.includes(column.id) ? '#eff6ff' : '#ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      borderColor: '#3b82f6',
+                      backgroundColor: selectedColumns.includes(column.id) ? '#eff6ff' : '#f8fafc',
+                    },
+                  }}
+                >
+                  <Checkbox
+                    checked={selectedColumns.includes(column.id)}
+                    size="small"
+                    sx={{
+                      padding: 0,
+                      color: '#94a3b8',
+                      '&.Mui-checked': { color: '#3b82f6' },
+                    }}
+                  />
+                  <Typography 
+                    variant="body2" 
+                    fontWeight={selectedColumns.includes(column.id) ? 500 : 400}
+                    color={selectedColumns.includes(column.id) ? '#1e293b' : '#64748b'}
+                  >
+                    {column.name}
+                  </Typography>
+                </Box>
               ))}
-            </FormGroup>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">
-            Save
+        <DialogActions sx={{ 
+          p: 2.5, 
+          borderTop: '1px solid #e2e8f0',
+          gap: 1.5,
+        }}>
+          <Button 
+            onClick={onClose}
+            sx={{ 
+              borderRadius: 2, 
+              textTransform: 'none',
+              color: '#64748b',
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            variant="contained"
+            sx={{ 
+              borderRadius: 2, 
+              textTransform: 'none',
+              background: '#1e293b',
+              '&:hover': { background: '#334155' },
+              px: 3,
+            }}
+          >
+            Save Permissions
           </Button>
         </DialogActions>
       </Dialog>
@@ -630,63 +707,64 @@ const UserManagement = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Box sx={{ width: "100%" }}>
       {/* Enhanced Header */}
-      <Box sx={{ mb: 2 }}>
-        <BackButton />
-      </Box>
-      <Paper
-        elevation={0}
-        sx={{
-          p: 3,
-          mb: 3,
-          borderRadius: 3,
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
-        }}
-      >
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          alignItems={{ xs: "flex-start", sm: "center" }}
-          spacing={2}
-        >
-          <Box>
-            <Typography
-              variant="h4"
-              component="h1"
-              fontWeight={700}
-              gutterBottom
-            >
-              User Management
-            </Typography>
-          </Box>
+      <Box sx={{ mb: 3 }}>
+        <Space size={16} align="center" style={{ marginBottom: 16 }}>
+          <AntButton
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(-1)}
+            style={{ borderRadius: 8 }}
+          >
+            Back
+          </AntButton>
+        </Space>
 
-          <Stack direction="row" spacing={2}>
-            {/* Commented out bulk permissions button */}
-            {/*
-            {canManageUsers && selectedUsers.length > 0 && (
-              <Button
-                variant="outlined"
-                startIcon={<PermissionIcon />}
-                onClick={() => setBulkColumnDialog(true)}
-                sx={{ 
-                  borderColor: 'rgba(255,255,255,0.3)',
-                  color: 'white',
-                  borderRadius: 2,
-                  '&:hover': {
-                    borderColor: 'white',
-                    bgcolor: 'rgba(255,255,255,0.1)'
-                  }
-                }}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            background: "#1e293b",
+            color: "white",
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={2}
+          >
+            <Box>
+              <Typography
+                variant="h5"
+                component="h1"
+                fontWeight={700}
+                gutterBottom
               >
-                Bulk Permissions ({selectedUsers.length})
-              </Button>
-            )}
-            */}
+                User Management
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                Manage team members, roles, and permissions
+              </Typography>
+            </Box>
+
+            <AntButton
+              type="primary"
+              icon={<UserAddOutlined />}
+              onClick={() => setInviteDialogOpen(true)}
+              style={{
+                borderRadius: 8,
+                height: 40,
+                background: "#3b82f6",
+                borderColor: "#3b82f6",
+              }}
+            >
+              Invite User
+            </AntButton>
           </Stack>
-        </Stack>
-      </Paper>
+        </Paper>
+      </Box>
 
       {/* Filtering Controls */}
       <Paper elevation={1} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
@@ -717,53 +795,31 @@ const UserManagement = () => {
       </Paper>
 
       {/* Enhanced Table */}
-      <Paper elevation={1} sx={{ borderRadius: 3, overflow: "hidden" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 4,
+          overflow: "hidden",
+          border: "1px solid #f0f0f0",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.06)",
+        }}
+      >
         <Box sx={{ p: 3 }}>
-          {/* Bulk Actions */}
-          {canManageUsers && (
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
-                mb: 3,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "grey.200",
-              }}
-            >
-              {/* <Stack direction="row" alignItems="center" spacing={3}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={selectedUsers.length === users.length && users.length > 0}
-                      indeterminate={selectedUsers.length > 0 && selectedUsers.length < users.length}
-                      onChange={handleSelectAll}
-                    />
-                  }
-                  label="Select All Users"
-                />
-                {selectedUsers.length > 0 && (
-                  <Chip
-                    label={`${selectedUsers.length} user(s) selected`}
-                    color="primary"
-                    variant="outlined"
-                  />
-                )}
-              </Stack> */}
-            </Paper>
-          )}
-
           <TableContainer
             sx={{
-              borderRadius: 2,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+              borderRadius: 3,
               overflow: "hidden",
+              border: "1px solid #f0f0f0",
             }}
           >
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: "grey.50" }}>
+                <TableRow
+                  sx={{
+                    background:
+                      "linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)",
+                  }}
+                >
                   {canManageUsers && <TableCell padding="checkbox" />}
                   <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
@@ -929,21 +985,41 @@ const UserManagement = () => {
                               <ColumnIcon />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="More Actions">
-                            <IconButton
-                              size="small"
-                              onClick={(event) =>
-                                handleMenuClick(event, user._id)
-                              }
-                              sx={{
-                                borderRadius: 2,
-                                "&:hover": { bgcolor: "grey.200" },
-                              }}
-                              id={`menu-button-${user._id}`}
-                            >
-                              <MoreVertIcon />
-                            </IconButton>
-                          </Tooltip>
+
+                          {/* Promote/Demote Button */}
+                          {user.role !== "admin" ? (
+                            <Tooltip title="Promote to Admin">
+                              <IconButton
+                                size="small"
+                                onClick={() => handlePromoteUser(user._id)}
+                                sx={{
+                                  borderRadius: 2,
+                                  color: "#10b981",
+                                  "&:hover": {
+                                    bgcolor: "#d1fae5",
+                                  },
+                                }}
+                              >
+                                <PromoteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Demote from Admin">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDemoteUser(user._id)}
+                                sx={{
+                                  borderRadius: 2,
+                                  color: "#f59e0b",
+                                  "&:hover": {
+                                    bgcolor: "#fef3c7",
+                                  },
+                                }}
+                              >
+                                <DemoteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Stack>
                       </TableCell>
                     )}
@@ -1093,7 +1169,7 @@ const UserManagement = () => {
           {toast.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 

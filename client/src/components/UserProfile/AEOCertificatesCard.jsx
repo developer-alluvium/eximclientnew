@@ -1,70 +1,29 @@
 import React, { useState, useEffect } from "react";
 import {
-  Business,
-  AddCircle,
-  Notifications,
-  Settings,
-  Close,
-  CheckCircle,
-  Warning,
-} from "@mui/icons-material";
+  Card,
+  Button,
+  Tag,
+  Modal,
+  Input,
+  Switch,
+  InputNumber,
+  Space,
+  Typography,
+  Empty,
+  Tooltip,
+} from "antd";
+import {
+  SafetyCertificateOutlined,
+  BellOutlined,
+  PlusCircleOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  CloseCircleOutlined,
+} from "@ant-design/icons";
 import axios from "axios";
 
-// Simple Custom Modal Component
-const CustomModal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "24px",
-          borderRadius: "12px",
-          width: "90%",
-          maxWidth: "500px",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>
-            {title}
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-            }}
-          >
-            <Close />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-};
+const { Title, Text } = Typography;
 
 const AEOCertificatesCard = ({
   user,
@@ -139,275 +98,303 @@ const AEOCertificatesCard = ({
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
       month: "short",
-      day: "numeric",
+      year: "numeric",
     });
   };
 
-  const getStatusClass = (status) => {
-    return status === "Valid"
-      ? "valid"
-      : status === "Expired"
-      ? "expired"
-      : "warning";
+  const getStatusConfig = (status) => {
+    if (status === "Valid") {
+      return { color: "success", icon: <CheckCircleOutlined /> };
+    } else if (status === "Expired") {
+      return { color: "error", icon: <CloseCircleOutlined /> };
+    }
+    return { color: "warning", icon: <ExclamationCircleOutlined /> };
   };
 
   return (
-    <div className="section-card">
-      <div className="card-header">
-        <h3>
-          <Business className="icon" /> AEO Certificates
-        </h3>
-        <button
-          className="btn btn-outline btn-sm"
-          onClick={() => setReminderSettingsOpen(true)}
-        >
-          <Notifications style={{ fontSize: 16 }} /> Reminders
-        </button>
-      </div>
-
-      <div className="card-content">
+    <>
+      <Card
+        style={{
+          borderRadius: 12,
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+        }}
+        title={
+          <Space>
+            <SafetyCertificateOutlined
+              style={{ fontSize: 18, color: "#1e293b" }}
+            />
+            <span style={{ fontWeight: 600 }}>AEO Certificates</span>
+          </Space>
+        }
+        extra={
+          <Button
+            icon={<BellOutlined />}
+            onClick={() => setReminderSettingsOpen(true)}
+            style={{ borderRadius: 8 }}
+          >
+            Reminders
+          </Button>
+        }
+      >
         {kycSummary?.kyc_summaries?.length > 0 ? (
-          <div className="certificate-grid">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {kycSummary.kyc_summaries.map((kyc, index) => {
               const certificates = kyc.aeo_certificates || [];
               return (
-                <div key={index} className="certificate-item">
-                  <div className="cert-header">
+                <Card
+                  key={index}
+                  size="small"
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid #f0f0f0",
+                    background: "#fafafa",
+                  }}
+                  bodyStyle={{ padding: 16 }}
+                >
+                  {/* Importer Header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: certificates.length > 0 ? 12 : 0,
+                    }}
+                  >
                     <div>
-                      <div className="cert-title">{kyc.importer_name}</div>
-                      <div style={{ fontSize: "0.8rem", color: "#64748B" }}>
-                        IE: {kyc.ie_code_no}
+                      <Text strong style={{ fontSize: 14 }}>
+                        {kyc.importer_name}
+                      </Text>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          IE: {kyc.ie_code_no}
+                        </Text>
                       </div>
                     </div>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => openAddCertificateDialog(kyc)}
-                      style={{ padding: "4px 8px" }}
-                      title="Add Certificate"
-                    >
-                      <AddCircle style={{ fontSize: 16 }} />
-                    </button>
+                    <Tooltip title="Add Certificate">
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusCircleOutlined />}
+                        onClick={() => openAddCertificateDialog(kyc)}
+                        style={{ borderRadius: 8 }}
+                      />
+                    </Tooltip>
                   </div>
 
+                  {/* Certificates */}
                   {certificates.length === 0 ? (
                     <div
                       style={{
                         textAlign: "center",
-                        padding: "1rem",
-                        background: "#FFF7ED",
-                        borderRadius: "8px",
-                        color: "#C2410C",
-                        fontSize: "0.9rem",
+                        padding: 16,
+                        background: "#fff7e6",
+                        borderRadius: 8,
+                        border: "1px solid #ffd591",
                       }}
                     >
-                      No AEO certificates linked.
+                      <Text type="secondary">No AEO certificates linked.</Text>
                     </div>
                   ) : (
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "10px",
+                        gap: 8,
                       }}
                     >
-                      {certificates.map((cert, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            background: "#F8FAFC",
-                            padding: "10px",
-                            borderRadius: "8px",
-                            border: "1px solid #E2E8F0",
-                          }}
-                        >
+                      {certificates.map((cert, idx) => {
+                        const statusConfig = getStatusConfig(
+                          cert.certificate_present_validity_status
+                        );
+                        const isExpired =
+                          new Date(cert.certificate_validity_date) < new Date();
+
+                        return (
                           <div
+                            key={idx}
                             style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginBottom: "8px",
+                              background: "#ffffff",
+                              padding: 12,
+                              borderRadius: 10,
+                              border: "1px solid #e8e8e8",
                             }}
                           >
-                            <span
-                              style={{ fontWeight: 600, fontSize: "0.9rem" }}
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: 8,
+                              }}
                             >
-                              {cert.certificate_no}
-                            </span>
-                            <span
-                              className={`cert-badge ${getStatusClass(
-                                cert.certificate_present_validity_status
-                              )}`}
-                            >
-                              {cert.certificate_present_validity_status}
-                            </span>
-                          </div>
-                          <div className="cert-details">
-                            <div className="detail">
-                              <span className="label">Tier</span>
-                              <span className="value">{cert.aeo_tier}</span>
-                            </div>
-                            <div className="detail">
-                              <span className="label">Expiry</span>
-                              <span
-                                className="value"
+                              <Text
+                                strong
                                 style={{
-                                  color:
-                                    new Date(cert.certificate_validity_date) <
-                                    new Date()
-                                      ? "#EF4444"
-                                      : "#16A34A",
+                                  fontSize: 13,
+                                  fontFamily: "monospace",
                                 }}
                               >
-                                {formatDate(cert.certificate_validity_date)}
-                              </span>
+                                {cert.certificate_no}
+                              </Text>
+                              <Tag
+                                color={statusConfig.color}
+                                icon={statusConfig.icon}
+                                style={{ margin: 0, borderRadius: 6 }}
+                              >
+                                {cert.certificate_present_validity_status}
+                              </Tag>
+                            </div>
+
+                            <div style={{ display: "flex", gap: 24 }}>
+                              <div>
+                                <Text
+                                  type="secondary"
+                                  style={{ fontSize: 11, display: "block" }}
+                                >
+                                  Tier
+                                </Text>
+                                <Tag
+                                  color="blue"
+                                  style={{ margin: 0, borderRadius: 4 }}
+                                >
+                                  {cert.aeo_tier}
+                                </Tag>
+                              </div>
+                              <div>
+                                <Text
+                                  type="secondary"
+                                  style={{ fontSize: 11, display: "block" }}
+                                >
+                                  Expiry
+                                </Text>
+                                <Text
+                                  strong
+                                  style={{
+                                    fontSize: 13,
+                                    color: isExpired ? "#ff4d4f" : "#52c41a",
+                                  }}
+                                >
+                                  <CalendarOutlined
+                                    style={{ marginRight: 4 }}
+                                  />
+                                  {formatDate(cert.certificate_validity_date)}
+                                </Text>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
-                </div>
+                </Card>
               );
             })}
           </div>
         ) : (
-          <div
-            style={{ textAlign: "center", padding: "2rem", color: "#64748B" }}
-          >
-            No importer assignments found.
-          </div>
+          <Empty
+            description="No importer assignments found"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
         )}
-      </div>
+      </Card>
 
       {/* Add Certificate Modal */}
-      <CustomModal
-        isOpen={updateCertificateOpen}
-        onClose={() => setUpdateCertificateOpen(false)}
+      <Modal
+        open={updateCertificateOpen}
+        onCancel={() => setUpdateCertificateOpen(false)}
         title="Add AEO Certificate"
-      >
-        <div style={{ marginBottom: "16px" }}>
-          <div
-            style={{
-              fontSize: "0.9rem",
-              color: "#64748B",
-              marginBottom: "4px",
-            }}
-          >
-            Importer:{" "}
-            <strong>{selectedImporterForUpdate?.importer_name}</strong>
-          </div>
-          <div style={{ fontSize: "0.9rem", color: "#64748B" }}>
-            IE Code: <strong>{selectedImporterForUpdate?.ie_code_no}</strong>
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Certificate Number</label>
-          <input
-            type="text"
-            value={newCertificateNumber}
-            onChange={(e) => setNewCertificateNumber(e.target.value)}
-            placeholder="e.g., AEO-T1-..."
-          />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "1rem",
-            marginTop: "24px",
-          }}
-        >
-          <button
-            className="btn btn-outline"
-            onClick={() => setUpdateCertificateOpen(false)}
-          >
+        footer={[
+          <Button key="cancel" onClick={() => setUpdateCertificateOpen(false)}>
             Cancel
-          </button>
-          <button
-            className="btn btn-primary"
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={updateLoading}
+            disabled={!newCertificateNumber}
             onClick={handleUpdateCertificateNumber}
-            disabled={updateLoading || !newCertificateNumber}
           >
-            {updateLoading ? "Verifying..." : "Verify & Add"}
-          </button>
-        </div>
-      </CustomModal>
+            Verify & Add
+          </Button>,
+        ]}
+        styles={{ body: { paddingTop: 20 } }}
+      >
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <div>
+            <Text type="secondary">Importer: </Text>
+            <Text strong>{selectedImporterForUpdate?.importer_name}</Text>
+          </div>
+          <div>
+            <Text type="secondary">IE Code: </Text>
+            <Text strong>{selectedImporterForUpdate?.ie_code_no}</Text>
+          </div>
+          <div>
+            <Text style={{ display: "block", marginBottom: 8 }}>
+              Certificate Number
+            </Text>
+            <Input
+              value={newCertificateNumber}
+              onChange={(e) => setNewCertificateNumber(e.target.value)}
+              placeholder="e.g., AEO-T1-..."
+              style={{ borderRadius: 8 }}
+            />
+          </div>
+        </Space>
+      </Modal>
 
       {/* Reminder Settings Modal */}
-      <CustomModal
-        isOpen={reminderSettingsOpen}
-        onClose={() => setReminderSettingsOpen(false)}
+      <Modal
+        open={reminderSettingsOpen}
+        onCancel={() => setReminderSettingsOpen(false)}
         title="Reminder Settings"
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            marginBottom: "20px",
-            gap: "10px",
-          }}
-        >
-          <input
-            type="checkbox"
-            id="reminderEnabled"
-            checked={reminderEnabled}
-            onChange={(e) => setReminderEnabled(e.target.checked)}
-            style={{ width: "20px", height: "20px" }}
-          />
-          <label
-            htmlFor="reminderEnabled"
-            style={{ margin: 0, fontSize: "1rem", fontWeight: 500 }}
-          >
-            Enable Email Reminders
-          </label>
-        </div>
-
-        {reminderEnabled && (
-          <div className="form-group">
-            <label>Days before expiry to notify</label>
-            <input
-              type="number"
-              value={reminderDays}
-              onChange={(e) =>
-                setReminderDays(Math.max(1, parseInt(e.target.value) || 0))
-              }
-              min="1"
-              max="365"
-            />
-            <div
-              style={{ fontSize: "0.8rem", color: "#64748B", marginTop: "8px" }}
-            >
-              You will receive an email notification for any certificate
-              expiring within {reminderDays} days.
-            </div>
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "1rem",
-            marginTop: "24px",
-          }}
-        >
-          <button
-            className="btn btn-outline"
-            onClick={() => setReminderSettingsOpen(false)}
-          >
+        footer={[
+          <Button key="cancel" onClick={() => setReminderSettingsOpen(false)}>
             Cancel
-          </button>
-          <button
-            className="btn btn-primary"
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
             onClick={handleSaveReminderSettings}
           >
             Save Settings
-          </button>
-        </div>
-      </CustomModal>
-    </div>
+          </Button>,
+        ]}
+        styles={{ body: { paddingTop: 20 } }}
+      >
+        <Space direction="vertical" size={20} style={{ width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Switch checked={reminderEnabled} onChange={setReminderEnabled} />
+            <Text strong>Enable Email Reminders</Text>
+          </div>
+
+          {reminderEnabled && (
+            <div>
+              <Text style={{ display: "block", marginBottom: 8 }}>
+                Days before expiry to notify
+              </Text>
+              <InputNumber
+                value={reminderDays}
+                onChange={(val) => setReminderDays(Math.max(1, val || 0))}
+                min={1}
+                max={365}
+                style={{ width: "100%", borderRadius: 8 }}
+              />
+              <Text
+                type="secondary"
+                style={{ fontSize: 12, marginTop: 8, display: "block" }}
+              >
+                You will receive an email notification for any certificate
+                expiring within {reminderDays} days.
+              </Text>
+            </div>
+          )}
+        </Space>
+      </Modal>
+    </>
   );
 };
 

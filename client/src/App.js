@@ -1,4 +1,6 @@
 import React, { useEffect } from "react";
+import { ConfigProvider } from "antd";
+import { antdTheme } from "./theme/antdTheme";
 import { getJsonCookie, getCookie } from "./utils/cookies";
 import {
   BrowserRouter,
@@ -105,151 +107,155 @@ function App() {
   const [selectedYear, setSelectedYear] = React.useState("");
 
   return (
-    <BrowserRouter>
-      <UserContext.Provider value={{ user, setUser }}>
-        <SelectedYearContext.Provider value={{ selectedYear, setSelectedYear }}>
-          <TabValueProvider>
-            <ImportersProvider>
-              <LayoutWrapper>
-                <Routes>
-                  {/* Login routes - no header */}
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/user/login" element={<UserLoginPage />} />
-                  <Route path="/admin/login" element={<AdminLoginPage />} />
-                  <Route
-                    path="/superadmin/login"
-                    element={<SuperAdminLoginPage />}
-                  />
-                  {/* User system routes - no header */}
-                  <Route
-                    path="/user/register"
-                    element={<UserRegistrationPage />}
-                  />
-                  <Route
-                    path="/verify-email/:token"
-                    element={<EmailVerification />}
-                  />
-                  <Route
-                    path="/reset-password/:token"
-                    element={<ResetPasswordPage />}
-                  />
-                  {/* Protected routes - with header */}
-                  <Route
-                    path="/user/dashboard"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <UserDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* Analytics Overview route */}
-                  <Route
-                    path="/import-analytics"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <AnalyticsOverview />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* Admin routes */}
-                  <Route
-                    path="/customer-admin/dashboard"
-                    element={
-                      <ProtectedRoute requiredAuth="admin">
-                        <CustomerAdminDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* SuperAdmin routes */}
-                  <Route
-                    path="/superadmin-dashboard"
-                    element={
-                      <ProtectedRoute requiredAuth="superadmin">
-                        <SuperAdminLayout />
-                      </ProtectedRoute>
-                    }
-                  >
-                    <Route index element={<SuperAdminDashboard />} />
+    <ConfigProvider theme={antdTheme}>
+      <BrowserRouter>
+        <UserContext.Provider value={{ user, setUser }}>
+          <SelectedYearContext.Provider
+            value={{ selectedYear, setSelectedYear }}
+          >
+            <TabValueProvider>
+              <ImportersProvider>
+                <LayoutWrapper>
+                  <Routes>
+                    {/* Login routes - no header */}
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/user/login" element={<UserLoginPage />} />
+                    <Route path="/admin/login" element={<AdminLoginPage />} />
                     <Route
-                      path="customer/:customerId"
-                      element={<SuperAdminCustomerDetail />}
+                      path="/superadmin/login"
+                      element={<SuperAdminLoginPage />}
                     />
-                  </Route>
-                  <Route
-                    path="/module-access-management"
-                    element={
-                      <ProtectedRoute requiredAuth="superadmin">
-                        <ModuleAccessManagement />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* Legacy customer routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <UserDashboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/netpage"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <NetPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/importdsr"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <CImportDSR />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/trademasterguide"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <ImportVideoPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/user/profile"
-                    element={
-                      <ProtectedRoute requiredAuth="user">
-                        <UserProfile />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* User Management route - check for admin role */}
-                  <Route
-                    path="/user-management"
-                    element={(() => {
-                      const user = getJsonCookie("exim_user");
-                      if (!user) return <LoginPage />;
-
-                      try {
-                        const userData = user;
-                        const isAdmin =
-                          userData.role === "admin" ||
-                          userData.role === "superadmin";
-                        return isAdmin ? <UserManagement /> : <LoginPage />;
-                      } catch (error) {
-                        console.error("Error reading user data:", error);
-                        return <LoginPage />;
+                    {/* User system routes - no header */}
+                    <Route
+                      path="/user/register"
+                      element={<UserRegistrationPage />}
+                    />
+                    <Route
+                      path="/verify-email/:token"
+                      element={<EmailVerification />}
+                    />
+                    <Route
+                      path="/reset-password/:token"
+                      element={<ResetPasswordPage />}
+                    />
+                    {/* Protected routes - with header */}
+                    <Route
+                      path="/user/dashboard"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <UserDashboard />
+                        </ProtectedRoute>
                       }
-                    })()}
-                  />
-                </Routes>
-              </LayoutWrapper>
-            </ImportersProvider>
-          </TabValueProvider>
-        </SelectedYearContext.Provider>
-      </UserContext.Provider>
-    </BrowserRouter>
+                    />
+                    {/* Analytics Overview route */}
+                    <Route
+                      path="/import-analytics"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <AnalyticsOverview />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* Admin routes */}
+                    <Route
+                      path="/customer-admin/dashboard"
+                      element={
+                        <ProtectedRoute requiredAuth="admin">
+                          <CustomerAdminDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* SuperAdmin routes */}
+                    <Route
+                      path="/superadmin-dashboard"
+                      element={
+                        <ProtectedRoute requiredAuth="superadmin">
+                          <SuperAdminLayout />
+                        </ProtectedRoute>
+                      }
+                    >
+                      <Route index element={<SuperAdminDashboard />} />
+                      <Route
+                        path="customer/:customerId"
+                        element={<SuperAdminCustomerDetail />}
+                      />
+                    </Route>
+                    <Route
+                      path="/module-access-management"
+                      element={
+                        <ProtectedRoute requiredAuth="superadmin">
+                          <ModuleAccessManagement />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* Legacy customer routes */}
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <UserDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/netpage"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <NetPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/importdsr"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <CImportDSR />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/trademasterguide"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <ImportVideoPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/user/profile"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <UserProfile />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* User Management route - check for admin role */}
+                    <Route
+                      path="/user-management"
+                      element={(() => {
+                        const user = getJsonCookie("exim_user");
+                        if (!user) return <LoginPage />;
+
+                        try {
+                          const userData = user;
+                          const isAdmin =
+                            userData.role === "admin" ||
+                            userData.role === "superadmin";
+                          return isAdmin ? <UserManagement /> : <LoginPage />;
+                        } catch (error) {
+                          console.error("Error reading user data:", error);
+                          return <LoginPage />;
+                        }
+                      })()}
+                    />
+                  </Routes>
+                </LayoutWrapper>
+              </ImportersProvider>
+            </TabValueProvider>
+          </SelectedYearContext.Provider>
+        </UserContext.Provider>
+      </BrowserRouter>
+    </ConfigProvider>
   );
 }
 

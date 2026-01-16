@@ -1,4 +1,11 @@
 import { useState, useEffect, useRef, useContext, useCallback } from "react";
+import {
+  Tabs as AntTabs,
+  Typography as AntTypography,
+  Button as AntButton,
+  Space,
+} from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import { Box, Typography, AppBar, Toolbar, TextField } from "@mui/material";
@@ -28,6 +35,8 @@ import JobExcelTable from "./JobExcelTable";
 import { UserContext } from "../../context/UserContext";
 import { logActivity } from "../../utils/activityLogger";
 import { useNavigate } from "react-router-dom";
+
+const { Title: AntTitle, Text: AntText } = AntTypography;
 
 const NetPage = () => {
   // Tabs for Jobs/Gandhidham
@@ -770,20 +779,29 @@ const NetPage = () => {
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: "24px",
+              gap: 16,
             }}
           >
-            <h1
-              style={{
-                fontSize: "28px",
-                fontWeight: "bold",
-                color: "#1F2937",
-                margin: 0,
-              }}
-            >
-              Customs Import Calculator
-            </h1>
+            <Space size={16} align="center">
+              <AntButton
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate(-1)}
+                style={{ borderRadius: 8 }}
+              >
+                Back
+              </AntButton>
+              <AntTitle
+                level={2}
+                style={{
+                  margin: 0,
+                  color: "#262626",
+                  fontWeight: 700,
+                }}
+              >
+                CostIQ - Import Calculator
+              </AntTitle>
+            </Space>
           </div>
-          <BackButton />
 
           {/* Tabs for Jobs/Gandhidham - show according to localStorage values */}
           {(showJobsTab || showGandhidhamTab) && (
