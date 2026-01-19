@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Alert as AntAlert, Tag } from "antd";
+import ReactApexChart from "react-apexcharts";
 import { WarningOutlined, CloseCircleOutlined } from "@ant-design/icons";
 import {
   Box,
@@ -22,10 +23,17 @@ import {
   TextField,
   Paper,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  Grid,
+  Stack,
 } from "@mui/material";
+import { Refresh as RefreshIcon } from "@mui/icons-material";
 import {
   Lock as LockIcon,
   Person as PersonIcon,
+  Warning as WarningIcon,
   Logout as LogoutIcon,
   ManageAccounts as ManageAccountsIcon,
 } from "@mui/icons-material";
@@ -52,14 +60,14 @@ import {
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: "100%",
-  minHeight: "170px",
+  minHeight: "130px",
   display: "flex",
   flexDirection: "column",
   cursor: "pointer",
   transition: "all 0.2s ease",
   borderRadius: "12px",
   position: "relative",
-  overflow: "hidden",
+  // overflow: "hidden",
   border: "1px solid #e2e8f0",
   backgroundColor: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
@@ -106,8 +114,8 @@ const IconContainer = styled(Box)(({ theme }) => ({
 }));
 
 const WelcomeBanner = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(3, 4),
-  marginBottom: theme.spacing(3),
+  padding: theme.spacing(1.5, 3),
+  marginBottom: theme.spacing(1.5),
   borderRadius: "12px",
   background: "#ffffff",
   color: "#1e293b",
@@ -204,6 +212,216 @@ function UserDashboard() {
   const [aeoCertificates, setAeoCertificates] = useState([]);
   const [reminderSettingsOpen, setReminderSettingsOpen] = useState(false);
 
+  // New Stats State
+  const eximUser = userData || getJsonCookie("exim_user");
+  const parsedUser = userData || eximUser;
+  const ieCodeAssignments = parsedUser?.ie_code_assignments || [];
+  const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
+  const userImporterName =
+    parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
+
+  const [stats, setStats] = useState(null);
+  const [selectedImporter, setSelectedImporter] = useState("");
+
+  const metricConfig = [
+    {
+      label: "Jobs Created",
+      key: "jobs_created_today",
+      trendKey: "jobs_trend",
+      color: "#3b82f6",
+    },
+    {
+      label: "Ops Completed",
+      key: "operations_completed",
+      trendKey: "ops_trend",
+      color: "#10b981",
+    },
+    {
+      label: "Exam Planned",
+      key: "examination_planning",
+      trendKey: "exam_trend",
+      color: "#f59e0b",
+    },
+    {
+      label: "Arrivals",
+      key: "arrivals_today",
+      trendKey: "arrival_trend",
+      color: "#6366f1",
+    },
+    {
+      label: "Rail Out",
+      key: "rail_out_today",
+      trendKey: "rail_out_trend",
+      color: "#8b5cf6",
+    },
+    {
+      label: "BE Filed",
+      key: "be_filed",
+      trendKey: "be_trend",
+      color: "#ec4899",
+    },
+    { label: "OOC", key: "ooc", trendKey: "ooc_trend", color: "#14b8a6" },
+    {
+      label: "DO Completed",
+      key: "do_completed",
+      trendKey: "do_trend",
+      color: "#f97316",
+    },
+    {
+      label: "Billing Sent",
+      key: "billing_sent",
+      trendKey: "billing_trend",
+      color: "#06b6d4",
+    },
+    { label: "ETA", key: "eta", trendKey: "eta_trend", color: "#84cc16" },
+    {
+      label: "Gateway IGM",
+      key: "gateway_igm_date",
+      trendKey: "gateway_igm_trend",
+      color: "#a855f7",
+    },
+    {
+      label: "Discharge",
+      key: "discharge_date",
+      trendKey: "discharge_trend",
+      color: "#ef4444",
+    },
+    {
+      label: "Empty Offload",
+      key: "empty_offload",
+      trendKey: null,
+      color: "#64748b",
+    },
+  ];
+  // Horizontal Bar Chart Data
+  const barSeries = useMemo(() => {
+    if (!stats || !stats.summary) return [{ name: "Count", data: [] }];
+    return [
+      {
+        name: "Count",
+        data: metricConfig.map((m) => stats.summary[m.key] || 0),
+      },
+    ];
+  }, [stats]);
+
+  const barOptions = useMemo(
+    () => ({
+      chart: {
+        type: "bar",
+        fontFamily: "inherit",
+        toolbar: { show: false },
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          barHeight: "45%", // Reduced from 60% for more spacing
+          borderRadius: 2,
+          distributed: true, // Use different color per bar
+          dataLabels: {
+            position: "right",
+          },
+        },
+      },
+      colors: metricConfig.map((m) => m.color),
+      xaxis: {
+        categories: metricConfig.map((m) => m.label),
+        labels: {
+          style: {
+            width: "100%",
+            fontSize: "11px",
+            fontWeight: 500,
+            colors: "#64748b",
+          },
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+      },
+      yaxis: {
+        labels: {
+          style: { fontSize: "12px", fontWeight: 600, colors: "#475569" },
+          maxWidth: 180,
+        },
+      },
+      legend: { show: false }, // Bars are self-labeled by axis
+      dataLabels: {
+        enabled: true,
+        textAnchor: "start",
+        style: { colors: ["#000"] },
+        formatter: function (val, opt) {
+          return val;
+        },
+        offsetX: 20,
+      },
+      tooltip: {
+        theme: "light",
+        y: {
+          formatter: function (val) {
+            return val;
+          },
+        },
+      },
+      grid: {
+        show: true,
+        borderColor: "#f1f5f9",
+        xaxis: { lines: { show: true } },
+        yaxis: { lines: { show: false } },
+        padding: { top: 0, right: 15, bottom: 0, left: 30 },
+      },
+    }),
+    [],
+  );
+
+  // Set default importer if only one assignment exists
+  useEffect(() => {
+    if (ieCodeAssignments.length === 1 && !selectedImporter) {
+      setSelectedImporter(ieCodeAssignments[0].importer_name);
+    }
+  }, [ieCodeAssignments]);
+
+  const [fromDate, setFromDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
+
+  const fetchStats = async () => {
+    try {
+      const token = getCookie("access_token");
+      let url = `${process.env.REACT_APP_API_STRING}/user-dashboard-stats`;
+
+      const params = new URLSearchParams();
+      if (selectedImporter) params.append("importer", selectedImporter);
+
+      if (fromDate) {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+        params.append("startDate", start.toISOString());
+      }
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        params.append("endDate", end.toISOString());
+      }
+
+      const response = await axios.get(`${url}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+      });
+      setStats(response.data);
+    } catch (err) {
+      console.error("Failed to fetch stats", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []); // Initial load only, then manual via button or importer change if desired.
+  // User asked for button click for dates. I'll add importer to dependency to auto-refresh on importer change as that's standard UX,
+  // but let dates be manual.
+
+  useEffect(() => {
+    fetchStats();
+  }, [selectedImporter]);
+
   const fetchAndUpdateUserData = async () => {
     try {
       const token = getCookie("access_token");
@@ -212,7 +430,7 @@ function UserDashboard() {
         {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
-        }
+        },
       );
 
       if (response.data.success) {
@@ -344,7 +562,7 @@ function UserDashboard() {
         `${process.env.REACT_APP_API_STRING}/aeo/kyc-summary`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       const data = await response.json();
       if (data.success) {
@@ -376,7 +594,7 @@ function UserDashboard() {
     try {
       const response = await axios.get(
         `${process.env.REACT_APP_API_STRING}/users/dashboard`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (response.data.success) {
         setDashboardData(response.data.data);
@@ -389,13 +607,6 @@ function UserDashboard() {
     }
   };
 
-  const eximUser = userData || getJsonCookie("exim_user");
-  const parsedUser = userData || eximUser;
-  const ieCodeAssignments = parsedUser?.ie_code_assignments || [];
-  const userIeCode = parsedUser?.ie_code_assignments?.[0]?.ie_code_no || "";
-  const userImporterName =
-    parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
-
   const expiringDocs = useMemo(() => {
     if (!parsedUser?.documents) return [];
     const today = new Date();
@@ -403,7 +614,7 @@ function UserDashboard() {
       if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
-        (expirationDate - today) / (1000 * 60 * 60 * 24)
+        (expirationDate - today) / (1000 * 60 * 60 * 24),
       );
       return daysUntilExpiration > 0 && daysUntilExpiration <= 30;
     });
@@ -416,7 +627,7 @@ function UserDashboard() {
       if (!doc.expirationDate) return false;
       const expirationDate = new Date(doc.expirationDate);
       const daysUntilExpiration = Math.ceil(
-        (expirationDate - today) / (1000 * 60 * 60 * 24)
+        (expirationDate - today) / (1000 * 60 * 60 * 24),
       );
       return daysUntilExpiration <= 0;
     });
@@ -437,7 +648,7 @@ function UserDashboard() {
 
         const validityDate = new Date(cert.certificate_validity_date);
         const daysUntilExpiry = Math.ceil(
-          (validityDate - today) / (1000 * 60 * 60 * 24)
+          (validityDate - today) / (1000 * 60 * 60 * 24),
         );
 
         // Check condition (Expires in next 90 days)
@@ -468,7 +679,7 @@ function UserDashboard() {
 
         const validityDate = new Date(cert.certificate_validity_date);
         const daysUntilExpiry = Math.ceil(
-          (validityDate - today) / (1000 * 60 * 60 * 24)
+          (validityDate - today) / (1000 * 60 * 60 * 24),
         );
 
         // Check condition (Already expired)
@@ -488,7 +699,7 @@ function UserDashboard() {
     path,
     isExternal = false,
     isLocked = false,
-    moduleName = ""
+    moduleName = "",
   ) => {
     if (isLocked) return;
     if (moduleName === "E-Lock") {
@@ -514,7 +725,7 @@ function UserDashboard() {
           `${
             process.env.REACT_APP_API_STRING
           }/users/generate-sso-token?ie_code_no=${encodeURIComponent(
-            selectedIeCode
+            selectedIeCode,
           )}`,
           {},
           {
@@ -523,7 +734,7 @@ function UserDashboard() {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         const ssoToken = res.data?.data?.token;
         if (ssoToken) {
@@ -553,7 +764,7 @@ function UserDashboard() {
       await axios.post(
         `${process.env.REACT_APP_API_STRING}/users/logout`,
         logoutData,
-        { withCredentials: true }
+        { withCredentials: true },
       );
       removeCookie("exim_user");
       removeCookie("access_token");
@@ -572,7 +783,7 @@ function UserDashboard() {
       const response = await axios.post(
         `${process.env.REACT_APP_API_STRING}/users/request-module-access`,
         { moduleKey: selectedModule.key, reason: requestReason },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       if (response.data.success) {
         setModuleRequestDialog(false);
@@ -585,7 +796,7 @@ function UserDashboard() {
 
   const userName = dashboardData?.user?.name || "User";
   const userInitial = userName ? userName.charAt(0).toUpperCase() : "U";
-
+  console.log(dashboardData);
   if (loading) {
     return (
       <ThemeProvider theme={modernTheme}>
@@ -617,7 +828,7 @@ function UserDashboard() {
           display: "flex",
           flexDirection: "column",
           height: "100vh",
-          overflow: "hidden",
+          // overflow: "hidden",
           backgroundColor: "#F8F9FB",
         }}
       >
@@ -626,9 +837,9 @@ function UserDashboard() {
           component="main"
           sx={{
             flexGrow: 1,
-            overflow: "auto",
-            padding: { xs: 2, md: 4 },
-            pb: 4,
+            //overflow: "auto",
+            padding: { xs: 1, md: 2 },
+            pb: 2,
           }}
         >
           {/* Welcome Banner */}
@@ -645,26 +856,68 @@ function UserDashboard() {
               >
                 Welcome back, {userName}
               </Typography>
-              <Chip
-                label="ACTIVE"
-                sx={{
-                  backgroundColor: "#10b981",
-                  color: "#ffffff",
-                  fontWeight: 600,
-                  borderRadius: "4px",
-                  height: "28px",
-                  fontSize: "0.7rem",
-                  letterSpacing: "0.5px",
-                }}
-              />
+              {(expiredDocs.length > 0 || expiringDocs.length > 0) && (
+                <Chip
+                  icon={<WarningIcon style={{ color: "white" }} />}
+                  label={
+                    expiredDocs.length > 0
+                      ? `${expiredDocs.length} Docs Expired`
+                      : `${expiringDocs.length} Docs Expiring`
+                  }
+                  onClick={() => navigate("/user/profile")}
+                  sx={{
+                    bgcolor: expiredDocs.length > 0 ? "#ef4444" : "#f59e0b",
+                    color: "white",
+                    fontWeight: 600,
+                    height: "28px",
+                    fontSize: "0.7rem",
+                    cursor: "pointer",
+                    "& .MuiChip-icon": { fontSize: "16px" },
+                  }}
+                />
+              )}
+              {(expiredAeoCertificates.length > 0 ||
+                expiringAeoCertificates.length > 0) && (
+                <Chip
+                  icon={<WarningIcon style={{ color: "white" }} />}
+                  label={
+                    expiredAeoCertificates.length > 0
+                      ? "AEO Expired"
+                      : "AEO Expiring"
+                  }
+                  onClick={() => navigate("/user/profile")}
+                  sx={{
+                    bgcolor:
+                      expiredAeoCertificates.length > 0 ? "#ef4444" : "#f59e0b",
+                    color: "white",
+                    fontWeight: 600,
+                    height: "28px",
+                    fontSize: "0.7rem",
+                    cursor: "pointer",
+                    "& .MuiChip-icon": { fontSize: "16px" },
+                  }}
+                />
+              )}
+              {expiredDocs.length === 0 &&
+                expiringDocs.length === 0 &&
+                expiredAeoCertificates.length === 0 &&
+                expiringAeoCertificates.length === 0 && (
+                  <Chip
+                    label="ACTIVE"
+                    sx={{
+                      backgroundColor: "#10b981",
+                      color: "#ffffff",
+                      fontWeight: 600,
+                      borderRadius: "4px",
+                      height: "28px",
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.5px",
+                    }}
+                  />
+                )}
             </Box>
 
-            <Box
-              display="flex"
-              gap={3}
-              flexWrap="wrap"
-              sx={{ width: "100%" }}
-            >
+            <Box display="flex" gap={3} flexWrap="wrap" sx={{ width: "100%" }}>
               {ieCodeAssignments.map((assignment, index) => (
                 <Typography
                   key={index}
@@ -677,13 +930,17 @@ function UserDashboard() {
                 >
                   {assignment.ie_code_no && (
                     <>
-                      <strong style={{ color: "#475569" }}>IE Code:</strong> {assignment.ie_code_no}
+                      <strong style={{ color: "#475569" }}>IE Code:</strong>{" "}
+                      {assignment.ie_code_no}
                     </>
                   )}
                   {assignment.importer_name && (
                     <>
-                      <span style={{ margin: "0 12px", color: "#cbd5e1" }}>|</span>
-                      <strong style={{ color: "#475569" }}>Importer:</strong> {assignment.importer_name}
+                      <span style={{ margin: "0 12px", color: "#cbd5e1" }}>
+                        |
+                      </span>
+                      <strong style={{ color: "#475569" }}>Importer:</strong>{" "}
+                      {assignment.importer_name}
                     </>
                   )}
                 </Typography>
@@ -693,279 +950,151 @@ function UserDashboard() {
 
           {/* Alerts */}
           {/* Alerts Section */}
-          <Box sx={{ mb: 3, display: "flex", flexDirection: "column", gap: 2 }}>
-            {/* Document Alert (Existing) */}
-            {docAlertOpen &&
-              (expiringDocs.length > 0 || expiredDocs.length > 0) && (
-                <Alert
-                  severity="warning"
-                  onClose={() => setDocAlertOpen(false)}
-                  onClick={() => navigate("/user/profile")}
-                  sx={{
-                    cursor: "pointer",
-                    borderRadius: "12px",
-                    border: "1px solid #ffd591",
-                    boxShadow: "0 2px 8px rgba(250, 173, 20, 0.15)",
-                    "& .MuiAlert-icon": {
-                      fontSize: "24px",
-                    },
-                    "&:hover": {
-                      boxShadow: "0 4px 12px rgba(250, 173, 20, 0.25)",
-                    },
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 500 }}>
-                    Attention: You have documents expiring soon or expired.
-                  </Typography>
-                </Alert>
-              )}
-
-            {/* AEO Alert (Updated) */}
-            {aeoAlertOpen &&
-              (expiringAeoCertificates.length > 0 ||
-                expiredAeoCertificates.length > 0) && (
-                <Alert
-                  severity="error"
-                  onClose={() => setAeoAlertOpen(false)}
-                  onClick={() => navigate("/user/profile")}
-                  sx={{
-                    cursor: "pointer",
-                    borderRadius: "12px",
-                    border: "1px solid #ffccc7",
-                    boxShadow: "0 2px 8px rgba(255, 77, 79, 0.15)",
-                    "& .MuiAlert-icon": {
-                      fontSize: "24px",
-                    },
-                    "&:hover": {
-                      boxShadow: "0 4px 12px rgba(255, 77, 79, 0.25)",
-                    },
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 500 }}>
-                    Attention:{" "}
-                    {expiredAeoCertificates.length > 0
-                      ? `${expiredAeoCertificates.length} AEO Certificate(s) have expired.`
-                      : `${expiringAeoCertificates.length} AEO Certificate(s) match your reminder settings.`}
-                  </Typography>
-                </Alert>
-              )}
-          </Box>
 
           {/* Main Content with Analytics Sidebar */}
-          <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', lg: 'row' } }}>
-            
+          <Box
+            sx={{
+              display: "flex",
+              display: "flex",
+              gap: 5, // Increased gap to move modules more to the right visually
+              height: "calc(100vh - 260px)",
+              overflow: "hidden",
+              flexDirection: { xs: "column", lg: "row" },
+            }}
+          >
             {/* Left Sidebar - Analytics */}
-            <Box sx={{ width: { xs: '100%', lg: '280px' }, flexShrink: 0 }}>
-              {/* Quick Stats Card */}
-              <Paper elevation={0} sx={{ 
-                p: 2.5, 
-                mb: 2.5, 
-                borderRadius: 3,
-                border: '1px solid #e2e8f0',
-              }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{ mb: 2 }}>
-                  📊 Quick Stats
-                </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    p: 1.5,
-                    borderRadius: 2,
-                    background: '#f0fdf4',
-                  }}>
-                    <Typography variant="body2" color="#166534">Active Modules</Typography>
-                    <Typography variant="h6" fontWeight={700} color="#166534">
-                      {modules.filter(m => !m.isLocked).length}
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    p: 1.5,
-                    borderRadius: 2,
-                    background: '#fef3c7',
-                  }}>
-                    <Typography variant="body2" color="#92400e">Pending Access</Typography>
-                    <Typography variant="h6" fontWeight={700} color="#92400e">
-                      {modules.filter(m => m.isLocked).length}
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    p: 1.5,
-                    borderRadius: 2,
-                    background: '#eff6ff',
-                  }}>
-                    <Typography variant="body2" color="#1e40af">IE Codes</Typography>
-                    <Typography variant="h6" fontWeight={700} color="#1e40af">
-                      {ieCodeAssignments?.length || 0}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
+            <Box
+              sx={{
+                width: { xs: "100%", lg: "40%" },
+                flexShrink: 0,
+                overflowY: "auto",
+                height: "100%",
+                pr: 1,
+                "&::-webkit-scrollbar": { width: "4px" },
+                "&::-webkit-scrollbar-track": { background: "transparent" },
+                "&::-webkit-scrollbar-thumb": {
+                  background: "#cbd5e1",
+                  borderRadius: "4px",
+                },
+              }}
+            >
+              {/* Importer Selector */}
+              <Box
+                sx={{ mb: 2, display: "flex", flexDirection: "column", gap: 2 }}
+              >
+                {ieCodeAssignments.length > 1 && (
+                  <FormControl
+                    fullWidth
+                    size="small"
+                    sx={{ bgcolor: "white", borderRadius: 1 }}
+                  >
+                    <InputLabel>Select Importer</InputLabel>
+                    <Select
+                      value={selectedImporter}
+                      label="Select Importer"
+                      onChange={(e) => setSelectedImporter(e.target.value)}
+                    >
+                      <MenuItem value="">
+                        <em>All Importers</em>
+                      </MenuItem>
+                      {ieCodeAssignments.map((assignment, index) => (
+                        <MenuItem key={index} value={assignment.importer_name}>
+                          {assignment.importer_name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
 
-              {/* AEO Certificate Status */}
-              <Paper elevation={0} sx={{ 
-                p: 2.5, 
-                mb: 2.5, 
-                borderRadius: 3,
-                border: '1px solid #e2e8f0',
-              }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{ mb: 2 }}>
-                  🏆 AEO Certificate Status
-                </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {expiringAeoCertificates.length > 0 || expiredAeoCertificates.length > 0 ? (
-                    <>
-                      {expiredAeoCertificates.length > 0 && (
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center',
-                          gap: 1.5,
-                          p: 1.5,
-                          borderRadius: 2,
-                          background: '#fef2f2',
-                          border: '1px solid #fecaca',
-                        }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            background: '#ef4444' 
-                          }} />
-                          <Typography variant="body2" color="#dc2626">
-                            {expiredAeoCertificates.length} Expired
-                          </Typography>
-                        </Box>
-                      )}
-                      {expiringAeoCertificates.length > 0 && (
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center',
-                          gap: 1.5,
-                          p: 1.5,
-                          borderRadius: 2,
-                          background: '#fffbeb',
-                          border: '1px solid #fde68a',
-                        }}>
-                          <Box sx={{ 
-                            width: 8, 
-                            height: 8, 
-                            borderRadius: '50%', 
-                            background: '#f59e0b' 
-                          }} />
-                          <Typography variant="body2" color="#d97706">
-                            {expiringAeoCertificates.length} Expiring Soon
-                          </Typography>
-                        </Box>
-                      )}
-                    </>
-                  ) : (
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center',
-                      gap: 1.5,
-                      p: 1.5,
-                      borderRadius: 2,
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                    }}>
-                      <Box sx={{ 
-                        width: 8, 
-                        height: 8, 
-                        borderRadius: '50%', 
-                        background: '#22c55e' 
-                      }} />
-                      <Typography variant="body2" color="#16a34a">
-                        All certificates valid
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              </Paper>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mt: 1, pt: 1 }}
+                >
+                  <TextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    label="From"
+                    InputLabelProps={{ shrink: true }}
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    sx={{ bgcolor: "white", borderRadius: 1 }}
+                  />
+                  <TextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    label="To"
+                    InputLabelProps={{ shrink: true }}
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    sx={{ bgcolor: "white", borderRadius: 1 }}
+                  />
+                  <IconButton
+                    onClick={fetchStats}
+                    sx={{
+                      bgcolor: "#3b82f6",
+                      color: "white",
+                      borderRadius: 1,
+                      width: 40,
+                      height: 40,
+                      "&:hover": { bgcolor: "#2563eb" },
+                    }}
+                  >
+                    <RefreshIcon />
+                  </IconButton>
+                </Stack>
+              </Box>
 
-              {/* Document Status */}
-              <Paper elevation={0} sx={{ 
-                p: 2.5, 
-                borderRadius: 3,
-                border: '1px solid #e2e8f0',
-              }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#1e293b" sx={{ mb: 2 }}>
-                  📄 Document Status
+              {/* Stats Grid */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  mb: 1.5,
+                  borderRadius: 3,
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  color="#1e293b"
+                  sx={{ mb: 2 }}
+                >
+                  📊 Daily Overview
                 </Typography>
-                
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {(expiringDocs.length > 0 || expiredDocs.length > 0) ? (
-                    <>
-                      {expiredDocs.length > 0 && (
-                        <Box sx={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          p: 1.5,
-                          borderRadius: 2,
-                          background: '#fef2f2',
-                        }}>
-                          <Typography variant="body2" color="#dc2626">Expired</Typography>
-                          <Chip 
-                            label={expiredDocs.length} 
-                            size="small" 
-                            sx={{ 
-                              bgcolor: '#ef4444', 
-                              color: 'white',
-                              fontWeight: 600,
-                              height: 24,
-                            }} 
-                          />
-                        </Box>
-                      )}
-                      {expiringDocs.length > 0 && (
-                        <Box sx={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          p: 1.5,
-                          borderRadius: 2,
-                          background: '#fffbeb',
-                        }}>
-                          <Typography variant="body2" color="#d97706">Expiring Soon</Typography>
-                          <Chip 
-                            label={expiringDocs.length} 
-                            size="small" 
-                            sx={{ 
-                              bgcolor: '#f59e0b', 
-                              color: 'white',
-                              fontWeight: 600,
-                              height: 24,
-                            }} 
-                          />
-                        </Box>
-                      )}
-                    </>
-                  ) : (
-                    <Typography variant="body2" color="#64748b" sx={{ textAlign: 'center', py: 2 }}>
-                      ✅ All documents up to date
-                    </Typography>
-                  )}
-                </Box>
+
+                {stats && stats.summary ? (
+                  <Box sx={{ minHeight: 350, py: 1 }}>
+                    <ReactApexChart
+                      options={barOptions}
+                      series={barSeries}
+                      type="bar"
+                      width="100%"
+                      height={350}
+                    />
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Loading stats...
+                  </Typography>
+                )}
               </Paper>
             </Box>
 
             {/* Right Side - Modules Grid */}
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="h6" fontWeight="600" sx={{ color: "#1e293b", mb: 2 }}>
+              <Typography
+                variant="h6"
+                fontWeight="600"
+                sx={{ color: "#1e293b", mb: 2 }}
+              >
                 Application Modules
               </Typography>
-              
+
               <Box
                 sx={{
                   display: "grid",
@@ -974,94 +1103,97 @@ function UserDashboard() {
                     sm: "repeat(2, 1fr)",
                     lg: "repeat(3, 1fr)",
                   },
-                  gap: 2.5,
-                  mb: 4,
+                  gap: 2,
+                  rowGap: 2,
+                  pb: 2,
+                  overflowY: "auto",
+                  maxHeight: "100%",
                 }}
               >
-            {modules.map((module, index) => (
-              <StyledCard
-                key={index}
-                onClick={() =>
-                  handleCardClick(
-                    module.path,
-                    module.isExternal,
-                    module.isLocked,
-                    module.name
-                  )
-                }
-                sx={{
-                  ...(module.isLocked
-                    ? { opacity: 0.6, filter: "grayscale(100%)" }
-                    : {}),
-                }}
-              >
-                {module.category === "beta" && <BetaBadge>BETA</BetaBadge>}
-
-                {module.isLocked && (
-                  <Box
+                {modules.map((module, index) => (
+                  <StyledCard
+                    key={index}
+                    onClick={() =>
+                      handleCardClick(
+                        module.path,
+                        module.isExternal,
+                        module.isLocked,
+                        module.name,
+                      )
+                    }
                     sx={{
-                      position: "absolute",
-                      top: 12,
-                      right: 12,
-                      color: "#94a3b8",
-                      zIndex: 2,
+                      ...(module.isLocked
+                        ? { opacity: 0.6, filter: "grayscale(100%)" }
+                        : {}),
                     }}
                   >
-                    <LockIcon fontSize="small" />
-                  </Box>
-                )}
+                    {module.category === "beta" && <BetaBadge>BETA</BetaBadge>}
 
-                <CardContent
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    padding: "20px",
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      variant="h6"
+                    {module.isLocked && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: 12,
+                          right: 12,
+                          color: "#94a3b8",
+                          zIndex: 2,
+                        }}
+                      >
+                        <LockIcon fontSize="small" />
+                      </Box>
+                    )}
+
+                    <CardContent
                       sx={{
-                        fontWeight: 600,
-                        fontSize: "1rem",
-                        color: "#1e293b",
-                        mb: 1,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        padding: "16px",
                       }}
                     >
-                      {module.name}
-                    </Typography>
+                      <Box>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: "1rem",
+                            color: "#1e293b",
+                            mb: 1,
+                          }}
+                        >
+                          {module.name}
+                        </Typography>
 
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#64748b",
-                        fontSize: "0.8rem",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {module.isLocked
-                        ? "Contact Admin for Access"
-                        : module.description}
-                    </Typography>
-                  </Box>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "#64748b",
+                            fontSize: "0.8rem",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {module.isLocked
+                            ? "Contact Admin for Access"
+                            : module.description}
+                        </Typography>
+                      </Box>
 
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: module.isLocked ? "#94a3b8" : "#6366f1",
-                      fontSize: "0.7rem",
-                      fontWeight: 500,
-                      letterSpacing: "0.5px",
-                      mt: 2,
-                    }}
-                  >
-                    {module.categoryLabel || "MODULE"}
-                  </Typography>
-                </CardContent>
-              </StyledCard>
-            ))}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: module.isLocked ? "#94a3b8" : "#6366f1",
+                          fontSize: "0.7rem",
+                          fontWeight: 500,
+                          letterSpacing: "0.5px",
+                          mt: 2,
+                        }}
+                      >
+                        {module.categoryLabel || "MODULE"}
+                      </Typography>
+                    </CardContent>
+                  </StyledCard>
+                ))}
               </Box>
             </Box>
           </Box>

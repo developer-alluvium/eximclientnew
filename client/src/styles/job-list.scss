@@ -1,60 +1,64 @@
+/* Job List Table Styles */
+
 .jobs-list-header {
   display: flex;
   align-items: center;
-  padding: 20px 0;
+  padding: 16px 0;
+  gap: 16px;
 
   h5 {
     flex: 1;
+    margin: 0;
+    color: #1e293b;
+    font-weight: 600;
   }
 }
 
-/* Table horizontal scroll improvements */
+/* Table Container */
 .table-container {
   height: 100%;
   display: flex;
   flex-direction: column;
-  
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+
   .MuiPaper-root {
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    will-change: scroll-position;
+    overflow: hidden;
+    border-radius: 0;
+    box-shadow: none !important;
     flex: 1;
   }
+
   .css-19kzrtu {
-    padding: 15px;
+    padding: 0;
   }
 
-  /* Add custom scrollbar styling */
+  /* Custom Scrollbar */
   .MuiTableContainer-root {
     &::-webkit-scrollbar {
-      height: 8px;
-      width: 8px;
+      height: 6px;
+      width: 6px;
     }
-    
+
     &::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
+      background: #f1f5f9;
     }
-    
+
     &::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-      
+      background: #cbd5e1;
+      border-radius: 3px;
+
       &:hover {
-        background: #555;
+        background: #94a3b8;
       }
     }
-    
-    /* Remove scroll inertia for more precise control */
+
     -webkit-overflow-scrolling: auto;
-    
-    /* Improve scroll performance */
     will-change: scroll-position;
-    
-    /* Add grab cursor to indicate scrollable area */
-    cursor: grab;
     user-select: none;
-    
+
     &.dragging {
       cursor: grabbing !important;
       * {
@@ -62,167 +66,480 @@
       }
     }
   }
+}
 
-  // Mobile-specific table improvements
-  @media (max-width: 768px) {
-    .MuiTableCell-root {
-      padding: 4px 8px !important;
-      font-size: 0.75rem !important;
-      
-      &.MuiTableCell-head {
-        font-size: 0.7rem !important;
-        font-weight: 600 !important;
-        padding: 6px 4px !important;
+/* MRT Table Specific Overrides */
+.MuiTableContainer-root {
+  /* Table Header */
+  .MuiTableHead-root {
+    .MuiTableRow-root {
+      background: #1e293b !important;
+    }
+
+    .MuiTableCell-head {
+      background: #ffffff !important;
+      color: #ffffff !important;
+      font-weight: 600 !important;
+      font-size: 0.7rem !important;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding: 10px 12px !important;
+      border-bottom: none !important;
+      white-space: nowrap;
+
+      /* All text inside header should be white */
+      * {
+        color: #000000 !important;
+      }
+
+      /* Sort label */
+      .MuiTableSortLabel-root {
+        color: #ffffff !important;
+
+        &:hover,
+        &.Mui-active {
+          color: #e2e8f0 !important;
+        }
+
+        .MuiTableSortLabel-icon {
+          color: #94a3b8 !important;
+          opacity: 1 !important;
+        }
+      }
+
+      /* Resize handle */
+      .Mui-TableHeadCell-ResizeHandle-Wrapper {
+        .Mui-TableHeadCell-ResizeHandle-Divider {
+          background-color: rgba(255, 255, 255, 0.2);
+        }
+      }
+
+      /* Icon buttons in header */
+      .MuiIconButton-root {
+        color: rgba(255, 255, 255, 0.7) !important;
+        padding: 4px !important;
+
+        &:hover {
+          color: #ffffff !important;
+          background-color: rgba(255, 255, 255, 0.1) !important;
+        }
       }
     }
-    
+  }
+
+  /* Table Body */
+  .MuiTableBody-root {
+    .MuiTableRow-root {
+      border-bottom: 1px solid #f1f5f9;
+      transition: background-color 0.1s ease;
+
+      &:hover {
+        background-color: #f8fafc !important;
+      }
+
+      .MuiTableCell-root {
+        padding: 8px 12px !important;
+        font-size: 0.75rem !important;
+        color: #334155;
+        border-bottom: 1px solid #f1f5f9 !important;
+
+        a {
+          color: #3b82f6;
+          text-decoration: none;
+          font-weight: 500;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+  }
+}
+
+/* Top Toolbar */
+.MuiToolbar-root.MRT_TopToolbar {
+  padding: 12px 16px !important;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  min-height: auto !important;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Filter Row Styling */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+
+  .MuiTextField-root,
+  .MuiAutocomplete-root {
+    .MuiOutlinedInput-root {
+      border-radius: 6px;
+      background: #ffffff;
+      font-size: 0.75rem;
+      height: 36px;
+
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #e2e8f0;
+      }
+
+      &:hover .MuiOutlinedInput-notchedOutline {
+        border-color: #cbd5e1;
+      }
+
+      &.Mui-focused .MuiOutlinedInput-notchedOutline {
+        border-color: #3b82f6;
+        border-width: 1px;
+      }
+    }
+
+    .MuiInputLabel-root {
+      font-size: 0.7rem;
+      transform: translate(12px, 10px) scale(1);
+
+      &.MuiInputLabel-shrink {
+        transform: translate(12px, -6px) scale(0.85);
+      }
+    }
+  }
+}
+
+/* Search Field */
+.search-field {
+  .MuiOutlinedInput-root {
+    background: #f8fafc !important;
+
+    &:hover {
+      background: #f1f5f9 !important;
+    }
+
+    &.Mui-focused {
+      background: #ffffff !important;
+    }
+  }
+}
+
+/* Status Tabs */
+.status-tabs {
+  .MuiTabs-root {
+    min-height: 40px;
+
+    .MuiTab-root {
+      min-height: 40px;
+      text-transform: none;
+      font-weight: 500;
+      font-size: 0.8rem;
+      color: #64748b;
+      padding: 8px 16px;
+
+      &.Mui-selected {
+        color: #1e293b;
+        font-weight: 600;
+      }
+    }
+
+    .MuiTabs-indicator {
+      background-color: #3b82f6;
+      height: 2px;
+    }
+  }
+}
+
+/* Action Buttons in Table */
+.table-action-btn {
+  border-radius: 4px !important;
+  font-size: 0.65rem !important;
+  font-weight: 500 !important;
+  padding: 4px 10px !important;
+  text-transform: none !important;
+  min-width: auto !important;
+  box-shadow: none !important;
+
+  &.copy-btn {
+    background: #3b82f6 !important;
+    color: white !important;
+
+    &:hover {
+      background: #2563eb !important;
+    }
+  }
+
+  &.pending-btn {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+    border: 1px solid #fcd34d !important;
+  }
+
+  &.completed-btn {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    border: 1px solid #86efac !important;
+  }
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &.pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &.completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  &.cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+}
+
+/* Pagination */
+.MuiPagination-root {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: center;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+
+  .MuiPaginationItem-root {
+    border-radius: 6px;
+    font-size: 0.75rem;
+    min-width: 32px;
+    height: 32px;
+    margin: 0 2px;
+
+    &.Mui-selected {
+      background: #1e293b;
+      color: #ffffff;
+
+      &:hover {
+        background: #334155;
+      }
+    }
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .table-container {
+    .MuiTableCell-root {
+      padding: 6px 8px !important;
+      font-size: 0.7rem !important;
+
+      &.MuiTableCell-head {
+        font-size: 0.65rem !important;
+        padding: 8px 8px !important;
+      }
+    }
+
     .MuiTableRow-root {
       &:hover {
         background-color: rgba(0, 0, 0, 0.04) !important;
       }
     }
-    
-    // Hide specific columns on very small screens
-    .MuiTableCell-root:nth-child(n+5) {
-      display: none;
-    }
   }
-  
-  @media (max-width: 480px) {
-    .MuiTableCell-root {
-      padding: 2px 4px !important;
-      font-size: 0.7rem !important;
-      
-      &.MuiTableCell-head {
-        font-size: 0.65rem !important;
-        padding: 4px 2px !important;
-      }
-    }
-    
-    // Show only essential columns on very small screens
-    .MuiTableCell-root:nth-child(n+4) {
-      display: none;
-    }
-  }
-}
 
-// Responsive toolbar improvements
-@media (max-width: 768px) {
   .MuiToolbar-root {
-    padding: 8px 16px !important;
+    padding: 8px 12px !important;
     flex-direction: column !important;
     align-items: stretch !important;
-    gap: 12px !important;
-  }
-  
-  .MuiTextField-root {
-    margin: 0 !important;
-  }
-  
-  .MuiAutocomplete-root {
-    margin: 0 !important;
+    gap: 8px !important;
   }
 }
 
-@media screen and (max-width: 992px) {
-  .jobs-list-header {
-    flex-direction: column;
-
-    h5 {
-      margin-bottom: 10px;
-      text-align: center;
-    }
-  }
-}
-
-// Improve touch interaction on mobile
-@media (hover: none) and (pointer: coarse) {
+@media (max-width: 480px) {
   .table-container {
-    .MuiTableContainer-root {
-      cursor: default;
-      
-      &.dragging {
-        cursor: default !important;
-        * {
-          cursor: default !important;
-        }
+    .MuiTableCell-root {
+      padding: 4px 6px !important;
+      font-size: 0.65rem !important;
+
+      &.MuiTableCell-head {
+        font-size: 0.6rem !important;
+        padding: 6px 6px !important;
       }
     }
-    
-    .MuiTableCell-root {
-      padding: 8px 12px !important;
-    }
-    
-    .MuiButton-root {
-      min-height: 44px !important;
-      padding: 8px 16px !important;
-    }
-    
-    .MuiIconButton-root {
-      width: 44px !important;
-      height: 44px !important;
-    }
   }
 }
 
-// Mobile job cards styling
+/* Mobile Job Cards (Alternative View) */
 .mobile-job-cards {
   .MuiCard-root {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     border-radius: 8px;
-    transition: all 0.2s ease-in-out;
-    
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
     &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
-    }
-    
-    &:active {
-      transform: translateY(0);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
     }
   }
-  
+
   .job-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 8px;
   }
-  
+
   .job-status-chip {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     height: 20px;
-    border-radius: 10px;
+    border-radius: 4px;
   }
 }
 
-// Responsive Material-UI overrides
-@media (max-width: 768px) {
-  .MuiToolbar-root {
-    min-height: auto !important;
-    padding: 8px !important;
-  }
-  
-  .MuiTableToolbar-root {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-  }
-  
-  .MuiPagination-root {
-    .MuiPaginationItem-root {
-      margin: 0 2px !important;
-      min-width: 28px !important;
-      height: 28px !important;
-      font-size: 0.75rem !important;
+/* Touch Device Improvements */
+@media (hover: none) and (pointer: coarse) {
+  .table-container {
+    .MuiTableContainer-root {
+      cursor: default;
+    }
+
+    .MuiTableCell-root {
+      padding: 10px 12px !important;
+    }
+
+    .MuiButton-root {
+      min-height: 40px !important;
+      padding: 8px 16px !important;
+    }
+
+    .MuiIconButton-root {
+      width: 40px !important;
+      height: 40px !important;
     }
   }
-  
-  .MuiToggleButtonGroup-root {
-    .MuiToggleButton-root {
-      padding: 4px 8px !important;
-      min-width: 36px !important;
+}
+
+@media screen and (max-width: 992px) {
+  .jobs-list-header {
+    flex-direction: column;
+    align-items: stretch;
+
+    h5 {
+      margin-bottom: 8px;
+      text-align: left;
+    }
+  }
+}
+
+/* Custom Table Styles (Non-MUI) */
+.custom-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+
+    thead {
+      background-color: #1e293b;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+
+      th {
+        color: white;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        position: relative;
+        white-space: nowrap;
+        user-select: none;
+
+        &.draggable {
+          cursor: grab;
+          &:active {
+            cursor: grabbing;
+          }
+        }
+
+        &.dragging {
+          opacity: 0.5;
+          background-color: #334155;
+        }
+
+        &.drag-over {
+          border-left: 2px solid #3b82f6;
+        }
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid #f1f5f9;
+
+        &:hover {
+          background-color: #f8fafc;
+        }
+
+        td {
+          padding: 12px 16px;
+          font-size: 0.8rem;
+          color: #334155;
+          vertical-align: top;
+          word-break: break-word;
+
+          /* Centered content by default per user request logic */
+          .cell-content {
+            height: 100%;
+            width: 100%;
+          }
+        }
+      }
+    }
+  }
+}
+
+.custom-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  gap: 8px;
+
+  button {
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border: 1px solid #cfd3d8;
+    background: white;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &.active {
+      background: #1e293b;
+      color: white;
+      border-color: #1e293b;
+    }
+
+    &:hover:not(:disabled):not(.active) {
+      background: #f1f5f9;
     }
   }
 }

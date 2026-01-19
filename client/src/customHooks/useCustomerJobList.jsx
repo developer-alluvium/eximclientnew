@@ -1,6 +1,17 @@
 import React, { useCallback, useMemo, useState } from "react";
 import EditableDeliveryAddressCell from "../components/EditableDeliveryAddressCell"; // Adjust the path as needed
-import { IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import {
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+} from "@mui/material";
+import { MdContentCopy, MdLocalShipping } from "react-icons/md";
+// import ScaleIcon from "@mui/icons-material/Scale";
+// import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ScaleIcon from "@mui/icons-material/Scale";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
@@ -8,13 +19,23 @@ import ChecklistCell from "../components/ChecklistCell"; // Adjust the path as n
 // import NetWeightCell from "../components/Net weight/NetWeightCell"; // Adjust the path as needed
 import DoPlanningToggle from "../components/DoPlanningToggle"; // Adjust the path as needed
 import EditableTransporterCell from "../components/EditableTransporterCell";
-import BENumberCell from"../components/BEnumberCell.jsx";
+import BENumberCell from "../components/BEnumberCell.jsx";
 // Custom hook to manage job columns configuration with centered content
 function useCustomerJobList() {
+  const badge = (bg, color, bold = false) => ({
+    backgroundColor: bg,
+    color,
+    padding: "0 6px",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: bold ? "bold" : 500,
+  });
+
   const [containerModalOpen, setContainerModalOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
   const [transporterModalOpen, setTransporterModalOpen] = useState(false);
-  const [selectedTransporterContainer, setSelectedTransporterContainer] = useState(null);
+  const [selectedTransporterContainer, setSelectedTransporterContainer] =
+    useState(null);
 
   const handleContainerClick = useCallback((container) => {
     setSelectedContainer(container);
@@ -29,7 +50,7 @@ function useCustomerJobList() {
   const handleTransporterClick = useCallback((container, jobId) => {
     setSelectedTransporterContainer({
       ...container,
-      jobId: jobId
+      jobId: jobId,
     });
     setTransporterModalOpen(true);
   }, []);
@@ -99,10 +120,10 @@ function useCustomerJobList() {
       //   accessorKey: "free_time",
       //   header: "Free Time",
       //   size: 85,
-      
+
       //   Cell: ({ cell }) => (
       //     <div  style={{
-      //     ...centeredCellStyle, 
+      //     ...centeredCellStyle,
       //     wordWrap: 'break-word',
       //     whiteSpace: 'pre-wrap',
       //     maxWidth: '320px',
@@ -112,84 +133,87 @@ function useCustomerJobList() {
       //   ),
       // },
 
+      {
+        // Group 2: Exporter & Job Number
+        accessorKey: "supplier_exporter",
+        header: "Exporter, Job Number & Free Time",
+        size: 200,
+        Cell: ({ cell }) => {
+          const { job_no, job_date, detailed_status, free_time } =
+            cell.row.original;
 
-    
-    
-{
-  // Group 2: Exporter & Job Number
-  accessorKey: "supplier_exporter",
-  header: "Exporter, Job Number & Free Time",
-  size: 140,
-  Cell: ({ cell }) => {
-    const { job_no, job_date, detailed_status, free_time } = cell.row.original;
+          // Get color based on status
+          let textColor = "inherit";
+          let bgColor = "transparent";
 
-    // Get color based on status
-    let textColor = "inherit";
-    let bgColor = "transparent";
+          if (detailed_status === "Completed") {
+            textColor = "#1a8917"; // Green for completed
+            bgColor = "#e8f5e9";
+          } else if (detailed_status === "In Progress") {
+            textColor = "#b36200"; // Orange for in progress
+            bgColor = "#fff3e0";
+          }
 
-    if (detailed_status === "Completed") {
-      textColor = "#1a8917"; // Green for completed
-      bgColor = "#e8f5e9";
-    } else if (detailed_status === "In Progress") {
-      textColor = "#b36200"; // Orange for in progress
-      bgColor = "#fff3e0";
-    }
+          return (
+            <div
+              style={{
+                ...centeredCellStyle,
+                wordWrap: "break-word",
+                whiteSpace: "pre-wrap",
+                maxWidth: "320px",
+                padding: "8px",
+                gap: "8px",
+              }}
+            >
+              <div>{cell.getValue() || "N/A"}</div>
+              <div
+                style={{
+                  color: textColor,
+                  backgroundColor: bgColor,
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "0.9em",
+                  fontWeight: "bold",
+                }}
+              >
+                {/* <div>{job_no}</div> */}
+                <div
+                  key="job-number"
+                  style={{
+                    fontWeight: "bold",
+                    fontSize: "0.8rem",
+                    border: "1px solid black",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    marginBottom: "4px",
+                    backgroundColor: "#f8f9fa",
+                    display: "inline-block",
+                  }}
+                >
+                  Job: {job_no}
+                </div>
+                <div
+                  key="free-time"
+                  style={{
+                    fontWeight: "bold",
+                    fontSize: "0.8rem",
+                    border: "1px solid black",
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    marginBottom: "4px",
+                    backgroundColor: "#f8f9fa",
+                    display: "inline-block",
+                  }}
+                >
+                  Free Time: {free_time}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
 
-    return (
-      <div 
-        style={{
-          ...centeredCellStyle,
-          wordWrap: 'break-word',
-          whiteSpace: 'pre-wrap',
-          maxWidth: '320px',
-          padding: '8px',
-          gap: '8px'
-        }}
-      >
-        <div>{cell.getValue() || "N/A"}</div>
-        <div 
-          style={{
-            color: textColor,
-            backgroundColor: bgColor,
-            padding: '4px 8px',
-            borderRadius: '4px',
-            cursor: "pointer",
-            fontSize: '0.9em',
-            fontWeight: 'bold'
-          }}
-        >
-          {/* <div>{job_no}</div> */}
-           <div key="job-number" style={{ 
-          fontWeight: 'bold', 
-          fontSize: '0.8rem', 
-          border: '1px solid black', 
-          padding: '2px 6px', 
-          borderRadius: '4px',
-          marginBottom: '4px',
-          backgroundColor: '#f8f9fa',
-          display: 'inline-block'
-        }}>
-          Job: {job_no}
-        </div>
-         <div key="free-time" style={{ 
-          fontWeight: 'bold', 
-          fontSize: '0.8rem', 
-          border: '1px solid black', 
-          padding: '2px 6px', 
-          borderRadius: '4px',
-          marginBottom: '4px',
-          backgroundColor: '#f8f9fa',
-          display: 'inline-block'
-        }}>
-          Free Time: {free_time}
-        </div>
-          
-        </div>
-      </div>
-    );
-  },
-},
-      
       // {
       //   accessorKey: "be_no",
       //   header: "BE Number & Date",
@@ -198,10 +222,10 @@ function useCustomerJobList() {
       //     const beNumber = cell?.getValue()?.toString();
       //     const rawBeDate = cell.row.original.be_date;
       //     const beDate = formatDate(rawBeDate);
-      //     const { 
-      //       processed_be_attachment = [], 
-      //       ooc_copies = [], 
-      //       gate_pass_copies = [] 
+      //     const {
+      //       processed_be_attachment = [],
+      //       ooc_copies = [],
+      //       gate_pass_copies = []
       //     } = cell.row.original;
 
       //     // Combine all documents with labels
@@ -259,7 +283,7 @@ function useCustomerJobList() {
       //               </IconButton>
       //             </div>
       //             <span>{beDate}</span>
-                  
+
       //             {/* Documents section - matching esanchit format */}
       //             <div style={{ marginTop: "8px", width: "100%" }}>
       //               {allDocuments.length > 0 ? (
@@ -270,7 +294,7 @@ function useCustomerJobList() {
       //                         href={doc.url}
       //                         target="_blank"
       //                         rel="noopener noreferrer"
-      //                         style={{ 
+      //                         style={{
       //                           fontSize: "0.9rem",
       //                           color: "#007bff",
       //                           textDecoration: "underline"
@@ -297,189 +321,236 @@ function useCustomerJobList() {
       //     );
       //   },
       // },
-       {
+      {
         accessorKey: "be_no",
-        header: "BE Number and Date",
-        size: 200,
+        header: (
+          <div className="flex flex-col text-center whitespace-normal leading-tight">
+            <span>BE Number</span>
+            <span>and Date</span>
+          </div>
+        ),
+        size: 230,
         Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} />,
       },
-     {
-  accessorKey: "checklist",
-  header: "Checklist/Shipping Line Invoices",
-  enableSorting: false,
-  size: 200,
-  Cell: ({ cell }) => {
-    const { do_shipping_line_invoice = [] } = cell.row.original;
-    
-    return (
-      <div style={centeredCellStyle}>
-        {/* Original ChecklistCell component */}
-        <ChecklistCell {...{ cell }} />
-        
-        {/* DO Shipping Line Invoice Documents */}
-        <div style={{ 
-          marginTop: '12px',
-          width: '100%',
-          borderTop: '1px solid #e0e0e0',
-          paddingTop: '8px'
-        }}>
-          <div style={{ 
-            fontSize: '0.85rem',
-            fontWeight: 'bold',
-            marginBottom: '6px',
-            color: '#333'
-          }}>
-            Shipping Line Invoices:
-          </div>
-          
-          {do_shipping_line_invoice.length > 0 ? (
-            do_shipping_line_invoice.map((invoice, index) => (
-              <div key={index} style={{ 
-                marginBottom: '6px',
-                padding: '4px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '4px',
-                fontSize: '0.8rem'
-              }}>
-                {/* Document Name */}
-                <div style={{ 
-                  fontWeight: 'bold',
-                  marginBottom: '2px',
-                  color: '#1976d2'
-                }}>
-                  {invoice.document_name || `Invoice ${index + 1}`}
-                </div>
-                
-                {/* Document URLs */}
-                {Array.isArray(invoice.url) && invoice.url.length > 0 ? (
-                  invoice.url.map((link, urlIndex) => (
-                    <div key={urlIndex} style={{ marginBottom: '2px' }}>
-                      <a
-                        href={link}
-                        target="_blank"
-                        rel="noopener noreferrer"
+      {
+        accessorKey: "checklist",
+        header: "Checklist/Shipping Line Invoices",
+        enableSorting: false,
+        size: 300,
+        Cell: ({ cell }) => {
+          const { do_shipping_line_invoice = [], remark_client } =
+            cell.row.original;
+
+          return (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                gap: "8px",
+                textAlign: "left",
+                width: "100%",
+                height: "100%",
+                fontSize: "12px",
+                alignItems: "flex-start",
+              }}
+            >
+              {/* Checklist Section - Left Side */}
+              <div style={{ flex: "1", minWidth: "0" }}>
+                <ChecklistCell {...{ cell }} />
+                {(do_shipping_line_invoice.length > 0 || remark_client) && (
+                  <div
+                    style={{
+                      flex: "1",
+                      minWidth: "0",
+                      borderLeft: "1px solid #e5e7eb",
+                      paddingLeft: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    {/* Remark Section */}
+                    {remark_client && (
+                      <div
                         style={{
-                          color: '#007bff',
-                          textDecoration: 'underline',
-                          fontSize: '0.75rem'
+                          backgroundColor: "#dbeafe",
+                          color: "#1e3a8a",
+                          wordBreak: "break-word",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          marginTop: "4px",
+                          width: "fit-content",
                         }}
                       >
-                        Document {urlIndex + 1}
-                      </a>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ 
-                    color: '#999',
-                    fontSize: '0.75rem',
-                    fontStyle: 'italic'
-                  }}>
-                    No document available
-                  </div>
-                )}
-                
-                {/* Status Indicators */}
-                <div style={{ 
-                  display: 'flex',
-                  gap: '4px',
-                  marginTop: '4px',
-                  flexWrap: 'wrap'
-                }}>
-                  {invoice.is_draft && (
-                    <span style={{
-                      backgroundColor: '#fff3cd',
-                      color: '#856404',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      fontSize: '0.65rem'
-                    }}>
-                      Draft
-                    </span>
-                  )}
-                  
-                  {invoice.is_final && (
-                    <span style={{
-                      backgroundColor: '#d1e7dd',
-                      color: '#0f5132',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      fontSize: '0.65rem'
-                    }}>
-                      Final
-                    </span>
-                  )}
-                  
-                  {invoice.is_payment_made && (
-                    <span style={{
-                      backgroundColor: '#d1e7dd',
-                      color: '#0f5132',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      fontSize: '0.65rem'
-                    }}>
-                      Paid
-                    </span>
-                  )}
-                  
-                  {invoice.is_payment_requested && !invoice.is_payment_made && (
-                    <span style={{
-                      backgroundColor: '#cff4fc',
-                      color: '#055160',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      fontSize: '0.65rem'
-                    }}>
-                      Payment Requested
-                    </span>
-                  )}
-                </div>
-                
-                {/* Payment Details */}
-                {invoice.document_amount_details && (
-                  <div style={{ 
-                    fontSize: '0.7rem',
-                    color: '#666',
-                    marginTop: '2px'
-                  }}>
-                    Amount: {invoice.document_amount_details}
-                  </div>
-                )}
-                
-                {invoice.payment_mode && (
-                  <div style={{ 
-                    fontSize: '0.7rem',
-                    color: '#666'
-                  }}>
-                    Mode: {invoice.payment_mode}
-                    {invoice.wire_transfer_method && ` (${invoice.wire_transfer_method})`}
+                        <span style={{ fontWeight: 600 }}>Remark:</span>{" "}
+                        {remark_client}
+                      </div>
+                    )}
+
+                    {/* Shipping Line Invoices Section */}
+                    {do_shipping_line_invoice.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          // gap: "4px",
+                        }}
+                      >
+                        {/* Label */}
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "#374151",
+                            whiteSpace: "nowrap",
+                            marginRight: "4px",
+                          }}
+                        >
+                          Invoices:
+                        </span>
+
+                        {/* Invoice list */}
+                        <span
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            flex: 1,
+                          }}
+                        >
+                          {do_shipping_line_invoice.map((invoice, index) => (
+                            <span
+                              key={index}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "2px",
+                                borderBottom: "1px solid #f3f4f6",
+                                paddingBottom: "4px",
+                              }}
+                            >
+                              {/* Top row */}
+                              <span
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "flex-start",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <span
+                                  title={invoice.document_name}
+                                  style={{
+                                    fontWeight: 500,
+                                    color: "#1d4ed8",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    maxWidth: "65%",
+                                  }}
+                                >
+                                  {invoice.document_name ||
+                                    `Invoice ${index + 1}`}
+                                </span>
+
+                                {/* Status badges */}
+                                <span style={{ display: "flex", gap: "4px" }}>
+                                  {invoice.is_draft && (
+                                    <span style={badge("#fef9c3", "#854d0e")}>
+                                      Draft
+                                    </span>
+                                  )}
+                                  {invoice.is_final && (
+                                    <span
+                                      style={badge("#dcfce7", "#166534", true)}
+                                    >
+                                      Final
+                                    </span>
+                                  )}
+                                  {invoice.is_payment_made && (
+                                    <span style={badge("#dcfce7", "#166534")}>
+                                      Paid
+                                    </span>
+                                  )}
+                                  {invoice.is_payment_requested &&
+                                    !invoice.is_payment_made && (
+                                      <span style={badge("#cffafe", "#155e75")}>
+                                        Req
+                                      </span>
+                                    )}
+                                </span>
+                              </span>
+
+                              {/* Amount details */}
+                              {invoice.document_amount_details && (
+                                <span
+                                  style={{
+                                    color: "#545964ff",
+                                    fontSize: "10px",
+                                  }}
+                                >
+                                  Amount: {invoice.document_amount_details}
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  fontSize: "0.7rem",
+                                  color: "#666",
+                                }}
+                              >
+                                Mode: {invoice.payment_mode}
+                                {invoice.wire_transfer_method &&
+                                  ` (${invoice.wire_transfer_method})`}
+                              </span>
+
+                              {/* Document links */}
+                              {Array.isArray(invoice.url) &&
+                                invoice.url.length > 0 && (
+                                  <span
+                                    style={{
+                                      display: "flex",
+                                      gap: "6px",
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    {invoice.url.map((link, i) => (
+                                      <a
+                                        key={i}
+                                        href={link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                          color: "#3b82f6",
+                                          textDecoration: "underline",
+                                          fontSize: "10px",
+                                        }}
+                                      >
+                                        Doc {i + 1}
+                                      </a>
+                                    ))}
+                                  </span>
+                                )}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ))
-          ) : (
-            <div style={{ 
-              color: '#999',
-              fontSize: '0.8rem',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              padding: '8px'
-            }}>
-              No shipping line invoices
+
+              {/* Remarks & Invoices - Right Side */}
             </div>
-          )}
-        </div>
-      </div>
-    );
-  },
-  sx: centeredCellStyle
-},
-
-
+          );
+        },
+        sx: centeredCellStyle,
+      },
 
       {
         accessorKey: "shipment_details",
         header: "Shipment & Commercial Details",
-        size: 220,
+        size: 240,
         Cell: ({ cell }) => {
           const {
             awb_bl_no,
@@ -510,11 +581,13 @@ function useCustomerJobList() {
                 </IconButton>
               )}{" "}
               {awb_bl_date} <br />
-              <strong>Gross Weight:</strong>{gross_weight || ""} kg<br />
-              <strong>Net weight:</strong> {job_net_weight || ""} kg<br />
-           
+              <strong>Gross Weight:</strong>
+              {gross_weight || ""} kg
+              <br />
+              <strong>Net weight:</strong> {job_net_weight || ""} kg
+              <br />
               <strong>Invoice:</strong> {invoice_number} {invoice_date} <br />
-              <strong>Value:</strong> 
+              <strong>Value:</strong>
               {total_inv_value || ""} <br />
               <strong>POL:</strong>{" "}
               {loading_port ? loading_port.replace(/\(.*?\)\s*/, "") : ""}{" "}
@@ -530,100 +603,122 @@ function useCustomerJobList() {
         },
       },
 
-    
+      {
+        // Group 4: Container
+        accessorKey: "container_details",
+        header: "Container",
+        size: 200,
+        Cell: ({ cell }) => {
+          const containerNos = cell.row.original.container_nos;
 
-     {
-  // Group 4: Container
-  accessorKey: "container_details",
-  header: "Container",
-  size: 200,
-  Cell: ({ cell }) => {
-    const containerNos = cell.row.original.container_nos;
+          // Helper function to get color based on shortage amount
+          const getShortageColor = (shortage) => {
+            if (shortage < 0) {
+              return "#e02251"; // Red for shortage
+            } else {
+              return "#2e7d32"; // Green for no shortage
+            }
+          };
 
-    // Helper function to get color based on shortage amount
-    const getShortageColor = (shortage) => {
-      if (shortage < 0) {
-        return "#e02251"; // Red for shortage
-      } else {
-        return "#2e7d32"; // Green for no shortage
-      }
-    };
+          const getShortageText = (shortage) => {
+            if (shortage < 0) {
+              return `Shortage: -${Math.abs(shortage).toFixed(2)} kg`;
+            } else if (shortage > 0) {
+              return `Excess: +${Math.abs(shortage).toFixed(2)} kg`;
+            } else {
+              return "No shortage/excess";
+            }
+          };
 
-    const getShortageText = (shortage) => {
-      if (shortage < 0) {
-        return `Shortage: -${Math.abs(shortage).toFixed(2)} kg`;
-      } else if (shortage > 0) {
-        return `Excess: +${Math.abs(shortage).toFixed(2)} kg`;
-      } else {
-        return "No shortage/excess";
-      }
-    };
+          return (
+            <React.Fragment>
+              <div style={centeredCellStyle}>
+                {containerNos?.map((container, id) => {
+                  const weightShortage =
+                    parseFloat(container.weight_shortage) || 0;
+                  const containerColor = getShortageColor(weightShortage);
+                  const tooltipText = getShortageText(weightShortage);
 
-    return (
-      <React.Fragment>
-        <div style={centeredCellStyle}>
-          {containerNos?.map((container, id) => {
-            const weightShortage = parseFloat(container.weight_shortage) || 0;
-            const containerColor = getShortageColor(weightShortage);
-            const tooltipText = getShortageText(weightShortage);
-
-            return (
-              <div key={id} className="mb-2 text-center w-full" style={{ marginBottom: "4px" }}>
-                <Tooltip title={tooltipText} arrow placement="top">
-                  <a
-                    
-                    style={{
-                      color: containerColor,
-                      fontWeight: "bold",
-                      textDecoration: "none",
-                      cursor: "pointer",
-                      marginRight: "6px",
-                    }}
-                    onClick={() => handleContainerClick(container)}
-                    onMouseOver={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                    onMouseOut={(e) => (e.currentTarget.style.textDecoration = "none")}
-                  >
-                    {container.container_number}
-                  </a>
-                </Tooltip>
-
-                <span style={{ marginLeft: "4px", marginRight: "8px" }}>
-                  | "{container.size}"
-                </span>
-
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Tooltip title="Copy Container Number" arrow>
-                    <IconButton
-                      size="small"
-                      onClick={(event) => handleCopy(event, container.container_number)}
+                  return (
+                    <div
+                      key={id}
+                      className="mb-2 text-center w-full"
+                      style={{ marginBottom: "4px" }}
                     >
-                      <ContentCopyIcon fontSize="inherit" />
-                    </IconButton>
-                  </Tooltip>
+                      <Tooltip title={tooltipText} arrow placement="top">
+                        <a
+                          style={{
+                            color: containerColor,
+                            fontWeight: "bold",
+                            textDecoration: "none",
+                            cursor: "pointer",
+                            marginRight: "6px",
+                          }}
+                          onClick={() => handleContainerClick(container)}
+                          onMouseOver={(e) =>
+                            (e.currentTarget.style.textDecoration = "underline")
+                          }
+                          onMouseOut={(e) =>
+                            (e.currentTarget.style.textDecoration = "none")
+                          }
+                        >
+                          {container.container_number}
+                        </a>
+                      </Tooltip>
 
-                  <Tooltip title="Assign Transporter" arrow>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleTransporterClick(container, cell.row.original._id)}
-                      sx={{ ml: 0.5, mr: 0.5 }}
-                    >
-                      <LocalShippingIcon fontSize="small" color="action" />
-                    </IconButton>
-                  </Tooltip>
-                </span>
+                      <span style={{ marginLeft: "4px", marginRight: "8px" }}>
+                        | "{container.size}"
+                      </span>
+
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Tooltip title="Copy Container Number" arrow>
+                          <IconButton
+                            size="small"
+                            onClick={(event) =>
+                              handleCopy(event, container.container_number)
+                            }
+                          >
+                            <ContentCopyIcon fontSize="inherit" />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Assign Transporter" arrow>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              handleTransporterClick(
+                                container,
+                                cell.row.original._id,
+                              )
+                            }
+                            sx={{ ml: 0.5, mr: 0.5 }}
+                          >
+                            <LocalShippingIcon
+                              fontSize="small"
+                              color="action"
+                            />
+                          </IconButton>
+                        </Tooltip>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      </React.Fragment>
-    );
-  },
-},
+            </React.Fragment>
+          );
+        },
+      },
 
-           {
+      {
         accessorKey: "container_numbers",
         header: "Container Numbers and Size",
-        size: 200,
+        size: 230,
         Cell: ({ cell }) => {
           const containerNos = cell.row.original.container_nos;
           const jobData = cell.row.original;
@@ -649,7 +744,7 @@ function useCustomerJobList() {
           };
 
           return (
-            <React.Fragment>
+            <div className="flex flex-col gap-1 w-full text-sm">
               {containerNos?.map((container, id) => {
                 const weightShortage =
                   parseFloat(container.weight_shortage) || 0;
@@ -657,52 +752,36 @@ function useCustomerJobList() {
                 const tooltipText = getShortageText(weightShortage);
 
                 return (
-                  <div key={id} style={{ marginBottom: "4px" }}>
-                    <Tooltip title={tooltipText} arrow placement="top">
-                      <a
-                        href={`https://www.ldb.co.in/ldb/containersearch/39/${container.container_number}/1726651147706`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          color: containerColor,
-                          fontWeight: "bold",
-                          textDecoration: "none",
-                          cursor: "pointer",
-                        }}
-                        onMouseOver={(e) =>
-                          (e.target.style.textDecoration = "underline")
-                        }
-                        onMouseOut={(e) =>
-                          (e.target.style.textDecoration = "none")
-                        }
-                      >
-                        {container.container_number}
-                      </a>
-                    </Tooltip>
-                    | "{container.size}"
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
+                  <div
+                    key={id}
+                    className="flex items-center gap-1 mb-1"
+                    title={tooltipText}
+                  >
+                    <a
+                      href={`https://www.ldb.co.in/ldb/containersearch/39/${container.container_number}/1726651147706`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold no-underline hover:underline"
+                      style={{ color: containerColor }}
                     >
-                      <Tooltip title="Copy Container Number" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={(event) =>
-                            handleCopy(event, container.container_number)
-                          }
-                        >
-                          <ContentCopyIcon fontSize="inherit" />
-                        </IconButton>
-                      </Tooltip>
-            
-                    </div>
+                      {container.container_number}
+                    </a>
+
+                    <span className="text-gray-600">| "{container.size}"</span>
+
+                    <button
+                      className="p-1 hover:bg-gray-100 rounded ml-1 text-gray-500"
+                      title="Copy Container Number"
+                      onClick={(event) =>
+                        handleCopy(event, container.container_number)
+                      }
+                    >
+                      <ContentCopyIcon size={12} />
+                    </button>
                   </div>
                 );
               })}
-            </React.Fragment>
+            </div>
           );
         },
       },
@@ -710,7 +789,7 @@ function useCustomerJobList() {
         // Group 5: Movement Timeline
         accessorKey: "movement_timeline",
         header: "Movement Timeline",
-        size: 220,
+        size: 300,
         Cell: ({ cell }) => {
           const {
             vessel_berthing,
@@ -720,107 +799,113 @@ function useCustomerJobList() {
             delivery_date,
             emptyContainerOffLoadDate,
             consignment_type,
-            detention_from
+            detention_from,
           } = cell.row.original;
 
           // Format dates
           const formattedOocDate = formatDate(out_of_charge);
-          const formatDischargedate=formatDate(discharge_date);
+          const formatDischargedate = formatDate(discharge_date);
 
           return (
             <div
               style={{
-                width: "100%",
-                lineHeight: "1.5",
-                // alignItems: "center",
                 display: "flex",
                 flexDirection: "column",
+                gap: "2px",
+                textAlign: "left",
               }}
             >
               <div>
-                <strong>ETA: </strong>
-                <span>{vessel_berthing || "N/A"}</span>
-              </div>
-
-              <div>
-                <strong>Discharge: </strong>
-                <span> {formatDischargedate}</span>
-              </div>
-            <div> 
-  <strong>{consignment_type === "LCL" ? "By Road: " : "Rail Out: "}</strong>
-  <span>
-    {container_nos.length > 0
-      ? container_nos.map((container, id) => (
-          <React.Fragment key={id}>
-            {consignment_type === "LCL"
-              ? (container.by_road_movement_date?.split("T")[0] ?? "N/A")
-              : (container.container_rail_out_date?.split("T")[0] ?? "N/A")}
-            <br />
-          </React.Fragment>
-        ))
-      : "N/A"}
-  </span>
-</div>
-              <div>
-                <strong>Arrival: </strong>
-                <span>
-                  {container_nos.length > 0
-                    ? container_nos.map((container, id) => (
-                        <React.Fragment key={id}>
-                          {container.arrival_date?.split("T")[0] ?? "N/A"}
-                          <br />
-                        </React.Fragment>
-                      ))
-                    : "N/A"}
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  ETA:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {vessel_berthing || "-"}
                 </span>
               </div>
-
               <div>
-                <strong>OOC: </strong>
-                <span>{formattedOocDate}</span>
-              </div>
-
-              <div> 
-                <strong>Detention From: </strong>
-                  <span>
-                  {container_nos.length > 0
-                    ? container_nos.map((container, id) => (
-                        <React.Fragment key={id}>
-                          {container.detention_from?.split("T")[0] ?? "N/A"}
-                          <br />
-                        </React.Fragment>
-                      ))
-                    : "N/A"}
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  Discharge:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {formatDischargedate || "-"}
                 </span>
               </div>
-
               <div>
-                <strong>Delivery: </strong>
-                <span>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  {consignment_type === "LCL" ? "By Road:" : "Rail Out:"}
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
                   {container_nos.length > 0
-                    ? container_nos.map((container, id) => (
-                        <React.Fragment key={id}>
-                          {container.delivery_date?.split("T")[0] ?? "N/A"}
-                          <br />
-                        </React.Fragment>
-                      ))
-                    : "N/A"}
+                    ? container_nos
+                        .map((c) =>
+                          consignment_type === "LCL"
+                            ? c.by_road_movement_date?.split("T")[0]
+                            : c.container_rail_out_date?.split("T")[0],
+                        )
+                        .filter(Boolean)
+                        .join(", ") || "-"
+                    : "-"}
                 </span>
-                </div>
-              
-            
-
-                <div>
-                <strong>Empty Offload: </strong>
-               <span>
+              </div>
+              <div>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  Arrival:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
                   {container_nos.length > 0
-                    ? container_nos.map((container, id) => (
-                        <React.Fragment key={id}>
-                          {container.emptyContainerOffLoadDate?.split("T")[0] ?? "N/A"}
-                          <br />
-                        </React.Fragment>
-                      ))
-                    : "N/A"}
+                    ? container_nos
+                        .map((c) => c.arrival_date?.split("T")[0])
+                        .filter(Boolean)
+                        .join(", ") || "-"
+                    : "-"}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  OOC:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {formattedOocDate || "-"}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  Detention From:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {container_nos.length > 0
+                    ? container_nos
+                        .map((c) => c.detention_from?.split("T")[0])
+                        .filter(Boolean)
+                        .join(", ") || "-"
+                    : "-"}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  Delivery:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {container_nos.length > 0
+                    ? container_nos
+                        .map((c) => c.delivery_date?.split("T")[0])
+                        .filter(Boolean)
+                        .join(", ") || "-"
+                    : "-"}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
+                  Empty Offload:
+                </span>{" "}
+                <span style={{ color: "#374151" }}>
+                  {container_nos.length > 0
+                    ? container_nos
+                        .map((c) => c.emptyContainerOffLoadDate?.split("T")[0])
+                        .filter(Boolean)
+                        .join(", ") || "-"
+                    : "-"}
                 </span>
               </div>
             </div>
@@ -836,11 +921,11 @@ function useCustomerJobList() {
         Cell: ({ cell }) => {
           const { cth_documents = [] } = cell.row.original;
           const validDocuments = cth_documents.filter(
-            (doc) => doc.document_check_date
+            (doc) => doc.document_check_date,
           );
 
           return (
-            <div >
+            <div>
               {validDocuments.length > 0 ? (
                 validDocuments.map((doc, index) => (
                   <div key={index} style={{ marginBottom: "4px" }}>
@@ -867,27 +952,32 @@ function useCustomerJobList() {
         },
       },
 
-      
-
-           {
+      {
         // Group 8: DO Planning
         accessorKey: "doPlanning",
         header: "DO Planning",
-        size: 300,
+        Header: () => <div className="w-full text-left">DO Planning</div>,
+        size: 250,
         Cell: ({ cell }) => {
           // Get the data from the row
-          const { 
-            do_planning_date, 
-            doPlanning, 
+          const {
+            do_planning_date,
+            doPlanning,
             do_planning_history,
             do_copies = [],
             do_validity,
-            do_completed
+            do_completed,
           } = cell.row.original;
           // console.log("DO Planning Cell Data:", cell.row.original.do_validity);
 
           return (
-            <div style={centeredCellStyle}>
+            <div
+              style={{
+                ...centeredCellStyle,
+                alignItems: "flex-start",
+                textAlign: "left",
+              }}
+            >
               {/* Commented out DoPlanningToggle component */}
               <DoPlanningToggle
                 do_planning_date={do_planning_date}
@@ -896,40 +986,44 @@ function useCustomerJobList() {
                 cell={cell}
                 row={cell.row}
               />
-              
+
               {/* New DO Planning Display */}
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '8px', 
-                width: '100%',
-                padding: '8px'
-              }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  width: "100%",
+                  padding: "8px",
+                }}
+              >
                 {/* DO Copies Documents */}
-                            
-                
 
                 {/* DO Validated */}
-                              {/* DO Validated */}
+                {/* DO Validated */}
                 <div>
                   <strong>DO Validity:</strong>
-                  <span style={{ 
-                    marginLeft: '8px',
-                    color: do_validity ? '#1a8917' : '#999',
-                    fontSize: '0.9em'
-                  }}>
-                    {do_validity ? formatDate(do_validity) : 'Not validated'}
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      color: do_validity ? "#1a8917" : "#999",
+                      fontSize: "0.9em",
+                    }}
+                  >
+                    {do_validity ? formatDate(do_validity) : "Not validated"}
                   </span>
                 </div>
                 {/* DO Completed Date */}
                 <div>
                   <strong>DO Completed Date:</strong>
-                  <span style={{ 
-                    marginLeft: '8px',
-                    fontSize: '0.9em',
-                    color: do_completed ? '#1a8917' : '#999'
-                  }}>
-                    {do_completed ? formatDate(do_completed) : 'Pending'}
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      fontSize: "0.9em",
+                      color: do_completed ? "#1a8917" : "#999",
+                    }}
+                  >
+                    {do_completed ? formatDate(do_completed) : "Pending"}
                   </span>
                 </div>
                 <div>
@@ -942,7 +1036,10 @@ function useCustomerJobList() {
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "#007bff", textDecoration: "underline" }}
+                            style={{
+                              color: "#007bff",
+                              textDecoration: "underline",
+                            }}
                           >
                             DO Copy {index + 1}
                           </a>
@@ -951,10 +1048,7 @@ function useCustomerJobList() {
                     </div>
                   ) : (
                     <div style={{ marginBottom: "5px" }}>
-                      <span style={{ color: "gray" }}>
-                        {" "}
-                       No DO copies{" "}
-                      </span>
+                      <span style={{ color: "gray" }}> No DO copies </span>
                     </div>
                   )}
                 </div>
@@ -964,21 +1058,27 @@ function useCustomerJobList() {
         },
       },
 
-      {
-        // Group 9: Delivery Planning
-        accessorKey: "delivery_planning",
-        header: "Delivery Planning",
-        size: 150,
-        Cell: ({ cell }) => {
-          const { examinationPlanning } = cell.row.original;
+      // {
+      //   // Group 9: Delivery Planning
+      //   accessorKey: "delivery_planning",
+      //   header: "Delivery Planning",
+      //   Header: () => (
+      //     <div className="flex flex-col items-center justify-center text-center w-full">
+      //       <span>Delivery</span>
+      //       <span>Planning</span>
+      //     </div>
+      //   ),
+      //   size: 200,
+      //   Cell: ({ cell }) => {
+      //     const { examinationPlanning } = cell.row.original;
 
-          return (
-            <div style={centeredCellStyle}>
-              <span>{examinationPlanning ? "Planned" : "Not Planned"}</span>
-            </div>
-          );
-        },
-      },
+      //     return (
+      //       <div style={centeredCellStyle}>
+      //         <span>{examinationPlanning ? "Planned" : "Not Planned"}</span>
+      //       </div>
+      //     );
+      //   },
+      // },
 
       // {
       //   accessorKey: "delivery_address",
@@ -997,10 +1097,16 @@ function useCustomerJobList() {
       // },
     ],
 
-    
-    [centeredCellStyle, formatDate, handleCopy, handleContainerClick, containerModalOpen, handleModalClose, selectedContainer, handleTransporterClick]
-
-    
+    [
+      centeredCellStyle,
+      formatDate,
+      handleCopy,
+      handleContainerClick,
+      containerModalOpen,
+      handleModalClose,
+      selectedContainer,
+      handleTransporterClick,
+    ],
   );
 
   // Create Transporter Modal JSX
@@ -1012,62 +1118,62 @@ function useCustomerJobList() {
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: '12px',
-          maxWidth: '600px'
-        }
+          borderRadius: "12px",
+          maxWidth: "600px",
+        },
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontWeight: 'bold',
-        bgcolor: '#f8f9fa',
-        borderBottom: '1px solid #e0e0e0'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <LocalShippingIcon color="primary" />
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontWeight: "bold",
+          bgcolor: "#f8f9fa",
+          borderBottom: "1px solid #e0e0e0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <LocalShippingIcon className="text-blue-600 text-xl" />
           Assign Transporter
-          {selectedTransporterContainer && 
-            <span style={{ color: '#666', fontSize: '0.9rem', marginLeft: '8px' }}>
+          {selectedTransporterContainer && (
+            <span
+              style={{ color: "#666", fontSize: "0.9rem", marginLeft: "8px" }}
+            >
               ({selectedTransporterContainer.container_number})
             </span>
-          }
+          )}
         </div>
       </DialogTitle>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
         {selectedTransporterContainer && (
-          <EditableTransporterCell 
-            cell={{ 
-              row: { 
-                original: { 
+          <EditableTransporterCell
+            cell={{
+              row: {
+                original: {
                   _id: selectedTransporterContainer.jobId,
-                  container_nos: [selectedTransporterContainer]
-                } 
-              } 
-            }} 
+                  container_nos: [selectedTransporterContainer],
+                },
+              },
+            }}
           />
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid #e0e0e0' }}>
-        <Button 
-          onClick={handleTransporterModalClose} 
-          variant="outlined"
-        >
+      <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
+        <Button onClick={handleTransporterModalClose} variant="outlined">
           Close
         </Button>
       </DialogActions>
     </Dialog>
   );
 
-  return { 
-    columns, 
-    containerModalOpen, 
-    handleModalClose, 
+  return {
+    columns,
+    containerModalOpen,
+    handleModalClose,
     selectedContainer,
-    transporterModal
+    transporterModal,
   };
 }
 
 export default useCustomerJobList;
-

@@ -116,9 +116,9 @@ export const antdTheme = {
 
   components: {
     Layout: {
-      colorBgHeader: "#ffffff",
-      colorBgBody: "#f5f7fa",
-      colorBgTrigger: "#002140",
+      headerBg: "#ffffff",
+      bodyBg: "#f5f7fa",
+      triggerBg: "#002140",
       headerHeight: 64,
       headerPadding: "0 24px",
       headerColor: "#262626",

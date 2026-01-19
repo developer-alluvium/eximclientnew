@@ -23,7 +23,10 @@ import {
   updateJob,
   getJobsByMultipleIECodes,
 } from "../controllers/jobStatusController.js";
-import { getJobsOverview } from "../controllers/jobOverviewController.js";
+import {
+  getJobsOverview,
+  getUserDashboardStats,
+} from "../controllers/jobOverviewController.js";
 import {
   getJobsByIECode,
   getJobsMultiStatus,
@@ -40,7 +43,7 @@ import {
   storeCalculatorDataGandhidham,
   updateJobDutyAndWeightGandhidham,
   getContainerDetailsGandhidham,
-  getContainerSummaryGandhidham
+  getContainerSummaryGandhidham,
 } from "../controllers/gandhidhamController.js";
 
 const router = express.Router();
@@ -51,9 +54,12 @@ router.get("/api/get-job-numbers/multiple", getJobNumbersByMultipleIECodes);
 router.get("/api/get-be-numbers/multiple", getBeNumbersByMultipleIECodes);
 router.get(
   "/api/gandhidham/get-be-numbers/multiple",
-  getBeNumbersByMultipleIECodesGandhidham
+  getBeNumbersByMultipleIECodesGandhidham,
 );
-router.get("/api/gandhidham/get-job-numbers/multiple", getJobNumbersByMultipleIECodesGandhidham);
+router.get(
+  "/api/gandhidham/get-job-numbers/multiple",
+  getJobNumbersByMultipleIECodesGandhidham,
+);
 router.get("/api/get-job-numbers/:ie_code_no", getJobNumbersByIECode); // Supports ?year= query param
 
 // Optimized routes for IE code based filtering
@@ -63,22 +69,22 @@ router.get("/api/optimized/:year/jobs/:ieCode/all", getJobsMultiStatus);
 // Route for multiple IE codes
 router.get(
   "/api/:year/jobs/:status/:detailedStatus/:customHouse/multiple",
-  getJobsByMultipleIECodes
+  getJobsByMultipleIECodes,
 );
 
 router.get(
   "/api/:year/jobs/:status/:detailedStatus/:importer",
-  getJobsByStatusAndImporter
+  getJobsByStatusAndImporter,
 );
 // Gandhidham jobs route
 router.get(
   "/api/gandhidham/:year/jobs/:status/:detailedStatus/:customHouse/multiple",
-  getJobsByStatusAndImporterGandhidham
+  getJobsByStatusAndImporterGandhidham,
 );
 
 router.get(
   "/api/gandhidham/get-importer-jobs/:importerURL/:year",
-  getImporterJobCountsGandhidham
+  getImporterJobCountsGandhidham,
 );
 
 router.patch("/api/jobs/:id", updateJob);
@@ -86,6 +92,7 @@ router.patch("/api/jobs/:id", updateJob);
 router.patch("/api/jobs/container/:id", updateContainerTransporter);
 
 // Route to get jobs overview
+router.get("/api/user-dashboard-stats", getUserDashboardStats);
 router.get("/api/get-jobs-overview/:year", getJobsOverview);
 router.get("/api/get-years", getYears);
 router.get("/api/get-exporters", getExporters);
@@ -98,7 +105,7 @@ router.patch("/api/gandhidham/update-per-kg-cost", updatePerKgCostGandhidham);
 router.patch("/api/update-job-duty-weight/:jobNo", updateJobDutyAndWeight);
 router.patch(
   "/api/gandhidham/update-job-duty-weight/:jobNo",
-  updateJobDutyAndWeightGandhidham
+  updateJobDutyAndWeightGandhidham,
 );
 // router.get("/api/lookup/:hsCode?/:jobNo/:year", lookup);
 
@@ -109,7 +116,7 @@ router.get("/api/gandhidham/lookup/:jobNo/:year", lookupGandhidam);
 router.post("/api/store-calculator-data/:jobNo", storeCalculatorData);
 router.post(
   "/api/gandhidham/store-calculator-data/:jobNo",
-  storeCalculatorDataGandhidham
+  storeCalculatorDataGandhidham,
 );
 
 // Container Summary Analysis API
@@ -117,7 +124,6 @@ router.get("/api/container-summary", getContainerSummary);
 
 // Container Details API - Get detailed list of containers by status
 router.get("/api/container-details", getContainerDetails);
-
 
 router.get("/api/gandhidham/container-summary", getContainerSummaryGandhidham);
 router.get("/api/gandhidham/container-details", getContainerDetailsGandhidham);

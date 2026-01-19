@@ -83,8 +83,8 @@ function CImportDSR() {
     visibleTabs.push({ label: "Jobs", key: "jobs" });
   if (tabVisibility.gandhidhamTabVisible)
     visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
-    // if (tabVisibility.analyticsTabVisible)
-    // visibleTabs.push({ label: "Analytics", key: "analytics" });
+  // if (tabVisibility.analyticsTabVisible)
+  // visibleTabs.push({ label: "Analytics", key: "analytics" });
 
   return (
     <Box
@@ -94,6 +94,7 @@ function CImportDSR() {
         minHeight: "calc(100vh - 70px)",
         width: "100%",
         overflow: "hidden",
+        backgroundColor: "#f8fafc",
       }}
     >
       <SelectedYearContext.Provider value={{ selectedYear, setSelectedYear }}>
@@ -104,16 +105,18 @@ function CImportDSR() {
             flexDirection: "column",
             minHeight: "100%",
             overflow: "hidden",
+           
+            
           }}
         >
           <Box
             sx={{
-              borderBottom: 1,
-              borderColor: "divider",
+              borderBottom: "1px solid #e2e8f0",
               display: "flex",
-              justifyContent: "flex-start",
+              justifyContent: "space-between",
               alignItems: "center",
-              padding: { xs: "8px", sm: "0 16px" },
+              padding: { xs: "8px 12px", sm: "0 16px" },
+              backgroundColor: "#ffffff",
               flexWrap: { xs: "wrap", sm: "nowrap" },
               gap: { xs: 1, sm: 0 },
             }}
@@ -129,13 +132,25 @@ function CImportDSR() {
               <Tabs
                 value={tabValue}
                 onChange={handleChange}
-                aria-label="basic tabs example"
+                aria-label="navigation tabs"
                 sx={{
-                  minHeight: { xs: "36px", sm: "48px" },
+                  minHeight: 44,
                   "& .MuiTab-root": {
-                    minHeight: { xs: "36px", sm: "36px" },
-                    fontSize: { xs: "0.875rem", sm: "1rem" },
-                    padding: { xs: "6px 12px", sm: "12px 16px" },
+                    minHeight: 44,
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    color: "#64748b",
+                    padding: "8px 16px",
+                    "&.Mui-selected": {
+                      color: "#1e293b",
+                      fontWeight: 600,
+                    },
+                  },
+                  "& .MuiTabs-indicator": {
+                    backgroundColor: "#3b82f6",
+                    height: 3,
+                    borderRadius: "2px 2px 0 0",
                   },
                 }}
               >
@@ -144,24 +159,18 @@ function CImportDSR() {
                 ))}
               </Tabs>
             </Box>
-            <Box
-              sx={{
-                position: "absolute",
-                left: "50%",
-                transform: "translateX(-50%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                textAlign: "center",
-              }}
-            >
+            {selectedImporter && (
               <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#000" }}
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 600,
+                  color: "#1e293b",
+                  fontSize: "0.9rem",
+                }}
               >
-                {selectedImporter || ""}
+                {selectedImporter}
               </Typography>
-            </Box>
+            )}
           </Box>
 
           {visibleTabs.map((tab, idx) => (

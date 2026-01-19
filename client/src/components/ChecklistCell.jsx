@@ -1,28 +1,40 @@
 import React, { useState, useEffect } from "react";
 import FileUpload from "../utils/FileUpload";
-import { FaUpload , FaPen} from "react-icons/fa";
+import { FaUpload, FaPen, FaFileAlt } from "react-icons/fa";
 import axios from "axios";
-import { Checkbox, FormControlLabel, Tooltip, TextField, IconButton } from "@mui/material";
+import {
+  Checkbox,
+  FormControlLabel,
+  Tooltip,
+  TextField,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+} from "@mui/material";
 
 const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
-  const [activeUpload, setActiveUpload] = useState(null);
   const [checklistFiles, setChecklistFiles] = useState(
-    cell.row.original.checklist || []
+    cell.row.original.checklist || [],
   );
   const [isChecklistApproved, setIsChecklistApproved] = useState(
-    cell.row.original.is_checklist_aprroved || false
+    cell.row.original.is_checklist_aprroved || false,
   );
   const [isChecklistClicked, setIsChecklistClicked] = useState(
     cell.row.original.is_checklist_clicked === true ||
-      cell.row.original.is_checklist_clicked === "true"
+      cell.row.original.is_checklist_clicked === "true",
   );
   const [approvalDate, setApprovalDate] = useState(
-    cell.row.original.is_checklist_aprroved_date || null
+    cell.row.original.is_checklist_aprroved_date || null,
   );
   const [remarkClient, setRemarkClient] = useState(
-    cell.row.original.remark_client || ""
+    cell.row.original.remark_client || "",
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Sync checklist documents and approval states
   useEffect(() => {
@@ -30,7 +42,7 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
     setIsChecklistApproved(cell.row.original.is_checklist_aprroved || false);
     setIsChecklistClicked(
       cell.row.original.is_checklist_clicked === true ||
-      cell.row.original.is_checklist_clicked === "true"
+        cell.row.original.is_checklist_clicked === "true",
     );
     setApprovalDate(cell.row.original.is_checklist_aprroved_date || null);
     setRemarkClient(cell.row.original.remark_client || "");
@@ -51,27 +63,22 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
 
   // Handle file uploads
   const handleFilesUploaded = async (newFiles) => {
-    const updatedFiles = [...checklistFiles, ...newFiles];
+    // Extract URLs from the uploaded file objects
+    const newUrls = newFiles.map((file) => file.url);
+    const updatedFiles = [...checklistFiles, ...newUrls];
     setChecklistFiles(updatedFiles);
 
-    // Update the database with the complete array
     try {
-      // Fix: Use the correct API endpoint structure that matches your backend
       await axios.patch(`${process.env.REACT_APP_API_STRING}/jobs/${rowId}`, {
         checklist: updatedFiles,
       });
 
-      // Call parent component's update function if available
       if (onDocumentsUpdated) {
         onDocumentsUpdated(rowId, "checklist", updatedFiles);
       }
     } catch (error) {
-      // Add minimal error handling to alert the user
       alert("Failed to update checklist documents. Please try again.");
     }
-
-    // Close the upload popup
-    setActiveUpload(null);
   };
 
   // Handle file delete
@@ -90,7 +97,7 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
     }
   };
 
-  // Handle checklist click (when user views a checklist)
+  // Handle checklist click
   const handleChecklistClick = async () => {
     if (!isChecklistClicked) {
       try {
@@ -103,32 +110,37 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
         }
       } catch (error) {
         console.error("Failed to update checklist clicked status:", error);
-        // Don't show alert for this as it's not critical to the document viewing
       }
     }
   };
 
   // Handle checklist approval
   const handleChecklistApproval = async (e) => {
-    // Don't allow changes if already approved (approval is final)
-    if (isChecklistApproved) {
+    if (isChecklistApproved && !e.target.checked) {
+      // Allow un-approving? Usually logic says approval is final, but in popup maybe editable?
+      // Current code: "Don't allow changes if already approved".
+      // I'll keep existing logic strictness unless user requested otherwise.
+      // User said "check box for approval".
       return;
     }
+    // Actually, allowing toggle might be better UX for "popup editor".
+    // But adhering to original logic:
+    if (isChecklistApproved) return;
 
     const checked = e.target.checked;
     setIsLoading(true);
-    
+
     try {
       const approvalDateTime = checked ? new Date().toISOString() : null;
-      
+
       await axios.patch(`${process.env.REACT_APP_API_STRING}/jobs/${rowId}`, {
         is_checklist_aprroved: checked,
         is_checklist_aprroved_date: approvalDateTime,
       });
-      
+
       setIsChecklistApproved(checked);
       setApprovalDate(approvalDateTime);
-      
+
       if (onDocumentsUpdated) {
         onDocumentsUpdated(rowId, "is_checklist_aprroved", checked);
       }
@@ -144,9 +156,9 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
       await axios.patch(`${process.env.REACT_APP_API_STRING}/jobs/${rowId}`, {
         remark_client: remarkText,
       });
-      
+
       setRemarkClient(remarkText);
-      
+
       if (onDocumentsUpdated) {
         onDocumentsUpdated(rowId, "remark_client", remarkText);
       }
@@ -155,127 +167,62 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
     }
   };
 
-  // Component to render the upload button and popup
-  const renderUploadButton = () => {
-    const isActive = activeUpload === "checklist";
-
+  const renderDocumentLinks = (documents) => {
+    if (!documents || documents.length === 0) {
+      return (
+        <span style={{ color: "gray", fontSize: "0.85em" }}>No Checklist</span>
+      );
+    }
     return (
       <div
         style={{
-          position: "relative",
-          display: "inline-block",
-          marginLeft: "10px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          alignItems: "flex-start",
         }}
       >
-        <button
-          type="button"
-          onClick={() => setActiveUpload(isActive ? null : "checklist")}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: "0",
-            color: "#0066cc",
-          }}
-          title="Upload Checklist Document"
-        >
-          <FaUpload size={14} />
-        </button>
-
-        {isActive && (
-          <div
-            style={{
-              position: "absolute",
-              zIndex: 10,
-              width: "100px",
-              height: "100px",
-              padding: "10px",
-              borderRadius: "4px",
-              right: 0,
-              marginTop: "5px",
-            }}
-          >
-            <FileUpload
-              label="Upload Checklist"
-              bucketPath="checklist"
-              onFilesUploaded={(newFiles) => handleFilesUploaded(newFiles)}
-              multiple={true}
-            />
-            <button
-              type="button"
-              onClick={() => setActiveUpload(null)}
-              style={{
-                marginTop: "5px",
-                padding: "3px 8px",
-                background: "#f0f0f0",
-                border: "1px solid #ccc",
-                borderRadius: "3px",
-                cursor: "pointer",
-                fontSize: "12px",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Render document links with delete button
-  const renderDocumentLinks = (documents) => {
-    if (!documents || documents.length === 0) {
-      return <span style={{ color: "gray" }}>No Checklist</span>;
-    }
-    return (
-      <>
         {documents.map((doc, index) => (
           <div
             key={index}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              marginTop: index === 0 ? 0 : "3px",
-            }}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
           >
+            <FaFileAlt style={{ color: "#3b82f6", fontSize: "12px" }} />
             <a
               href={doc}
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleChecklistClick}
               style={{
-                color: "blue",
-                textDecoration: "underline",
-                cursor: "pointer",
-                display: "block",
+                color: "#2563eb",
+                fontSize: "12px",
+                textDecoration: "none",
               }}
+              onMouseOver={(e) => (e.target.style.textDecoration = "underline")}
+              onMouseOut={(e) => (e.target.style.textDecoration = "none")}
             >
               Checklist {index + 1}
             </a>
-            {/* Only show delete button if checklist is not approved */}
             {!isChecklistApproved && (
-              <Tooltip title="Delete Checklist File">
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#e02251",
-                    cursor: "pointer",
-                    fontSize: 16,
-                    marginLeft: 2,
-                  }}
-                  onClick={() => handleDeleteFile(doc)}
-                  disabled={isLoading}
-                  aria-label="Delete Checklist File"
-                >
-                  ×
-                </button>
-              </Tooltip>
+              <button
+                style={{
+                  color: "#ef4444",
+                  marginLeft: "4px",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  border: "none",
+                  background: "none",
+                  cursor: "pointer",
+                }}
+                onClick={() => handleDeleteFile(doc)}
+                disabled={isLoading}
+              >
+                ×
+              </button>
             )}
           </div>
         ))}
-      </>
+      </div>
     );
   };
 
@@ -284,85 +231,175 @@ const ChecklistCell = ({ cell, onDocumentsUpdated }) => {
       style={{
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
-        position: "relative",
+        alignItems: "flex-start",
+        gap: "4px",
+        padding: "4px",
+        width: "100%",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <div style={{ flex: 1 }}>{renderDocumentLinks(checklistFiles)}</div>
-        {renderUploadButton()}
+      {/* Top Row: Docs + Upload Button */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-start",
+          gap: "8px",
+        }}
+      >
+        {renderDocumentLinks(checklistFiles)}
+        <Tooltip title="Upload / Edit Checklist Details">
+          <IconButton
+            size="small"
+            onClick={() => setIsDialogOpen(true)}
+            sx={{ padding: "2px", marginLeft: 1 }}
+          >
+            <FaUpload style={{ color: "#4b5563", fontSize: "12px" }} />
+          </IconButton>
+        </Tooltip>
       </div>
-      <div style={{ marginTop: 8 }}>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={isChecklistApproved}
-              onChange={handleChecklistApproval}
-              disabled={
-                (!isChecklistClicked && !isChecklistApproved) || // Can't approve if not clicked and not already approved
-                isChecklistApproved || // Can't change if already approved (approval is final)
-                isLoading
-              }
-              color="primary"
-            />
-          }
-          label="Checklist Approved"
-          sx={{
-            '& .MuiFormControlLabel-label': {
-              fontSize: '12px'
-            }
+
+      {/* Status Row */}
+      {isChecklistApproved && approvalDate && (
+        <div
+          style={{
+            color: "#166534",
+            backgroundColor: "#dcfce7",
+            padding: "2px 6px",
+            borderRadius: "4px",
+            fontSize: "10px",
+            fontWeight: 600,
+            marginTop: "4px",
+            display: "inline-block",
           }}
-          
-        />
-        
-        {/* Show approval date if approved */}
-        {isChecklistApproved && approvalDate && (
-          <div style={{ color: "green", fontSize: 12, marginTop: 4 }}>
-            Approved on: {formatApprovalDate(approvalDate)}
-          </div>
-        )}
-        
-        {/* Show remark text box if checklist is NOT approved */}
-         {!isChecklistApproved && (
-          <div style={{ marginTop: 8, width: "200px" }}>
-            {remarkClient ? (
+        >
+          Approved on: {formatApprovalDate(approvalDate)}
+        </div>
+      )}
+
+      {/* Dialog Popup */}
+      <Dialog
+        open={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        onClick={(e) => e.stopPropagation()} // Prevent row selection if clicking dialog
+      >
+        <DialogTitle sx={{ fontSize: "1rem", fontWeight: 600 }}>
+          Checklist Actions
+        </DialogTitle>
+        <DialogContent dividers>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+          >
+            {/* 1. File Upload */}
+            <div>
+              <Typography
+                variant="caption"
+                style={{
+                  marginBottom: "4px",
+                  display: "block",
+                  fontWeight: 600,
+                  color: "#4b5563",
+                }}
+              >
+                Documents
+              </Typography>
+              <FileUpload
+                label="Upload Checklist"
+                bucketPath="checklist"
+                onFilesUploaded={handleFilesUploaded}
+                multiple={true}
+              />
+            </div>
+
+            {/* 2. Remark */}
+            <div>
+              <Typography
+                variant="caption"
+                style={{
+                  marginBottom: "4px",
+                  display: "block",
+                  fontWeight: 600,
+                  color: "#4b5563",
+                }}
+              >
+                Client Remark
+              </Typography>
               <TextField
-                label=" Remark"
+                fullWidth
+                multiline
+                rows={2}
+                size="small"
+                variant="outlined"
+                placeholder="Enter remark..."
                 value={remarkClient}
                 onChange={(e) => setRemarkClient(e.target.value)}
                 onBlur={(e) => handleRemarkClientUpdate(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleRemarkClientUpdate(e.target.value);
-                  }
-                }}
-                multiline
-                rows={1}
-                size="small"
-                variant="outlined"
-                placeholder="Enter remark for client..."
-                style={{ width: "100%" }}
               />
-            ) : (
-              <Tooltip title="Add remark for client">
-                <IconButton
-                  size="small"
-                  onClick={() => setRemarkClient(" ")} // Set a space to trigger TextField display
-                  style={{ 
-                    color: "#666",
-                    padding: "4px"
+            </div>
+
+            {/* 3. Approval */}
+            <div
+              style={{
+                marginTop: "8px",
+                padding: "8px",
+                backgroundColor: "#f9fafb",
+                borderRadius: "4px",
+                border: "1px solid #f3f4f6",
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isChecklistApproved}
+                    onChange={handleChecklistApproval}
+                    disabled={
+                      !isChecklistClicked || isChecklistApproved || isLoading
+                    }
+                    color="success"
+                  />
+                }
+                label={
+                  <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                    Approve Checklist
+                  </span>
+                }
+              />
+              {!isChecklistClicked && (
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#f97316",
+                    marginLeft: "32px",
                   }}
                 >
-                  <FaPen size={12} />
-                </IconButton>
-              </Tooltip>
-            )}
+                  * View document to enable approval
+                </div>
+              )}
+              {isChecklistApproved && (
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#16a34a",
+                    marginLeft: "32px",
+                  }}
+                >
+                  Approved on {formatApprovalDate(approvalDate)}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-        {/* Show instruction if not clicked and not approved */}
-        
-      </div>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setIsDialogOpen(false)}
+            variant="contained"
+            size="small"
+          >
+            Done
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

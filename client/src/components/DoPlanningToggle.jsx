@@ -42,7 +42,7 @@ const DoPlanningToggle = ({
 
   // Count of how many times planning was canceled
   const cancelCount = planHistory.filter(
-    (record) => record.action === "canceled"
+    (record) => record.action === "canceled",
   ).length;
 
   // Handle toggle change
@@ -75,7 +75,7 @@ const DoPlanningToggle = ({
               "Content-Type": "application/json",
             },
             body: JSON.stringify(updateData),
-          }
+          },
         );
 
         if (!response.ok) {
@@ -100,7 +100,7 @@ const DoPlanningToggle = ({
         setIsPlanned(!newStatus);
       }
     },
-    [planHistory, onUpdate]
+    [planHistory, onUpdate],
   );
 
   // Error handling
@@ -135,9 +135,9 @@ const DoPlanningToggle = ({
 
   return (
     <>
-      <div className="flex items-center justify-between w-full p-3 rounded-lg bg-white border border-gray-200 shadow-md hover:shadow-lg transition-shadow duration-300 ease-in-out relative">
+      <div className="flex flex-col w-full relative">
         {/* Status Toggle and Label Container */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
           <div className="relative">
             <Switch
               checked={isPlanned}
@@ -167,7 +167,7 @@ const DoPlanningToggle = ({
             <span className="sr-only">Cancellation count: {cancelCount}</span>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex">
             <span
               className={`font-semibold text-sm transition-colors duration-200 
                 ${isPlanned ? "text-blue-600" : "text-gray-500"}`}
@@ -179,7 +179,7 @@ const DoPlanningToggle = ({
 
         {/* Planning Date */}
         {isPlanned && do_planning_date && (
-          <div className="text-xs text-gray-500 italic">
+          <div className="text-xs text-gray-500 italic mt-1">
             Planned on: {formatDate(do_planning_date)}
           </div>
         )}
@@ -216,122 +216,122 @@ const DoPlanningToggle = ({
             anchorEl={anchorEl}
             onClose={handleInfoClose}
             anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          PaperProps={{
-            className: "rounded-2xl shadow-2xl border border-gray-200",
-            sx: {
-              width: "600px", // Increased width
-              maxHeight: "400px", // Controlled height
-              overflowY: "auto",
-            },
-          }}
-        >
-          <div className="p-6 bg-white rounded-2xl w-full">
-            <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-200">
-              {" "}
-              {/* Reduced margins and padding */}
-              <h4 className="text-lg font-bold text-gray-900 flex items-center">
-                <HistoryIcon className="mr-2 text-blue-600" />
-                Planning Timeline
-              </h4>
-              {cancelCount > 0 && (
-                <Chip
-                  icon={<CancelIcon />}
-                  label={`${cancelCount} Cancellations`}
-                  color="error"
-                  size="small"
-                  variant="outlined"
-                  className="bg-red-50"
-                />
-              )}
-            </div>
+              vertical: "bottom",
+              horizontal: "right",
+            }}
+            transformOrigin={{
+              vertical: "top",
+              horizontal: "right",
+            }}
+            PaperProps={{
+              className: "rounded-2xl shadow-2xl border border-gray-200",
+              sx: {
+                width: "600px", // Increased width
+                maxHeight: "400px", // Controlled height
+                overflowY: "auto",
+              },
+            }}
+          >
+            <div className="p-6 bg-white rounded-2xl w-full">
+              <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-200">
+                {" "}
+                {/* Reduced margins and padding */}
+                <h4 className="text-lg font-bold text-gray-900 flex items-center">
+                  <HistoryIcon className="mr-2 text-blue-600" />
+                  Planning Timeline
+                </h4>
+                {cancelCount > 0 && (
+                  <Chip
+                    icon={<CancelIcon />}
+                    label={`${cancelCount} Cancellations`}
+                    color="error"
+                    size="small"
+                    variant="outlined"
+                    className="bg-red-50"
+                  />
+                )}
+              </div>
 
-            {planHistory.length > 0 ? (
-              <div className="max-h-70 overflow-y-auto pr-2">
-                <Timeline position="right" className="p-0">
-                  {planHistory.map((record, index) => (
-                    <TimelineItem key={index} className="before:content-none">
-                      <TimelineSeparator>
-                        <TimelineDot
-                          color={
-                            record.action === "planned" ? "success" : "error"
-                          }
-                          variant="outlined"
-                        >
-                          {record.action === "planned" ? (
-                            <CheckCircleIcon />
-                          ) : (
-                            <CancelIcon />
+              {planHistory.length > 0 ? (
+                <div className="max-h-70 overflow-y-auto pr-2">
+                  <Timeline position="right" className="p-0">
+                    {planHistory.map((record, index) => (
+                      <TimelineItem key={index} className="before:content-none">
+                        <TimelineSeparator>
+                          <TimelineDot
+                            color={
+                              record.action === "planned" ? "success" : "error"
+                            }
+                            variant="outlined"
+                          >
+                            {record.action === "planned" ? (
+                              <CheckCircleIcon />
+                            ) : (
+                              <CancelIcon />
+                            )}
+                          </TimelineDot>
+                          {index < planHistory.length - 1 && (
+                            <TimelineConnector />
                           )}
-                        </TimelineDot>
-                        {index < planHistory.length - 1 && (
-                          <TimelineConnector />
-                        )}
-                      </TimelineSeparator>
+                        </TimelineSeparator>
 
-                      <TimelineContent>
-                        <Paper
-                          elevation={0}
-                          className={`p-3 rounded-lg transition-all duration-300 
+                        <TimelineContent>
+                          <Paper
+                            elevation={0}
+                            className={`p-3 rounded-lg transition-all duration-300 
                     ${
                       record.action === "planned"
                         ? "bg-green-50 hover:bg-green-100"
                         : "bg-red-50 hover:bg-red-100"
                     }`}
-                        >
-                          <Typography
-                            variant="body2"
-                            color={
-                              record.action === "planned"
-                                ? "success.main"
-                                : "error.main"
-                            }
-                            className="font-semibold"
                           >
-                            {record.action === "planned"
-                              ? "Planning Initiated"
-                              : "Planning Canceled"}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            className="block mt-1"
-                          >
-                            {formatDate(record.timestamp)}
-                          </Typography>
-                        </Paper>
-                      </TimelineContent>
-                    </TimelineItem>
-                  ))}
-                </Timeline>
-              </div>
-            ) : (
-              <Box
-                display="flex"
-                flexDirection="column"
-                alignItems="center"
-                justifyContent="center"
-                p={4}
-                className="bg-gray-50 rounded-lg"
-              >
-                <BlockIcon className="text-gray-400 mb-2" fontSize="large" />
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  align="center"
+                            <Typography
+                              variant="body2"
+                              color={
+                                record.action === "planned"
+                                  ? "success.main"
+                                  : "error.main"
+                              }
+                              className="font-semibold"
+                            >
+                              {record.action === "planned"
+                                ? "Planning Initiated"
+                                : "Planning Canceled"}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              className="block mt-1"
+                            >
+                              {formatDate(record.timestamp)}
+                            </Typography>
+                          </Paper>
+                        </TimelineContent>
+                      </TimelineItem>
+                    ))}
+                  </Timeline>
+                </div>
+              ) : (
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                  p={4}
+                  className="bg-gray-50 rounded-lg"
                 >
-                  No planning history available
-                </Typography>
-              </Box>
-            )}
-          </div>
-        </Popover>
+                  <BlockIcon className="text-gray-400 mb-2" fontSize="large" />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    align="center"
+                  >
+                    No planning history available
+                  </Typography>
+                </Box>
+              )}
+            </div>
+          </Popover>
         )}
       </div>
 

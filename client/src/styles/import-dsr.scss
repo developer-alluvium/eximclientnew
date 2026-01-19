@@ -1,3 +1,5 @@
+/* Import DSR Page Styles */
+
 .jobs-overview {
   .jobs-overview-item {
     flex: 1;
@@ -7,26 +9,26 @@
   .jobs-overview-item-inner {
     display: flex;
     align-items: center;
-    box-shadow: 2px 2px 50px 10px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     margin: 10px;
     padding: 10px;
     background-color: #fff;
+    border-radius: 8px;
 
     h3 {
       display: block;
-      color: #6e6e6f;
+      color: #64748b;
     }
     p {
       margin-bottom: 0;
     }
   }
 
-  // Mobile responsive styles
   @media (max-width: 768px) {
     .jobs-overview-item-inner {
       margin: 5px;
       padding: 8px;
-      
+
       h3 {
         font-size: 0.875rem;
       }
@@ -34,59 +36,288 @@
   }
 }
 
-// Mobile-first responsive breakpoints
+/* Premium Table Styling */
+.import-dsr-container {
+  background-color: #f8fafc;
+  min-height: calc(100vh - 64px);
+
+  .MuiPaper-root {
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
+  }
+}
+
+/* Table Header Styling - Dark Blue Theme */
+.MuiTableHead-root {
+  .MuiTableRow-root {
+    // background: #1e293b !important;
+
+    .MuiTableCell-head {
+      // background: #1e293b !important;
+      color: #ffffff !important;
+      font-weight: 600 !important;
+      font-size: 0.75rem !important;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 16px !important;
+      border-bottom: none !important;
+      white-space: nowrap;
+
+      .Mui-TableHeadCell-Content {
+        color: #ffffff;
+      }
+
+      .MuiTableSortLabel-root {
+        color: #ffffff !important;
+
+        &:hover {
+          color: #94a3b8 !important;
+        }
+
+        .MuiTableSortLabel-icon {
+          color: #94a3b8 !important;
+        }
+      }
+
+      /* Column action icons */
+      .MuiIconButton-root {
+        color: rgba(255, 255, 255, 0.7) !important;
+
+        &:hover {
+          color: #ffffff !important;
+          background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+      }
+    }
+  }
+}
+
+/* Table Body Styling */
+.MuiTableBody-root {
+  .MuiTableRow-root {
+    transition: background-color 0.15s ease;
+    border-bottom: 1px solid #f1f5f9;
+
+    &:hover {
+      background-color: #f8fafc !important;
+    }
+
+    &:nth-of-type(even) {
+      background-color: #fafbfc;
+    }
+
+    .MuiTableCell-root {
+      padding: 10px 16px !important;
+      font-size: 0.8rem !important;
+      color: #334155;
+      border-bottom: 1px solid #f1f5f9 !important;
+      white-space: nowrap;
+
+      /* Job No column styling */
+      &:first-of-type {
+        font-weight: 600;
+        // color: #1e293b;
+      }
+    }
+  }
+}
+
+/* Toolbar Styling */
+.MuiToolbar-root {
+  padding: 16px !important;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  .MuiTypography-root {
+    color: #1e293b;
+    font-weight: 600;
+  }
+}
+
+/* Filter Controls Styling */
+.MuiTextField-root,
+.MuiAutocomplete-root {
+  .MuiOutlinedInput-root {
+    border-radius: 8px !important;
+    background: #ffffff;
+    font-size: 0.75rem;
+
+    &:hover {
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #94a3b8 !important;
+      }
+    }
+
+    &.Mui-focused {
+      .MuiOutlinedInput-notchedOutline {
+        border-color: #3b82f6 !important;
+        border-width: 2px;
+      }
+    }
+  }
+
+  .MuiInputLabel-root {
+    font-size: 0.75rem;
+    color: #64748b;
+
+    &.Mui-focused {
+      color: #3b82f6;
+    }
+  }
+}
+
+/* Tab Styling */
+.MuiTabs-root {
+  .MuiTab-root {
+    text-transform: none;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #64748b;
+    min-height: 44px;
+    padding: 8px 16px;
+
+    &.Mui-selected {
+      color: #1e293b;
+      font-weight: 600;
+    }
+  }
+
+  .MuiTabs-indicator {
+    background-color: #3b82f6;
+    height: 3px;
+    border-radius: 2px 2px 0 0;
+  }
+}
+
+/* Button Styling */
+.MuiButton-contained {
+  border-radius: 8px !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+
+  &.MuiButton-containedPrimary {
+    background: #1e293b !important;
+
+    &:hover {
+      background: #334155 !important;
+    }
+  }
+}
+
+/* Status Chip Styling */
+.status-chip {
+  border-radius: 4px !important;
+  font-size: 0.65rem !important;
+  font-weight: 600 !important;
+  padding: 4px 8px !important;
+  height: auto !important;
+}
+
+/* Custom Scrollbar */
+.MuiTableContainer-root {
+  &::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+
+    &:hover {
+      background: #94a3b8;
+    }
+  }
+}
+
+/* Pagination Styling */
+.MuiPagination-root {
+  .MuiPaginationItem-root {
+    border-radius: 6px;
+    font-size: 0.75rem;
+    min-width: 32px;
+    height: 32px;
+
+    &.Mui-selected {
+      background: #1e293b;
+      color: #ffffff;
+
+      &:hover {
+        background: #334155;
+      }
+    }
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .MuiToolbar-root {
+    padding: 12px !important;
+  }
+
+  .MuiTableCell-root {
+    padding: 8px 12px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .MuiTab-root {
+    min-width: auto !important;
+    padding: 6px 12px !important;
+    font-size: 0.75rem !important;
+  }
+}
+
 @media (max-width: 480px) {
   .MuiBox-root {
     padding: 4px !important;
   }
-  
+
   .MuiTab-root {
     min-width: auto !important;
     padding: 6px 8px !important;
-    font-size: 0.75rem !important;
+    font-size: 0.7rem !important;
   }
 }
 
-@media (max-width: 768px) {
-  .MuiButton-root {
-    font-size: 0.75rem !important;
-    padding: 4px 8px !important;
-  }
-  
-  .MuiTypography-h6 {
-    font-size: 1rem !important;
-  }
-}
-
+/* Background Colors for Status */
 .bg-yellow {
-  background-color: yellow;
+  background-color: #fef9c3;
 }
 
 .bg-orange {
-  background-color: orange;
+  background-color: #fed7aa;
 }
 
 .bg-green {
-  background-color: green;
+  background-color: #dcfce7;
 }
-// .css-ynlzys-MuiTableCell-root {
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-// }
-// .css-1mpnnre-MuiTableRow-root {
-//   // align-items: center;
-//   // justify-content: center;
-//   justify-content: center !important;
-//  align-items: center !important;
-//  text-align: center !important;
-//   background-color: aqua !important;
 
-//   // justify-content: center;
-// }
+/* Action Button Styling */
+.action-btn {
+  border-radius: 6px !important;
+  font-size: 0.65rem !important;
+  font-weight: 500 !important;
+  padding: 4px 12px !important;
+  text-transform: none !important;
+  min-width: auto !important;
 
-.css-c8wlay {
-  justify-content: center !important;
-  align-items: center !important;
-  text-align: center !important;
+  &.copy-btn {
+    background: #3b82f6 !important;
+    color: white !important;
+
+    &:hover {
+      background: #2563eb !important;
+    }
+  }
 }

@@ -169,7 +169,7 @@ function CJobList(props) {
         });
 
         const uniqueExporters = [...new Set(res.data.exporters || [])].filter(
-          (exp) => exp && exp.trim() !== ""
+          (exp) => exp && exp.trim() !== "",
         );
 
         setExporters(uniqueExporters);
@@ -216,7 +216,7 @@ function CJobList(props) {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         // Set allowed columns based on user role and backend response
@@ -237,8 +237,8 @@ function CJobList(props) {
             userRole === "superadmin"
               ? columns.map((col) => col.accessorKey)
               : res.data.allowedColumns && res.data.allowedColumns.length > 0
-              ? res.data.allowedColumns
-              : columns.map((col) => col.accessorKey);
+                ? res.data.allowedColumns
+                : columns.map((col) => col.accessorKey);
           setColumnOrder(allowedCols);
         }
 
@@ -311,7 +311,7 @@ function CJobList(props) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
       setUnsavedChanges(false);
       console.log("Column order saved successfully");
@@ -349,14 +349,14 @@ function CJobList(props) {
     selectedImporter,
     selectedExporter,
     custom_house, // <-- Place custom_house here
-    props.gandhidham // <-- Place gandhidham after
+    props.gandhidham, // <-- Place gandhidham after
   );
 
   useEffect(() => {
     async function getYears() {
       try {
         const res = await axios.get(
-          `${process.env.REACT_APP_API_STRING}/get-years`
+          `${process.env.REACT_APP_API_STRING}/get-years`,
         );
         const filteredYears = res.data.filter((year) => year !== null);
         setYears(filteredYears);
@@ -478,14 +478,15 @@ function CJobList(props) {
     // SuperAdmin can see all columns, regular users can only see their allowed columns
     columns: columns.filter(
       (col) =>
-        userRole === "superadmin" || allowedColumns.includes(col.accessorKey)
+        userRole === "superadmin" || allowedColumns.includes(col.accessorKey),
     ),
     data: rows.map((row, index) => ({ ...row, id: row._id || `row-${index}` })),
     enableColumnResizing: true,
     state: {
       // Also filter column order to match allowed columns
       columnOrder: columnOrder.filter(
-        (colKey) => userRole === "superadmin" || allowedColumns.includes(colKey)
+        (colKey) =>
+          userRole === "superadmin" || allowedColumns.includes(colKey),
       ),
     },
     onColumnOrderChange: (newOrder) => {
@@ -503,6 +504,14 @@ function CJobList(props) {
     muiTableOptions: {
       sx: {
         tableLayout: "fixed",
+      },
+    },
+    muiTablePaperProps: {
+      elevation: 0,
+      sx: {
+        borderRadius: 3,
+        border: "1px solid #e2e8f0",
+        overflow: "hidden",
       },
     },
     initialState: {
@@ -545,8 +554,14 @@ function CJobList(props) {
         willChange: "scroll-position",
         WebkitOverflowScrolling: "touch",
         transform: "translateZ(0)",
-        width: "100%",
+        width: "100%", // Fit to parent container
         minHeight: { xs: "300px", sm: "400px" },
+      },
+    },
+    muiTableProps: {
+      sx: {
+        minWidth: "2000px", // Force table to be wide enough for all columns
+        tableLayout: "fixed",
       },
     },
     muiTableBodyRowProps: ({ row }) => ({
@@ -554,6 +569,10 @@ function CJobList(props) {
       sx: {
         textAlign: "center",
         backgroundColor: getStatusColor(row.original.detailed_status),
+        borderBottom: "1px solid #f1f5f9",
+        "&:hover": {
+          backgroundColor: "#f8fafc !important",
+        },
       },
       onClick: (e) => e.stopPropagation(),
     }),
@@ -561,40 +580,68 @@ function CJobList(props) {
       sx: {
         position: "sticky",
         top: 0,
-        zIndex: 1,
+        zIndex: 2,
+        // backgroundColor: "#1e293b",
+        color: "#ffffff",
+        fontWeight: 600,
+        fontSize: "0.7rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.3px",
+        padding: "10px 12px",
+        borderBottom: "none",
+        whiteSpace: "nowrap",
+        "& .MuiTableSortLabel-root": {
+          color: "#ffffff",
+          "&:hover": {
+            color: "#e2e8f0",
+          },
+          "&.Mui-active": {
+            color: "#e2e8f0",
+          },
+        },
+        "& .MuiTableSortLabel-icon": {
+          color: "#94a3b8 !important",
+        },
+        "& .MuiIconButton-root": {
+          color: "rgba(255, 255, 255, 0.7)",
+          "&:hover": {
+            color: "#ffffff",
+            backgroundColor: "rgba(255, 255, 255, 0.1)",
+          },
+        },
       },
     },
+  
     renderTopToolbarCustomActions: () => (
       <div
         style={{
           display: "flex",
-          // flexDirection: "column",
-          alignItems: "flex-start",
+          alignItems: "center",
           width: "100%",
-          gap: "12px",
-          padding: isMobile ? "8px 0" : "0",
+          gap: "16px",
+          padding: isMobile ? "8px 0" : "4px 0",
+          flexWrap: "wrap",
         }}
       >
         <Typography
-          variant="body1"
+          variant="h6"
           sx={{
-            fontWeight: "bold",
-            fontSize: { xs: "1.1rem", sm: "1.3rem", md: "1.5rem" },
-            textAlign: "left",
+            fontWeight: 600,
+            fontSize: { xs: "1rem", sm: "1.1rem", md: "1.2rem" },
+            color: "#1e293b",
             flexShrink: 0,
           }}
         >
-          {props.status} Jobs: {total}
+          {props.status} Jobs: <span style={{ color: "#3b82f6" }}>{total}</span>
         </Typography>
 
         <div
           style={{
             display: "flex",
-            // flexDirection: isMobile ? "row" : "row",
             flexDirection: "row",
-            alignItems: "flex-start",
-            gap: isMobile ? "8px" : "12px",
-            width: isMobile ? "100%" : "auto",
+            alignItems: "center",
+            gap: "10px",
+            flex: 1,
             flexWrap: "wrap",
           }}
         >
@@ -628,13 +675,13 @@ function CJobList(props) {
               options={[
                 "All Importers",
                 ...(ieCodeAssignments?.map(
-                  (assignment) => assignment.importer_name
+                  (assignment) => assignment.importer_name,
                 ) || []),
               ]}
               value={selectedImporter || "All Importers"}
               onChange={(event, newValue) => {
                 setSelectedImporter(
-                  newValue === "All Importers" ? null : newValue
+                  newValue === "All Importers" ? null : newValue,
                 );
               }}
               sx={{

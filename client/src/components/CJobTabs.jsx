@@ -24,7 +24,7 @@ function CustomTabPanel(props) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 0, mt: 2 }}>{children}</Box>}
     </div>
   );
 }
@@ -81,82 +81,96 @@ function CJobTabs({ gandhidham = false }) {
   };
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={{ backgroundColor: "#ffffffff" }}>
       <Box
         sx={{
-          borderBottom: 1,
-          borderColor: "divider",
+          borderBottom: "1px solid #e2e8f0",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginTop: "-16px",
+          backgroundColor: "#ffffff",
+          px: 2,
+          py: 0.5,
         }}
       >
         <Tabs
           value={value}
           onChange={handleChange}
-          aria-label="basic tabs example"
+          aria-label="job status tabs"
+          sx={{
+            minHeight: 44,
+            "& .MuiTab-root": {
+              textTransform: "none",
+              fontWeight: 500,
+              fontSize: "0.875rem",
+              color: "#64748b",
+              minHeight: 44,
+              px: 3,
+              "&.Mui-selected": {
+                color: "#1e293b",
+                fontWeight: 600,
+              },
+            },
+            "& .MuiTabs-indicator": {
+             backgroundColor: "#3b82f6",
+              height: 3,
+              borderRadius: "2px 2px 0 0",
+            },
+          }}
         >
-          [
-          <Tab label="Pending" {...a11yProps(0)} key={0} />,
-          <Tab label="Completed" {...a11yProps(1)} key={1} />,
-          <Tab label="Cancelled" {...a11yProps(2)} key={2} />
-          ,]
+          <Tab label="Pending" {...a11yProps(0)} />
+          <Tab label="Completed" {...a11yProps(1)} />
+          <Tab label="Cancelled" {...a11yProps(2)} />
         </Tabs>
 
-        {/* --- Grouped Buttons --- */}
-        <Box sx={{ display: "flex", gap: 2, mr: 2 }}>
-          {/* New Currency Rate Dialog Button */}
+        {/* Action Buttons */}
+        <Box sx={{ display: "flex", gap: 1.5 }}>
           <Button
-            variant="contained"
-            color="primary" // Changed color to differentiate
-            startIcon={<AttachMoneyIcon />}
+            variant="outlined"
+            size="small"
+            startIcon={<AttachMoneyIcon sx={{ fontSize: 18 }} />}
             onClick={handleCurrencyDialogOpen}
             sx={{
               textTransform: "none",
-              fontWeight: "bold",
-              borderRadius: "8px",
-              boxShadow: "0 2px 8px rgba(25, 118, 210, 0.3)",
+              fontWeight: 500,
+              fontSize: "0.8rem",
+              borderRadius: 2,
+              borderColor: "#e2e8f0",
+              color: "#475569",
+              px: 2,
+              py: 0.75,
               "&:hover": {
-                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.4)",
-                transform: "translateY(-1px)",
+                borderColor: "#94a3b8",
+                backgroundColor: "#f8fafc",
               },
-              transition: "all 0.2s ease-in-out",
             }}
           >
             Currency Rates
           </Button>
 
-          {/* Existing Container Summary Button */}
           <Button
             variant="contained"
-            color="primary"
-            startIcon={<AssessmentIcon />}
+            size="small"
+            startIcon={<AssessmentIcon sx={{ fontSize: 18 }} />}
             onClick={handleContainerSummaryOpen}
             sx={{
-              // mr: 2, // Removed mr, using gap on parent Box now
               textTransform: "none",
-              fontWeight: "bold",
-              borderRadius: "8px",
-              boxShadow: "0 2px 8px rgba(25, 118, 210, 0.3)",
+              fontWeight: 500,
+              fontSize: "0.8rem",
+              borderRadius: 2,
+              backgroundColor: "#1e293b",
+              px: 2,
+              py: 0.75,
+              boxShadow: "none",
               "&:hover": {
-                boxShadow: "0 4px 12px rgba(25, 118, 210, 0.4)",
-                transform: "translateY(-1px)",
+                backgroundColor: "#334155",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               },
-              transition: "all 0.2s ease-in-out",
             }}
           >
             Container Summary
           </Button>
         </Box>
-
-        {/* This <Box> was removed as it's replaced by the button
-        <Box>
-          CurrencyRateDialog
-        </Box> 
-        */}
-
-        {/* {userImporterName && ( ...omitted for brevity... )} */}
       </Box>
 
       <CustomTabPanel value={value} index={0}>
