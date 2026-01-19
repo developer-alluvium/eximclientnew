@@ -110,7 +110,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
             expirationDate: expirationDate || null,
             reminderDays: reminderDays,
           }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -175,7 +175,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
           headers: {
             Authorization: `Bearer ${getCookie("access_token")}`,
           },
-        }
+        },
       );
 
       const data = await response.json();
@@ -248,7 +248,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
             {user?.documents?.length > 0 ? (
               user.documents
                 .filter((doc) =>
-                  doc.title.toLowerCase().includes(searchTerm.toLowerCase())
+                  doc.title.toLowerCase().includes(searchTerm.toLowerCase()),
                 )
                 .map((doc) => (
                   <tr key={doc._id}>
@@ -370,6 +370,7 @@ const DocumentsTab = ({ user, onRefreshProfile, onSetError, onSetSuccess }) => {
               background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
               borderRadius: "10px",
               textTransform: "none",
+              color: "#ffffff !important",
               fontWeight: 600,
               boxShadow: "0 4px 15px rgba(102, 126, 234, 0.3)",
               "&:hover": {

@@ -221,7 +221,6 @@ function UserDashboard() {
     parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
 
   const [stats, setStats] = useState(null);
-  const [selectedImporter, setSelectedImporter] = useState("");
 
   const metricConfig = [
     {
@@ -318,7 +317,7 @@ function UserDashboard() {
           borderRadius: 2,
           distributed: true, // Use different color per bar
           dataLabels: {
-            position: "right",
+            position: "top",
           },
         },
       },
@@ -350,7 +349,7 @@ function UserDashboard() {
         formatter: function (val, opt) {
           return val;
         },
-        offsetX: 20,
+        offsetX: 10,
       },
       tooltip: {
         theme: "light",
@@ -365,7 +364,7 @@ function UserDashboard() {
         borderColor: "#f1f5f9",
         xaxis: { lines: { show: true } },
         yaxis: { lines: { show: false } },
-        padding: { top: 0, right: 15, bottom: 0, left: 30 },
+        padding: { top: 0, right: 40, bottom: 0, left: 30 },
       },
     }),
     [],
@@ -378,6 +377,7 @@ function UserDashboard() {
     }
   }, [ieCodeAssignments]);
 
+  const [selectedImporter, setSelectedImporter] = useState([]);
   const [fromDate, setFromDate] = useState(
     new Date().toISOString().split("T")[0],
   );
@@ -389,7 +389,14 @@ function UserDashboard() {
       let url = `${process.env.REACT_APP_API_STRING}/user-dashboard-stats`;
 
       const params = new URLSearchParams();
-      if (selectedImporter) params.append("importer", selectedImporter);
+      if (selectedImporter && selectedImporter.length > 0) {
+        params.append(
+          "importer",
+          Array.isArray(selectedImporter)
+            ? selectedImporter.join(",")
+            : selectedImporter,
+        );
+      }
 
       if (fromDate) {
         const start = new Date(fromDate);
@@ -844,10 +851,12 @@ function UserDashboard() {
         >
           {/* Welcome Banner */}
           <WelcomeBanner elevation={0}>
+            {/* Row 1: Welcome + AEO/Active */}
             <Box
               display="flex"
               justifyContent="space-between"
               alignItems="center"
+              sx={{ mb: 1 }}
             >
               <Typography
                 variant="h5"
@@ -856,95 +865,110 @@ function UserDashboard() {
               >
                 Welcome back, {userName}
               </Typography>
-              {(expiredDocs.length > 0 || expiringDocs.length > 0) && (
-                <Chip
-                  icon={<WarningIcon style={{ color: "white" }} />}
-                  label={
-                    expiredDocs.length > 0
-                      ? `${expiredDocs.length} Docs Expired`
-                      : `${expiringDocs.length} Docs Expiring`
-                  }
-                  onClick={() => navigate("/user/profile")}
-                  sx={{
-                    bgcolor: expiredDocs.length > 0 ? "#ef4444" : "#f59e0b",
-                    color: "white",
-                    fontWeight: 600,
-                    height: "28px",
-                    fontSize: "0.7rem",
-                    cursor: "pointer",
-                    "& .MuiChip-icon": { fontSize: "16px" },
-                  }}
-                />
-              )}
-              {(expiredAeoCertificates.length > 0 ||
-                expiringAeoCertificates.length > 0) && (
-                <Chip
-                  icon={<WarningIcon style={{ color: "white" }} />}
-                  label={
-                    expiredAeoCertificates.length > 0
-                      ? "AEO Expired"
-                      : "AEO Expiring"
-                  }
-                  onClick={() => navigate("/user/profile")}
-                  sx={{
-                    bgcolor:
-                      expiredAeoCertificates.length > 0 ? "#ef4444" : "#f59e0b",
-                    color: "white",
-                    fontWeight: 600,
-                    height: "28px",
-                    fontSize: "0.7rem",
-                    cursor: "pointer",
-                    "& .MuiChip-icon": { fontSize: "16px" },
-                  }}
-                />
-              )}
-              {expiredDocs.length === 0 &&
-                expiringDocs.length === 0 &&
-                expiredAeoCertificates.length === 0 &&
-                expiringAeoCertificates.length === 0 && (
+
+              <Box>
+                {expiredAeoCertificates.length > 0 ||
+                expiringAeoCertificates.length > 0 ? (
                   <Chip
-                    label="ACTIVE"
+                    icon={<WarningIcon style={{ color: "white" }} />}
+                    label={
+                      expiredAeoCertificates.length > 0
+                        ? "AEO Expired"
+                        : "AEO Expiring"
+                    }
+                    onClick={() => navigate("/user/profile")}
                     sx={{
-                      backgroundColor: "#10b981",
-                      color: "#ffffff",
+                      bgcolor:
+                        expiredAeoCertificates.length > 0
+                          ? "#ef4444"
+                          : "#f59e0b",
+                      color: "white",
                       fontWeight: 600,
-                      borderRadius: "4px",
                       height: "28px",
                       fontSize: "0.7rem",
-                      letterSpacing: "0.5px",
+                      cursor: "pointer",
+                      "& .MuiChip-icon": { fontSize: "16px" },
+                    }}
+                  />
+                ) : (
+                  expiredDocs.length === 0 &&
+                  expiringDocs.length === 0 && (
+                    <Chip
+                      label="ACTIVE"
+                      sx={{
+                        backgroundColor: "#10b981",
+                        color: "#ffffff",
+                        fontWeight: 600,
+                        borderRadius: "4px",
+                        height: "28px",
+                        fontSize: "0.7rem",
+                        letterSpacing: "0.5px",
+                      }}
+                    />
+                  )
+                )}
+              </Box>
+            </Box>
+
+            {/* Row 2: IE Code + Docs */}
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="wrap"
+            >
+              <Box display="flex" flexDirection="column" gap={0.5}>
+                {ieCodeAssignments.map((assignment, index) => (
+                  <Typography
+                    key={index}
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      fontSize: "0.875rem",
+                      color: "#64748b",
+                    }}
+                  >
+                    {assignment.ie_code_no && (
+                      <>
+                        <strong style={{ color: "#475569" }}>IE Code:</strong>{" "}
+                        {assignment.ie_code_no}
+                      </>
+                    )}
+                    {assignment.importer_name && (
+                      <>
+                        <span style={{ margin: "0 12px", color: "#cbd5e1" }}>
+                          |
+                        </span>
+                        <strong style={{ color: "#475569" }}>Importer:</strong>{" "}
+                        {assignment.importer_name}
+                      </>
+                    )}
+                  </Typography>
+                ))}
+              </Box>
+
+              <Box>
+                {(expiredDocs.length > 0 || expiringDocs.length > 0) && (
+                  <Chip
+                    icon={<WarningIcon style={{ color: "white" }} />}
+                    label={
+                      expiredDocs.length > 0
+                        ? `${expiredDocs.length} Docs Expired`
+                        : `${expiringDocs.length} Docs Expiring`
+                    }
+                    onClick={() => navigate("/user/profile")}
+                    sx={{
+                      bgcolor: expiredDocs.length > 0 ? "#ef4444" : "#f59e0b",
+                      color: "white",
+                      fontWeight: 600,
+                      height: "28px",
+                      fontSize: "0.7rem",
+                      cursor: "pointer",
+                      "& .MuiChip-icon": { fontSize: "16px" },
                     }}
                   />
                 )}
-            </Box>
-
-            <Box display="flex" gap={3} flexWrap="wrap" sx={{ width: "100%" }}>
-              {ieCodeAssignments.map((assignment, index) => (
-                <Typography
-                  key={index}
-                  variant="body2"
-                  sx={{
-                    fontWeight: 400,
-                    fontSize: "0.875rem",
-                    color: "#64748b",
-                  }}
-                >
-                  {assignment.ie_code_no && (
-                    <>
-                      <strong style={{ color: "#475569" }}>IE Code:</strong>{" "}
-                      {assignment.ie_code_no}
-                    </>
-                  )}
-                  {assignment.importer_name && (
-                    <>
-                      <span style={{ margin: "0 12px", color: "#cbd5e1" }}>
-                        |
-                      </span>
-                      <strong style={{ color: "#475569" }}>Importer:</strong>{" "}
-                      {assignment.importer_name}
-                    </>
-                  )}
-                </Typography>
-              ))}
+              </Box>
             </Box>
           </WelcomeBanner>
 
@@ -955,11 +979,12 @@ function UserDashboard() {
           <Box
             sx={{
               display: "flex",
-              display: "flex",
-              gap: 5, // Increased gap to move modules more to the right visually
-              height: "calc(100vh - 260px)",
+              gap: 5,
+              flex: 1, // Fill remaining space
+              minHeight: 0, // Allow nested scrolling
               overflow: "hidden",
               flexDirection: { xs: "column", lg: "row" },
+              mt: 1,
             }}
           >
             {/* Left Sidebar - Analytics */}
@@ -988,17 +1013,52 @@ function UserDashboard() {
                     size="small"
                     sx={{ bgcolor: "white", borderRadius: 1 }}
                   >
-                    <InputLabel>Select Importer</InputLabel>
+                    <InputLabel sx={{ color: "#1e293b !important" }}>
+                      Select Importer
+                    </InputLabel>
                     <Select
-                      value={selectedImporter}
+                      multiple
+                      value={
+                        Array.isArray(selectedImporter) ? selectedImporter : []
+                      }
                       label="Select Importer"
-                      onChange={(e) => setSelectedImporter(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // If "all" is selected (empty string passed), reset to empty array
+                        if (val.includes("")) {
+                          setSelectedImporter([]);
+                        } else {
+                          setSelectedImporter(
+                            typeof val === "string" ? val.split(",") : val,
+                          );
+                        }
+                      }}
+                      renderValue={(selected) => {
+                        if (!Array.isArray(selected) || selected.length === 0) {
+                          return <em>All Importers</em>;
+                        }
+                        return selected.join(", ");
+                      }}
+                      sx={{ color: "#1e293b !important" }}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: {
+                            "& .MuiMenuItem-root": {
+                              color: "#1e293b !important",
+                            },
+                          },
+                        },
+                      }}
                     >
-                      <MenuItem value="">
+                      <MenuItem value="" sx={{ color: "#1e293b !important" }}>
                         <em>All Importers</em>
                       </MenuItem>
                       {ieCodeAssignments.map((assignment, index) => (
-                        <MenuItem key={index} value={assignment.importer_name}>
+                        <MenuItem
+                          key={index}
+                          value={assignment.importer_name}
+                          sx={{ color: "#1e293b !important" }}
+                        >
                           {assignment.importer_name}
                         </MenuItem>
                       ))}

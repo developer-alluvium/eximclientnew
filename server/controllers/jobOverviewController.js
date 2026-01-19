@@ -23,7 +23,9 @@ const getOverviewPipeline = (start, end, importer) => {
   const sevenDaysAgoStr = toYMD(start);
   const todayStr = toYMD(end);
 
-  const importerMatch = importer ? { importer: importer } : {};
+  const importerMatch = importer
+    ? { importer: { $in: importer.split(",") } }
+    : {};
 
   return [
     {
