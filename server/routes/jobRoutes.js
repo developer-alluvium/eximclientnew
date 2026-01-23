@@ -27,6 +27,7 @@ import {
   getJobsOverview,
   getUserDashboardStats,
 } from "../controllers/jobOverviewController.js";
+import { authenticateUser } from "../middlewares/authMiddleware.js";
 import {
   getJobsByIECode,
   getJobsMultiStatus,
@@ -92,7 +93,7 @@ router.patch("/api/jobs/:id", updateJob);
 router.patch("/api/jobs/container/:id", updateContainerTransporter);
 
 // Route to get jobs overview
-router.get("/api/user-dashboard-stats", getUserDashboardStats);
+router.get("/api/user-dashboard-stats", authenticateUser, getUserDashboardStats);
 router.get("/api/get-jobs-overview/:year", getJobsOverview);
 router.get("/api/get-years", getYears);
 router.get("/api/get-exporters", getExporters);

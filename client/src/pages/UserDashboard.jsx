@@ -349,7 +349,7 @@ function UserDashboard() {
         formatter: function (val, opt) {
           return val;
         },
-        offsetX: 10,
+        offsetX: 15, // Increased offset to push label further right
       },
       tooltip: {
         theme: "light",
@@ -364,7 +364,7 @@ function UserDashboard() {
         borderColor: "#f1f5f9",
         xaxis: { lines: { show: true } },
         yaxis: { lines: { show: false } },
-        padding: { top: 0, right: 40, bottom: 0, left: 30 },
+        padding: { top: 0, right: 80, bottom: 0, left: 30 }, // Further increased right padding
       },
     }),
     [],
@@ -378,10 +378,72 @@ function UserDashboard() {
   }, [ieCodeAssignments]);
 
   const [selectedImporter, setSelectedImporter] = useState([]);
-  const [fromDate, setFromDate] = useState(
-    new Date().toISOString().split("T")[0],
+  const [dateFilterType, setDateFilterType] = useState("daily");
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
   );
-  const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
+  // Custom range state
+  const [customStartDate, setCustomStartDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [customEndDate, setCustomEndDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+
+  const getStartEndDate = () => {
+    const today = new Date();
+    let start = new Date(selectedDate);
+    let end = new Date(selectedDate);
+
+    switch (dateFilterType) {
+      case "daily":
+        // start and end are the selected date
+        break;
+      case "weekly":
+        // Week starting Monday
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+        start.setDate(diff);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        break;
+      case "monthly":
+        start.setDate(1);
+        end = new Date(start);
+        end.setMonth(start.getMonth() + 1);
+        end.setDate(0);
+        break;
+      case "quarterly":
+        const quarterMonth = Math.floor(start.getMonth() / 3) * 3;
+        start.setMonth(quarterMonth);
+        start.setDate(1);
+        end = new Date(start);
+        end.setMonth(start.getMonth() + 3);
+        end.setDate(0);
+        break;
+      case "yearly":
+        start.setMonth(0, 1);
+        end = new Date(start);
+        end.setMonth(12, 0);
+        break;
+      case "custom":
+        start = new Date(customStartDate);
+        end = new Date(customEndDate);
+        break;
+      default:
+        break;
+    }
+
+    // Format to YYYY-MM-DD
+    const toYMD = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    return { startDate: toYMD(start), endDate: toYMD(end) };
+  };
 
   const fetchStats = async () => {
     try {
@@ -398,15 +460,11 @@ function UserDashboard() {
         );
       }
 
-      if (fromDate) {
-        const start = new Date(fromDate);
-        start.setHours(0, 0, 0, 0);
-        params.append("startDate", start.toISOString());
-      }
-      if (toDate) {
-        const end = new Date(toDate);
-        end.setHours(23, 59, 59, 999);
-        params.append("endDate", end.toISOString());
+      const { startDate, endDate } = getStartEndDate();
+
+      if (startDate && endDate) {
+        params.append("startDate", startDate);
+        params.append("endDate", endDate);
       }
 
       const response = await axios.get(`${url}?${params.toString()}`, {
@@ -421,13 +479,7 @@ function UserDashboard() {
 
   useEffect(() => {
     fetchStats();
-  }, []); // Initial load only, then manual via button or importer change if desired.
-  // User asked for button click for dates. I'll add importer to dependency to auto-refresh on importer change as that's standard UX,
-  // but let dates be manual.
-
-  useEffect(() => {
-    fetchStats();
-  }, [selectedImporter]);
+  }, [selectedImporter, selectedDate, dateFilterType, customStartDate, customEndDate]);
 
   const fetchAndUpdateUserData = async () => {
     try {
@@ -702,67 +754,6 @@ function UserDashboard() {
     return allExpired;
   }, [aeoCertificates]);
 
-  const handleCardClick = async (
-    path,
-    isExternal = false,
-    isLocked = false,
-    moduleName = "",
-  ) => {
-    if (isLocked) return;
-    if (moduleName === "E-Lock") {
-      try {
-        let token = getCookie("access_token");
-        if (!eximUser || !token) {
-          navigate("/login");
-          return;
-        }
-        const parsedUser = parsedUser || eximUser;
-        let selectedIeCode = "";
-        if (
-          parsedUser?.ie_code_assignments &&
-          parsedUser.ie_code_assignments.length > 0
-        )
-          selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
-        else if (parsedUser?.ie_code_no) selectedIeCode = parsedUser.ie_code_no;
-        else {
-          alert("IE Code not found. Cannot generate SSO token.");
-          return;
-        }
-        const res = await axios.post(
-          `${
-            process.env.REACT_APP_API_STRING
-          }/users/generate-sso-token?ie_code_no=${encodeURIComponent(
-            selectedIeCode,
-          )}`,
-          {},
-          {
-            withCredentials: true,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-        const ssoToken = res.data?.data?.token;
-        if (ssoToken) {
-          setCookie("sso_token", ssoToken, 1);
-          window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
-        } else alert("Failed to generate SSO token for E-Lock.");
-      } catch (err) {
-        if (err.response?.status === 401) navigate("/login");
-        else alert("Error generating SSO token for E-Lock.");
-      }
-      return;
-    }
-    if (isExternal && path && path.startsWith("http")) {
-      window.open(path, "_blank");
-      return;
-    }
-    if (path && path.startsWith("/")) {
-      navigate(path);
-      return;
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -798,7 +789,71 @@ function UserDashboard() {
         setRequestReason("");
         fetchDashboardData();
       }
-    } catch (error) {}
+    } catch (error) { }
+  };
+  const handleCardClick = async (
+    path,
+    isExternal = false,
+    isLocked = false,
+    moduleName = "",
+  ) => {
+
+    //console.log(parsedUser);
+    if (isLocked) return;
+    if (moduleName === "E-Lock") {
+      try {
+        let token = getCookie("access_token");
+        if (!parsedUser || !token) {
+          navigate("/login");
+          return;
+        }
+
+        let selectedIeCode = "";
+        if (
+          parsedUser?.ie_code_assignments &&
+          parsedUser.ie_code_assignments.length > 0
+        )
+          selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
+        else if (parsedUser?.ie_code_no) selectedIeCode = parsedUser.ie_code_no;
+        else {
+          alert("IE Code not found. Cannot generate SSO token.");
+          return;
+        }
+        const res = await axios.post(
+          `${process.env.REACT_APP_API_STRING
+          }/users/generate-sso-token?ie_code_no=${encodeURIComponent(
+            selectedIeCode,
+          )}`,
+          {},
+          {
+            withCredentials: true,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        const ssoToken = res.data?.data?.token;
+        if (ssoToken) {
+          setCookie("sso_token", ssoToken, 1);
+          window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
+        } else alert("Failed to generate SSO token for E-Lock.");
+      } catch (err) {
+        console.log(err);
+        if (err.response?.status === 401) navigate("/login");
+        else alert("Error generating SSO token for E-Lock.");
+
+      }
+      return;
+    }
+    if (isExternal && path && path.startsWith("http")) {
+      window.open(path, "_blank");
+      return;
+    }
+    if (path && path.startsWith("/")) {
+      navigate(path);
+      return;
+    }
   };
 
   const userName = dashboardData?.user?.name || "User";
@@ -868,7 +923,7 @@ function UserDashboard() {
 
               <Box>
                 {expiredAeoCertificates.length > 0 ||
-                expiringAeoCertificates.length > 0 ? (
+                  expiringAeoCertificates.length > 0 ? (
                   <Chip
                     icon={<WarningIcon style={{ color: "white" }} />}
                     label={
@@ -1065,47 +1120,6 @@ function UserDashboard() {
                     </Select>
                   </FormControl>
                 )}
-
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mt: 1, pt: 1 }}
-                >
-                  <TextField
-                    type="date"
-                    size="small"
-                    fullWidth
-                    label="From"
-                    InputLabelProps={{ shrink: true }}
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    sx={{ bgcolor: "white", borderRadius: 1 }}
-                  />
-                  <TextField
-                    type="date"
-                    size="small"
-                    fullWidth
-                    label="To"
-                    InputLabelProps={{ shrink: true }}
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    sx={{ bgcolor: "white", borderRadius: 1 }}
-                  />
-                  <IconButton
-                    onClick={fetchStats}
-                    sx={{
-                      bgcolor: "#3b82f6",
-                      color: "white",
-                      borderRadius: 1,
-                      width: 40,
-                      height: 40,
-                      "&:hover": { bgcolor: "#2563eb" },
-                    }}
-                  >
-                    <RefreshIcon />
-                  </IconButton>
-                </Stack>
               </Box>
 
               {/* Stats Grid */}
@@ -1118,14 +1132,142 @@ function UserDashboard() {
                   border: "1px solid #e2e8f0",
                 }}
               >
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  color="#1e293b"
-                  sx={{ mb: 2 }}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
                 >
-                  📊 Daily Overview
-                </Typography>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={600}
+                    color="#1e293b"
+                  >
+                    📊 Overview
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Select
+                      value={dateFilterType}
+                      onChange={(e) => setDateFilterType(e.target.value)}
+                      size="small"
+                      sx={{
+                        height: 32,
+                        fontSize: "0.75rem",
+                        bgcolor: "#f8fafc",
+                        "& .MuiSelect-select": { py: 0 },
+                      }}
+                    >
+                      <MenuItem value="daily">Daily</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="monthly">Monthly</MenuItem>
+                      <MenuItem value="quarterly">Quarterly</MenuItem>
+                      <MenuItem value="yearly">Yearly</MenuItem>
+                      <MenuItem value="custom">Custom</MenuItem>
+                    </Select>
+
+                    {dateFilterType === "custom" ? (
+                      <>
+                        <TextField
+                          type="date"
+                          size="small"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          sx={{
+                            bgcolor: "#f8fafc",
+                            borderRadius: 1,
+                            width: 130,
+                            "& .MuiOutlinedInput-root": {
+                              height: 32,
+                              fontSize: "0.75rem",
+                            },
+                          }}
+                        />
+                        <TextField
+                          type="date"
+                          size="small"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          sx={{
+                            bgcolor: "#f8fafc",
+                            borderRadius: 1,
+                            width: 130,
+                            "& .MuiOutlinedInput-root": {
+                              height: 32,
+                              fontSize: "0.75rem",
+                            },
+                          }}
+                        />
+                      </>
+                    ) : dateFilterType === "monthly" ? (
+                      <TextField
+                        type="month"
+                        size="small"
+                        value={selectedDate.slice(0, 7)}
+                        onChange={(e) => setSelectedDate(e.target.value + "-01")}
+                        sx={{
+                          bgcolor: "#f8fafc",
+                          borderRadius: 1,
+                          width: 140,
+                          "& .MuiOutlinedInput-root": {
+                            height: 32,
+                            fontSize: "0.75rem",
+                          },
+                        }}
+                      />
+                    ) : dateFilterType === "yearly" ? (
+                      <TextField
+                        type="number"
+                        size="small"
+                        placeholder="Year"
+                        value={selectedDate.split("-")[0]}
+                        onChange={(e) => setSelectedDate(`${e.target.value}-01-01`)}
+                        sx={{
+                          bgcolor: "#f8fafc",
+                          borderRadius: 1,
+                          width: 100,
+                          "& .MuiOutlinedInput-root": {
+                            height: 32,
+                            fontSize: "0.75rem",
+                          },
+                        }}
+                      />
+                    ) : (
+                      <TextField
+                        type="date"
+                        size="small"
+                        InputLabelProps={{ shrink: true }}
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        sx={{
+                          bgcolor: "#f8fafc",
+                          borderRadius: 1,
+                          width: 140,
+                          "& .MuiOutlinedInput-root": {
+                            height: 32,
+                            fontSize: "0.75rem",
+                          },
+                        }}
+                      />
+                    )}
+
+                    <IconButton
+                      onClick={fetchStats}
+                      size="small"
+                      sx={{
+                        bgcolor: "#3b82f6",
+                        color: "white",
+                        borderRadius: 1,
+                        width: 32,
+                        height: 32,
+                        "&:hover": { bgcolor: "#2563eb" },
+                      }}
+                    >
+                      <RefreshIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Stack>
+                </Box>
 
                 {stats && stats.summary ? (
                   <Box sx={{ minHeight: 350, py: 1 }}>

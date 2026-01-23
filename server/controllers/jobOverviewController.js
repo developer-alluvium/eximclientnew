@@ -15,16 +15,21 @@ const buildSearchQuery = (search) => {
   };
 };
 
-const getOverviewPipeline = (start, end, importer) => {
-  // Helper to format Date to YYYY-MM-DD string safely
-  const toYMD = (date) => date.toISOString().split("T")[0];
+const getOverviewPipeline = (startDateStr, endDateStr, importer) => {
+  // startDateStr and endDateStr are now YYYY-MM-DD strings directly
+  const sevenDaysAgoStr = startDateStr;
+  const todayStr = endDateStr;
 
-  // Use provided start and end dates for trend
-  const sevenDaysAgoStr = toYMD(start);
-  const todayStr = toYMD(end);
+  // Handle importer filtering: accept array or comma-separated string
+  let importerList = [];
+  if (Array.isArray(importer)) {
+    importerList = importer;
+  } else if (typeof importer === 'string' && importer) {
+    importerList = importer.split(',');
+  }
 
-  const importerMatch = importer
-    ? { importer: { $in: importer.split(",") } }
+  const importerMatch = importerList.length > 0
+    ? { importer: { $in: importerList } }
     : {};
 
   return [
@@ -33,7 +38,7 @@ const getOverviewPipeline = (start, end, importer) => {
         jobs_created_today: [
           {
             $match: {
-              job_date: { $gte: toYMD(start), $lte: end.toISOString() },
+              job_date: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -50,8 +55,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               completed_operation_date: {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
               ...importerMatch,
             },
@@ -69,8 +74,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               examination_planning_date: {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
               ...importerMatch,
             },
@@ -289,8 +294,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               "container_nos.arrival_date": {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
             },
           },
@@ -310,8 +315,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               "container_nos.container_rail_out_date": {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
             },
           },
@@ -328,7 +333,7 @@ const getOverviewPipeline = (start, end, importer) => {
         be_filed: [
           {
             $match: {
-              be_date: { $gte: toYMD(start), $lte: end.toISOString() },
+              be_date: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -345,7 +350,7 @@ const getOverviewPipeline = (start, end, importer) => {
         ooc: [
           {
             $match: {
-              out_of_charge: { $gte: toYMD(start), $lte: end.toISOString() },
+              out_of_charge: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -362,7 +367,7 @@ const getOverviewPipeline = (start, end, importer) => {
         do_completed: [
           {
             $match: {
-              do_completed: { $gte: toYMD(start), $lte: end.toISOString() },
+              do_completed: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -379,8 +384,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               bill_document_sent_to_accounts: {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
               ...importerMatch,
             },
@@ -397,7 +402,7 @@ const getOverviewPipeline = (start, end, importer) => {
         eta: [
           {
             $match: {
-              vessel_berthing: { $gte: toYMD(start), $lte: end.toISOString() },
+              vessel_berthing: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -413,7 +418,7 @@ const getOverviewPipeline = (start, end, importer) => {
         gateway_igm_date: [
           {
             $match: {
-              gateway_igm_date: { $gte: toYMD(start), $lte: end.toISOString() },
+              gateway_igm_date: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -429,7 +434,7 @@ const getOverviewPipeline = (start, end, importer) => {
         discharge_date: [
           {
             $match: {
-              discharge_date: { $gte: toYMD(start), $lte: end.toISOString() },
+              discharge_date: { $gte: startDateStr, $lte: endDateStr },
               ...importerMatch,
             },
           },
@@ -448,8 +453,8 @@ const getOverviewPipeline = (start, end, importer) => {
           {
             $match: {
               "container_nos.emptyContainerOffLoadDate": {
-                $gte: toYMD(start),
-                $lte: end.toISOString(),
+                $gte: startDateStr,
+                $lte: endDateStr,
               },
             },
           },
@@ -516,15 +521,77 @@ const getOverviewPipeline = (start, end, importer) => {
 
 export async function getUserDashboardStats(req, res) {
   try {
-    const { importer, startDate, endDate } = req.query; // Optional filters
+    const { importer, date, startDate, endDate } = req.query;
+    const user = req.user;
 
-    const start = startDate ? new Date(startDate) : new Date();
-    if (!startDate) start.setHours(0, 0, 0, 0); // Start of today if defaulting
+    // Determine start and end dates
+    // Prioritize explicit start/end dates, fallback to 'date' param, then fallback to today
+    let startStr, endStr;
 
-    const end = endDate ? new Date(endDate) : new Date();
-    if (!endDate) end.setHours(23, 59, 59, 999); // End of today if defaulting
+    if (startDate && endDate) {
+      startStr = startDate;
+      endStr = endDate;
+    } else {
+      // Fallback to single date logic
+      let singleDate;
+      if (date) {
+        singleDate = date;
+      } else {
+        // Default to today in local timezone
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        singleDate = `${year}-${month}-${day}`;
+      }
+      startStr = singleDate;
+      endStr = singleDate;
+    }
 
-    const pipeline = getOverviewPipeline(start, end, importer);
+    let targetImporters = null; // null implies fetch all (for superadmin)
+
+    // Check if user is restricted (not superadmin)
+    if (user && user.role !== "superadmin") {
+      const assignments = user.ie_code_assignments || [];
+      let assignedNames = assignments.map((a) => a.importer_name);
+
+      // Fallback for legacy single assignment
+      if (assignedNames.length === 0 && user.assignedImporterName) {
+        assignedNames = [user.assignedImporterName];
+      }
+
+      // If user has no assignments, return empty result
+      if (assignedNames.length === 0) {
+        return res.json({ summary: {}, details: {} });
+      }
+
+      // If user requested specific importers, filter them against their assignments
+      if (importer) {
+        const requested = importer.split(",");
+        targetImporters = requested.filter((name) =>
+          assignedNames.includes(name)
+        );
+      } else {
+        // Default to all assigned importers
+        targetImporters = assignedNames;
+      }
+
+      // If filtering resulted in no valid importers, return empty result
+      if (targetImporters.length === 0) {
+        return res.json({ summary: {}, details: {} });
+      }
+    } else {
+      // Superadmin or no user validation (though middleware should catch this)
+      if (importer) {
+        targetImporters = importer.split(",");
+      }
+    }
+
+    // Pass targetImporters (array or null) directly to pipeline helper
+    const importerParam = targetImporters;
+
+    // Pass the calculated start and end strings
+    const pipeline = getOverviewPipeline(startStr, endStr, importerParam);
     const result = await JobModel.aggregate(pipeline);
 
     const stats = result[0] || { summary: {}, details: {} };
