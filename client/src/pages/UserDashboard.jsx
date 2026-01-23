@@ -28,6 +28,12 @@ import {
   Select,
   Grid,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import {
@@ -221,6 +227,9 @@ function UserDashboard() {
     parsedUser?.ie_code_assignments?.[0]?.importer_name || "";
 
   const [stats, setStats] = useState(null);
+  const [selectedJobTitle, setSelectedJobTitle] = useState("");
+  const [selectedJobList, setSelectedJobList] = useState([]);
+  const [jobListDialogOpen, setJobListDialogOpen] = useState(false);
 
   const metricConfig = [
     {
@@ -309,6 +318,21 @@ function UserDashboard() {
         type: "bar",
         fontFamily: "inherit",
         toolbar: { show: false },
+        events: {
+          dataPointSelection: (event, chartContext, config) => {
+            const index = config.dataPointIndex;
+            const metric = metricConfig[index];
+            if (metric && stats?.details?.[metric.key]) {
+              const details = stats.details[metric.key];
+              // Ensure details is an array
+              if (Array.isArray(details) && details.length > 0) {
+                setSelectedJobTitle(metric.label);
+                setSelectedJobList(details);
+                setJobListDialogOpen(true);
+              }
+            }
+          },
+        },
       },
       plotOptions: {
         bar: {
@@ -367,7 +391,7 @@ function UserDashboard() {
         padding: { top: 0, right: 80, bottom: 0, left: 30 }, // Further increased right padding
       },
     }),
-    [],
+    [stats] // Added stats dependency so the event handler has access to latest data
   );
 
   // Set default importer if only one assignment exists
@@ -1441,8 +1465,292 @@ function UserDashboard() {
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
-    </ThemeProvider>
+
+        {/* Job Details Modal */}
+        <Dialog
+          open={jobListDialogOpen}
+          onClose={() => setJobListDialogOpen(false)}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: "12px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              fontWeight: 700,
+              fontSize: "1.25rem",
+              color: "#1e293b",
+              borderBottom: "1px solid #e2e8f0",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              py: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 4,
+                height: 28,
+                bgcolor: "#3b82f6",
+                borderRadius: 1,
+              }}
+            />
+            {selectedJobTitle}
+            <Chip
+              label={`${selectedJobList?.length || 0} Records`}
+              size="small"
+              sx={{
+                bgcolor: "#eff6ff",
+                color: "#3b82f6",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+              }}
+            />
+          </DialogTitle>
+          <DialogContent sx={{ p: 0 }}>
+            {selectedJobList && selectedJobList.length > 0 ? (
+              <Box>
+                {/* Fixed Header Row */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: `100px ${selectedJobList.some((j) => j.importer) ? "1fr" : "0px"
+                      } ${selectedJobList.some((j) => j.shipping_line_airline)
+                        ? "150px"
+                        : "0px"
+                      } ${selectedJobList.some(
+                        (j) =>
+                          j.container_number ||
+                          (Array.isArray(j.container_nos) &&
+                            j.container_nos.length > 0),
+                      )
+                        ? "150px"
+                        : "0px"
+                      } ${selectedJobList.some((j) => j.relevant_date)
+                        ? "100px"
+                        : "0px"
+                      }`,
+                    bgcolor: "#1e293b",
+                    color: "#ffffff",
+                    py: 1.5,
+                    px: 2,
+                    borderBottom: "2px solid #3b82f6",
+                    gap: 1,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      color: "#ffffff",
+                    }}
+                  >
+                    Job No
+                  </Typography>
+                  {selectedJobList.some((j) => j.importer) && (
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        color: "#ffffff",
+                      }}
+                    >
+                      Importer
+                    </Typography>
+                  )}
+                  {selectedJobList.some((j) => j.shipping_line_airline) && (
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        color: "#ffffff",
+                      }}
+                    >
+                      Shipping Line
+                    </Typography>
+                  )}
+                  {selectedJobList.some(
+                    (j) =>
+                      j.container_number ||
+                      (Array.isArray(j.container_nos) &&
+                        j.container_nos.length > 0),
+                  ) && (
+                      <Typography
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.75rem",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          color: "#ffffff",
+                        }}
+                      >
+                        Container No
+                      </Typography>
+                    )}
+                  {selectedJobList.some((j) => j.relevant_date) && (
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        color: "#ffffff",
+                      }}
+                    >
+                      Date
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Scrollable Data Rows */}
+                <Box
+                  sx={{
+                    maxHeight: 400,
+                    overflowY: "auto",
+                    "&::-webkit-scrollbar": { width: "6px" },
+                    "&::-webkit-scrollbar-thumb": {
+                      bgcolor: "#cbd5e1",
+                      borderRadius: "3px",
+                    },
+                  }}
+                >
+                  {selectedJobList.map((job, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: `100px ${selectedJobList.some((j) => j.importer)
+                            ? "1fr"
+                            : "0px"
+                          } ${selectedJobList.some((j) => j.shipping_line_airline)
+                            ? "150px"
+                            : "0px"
+                          } ${selectedJobList.some(
+                            (j) =>
+                              j.container_number ||
+                              (Array.isArray(j.container_nos) &&
+                                j.container_nos.length > 0),
+                          )
+                            ? "150px"
+                            : "0px"
+                          } ${selectedJobList.some((j) => j.relevant_date)
+                            ? "100px"
+                            : "0px"
+                          }`,
+                        py: 1.5,
+                        px: 2,
+                        bgcolor: index % 2 === 0 ? "#ffffff" : "#f8fafc",
+                        borderBottom: "1px solid #e2e8f0",
+                        "&:hover": { bgcolor: "#eff6ff" },
+                        transition: "background-color 0.15s ease",
+                        gap: 1,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontWeight: 600,
+                          color: "#3b82f6",
+                          fontSize: "0.875rem",
+                        }}
+                      >
+                        {job.job_no || "-"}
+                      </Typography>
+                      {selectedJobList.some((j) => j.importer) && (
+                        <Typography
+                          sx={{
+                            color: "#334155",
+                            fontSize: "0.875rem",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            pr: 2,
+                          }}
+                        >
+                          {job.importer || "-"}
+                        </Typography>
+                      )}
+                      {selectedJobList.some((j) => j.shipping_line_airline) && (
+                        <Typography
+                          sx={{ color: "#334155", fontSize: "0.875rem" }}
+                        >
+                          {job.shipping_line_airline || "-"}
+                        </Typography>
+                      )}
+                      {selectedJobList.some(
+                        (j) =>
+                          j.container_number ||
+                          (Array.isArray(j.container_nos) &&
+                            j.container_nos.length > 0),
+                      ) && (
+                          <Typography
+                            sx={{
+                              color: "#334155",
+                              fontSize: "0.875rem",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {job.container_number ||
+                              (Array.isArray(job.container_nos)
+                                ? job.container_nos.join(", ")
+                                : "-")}
+                          </Typography>
+                        )}
+                      {selectedJobList.some((j) => j.relevant_date) && (
+                        <Typography
+                          sx={{ color: "#334155", fontSize: "0.875rem" }}
+                        >
+                          {job.relevant_date
+                            ? new Date(job.relevant_date).toLocaleDateString(
+                              "en-GB",
+                            )
+                            : "-"}
+                        </Typography>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ p: 4, textAlign: "center" }}>
+                <Typography color="text.secondary">
+                  No details available.
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions
+            sx={{ borderTop: "1px solid #e2e8f0", px: 3, py: 1.5 }}
+          >
+            <Button
+              onClick={() => setJobListDialogOpen(false)}
+              variant="outlined"
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                borderColor: "#e2e8f0",
+                color: "#475569",
+                "&:hover": {
+                  borderColor: "#cbd5e1",
+                  bgcolor: "#f8fafc",
+                },
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog >
+      </Box >
+    </ThemeProvider >
   );
 }
 
