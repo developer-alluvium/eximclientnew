@@ -34,8 +34,6 @@ const connectDB = async () => {
     // Connection options (can be tuned via environment variables)
     const mongooseOptions = {
       appName: process.env.MONGOOSE_APP_NAME || "EximServer",
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE, 10) || 0,
       maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE, 10) || 30,
       maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_MS, 10) || 30000,

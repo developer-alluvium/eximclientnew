@@ -82,21 +82,21 @@ const adminSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { 
+  {
     timestamps: true,
     collection: 'admins'
   }
 );
 
 // Virtual for locked account
-adminSchema.virtual('isLocked').get(function() {
+adminSchema.virtual('isLocked').get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 // Hash password before save
 adminSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -113,7 +113,7 @@ adminSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 // Increment login attempts
-adminSchema.methods.incLoginAttempts = function() {
+adminSchema.methods.incLoginAttempts = function () {
   // If we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({
@@ -125,18 +125,18 @@ adminSchema.methods.incLoginAttempts = function() {
       }
     });
   }
-  
+
   const updates = { $inc: { loginAttempts: 1 } };
   // Lock account after 5 attempts for 2 hours
   if (this.loginAttempts + 1 >= 5 && !this.isLocked) {
     updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 }; // 2 hours
   }
-  
+
   return this.updateOne(updates);
 };
 
 // Reset login attempts
-adminSchema.methods.resetLoginAttempts = function() {
+adminSchema.methods.resetLoginAttempts = function () {
   return this.updateOne({
     $unset: {
       loginAttempts: 1,
@@ -146,14 +146,13 @@ adminSchema.methods.resetLoginAttempts = function() {
 };
 
 // Get users under this admin's IE code
-adminSchema.methods.getManagedUsers = function() {
-  return mongoose.model('EximclientUser').find({ 
-    ie_code_no: this.ie_code_no 
+adminSchema.methods.getManagedUsers = function () {
+  return mongoose.model('EximclientUser').find({
+    ie_code_no: this.ie_code_no
   }).populate('adminId', 'name email');
 };
 
 // Index for better performance
-adminSchema.index({ email: 1 });
 adminSchema.index({ ie_code_no: 1 });
 adminSchema.index({ createdBy: 1 });
 adminSchema.index({ isActive: 1 });

@@ -5,10 +5,7 @@ import JobModel from "../models/jobModel.js";
 
 // Connect to Gandhidham DB using a separate mongoose connection
 const gandhidhamConnection = mongoose.createConnection(
-  process.env.Gandhidham_URI,
-  {
-    useUnifiedTopology: true,
-  }
+  process.env.Gandhidham_URI
 );
 
 const GandhidhamJobModel = gandhidhamConnection.model("Job", JobModel.schema);
@@ -323,11 +320,11 @@ export async function getImporterJobCountsGandhidham(req, res) {
     const responseArray =
       jobCounts.length > 0
         ? [
-            jobCounts[0].totalCount,
-            jobCounts[0].pendingCount,
-            jobCounts[0].completedCount,
-            jobCounts[0].cancelledCount,
-          ]
+          jobCounts[0].totalCount,
+          jobCounts[0].pendingCount,
+          jobCounts[0].completedCount,
+          jobCounts[0].cancelledCount,
+        ]
         : [0, 0, 0, 0];
 
     res.json(responseArray);
@@ -499,8 +496,8 @@ export async function getJobNumbersByMultipleIECodesGandhidham(req, res) {
         success: false,
         message: search
           ? `No jobs found for IE codes: ${ieCodeArray.join(
-              ", "
-            )} matching search: ${search}`
+            ", "
+          )} matching search: ${search}`
           : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
       });
     }
@@ -606,8 +603,8 @@ export async function getBeNumbersByMultipleIECodesGandhidham(req, res) {
         success: false,
         message: search
           ? `No jobs found for IE codes: ${ieCodeArray.join(
-              ", "
-            )} matching search: ${search}`
+            ", "
+          )} matching search: ${search}`
           : `No jobs found for IE codes: ${ieCodeArray.join(", ")}`,
       });
     }
@@ -624,9 +621,8 @@ export async function getBeNumbersByMultipleIECodesGandhidham(req, res) {
 
     res.status(200).json({
       success: true,
-      message: `Found ${
-        jobs.length
-      } job(s) with BE numbers for IE codes: ${ieCodeArray.join(", ")}`,
+      message: `Found ${jobs.length
+        } job(s) with BE numbers for IE codes: ${ieCodeArray.join(", ")}`,
       data: beNumbers,
       total_count: jobs.length,
       ie_codes_searched: ieCodeArray,
@@ -1217,9 +1213,9 @@ export const getContainerDetailsGandhidham = async (req, res) => {
       container_status: status,
       days_since_arrival: item.container.arrival_date
         ? Math.floor(
-            (new Date() - new Date(item.container.arrival_date)) /
-              (1000 * 60 * 60 * 24)
-          )
+          (new Date() - new Date(item.container.arrival_date)) /
+          (1000 * 60 * 60 * 24)
+        )
         : null,
     }));
 

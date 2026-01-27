@@ -1,3 +1,5 @@
+import "./fix-dns.js";
+import dns from "dns";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -30,7 +32,9 @@ import currencyRate from "./routes/currencyRate.js";
 // Load environment variables
 dotenv.config();
 
+
 // Initialize Express app
+
 const app = express();
 const PORT = config.port;
 
@@ -48,6 +52,7 @@ app.use(cookieParser());
 // Build allowed origins list using configured client URLs (env) and common dev hosts
 const defaultOrigins = [
   "http://localhost:3001",
+  "http://localhost:3000",
   "http://43.205.59.159",
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
