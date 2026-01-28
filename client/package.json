@@ -22,6 +22,7 @@
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
+    "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "lucide-react": "^0.509.0",
     "material-react-table": "^3.2.1",
@@ -31,9 +32,11 @@
     "react-bootstrap": "^2.10.9",
     "react-feather": "^2.0.10",
     "react-icons": "^5.5.0",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.4.1",
     "recharts": "^2.15.3",
     "sass": "^1.86.3",
+    "socket.io-client": "^4.8.3",
     "web-vitals": "^4.2.4"
   },
   "scripts": {
@@ -61,9 +64,6 @@
     ]
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.3",
-    "react-scripts": "^5.0.1",
-    "tailwindcss": "^4.1.6"
+    "react-scripts": "^5.0.1"
   }
 }

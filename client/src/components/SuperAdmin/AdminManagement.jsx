@@ -98,7 +98,7 @@ const AVAILABLE_MODULES = [
     isExternal: true,
   },
   {
-    id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    id: "/elock",
     // id:"http://localhost:3005/",
     name: "E-Lock",
     description:

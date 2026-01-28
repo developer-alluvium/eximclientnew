@@ -285,10 +285,10 @@ function HomePage() {
       name: "E-Lock",
       description:
         "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      path: process.env.REACT_APP_ELOCK_URL,
+      path: "/elock",
       icon: <LockOutlinedIcon />,
       category: "core",
-      isExternal: true,
+      isExternal: false,
     },
     {
       name: "Intendor Management System",
@@ -348,66 +348,7 @@ function HomePage() {
       return;
     }
 
-    if (moduleName === "E-Lock") {
-      try {
-        const eximUser = getJsonCookie("exim_user");
-        const token = getCookie("access_token");
-        let parsedUser = eximUser;
-
-        if (!token && !parsedUser) {
-          navigate("/login");
-          return;
-        }
-
-        // Pick first IE code from ie_code_assignments array
-        let selectedIeCode = "";
-        if (
-          parsedUser?.ie_code_assignments &&
-          parsedUser.ie_code_assignments.length > 0
-        ) {
-          selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
-        } else if (parsedUser?.ie_code_no) {
-          selectedIeCode = parsedUser.ie_code_no;
-        } else {
-          alert("IE Code not found. Cannot generate SSO token.");
-          return;
-        }
-
-        const res = await axios.post(
-          `${
-            process.env.REACT_APP_API_STRING
-          }/users/generate-sso-token?ie_code_no=${encodeURIComponent(
-            selectedIeCode
-          )}`,
-          {},
-          {
-            withCredentials: true,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const ssoToken = res.data?.data?.token;
-        if (ssoToken) {
-          setCookie("sso_token", ssoToken, 1);
-          const elockUrl =
-            "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/";
-          window.location.href = `${elockUrl}?token=${ssoToken}`;
-        } else {
-          alert("Failed to generate SSO token for E-Lock.");
-        }
-      } catch (err) {
-        console.error("SSO token generation error:", err);
-        if (err.response?.status === 401) {
-          navigate("/login");
-        } else {
-          alert("Error generating SSO token for E-Lock.");
-        }
-      }
-      return;
-    }
+    // E-Lock handling removed to use standard navigation
 
     if (isExternal && path && path.startsWith("http")) {
       window.open(path, "_blank");
@@ -585,24 +526,24 @@ function HomePage() {
                     sx={{
                       ...(module.category === "beta"
                         ? {
-                            "&:before": {
-                              backgroundColor: "#ff9800", // Orange color for beta modules
-                            },
-                          }
+                          "&:before": {
+                            backgroundColor: "#ff9800", // Orange color for beta modules
+                          },
+                        }
                         : {}),
                       ...(module.isLocked
                         ? {
-                            opacity: 0.6,
-                            filter: "grayscale(50%)",
-                            cursor: "not-allowed",
-                            "&:hover": {
-                              transform: "none",
-                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                            },
-                            "&:before": {
-                              backgroundColor: "#f44336", // Red color for locked modules
-                            },
-                          }
+                          opacity: 0.6,
+                          filter: "grayscale(50%)",
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            transform: "none",
+                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                          },
+                          "&:before": {
+                            backgroundColor: "#f44336", // Red color for locked modules
+                          },
+                        }
                         : {}),
                     }}
                   >
@@ -653,15 +594,15 @@ function HomePage() {
                       >
                         {module.category === "beta"
                           ? React.cloneElement(module.icon, {
-                              sx: {
-                                color: module.isLocked ? "#f44336" : "#ff9800",
-                              },
-                            })
+                            sx: {
+                              color: module.isLocked ? "#f44336" : "#ff9800",
+                            },
+                          })
                           : React.cloneElement(module.icon, {
-                              sx: {
-                                color: module.isLocked ? "#f44336" : undefined,
-                              },
-                            })}
+                            sx: {
+                              color: module.isLocked ? "#f44336" : undefined,
+                            },
+                          })}
                       </IconContainer>
 
                       <Typography
@@ -744,37 +685,37 @@ function HomePage() {
                     sx={{
                       ...(module.category === "beta"
                         ? {
-                            "&:before": {
-                              backgroundColor: "#ff9800", // Orange color for beta modules
-                            },
-                          }
+                          "&:before": {
+                            backgroundColor: "#ff9800", // Orange color for beta modules
+                          },
+                        }
                         : {}),
                       ...(module.category === "coming-soon"
                         ? {
-                            opacity: 0.7,
-                            cursor: "not-allowed",
-                            "&:hover": {
-                              transform: "none",
-                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                            },
-                            "&:before": {
-                              backgroundColor: "#9e9e9e", // Gray color for coming soon modules
-                            },
-                          }
+                          opacity: 0.7,
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            transform: "none",
+                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                          },
+                          "&:before": {
+                            backgroundColor: "#9e9e9e", // Gray color for coming soon modules
+                          },
+                        }
                         : {}),
                       ...(module.isLocked
                         ? {
-                            opacity: 0.6,
-                            filter: "grayscale(50%)",
-                            cursor: "not-allowed",
-                            "&:hover": {
-                              transform: "none",
-                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                            },
-                            "&:before": {
-                              backgroundColor: "#f44336", // Red color for locked modules
-                            },
-                          }
+                          opacity: 0.6,
+                          filter: "grayscale(50%)",
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            transform: "none",
+                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                          },
+                          "&:before": {
+                            backgroundColor: "#f44336", // Red color for locked modules
+                          },
+                        }
                         : {}),
                     }}
                   >
@@ -818,8 +759,8 @@ function HomePage() {
                           ...(module.category === "beta"
                             ? { backgroundColor: "rgba(255, 152, 0, 0.1)" }
                             : module.category === "coming-soon"
-                            ? { backgroundColor: "rgba(158, 158, 158, 0.1)" }
-                            : {}),
+                              ? { backgroundColor: "rgba(158, 158, 158, 0.1)" }
+                              : {}),
                           ...(module.isLocked
                             ? { backgroundColor: "rgba(244, 67, 54, 0.1)" }
                             : {}),
@@ -827,17 +768,17 @@ function HomePage() {
                       >
                         {module.category === "beta"
                           ? React.cloneElement(module.icon, {
-                              sx: {
-                                color: module.isLocked ? "#f44336" : "#ff9800",
-                              },
-                            })
+                            sx: {
+                              color: module.isLocked ? "#f44336" : "#ff9800",
+                            },
+                          })
                           : module.category === "coming-soon"
-                          ? React.cloneElement(module.icon, {
+                            ? React.cloneElement(module.icon, {
                               sx: {
                                 color: module.isLocked ? "#f44336" : "#9e9e9e",
                               },
                             })
-                          : React.cloneElement(module.icon, {
+                            : React.cloneElement(module.icon, {
                               sx: {
                                 color: module.isLocked ? "#f44336" : undefined,
                               },
@@ -920,30 +861,30 @@ function HomePage() {
                     sx={{
                       ...(module.category === "coming-soon"
                         ? {
-                            opacity: 0.7,
-                            cursor: "not-allowed",
-                            "&:hover": {
-                              transform: "none",
-                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                            },
-                            "&:before": {
-                              backgroundColor: "#9e9e9e", // Gray color for coming soon modules
-                            },
-                          }
+                          opacity: 0.7,
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            transform: "none",
+                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                          },
+                          "&:before": {
+                            backgroundColor: "#9e9e9e", // Gray color for coming soon modules
+                          },
+                        }
                         : {}),
                       ...(module.isLocked
                         ? {
-                            opacity: 0.6,
-                            filter: "grayscale(50%)",
-                            cursor: "not-allowed",
-                            "&:hover": {
-                              transform: "none",
-                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                            },
-                            "&:before": {
-                              backgroundColor: "#f44336", // Red color for locked modules
-                            },
-                          }
+                          opacity: 0.6,
+                          filter: "grayscale(50%)",
+                          cursor: "not-allowed",
+                          "&:hover": {
+                            transform: "none",
+                            boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                          },
+                          "&:before": {
+                            backgroundColor: "#f44336", // Red color for locked modules
+                          },
+                        }
                         : {}),
                     }}
                   >
@@ -994,15 +935,15 @@ function HomePage() {
                       >
                         {module.category === "coming-soon"
                           ? React.cloneElement(module.icon, {
-                              sx: {
-                                color: module.isLocked ? "#f44336" : "#9e9e9e",
-                              },
-                            })
+                            sx: {
+                              color: module.isLocked ? "#f44336" : "#9e9e9e",
+                            },
+                          })
                           : React.cloneElement(module.icon, {
-                              sx: {
-                                color: module.isLocked ? "#f44336" : undefined,
-                              },
-                            })}
+                            sx: {
+                              color: module.isLocked ? "#f44336" : undefined,
+                            },
+                          })}
                       </IconContainer>
 
                       <Typography
@@ -1088,22 +1029,22 @@ function HomePage() {
                       sx={{
                         ...(module.isLocked
                           ? {
-                              opacity: 0.6,
-                              filter: "grayscale(50%)",
-                              cursor: "not-allowed",
-                              "&:hover": {
-                                transform: "none",
-                                boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
-                              },
-                              "&:before": {
-                                backgroundColor: "#f44336", // Red color for locked modules
-                              },
-                            }
+                            opacity: 0.6,
+                            filter: "grayscale(50%)",
+                            cursor: "not-allowed",
+                            "&:hover": {
+                              transform: "none",
+                              boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
+                            },
+                            "&:before": {
+                              backgroundColor: "#f44336", // Red color for locked modules
+                            },
+                          }
                           : {
-                              "&:before": {
-                                backgroundColor: "#d32f2f", // Different color for admin modules
-                              },
-                            }),
+                            "&:before": {
+                              backgroundColor: "#d32f2f", // Different color for admin modules
+                            },
+                          }),
                       }}
                     >
                       <CardContent

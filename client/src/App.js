@@ -35,7 +35,9 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import MainLayout from "./pages/MainLayout.jsx";
 import CImportDSR from "./components/CImportDSR.jsx";
-import AnalyticsOverview from "./components/AnalyticsOverview.jsx"; // Add this import
+import AnalyticsOverview from "./components/AnalyticsOverview.jsx";
+import Dashboard from "./pages/Elock/components/Dashboard.jsx"; // Elock Dashboard
+import ElockGPSOperationPage from "./pages/Elock/pages/ElockGPSOperationPage.jsx"; // Elock Operation Page
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
@@ -153,6 +155,23 @@ function App() {
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <AnalyticsOverview />
+                        </ProtectedRoute>
+                      }
+                    />
+                    {/* Elock Routes */}
+                    <Route
+                      path="/elock"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/elock/:elockNo"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <ElockGPSOperationPage />
                         </ProtectedRoute>
                       }
                     />

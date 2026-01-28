@@ -444,11 +444,11 @@ export const getUserDashboard = async (req, res) => {
           permissions: access
             ? access.permissions
             : {
-                canView: false,
-                canEdit: false,
-                canDelete: false,
-                canExport: false,
-              },
+              canView: false,
+              canEdit: false,
+              canDelete: false,
+              canExport: false,
+            },
         };
       }),
       notifications: await Notification.find({
@@ -560,9 +560,8 @@ export const requestModuleAccess = async (req, res) => {
       sender: user._id,
       senderModel: "EximclientUser",
       title: "Module Access Request",
-      message: `User ${user.name} has requested access to ${
-        module.name
-      }. Reason: ${reason || "Not specified"}`,
+      message: `User ${user.name} has requested access to ${module.name
+        }. Reason: ${reason || "Not specified"}`,
       data: {
         userId: user._id,
         moduleKey,
@@ -745,7 +744,9 @@ export const getCurrentUser = async (req, res) => {
           aeo_reminder_days: user.aeo_reminder_days,
           aeo_reminder_enabled: user.aeo_reminder_enabled,
           lastLogin: user.lastLogin,
-          assignedModules: user.assignedModules,
+          assignedModules: (user.assignedModules || []).map(m =>
+            m === "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/" ? "/elock" : m
+          ),
           jobsTabVisible: user.jobsTabVisible,
           gandhidhamTabVisible: user.gandhidhamTabVisible,
           emailVerified: user.emailVerified,

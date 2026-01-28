@@ -577,10 +577,10 @@ function UserDashboard() {
       name: "E-Lock",
       description:
         "GPS-enabled electronic seal system for secure cargo transport verification",
-      path: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+      path: "/elock",
       categoryLabel: "SECURITY & TRACKING",
       category: "core",
-      isExternal: true,
+      isExternal: false,
     },
     {
       name: "SnapCheck",
@@ -824,52 +824,6 @@ function UserDashboard() {
 
     //console.log(parsedUser);
     if (isLocked) return;
-    if (moduleName === "E-Lock") {
-      try {
-        let token = getCookie("access_token");
-        if (!parsedUser || !token) {
-          navigate("/login");
-          return;
-        }
-
-        let selectedIeCode = "";
-        if (
-          parsedUser?.ie_code_assignments &&
-          parsedUser.ie_code_assignments.length > 0
-        )
-          selectedIeCode = parsedUser.ie_code_assignments[0].ie_code_no;
-        else if (parsedUser?.ie_code_no) selectedIeCode = parsedUser.ie_code_no;
-        else {
-          alert("IE Code not found. Cannot generate SSO token.");
-          return;
-        }
-        const res = await axios.post(
-          `${process.env.REACT_APP_API_STRING
-          }/users/generate-sso-token?ie_code_no=${encodeURIComponent(
-            selectedIeCode,
-          )}`,
-          {},
-          {
-            withCredentials: true,
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-        const ssoToken = res.data?.data?.token;
-        if (ssoToken) {
-          setCookie("sso_token", ssoToken, 1);
-          window.location.href = `http://elock-tracking.s3-website.ap-south-1.amazonaws.com/?token=${ssoToken}`;
-        } else alert("Failed to generate SSO token for E-Lock.");
-      } catch (err) {
-        console.log(err);
-        if (err.response?.status === 401) navigate("/login");
-        else alert("Error generating SSO token for E-Lock.");
-
-      }
-      return;
-    }
     if (isExternal && path && path.startsWith("http")) {
       window.open(path, "_blank");
       return;
@@ -1630,8 +1584,8 @@ function UserDashboard() {
                       sx={{
                         display: "grid",
                         gridTemplateColumns: `100px ${selectedJobList.some((j) => j.importer)
-                            ? "1fr"
-                            : "0px"
+                          ? "1fr"
+                          : "0px"
                           } ${selectedJobList.some((j) => j.shipping_line_airline)
                             ? "150px"
                             : "0px"

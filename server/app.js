@@ -25,6 +25,9 @@ import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
 import aeoReminderRoutes from "./routes/aeoReminderRoutes.js";
 import analytics from "./routes/analytics.js";
 
+import elockRoutes from "./routes/elockRoutes.js";
+import elockDetailsRoutes from "./routes/elockDetailsRoutes.js";
+
 import icegateProxy from "./routes/icegateProxy.js";
 
 //currency rate routes
@@ -125,6 +128,9 @@ app.use(aeoReminderRoutes);
 app.use(icegateProxy);
 app.use(currencyRate);
 app.use(analytics);
+
+app.use("/api/elock", elockRoutes);
+app.use("/api/elock-details", elockDetailsRoutes);
 
 // Root route
 app.get("/", (req, res) => {

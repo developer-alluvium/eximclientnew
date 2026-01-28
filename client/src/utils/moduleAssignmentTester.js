@@ -86,7 +86,7 @@ class ModuleAssignmentFrontendTester {
         const testModules = [
           "/importdsr",
           "/netpage",
-          "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+          "/elock",
         ];
         testModules.forEach((module) => {
           const hasAccess = hasModuleAccess(module);
@@ -178,7 +178,7 @@ class ModuleAssignmentFrontendTester {
       "http://qrlocker.s3-website.ap-south-1.amazonaws.com/": "QR Locker",
       "http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/":
         "Task Flow AI",
-      "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/": "E-Lock",
+      "/elock": "E-Lock",
       // 'http://localhost:3005': 'E-Lock (Local)',
       "/trademasterguide": "Import Video",
     };

@@ -461,7 +461,13 @@ export const sanitizeUserData = (user) => {
 
   additionalFields.forEach((field) => {
     if (user[field] !== undefined) {
-      sanitized[field] = user[field];
+      if (field === "assignedModules" && Array.isArray(user[field])) {
+        sanitized[field] = user[field].map(m =>
+          m === "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/" ? "/elock" : m
+        );
+      } else {
+        sanitized[field] = user[field];
+      }
     }
   });
 

@@ -9,7 +9,7 @@ const AVAILABLE_MODULES = [
     category: "core"
   },
   {
-    id: "/netpage", 
+    id: "/netpage",
     name: "CostIQ",
     description: "Calculate shipping costs per kilogram for better pricing decisions",
     category: "core"
@@ -23,7 +23,7 @@ const AVAILABLE_MODULES = [
   },
   {
     id: "http://qrlocker.s3-website.ap-south-1.amazonaws.com/",
-    name: "QR Locker", 
+    name: "QR Locker",
     description: "Beta Version - Digital locker management with QR code integration",
     category: "beta",
     isExternal: true
@@ -35,7 +35,7 @@ const AVAILABLE_MODULES = [
     category: "core",
     isExternal: true
   },
-  
+
   // {
   //   id: process.env.ELOCK_URL || "https://elock.s3.ap-south-1.amazonaws.com",
   //   name: "E-Lock",
@@ -44,12 +44,12 @@ const AVAILABLE_MODULES = [
   //   isExternal: true
   // },
   {
-    id: "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/",
+    id: "/elock",
     // id:"http://localhost:3005",
     name: "E-Lock",
     description: "Secure electronic document locking and verification (Tracking)",
     category: "core",
-    isExternal: true
+    isExternal: false
   },
   {
     id: "/trademasterguide",
@@ -57,7 +57,7 @@ const AVAILABLE_MODULES = [
     description: "View and manage import daily status reports and track shipments",
     category: "core",
   },
- 
+
 
 ];
 
@@ -105,7 +105,9 @@ export const getCustomerModuleAssignments = async (req, res) => {
           id: customer._id,
           name: customer.name,
           ie_code_no: customer.ie_code_no,
-          assignedModules: customer.assignedModules || []
+          assignedModules: (customer.assignedModules || []).map(m =>
+            m === "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/" ? "/elock" : m
+          )
         },
         availableModules: AVAILABLE_MODULES
       },
@@ -128,9 +130,16 @@ export const updateCustomerModuleAssignments = async (req, res) => {
     console.log("=== UPDATE MODULE ASSIGNMENTS ===");
     console.log("Customer ID:", req.params.customerId);
     console.log("Request body:", req.body);
-    
+
     const { customerId } = req.params;
-    const { assignedModules } = req.body;
+    let { assignedModules } = req.body;
+
+    // Normalize E-Lock URL
+    if (assignedModules && Array.isArray(assignedModules)) {
+      assignedModules = assignedModules.map(m =>
+        m === "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/" ? "/elock" : m
+      );
+    }
 
     // Validate input
     if (!Array.isArray(assignedModules)) {
@@ -144,7 +153,7 @@ export const updateCustomerModuleAssignments = async (req, res) => {
     // Validate that all assigned modules exist in available modules
     const validModuleIds = AVAILABLE_MODULES.map(module => module.id);
     const invalidModules = assignedModules.filter(moduleId => !validModuleIds.includes(moduleId));
-    
+
     if (invalidModules.length > 0) {
       return res.status(400).json({
         success: false,
@@ -206,12 +215,20 @@ export const getAllCustomersWithModules = async (req, res) => {
     ).sort({ created_at: -1 }).lean();
 
     // Add module details to each customer
-    const customersWithModuleDetails = customers.map(customer => ({
-      ...customer,
-      assignedModuleDetails: AVAILABLE_MODULES.filter(module => 
-        customer.assignedModules?.includes(module.id)
-      )
-    }));
+    const customersWithModuleDetails = customers.map(customer => {
+      // Normalize assigned modules
+      const normalizedAssignedModules = (customer.assignedModules || []).map(m =>
+        m === "http://elock-tracking.s3-website.ap-south-1.amazonaws.com/" ? "/elock" : m
+      );
+
+      return {
+        ...customer,
+        assignedModules: normalizedAssignedModules,
+        assignedModuleDetails: AVAILABLE_MODULES.filter(module =>
+          normalizedAssignedModules.includes(module.id)
+        )
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -246,7 +263,7 @@ export const bulkAssignModules = async (req, res) => {
     // Validate that all assigned modules exist in available modules
     const validModuleIds = AVAILABLE_MODULES.map(module => module.id);
     const invalidModules = assignedModules.filter(moduleId => !validModuleIds.includes(moduleId));
-    
+
     if (invalidModules.length > 0) {
       return res.status(400).json({
         success: false,
