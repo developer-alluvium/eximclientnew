@@ -54,8 +54,8 @@ const Dashboard = () => {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [serviceStatus, setServiceStatus] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
-  const [statusFilter, setStatusFilter] = useState("");
-  const [filterType, setFilterType] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [filterType, setFilterType] = useState("All Types");
   const [userData, setUserData] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const [clientCallStates, setClientCallStates] = useState({});
@@ -327,7 +327,7 @@ const Dashboard = () => {
   const CustomPagination = () => (
     <div className="custom-pagination-wrapper compact" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span className="pagination-text" style={{ fontSize: '12px' }}>Items/page:</span>
+        <span className="pagination-text" style={{ fontSize: '12px' }}>Page:</span>
         <Select
           value={itemsPerPage}
           onChange={(val) => {
@@ -632,7 +632,9 @@ const Dashboard = () => {
                   onChange={setStatusFilter}
                   allowClear
                   size="small"
+                  defaultValue="All Status"
                 >
+                  <Option value="All Status">All Status</Option>
                   <Option value="ASSIGNED">Assigned</Option>
                   <Option value="RETURNED">Returned</Option>
                   <Option value="UNASSIGNED">Unassigned</Option>
@@ -644,7 +646,9 @@ const Dashboard = () => {
                   onChange={setFilterType}
                   allowClear
                   size="small"
+                  defaultValue="All Type"
                 >
+                  <Option value="All Type">All Type</Option>
                   <Option value="consignor">Consignor</Option>
                   <Option value="consignee">Consignee</Option>
                 </Select>

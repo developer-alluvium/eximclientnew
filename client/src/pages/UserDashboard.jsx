@@ -34,6 +34,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Checkbox,
+  Radio,
+  ListItemText,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import {
@@ -867,7 +870,7 @@ function UserDashboard() {
         sx={{
           display: "flex",
           flexDirection: "column",
-          height: "100vh",
+          height: "100%",
           // overflow: "hidden",
           backgroundColor: "#F8F9FB",
         }}
@@ -1046,15 +1049,12 @@ function UserDashboard() {
                     size="small"
                     sx={{ bgcolor: "white", borderRadius: 1 }}
                   >
-                    <InputLabel sx={{ color: "#1e293b !important" }}>
-                      Select Importer
-                    </InputLabel>
                     <Select
                       multiple
+                      displayEmpty
                       value={
                         Array.isArray(selectedImporter) ? selectedImporter : []
                       }
-                      label="Select Importer"
                       onChange={(e) => {
                         const val = e.target.value;
                         // If "all" is selected (empty string passed), reset to empty array
@@ -1083,16 +1083,19 @@ function UserDashboard() {
                         },
                       }}
                     >
-                      <MenuItem value="" sx={{ color: "#1e293b !important" }}>
-                        <em>All Importers</em>
+                      <MenuItem value="" dense sx={{ color: "#1e293b !important", py: 0.5 }}>
+                        <Radio size="small" checked={!Array.isArray(selectedImporter) || selectedImporter.length === 0} sx={{ p: 0.5 }} />
+                        <ListItemText primary="All Importers" primaryTypographyProps={{ variant: "body2", fontSize: "0.85rem" }} />
                       </MenuItem>
                       {ieCodeAssignments.map((assignment, index) => (
                         <MenuItem
                           key={index}
                           value={assignment.importer_name}
-                          sx={{ color: "#1e293b !important" }}
+                          dense
+                          sx={{ color: "#1e293b !important", py: 0.5 }}
                         >
-                          {assignment.importer_name}
+                          <Checkbox size="small" checked={Array.isArray(selectedImporter) && selectedImporter.indexOf(assignment.importer_name) > -1} sx={{ p: 0.5 }} />
+                          <ListItemText primary={assignment.importer_name} primaryTypographyProps={{ variant: "body2", fontSize: "0.85rem" }} />
                         </MenuItem>
                       ))}
                     </Select>

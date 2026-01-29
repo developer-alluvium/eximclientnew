@@ -88,7 +88,7 @@ const MainLayout = ({ children }) => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#f5f7fa" }}>
+    <Layout style={{ height: "100vh", overflow: "hidden", background: "#f5f7fa" }}>
       <Header
         style={{
           background: "#1e293b",
@@ -236,7 +236,8 @@ const MainLayout = ({ children }) => {
             padding: "24px 32px",
             maxWidth: "100%",
             margin: "0 auto",
-            minHeight: "calc(100vh - 64px)",
+            height: "calc(100vh - 64px)",
+            overflow: "auto",
           }}
         >
           {children}
