@@ -73,9 +73,9 @@ app.use(
       "Content-Type",
       "Authorization",
       "user-id",
-      "username",
       "user-role",
       "x-username",
+      "X-Requested-With",
     ],
   })
 );

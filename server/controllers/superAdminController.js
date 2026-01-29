@@ -609,9 +609,8 @@ export const updateAdminStatus = async (req, res) => {
       sender: superAdmin._id,
       senderModel: "SuperAdmin",
       title: `Account ${isActive ? "Activated" : "Deactivated"}`,
-      message: `Your admin account has been ${
-        isActive ? "activated" : "deactivated"
-      } by SuperAdmin. ${reason ? "Reason: " + reason : ""}`,
+      message: `Your admin account has been ${isActive ? "activated" : "deactivated"
+        } by SuperAdmin. ${reason ? "Reason: " + reason : ""}`,
       data: {
         oldStatus,
         newStatus: isActive,
@@ -918,11 +917,11 @@ export const getAllUsers = async (req, res) => {
           adminCustomer:
             user.isAdmin && customerRecord
               ? {
-                  id: customerRecord._id,
-                  name: customerRecord.name,
-                  ie_code_no: customerRecord.ie_code_no,
-                  adminRoleGrantedAt: customerRecord.adminRoleGrantedAt,
-                }
+                id: customerRecord._id,
+                name: customerRecord.name,
+                ie_code_no: customerRecord.ie_code_no,
+                adminRoleGrantedAt: customerRecord.adminRoleGrantedAt,
+              }
               : null,
         };
       })
@@ -966,9 +965,8 @@ export const updateCustomerAdminStatus = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Customer admin status ${
-        isAdmin ? "granted" : "revoked"
-      } successfully.`,
+      message: `Customer admin status ${isAdmin ? "granted" : "revoked"
+        } successfully.`,
       data: {
         customer: {
           id: customer._id,
@@ -1210,9 +1208,8 @@ export const updateUserStatus = async (req, res) => {
     // Create notification for user
     const notificationMessage = isActive
       ? "Your account has been activated by SuperAdmin. You can now access the system."
-      : `Your account has been deactivated by SuperAdmin. ${
-          reason ? "Reason: " + reason : ""
-        }`;
+      : `Your account has been deactivated by SuperAdmin. ${reason ? "Reason: " + reason : ""
+      }`;
 
     await Notification.createNotification({
       type: isActive ? "user_activated" : "user_deactivated",
@@ -1454,8 +1451,7 @@ export const assignIeCodeToUser = async (req, res) => {
     // Log activity
 
     console.log(
-      `IEC ${ieCodeNo} and Importer ${
-        customerKyc.name_of_individual
+      `IEC ${ieCodeNo} and Importer ${customerKyc.name_of_individual
       } assigned to user ${user.name} by ${actor.role || "superadmin"}`
     );
 
@@ -1564,9 +1560,8 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
       senderModel:
         actor.role === "superadmin" ? "SuperAdmin" : "EximclientUser",
       title: "IE Code and Importer Assigned",
-      message: `Your account has been assigned IEC: ${ieCodeNo} and Importer: ${
-        customerKyc.name_of_individual
-      }. ${reason ? "Reason: " + reason : ""}`,
+      message: `Your account has been assigned IEC: ${ieCodeNo} and Importer: ${customerKyc.name_of_individual
+        }. ${reason ? "Reason: " + reason : ""}`,
     }));
 
     // Bulk create notifications
@@ -1575,10 +1570,8 @@ export const bulkAssignIeCodeToUsers = async (req, res) => {
     // Log activity
 
     console.log(
-      `Bulk IEC assignment: ${ieCodeNo} and Importer ${
-        customerKyc.name_of_individual
-      } assigned to ${result.modifiedCount} users by ${
-        actor.role || "superadmin"
+      `Bulk IEC assignment: ${ieCodeNo} and Importer ${customerKyc.name_of_individual
+      } assigned to ${result.modifiedCount} users by ${actor.role || "superadmin"
       }`
     );
 

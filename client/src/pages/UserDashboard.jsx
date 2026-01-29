@@ -1470,7 +1470,7 @@ function UserDashboard() {
         <Dialog
           open={jobListDialogOpen}
           onClose={() => setJobListDialogOpen(false)}
-          maxWidth="lg"
+          maxWidth="md"
           fullWidth
           PaperProps={{
             sx: {
@@ -1630,8 +1630,8 @@ function UserDashboard() {
                       sx={{
                         display: "grid",
                         gridTemplateColumns: `100px ${selectedJobList.some((j) => j.importer)
-                            ? "1fr"
-                            : "0px"
+                          ? "1fr"
+                          : "0px"
                           } ${selectedJobList.some((j) => j.shipping_line_airline)
                             ? "150px"
                             : "0px"

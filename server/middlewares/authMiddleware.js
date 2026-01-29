@@ -31,13 +31,13 @@ export const generateToken = (user) => {
       id: user._id,
       ie_code_assignments: !isSuperAdmin
         ? user.ie_code_assignments || [
-            {
-              ie_code_no: user.ie_code_no,
-              importer_name: user.assignedImporterName,
-              assigned_at: user.ieCodeAssignedAt || new Date(),
-              is_primary: true,
-            },
-          ]
+          {
+            ie_code_no: user.ie_code_no,
+            importer_name: user.assignedImporterName,
+            assigned_at: user.ieCodeAssignedAt || new Date(),
+            is_primary: true,
+          },
+        ]
         : undefined,
       primary_ie_code: !isSuperAdmin ? user.ie_code_no : undefined,
       name: user.name,
@@ -148,9 +148,9 @@ export const createSendTokens = (
     ...cookieOptions,
     expires: new Date(
       Date.now() +
-        (process.env.JWT_COOKIE_EXPIRES_IN
-          ? parseInt(process.env.JWT_COOKIE_EXPIRES_IN) * 60 * 60 * 1000
-          : 24 * 60 * 60 * 1000)
+      (process.env.JWT_COOKIE_EXPIRES_IN
+        ? parseInt(process.env.JWT_COOKIE_EXPIRES_IN) * 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000)
     ),
   });
 
@@ -252,11 +252,11 @@ export const authenticate = async (req, res, next) => {
       ie_code_assignments:
         userType !== "superadmin"
           ? user.ie_code_assignments || [
-              {
-                ie_code_no: user.ie_code_no,
-                importer_name: user.assignedImporterName,
-              },
-            ]
+            {
+              ie_code_no: user.ie_code_no,
+              importer_name: user.assignedImporterName,
+            },
+          ]
           : [],
       name: user.name,
       role: userType, // Use the determined userType as role
@@ -331,9 +331,9 @@ export const refreshAccessToken = async (req, res) => {
       ...cookieOptions,
       expires: new Date(
         Date.now() +
-          (process.env.JWT_COOKIE_EXPIRES_IN
-            ? parseInt(process.env.JWT_COOKIE_EXPIRES_IN) * 60 * 60 * 1000
-            : 24 * 60 * 60 * 1000)
+        (process.env.JWT_COOKIE_EXPIRES_IN
+          ? parseInt(process.env.JWT_COOKIE_EXPIRES_IN) * 60 * 60 * 1000
+          : 24 * 60 * 60 * 1000)
       ),
     });
 
@@ -417,13 +417,13 @@ export const sanitizeUserData = (user) => {
       user.ie_code_assignments ||
       (user.ie_code_no
         ? [
-            {
-              ie_code_no: user.ie_code_no,
-              importer_name: user.assignedImporterName,
-              assigned_at: user.ieCodeAssignedAt || new Date(),
-              is_primary: true,
-            },
-          ]
+          {
+            ie_code_no: user.ie_code_no,
+            importer_name: user.assignedImporterName,
+            assigned_at: user.ieCodeAssignedAt || new Date(),
+            is_primary: true,
+          },
+        ]
         : []),
     primary_ie_code: user.ie_code_no, // Primary IE code for compatibility
     ie_code_no: user.ie_code_no, // Keep for backward compatibility
@@ -515,14 +515,36 @@ export const authenticateUser = async (req, res, next) => {
     console.log('Cookies received:', req.cookies);
     console.log('Authorization header:', req.headers.authorization);
     console.log('================================');
-    
+
     // Get token from cookie or Authorization header
-    const token =
-      (req.cookies && req.cookies.access_token) ||           // Standard cookie
-      (req.cookies && req.cookies.user_access_token) ||      // User-specific cookie
-      (req.cookies && req.cookies.customer_admin_access_token) || // Admin cookie
-      (req.headers.authorization && req.headers.authorization.split(" ")[1]) || // Bearer token
-      (req.headers.authorization && req.headers.authorization.replace("Bearer ", "")); // Bearer without space
+    // Get token and determine source
+    let token = null;
+    let isCookieAuth = false;
+
+    if (req.headers.authorization) {
+      if (req.headers.authorization.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      } else {
+        token = req.headers.authorization;
+      }
+    } else if (req.cookies) {
+      token =
+        req.cookies.access_token ||
+        req.cookies.user_access_token ||
+        req.cookies.customer_admin_access_token;
+
+      if (token) isCookieAuth = true;
+    }
+
+    // Security check: If authenticating via cookie, ensure it's an AJAX request
+    // This prevents users from accessing API endpoints directly in browser address bar
+    if (isCookieAuth && req.headers["x-requested-with"] !== "XMLHttpRequest") {
+      console.log('❌ CSSRF Protection: Blocked direct browser navigation to API');
+      return res.status(403).json({
+        success: false,
+        message: "Direct browser access to API is not allowed.",
+      });
+    }
 
     if (!token) {
       console.log('❌ No token found in cookies or headers');
@@ -597,7 +619,7 @@ export const authenticateUser = async (req, res, next) => {
     next();
   } catch (error) {
     console.log('❌ Authentication error:', error.message);
-    
+
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
