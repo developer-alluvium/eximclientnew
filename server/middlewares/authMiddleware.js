@@ -554,11 +554,8 @@ export const authenticateUser = async (req, res, next) => {
       });
     }
 
-    console.log('✅ Token found, length:', token.length);
-
     // Verify token
     const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
-    console.log('✅ Token decoded, user ID:', decoded.id);
 
     // Get user based on type
     let user;

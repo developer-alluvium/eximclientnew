@@ -79,7 +79,7 @@ const eximclientUserSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['super_admin', 'admin' , 'user'],
+      enum: ['super_admin', 'admin', 'user'],
       default: 'user'
     },
     isActive: {
@@ -90,7 +90,7 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    
+
     // AEO Certificate Reminder Settings - MOVED TO MAIN SCHEMA
     aeo_reminder_days: {
       type: Number,
@@ -102,13 +102,13 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
-    
+
     assignedModules: {
       type: [String],
       default: [],
     },
-    columnOrder:{
-      type:[String],
+    columnOrder: {
+      type: [String],
       default: [],
     },
     allowedColumns: {
@@ -214,20 +214,20 @@ const eximclientUserSchema = new mongoose.Schema(
       }
     }],
   },
-  { 
+  {
     timestamps: true,
   }
 );
 
 // Virtual for locked account
-eximclientUserSchema.virtual('isLocked').get(function() {
+eximclientUserSchema.virtual('isLocked').get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 // Hash password before save
 eximclientUserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -244,7 +244,7 @@ eximclientUserSchema.methods.comparePassword = async function (candidatePassword
 };
 
 // Increment login attempts
-eximclientUserSchema.methods.incLoginAttempts = function() {
+eximclientUserSchema.methods.incLoginAttempts = function () {
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({
       $set: {
@@ -255,17 +255,17 @@ eximclientUserSchema.methods.incLoginAttempts = function() {
       }
     });
   }
-  
+
   const updates = { $inc: { loginAttempts: 1 } };
   if (this.loginAttempts + 1 >= 5 && !this.isLocked) {
     updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 };
   }
-  
+
   return this.updateOne(updates);
 };
 
 // Reset login attempts
-eximclientUserSchema.methods.resetLoginAttempts = function() {
+eximclientUserSchema.methods.resetLoginAttempts = function () {
   return this.updateOne({
     $unset: {
       loginAttempts: 1,
@@ -275,7 +275,7 @@ eximclientUserSchema.methods.resetLoginAttempts = function() {
 };
 
 // Generate email verification token
-eximclientUserSchema.methods.generateVerificationToken = function() {
+eximclientUserSchema.methods.generateVerificationToken = function () {
   const token = crypto.randomBytes(32).toString('hex');
   this.emailVerificationToken = token;
   this.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
@@ -283,7 +283,7 @@ eximclientUserSchema.methods.generateVerificationToken = function() {
 };
 
 // Generate password reset token
-eximclientUserSchema.methods.generatePasswordResetToken = function() {
+eximclientUserSchema.methods.generatePasswordResetToken = function () {
   const resetToken = crypto.randomBytes(32).toString('hex');
   this.passwordResetToken = crypto
     .createHash('sha256')
@@ -294,7 +294,6 @@ eximclientUserSchema.methods.generatePasswordResetToken = function() {
 };
 
 // Index for better performance
-eximclientUserSchema.index({ email: 1 });
 eximclientUserSchema.index({ ie_code_no: 1 });
 eximclientUserSchema.index({ adminId: 1 });
 eximclientUserSchema.index({ status: 1 });
