@@ -144,17 +144,17 @@ const Dashboard = () => {
           setSelectedIeCode(response.user.ieCodes[0]);
         }
 
-        if (response.user.ieCodes && response.user.ieCodes.length > 1) {
-          message.success(`Authenticated with ${response.user.ieCodes.length} IE Codes`);
-        } else if (response.user.ieCodeNo) {
-          message.success(`Authenticated with IE Code: ${response.user.ieCodeNo}`);
-        }
+        // if (response.user.ieCodes && response.user.ieCodes.length > 1) {
+        //   message.success(`Authenticated with ${response.user.ieCodes.length} IE Codes`);
+        // } else if (response.user.ieCodeNo) {
+        //   message.success(`Authenticated with IE Code: ${response.user.ieCodeNo}`);
+        // }
       } else {
         message.error("Failed to load user data");
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
-      message.error("Error loading user data");
+      //message.error("Error loading user data");
     }
   };
 
@@ -301,86 +301,86 @@ const Dashboard = () => {
   /* Compact Render Limit Pills */
   const renderLimitPills = () => {
     if (limitsLoading) {
-       return <Spin size="small" />;
+      return <Spin size="small" />;
     }
     if (!limits && filterType) {
-        return <Tag icon={<ExclamationCircleOutlined />} color="warning" style={{ fontSize: '12px' }}>Sync Needed</Tag>;
+      return <Tag icon={<ExclamationCircleOutlined />} color="warning" style={{ fontSize: '12px' }}>Sync Needed</Tag>;
     }
     if (limits) {
-        return (
-            <div className="limit-pills-container compact">
-                <div className="custom-pill pill-assigned compact">
-                    <span className="pill-label">ASSIGNED</span>
-                    <span className="pill-count">{limits.assigned || 0}</span>
-                </div>
-                <div className="custom-pill pill-remaining compact">
-                    <span className="pill-label">REMAINING</span>
-                    <span className="pill-count">{limits.remaining || 0}</span>
-                </div>
-            </div>
-        );
+      return (
+        <div className="limit-pills-container compact">
+          <div className="custom-pill pill-assigned compact">
+            <span className="pill-label">ASSIGNED</span>
+            <span className="pill-count">{limits.assigned || 0}</span>
+          </div>
+          <div className="custom-pill pill-remaining compact">
+            <span className="pill-label">REMAINING</span>
+            <span className="pill-count">{limits.remaining || 0}</span>
+          </div>
+        </div>
+      );
     }
     return null;
   };
 
   /* Compact Pagination */
   const CustomPagination = () => (
-    <div className="custom-pagination-wrapper compact">
-        <div className="pagination-top-row">
-            <span className="pagination-text" style={{ fontSize: '12px' }}>Items/page:</span>
-            <Select 
-                value={itemsPerPage} 
-                onChange={(val) => {
-                    setItemsPerPage(val);
-                    setCurrentPage(1);
-                }}
-                className="pagination-select compact"
-                size="small"
-                dropdownMatchSelectWidth={false}
-                style={{ width: 60, fontSize: '12px' }}
-            >
-                <Option value={20}>20</Option>
-                <Option value={100}>100</Option>
-                <Option value={1000}>1000</Option>
-            </Select>
-            <span className="pagination-text" style={{ fontSize: '12px' }}>
-                 {currentPage}-{Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount}
-            </span>
+    <div className="custom-pagination-wrapper compact" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span className="pagination-text" style={{ fontSize: '12px' }}>Items/page:</span>
+        <Select
+          value={itemsPerPage}
+          onChange={(val) => {
+            setItemsPerPage(val);
+            setCurrentPage(1);
+          }}
+          className="pagination-select compact"
+          size="small"
+          dropdownMatchSelectWidth={false}
+          style={{ width: 60, fontSize: '12px' }}
+        >
+          <Option value={20}>20</Option>
+          <Option value={100}>100</Option>
+          <Option value={1000}>1000</Option>
+        </Select>
+        <span className="pagination-text" style={{ fontSize: '12px' }}>
+          {currentPage}-{Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Button
+          size="small"
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-nav-btn compact"
+          style={{ fontSize: '12px' }}
+        >
+          Prev
+        </Button>
+        <div className="pagination-numbers compact" style={{ display: 'flex' }}>
+          {[...Array(Math.min(5, Math.ceil(totalCount / itemsPerPage) || 1))].map((_, idx) => {
+            const pageNum = idx + 1;
+            return (
+              <button
+                key={pageNum}
+                className={`pagination-number-btn compact ${currentPage === pageNum ? 'active' : ''}`}
+                onClick={() => setCurrentPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
         </div>
-        <div className="pagination-bottom-row">
-            <Button 
-                size="small" 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="pagination-nav-btn compact"
-                style={{ fontSize: '12px' }}
-            >
-                Prev
-            </Button>
-            <div className="pagination-numbers compact">
-                {[...Array(Math.min(5, Math.ceil(totalCount / itemsPerPage) || 1))].map((_, idx) => {
-                   const pageNum = idx + 1;
-                   return (
-                       <button
-                           key={pageNum}
-                           className={`pagination-number-btn compact ${currentPage === pageNum ? 'active' : ''}`}
-                           onClick={() => setCurrentPage(pageNum)}
-                       >
-                           {pageNum}
-                       </button>
-                   );
-                })}
-            </div>
-            <Button 
-                size="small" 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalCount / itemsPerPage) || 1))}
-                disabled={currentPage >= (Math.ceil(totalCount / itemsPerPage) || 1)}
-                className="pagination-nav-btn compact"
-                style={{ fontSize: '12px' }}
-            >
-                Next
-            </Button>
-        </div>
+        <Button
+          size="small"
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(totalCount / itemsPerPage) || 1))}
+          disabled={currentPage >= (Math.ceil(totalCount / itemsPerPage) || 1)}
+          className="pagination-nav-btn compact"
+          style={{ fontSize: '12px' }}
+        >
+          Next
+        </Button>
+      </div>
     </div>
   );
 
@@ -396,8 +396,8 @@ const Dashboard = () => {
             icon={<UnlockOutlined style={{ fontSize: '12px' }} />}
             loading={loadingStates[`unlock_${record.f_asset_id || record.elock_no}`]}
             disabled={
-                !(record.f_asset_id || record.elock_no) ||
-                record.elock_assign_status === "RETURNED"
+              !(record.f_asset_id || record.elock_no) ||
+              record.elock_assign_status === "RETURNED"
             }
             onClick={() => handleUnlockDevice(record.f_asset_id || record.elock_no, record.container_no)}
             style={{ fontSize: '11px', height: '22px', padding: '0 8px' }}
@@ -410,8 +410,8 @@ const Dashboard = () => {
             ghost
             icon={<EnvironmentOutlined style={{ fontSize: '12px' }} />}
             disabled={
-                !(record.f_asset_id || record.elock_no) ||
-                record.elock_assign_status === "RETURNED"
+              !(record.f_asset_id || record.elock_no) ||
+              record.elock_assign_status === "RETURNED"
             }
             onClick={() => handleTrackElock(record.f_asset_id || record.elock_no, record)}
             style={{ fontSize: '11px', height: '22px', padding: '0 8px' }}
@@ -496,7 +496,7 @@ const Dashboard = () => {
           <div style={{ lineHeight: '1.2' }}>
             <Text style={{ fontSize: '12px' }} strong>{formatFieldValue(record.elock_no || record.f_asset_id)}</Text>
             <div>
-               <Tag color={statusColor} style={{ fontSize: '10px', lineHeight: '18px', padding: '0 4px', margin: 0 }}>{formatFieldValue(record.elock_status)}</Tag>
+              <Tag color={statusColor} style={{ fontSize: '10px', lineHeight: '18px', padding: '0 4px', margin: 0 }}>{formatFieldValue(record.elock_status)}</Tag>
             </div>
           </div>
         );
@@ -543,7 +543,7 @@ const Dashboard = () => {
       width: 140,
       ellipsis: true,
       render: text => (
-          <Tooltip title={text}>
+        <Tooltip title={text}>
           <div style={{ fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {formatFieldValue(text)}
           </div>
@@ -557,126 +557,129 @@ const Dashboard = () => {
       {/* Header */}
       <div className="dashboard-header-ant compact">
         <Row align="middle" justify="space-between" gutter={[8, 8]}>
-           <Col>
-              <Space size="small">
-                  <Button icon={<LeftOutlined />} onClick={() => navigate("/")} type="text" size="small" />
-                  <div>
-                      <Title level={5} style={{ margin: 0, fontSize: '16px' }}>E-Lock Tracking</Title>
-                      {userData && (
-                           <div style={{ marginTop: 2 }}>
-                               {userData.ieCodes && userData.ieCodes.length > 1 ? (
-                                   <Select 
-                                     value={selectedIeCode} 
-                                     onChange={(val) => {
-                                         setSelectedIeCode(val);
-                                         setCurrentPage(1);
-                                     }}
-                                     size="small"
-                                     style={{ width: 200 }}
-                                     prefix={<UserOutlined />}
-                                   >
-                                       {userData.ieCodes.map((code, idx) => (
-                                           <Option key={code} value={code}>
-                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                                                   <span>{code}</span>
-                                               </div>
-                                           </Option>
-                                       ))}
-                                   </Select>
-                               ) : (
-                                   <div style={{ fontSize: '12px', color: '#666' }}>
-                                      <UserOutlined style={{ marginRight: 4 }} /> {userData?.ieCodeNo} {userData?.ieCodeAssignments?.[0]?.importer_name}
-                                   </div>
-                               )}
-                           </div>
-                      )}
+          <Col>
+            <Space size="small">
+              <Button icon={<LeftOutlined />} onClick={() => navigate("/")} type="text" size="small" />
+              <div>
+                <Title level={5} style={{ margin: 0, fontSize: '16px' }}>E-Lock Tracking</Title>
+                {userData && (
+                  <div style={{ marginTop: 2 }}>
+                    {userData.ieCodes && userData.ieCodes.length > 1 ? (
+                      <Select
+                        value={selectedIeCode}
+                        onChange={(val) => {
+                          setSelectedIeCode(val);
+                          setCurrentPage(1);
+                        }}
+                        size="small"
+                        style={{ width: 200 }}
+                        prefix={<UserOutlined />}
+                      >
+                        {userData.ieCodes.map((code, idx) => (
+                          <Option key={code} value={code}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                              <span>{code}</span>
+                            </div>
+                          </Option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        <UserOutlined style={{ marginRight: 4 }} /> {userData?.ieCodeNo} {userData?.ieCodeAssignments?.[0]?.importer_name}
+                      </div>
+                    )}
                   </div>
-              </Space>
-           </Col>
-           <Col>
-               <Space size="small">
-                   <Tag icon={serviceStatus?.overall ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />} color={serviceStatus?.overall ? "success" : "error"} style={{ fontSize: '11px', padding: '0 4px' }}>
-                       {serviceStatus?.overall ? "Online" : "Offline"}
-                   </Tag>
-                   <Button size="small" icon={<ReloadOutlined />} onClick={() => { fetchAssignments(); checkServiceStatus(); fetchLimits(); }}>Refresh</Button>
-                   <Button size="small" icon={<SyncOutlined />} onClick={fetchLimits}>Sync</Button>
-               </Space>
-           </Col>
+                )}
+              </div>
+            </Space>
+          </Col>
+          <Col>
+            <Space size="small">
+              <Tag icon={serviceStatus?.overall ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />} color={serviceStatus?.overall ? "success" : "error"} style={{ fontSize: '11px', padding: '0 4px' }}>
+                {serviceStatus?.overall ? "Online" : "Offline"}
+              </Tag>
+              <Button size="small" icon={<ReloadOutlined />} onClick={() => { fetchAssignments(); checkServiceStatus(); fetchLimits(); }}>Refresh</Button>
+              <Button size="small" icon={<SyncOutlined />} onClick={fetchLimits}>Sync</Button>
+            </Space>
+          </Col>
         </Row>
       </div>
 
       <div className="main-content-ant compact" style={{ padding: '16px' }}>
-         <Card bordered={false} className="shadow-box" bodyStyle={{ padding: '12px' }}>
-             
-             {/* Controls Container */}
-             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
-                 
-                 {/* Top Row */}
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap', gap: 12 }}>
-                    
-                    {/* Filters Left */}
-                    <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Input 
-                            placeholder="Search container..." 
-                            prefix={<SearchOutlined />} 
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            allowClear
-                            size="small"
-                            style={{ width: 180, fontSize: '12px' }}
-                        />
-                         <Select 
-                            style={{ width: 110, fontSize: '12px' }} 
-                            placeholder="Status" 
-                            value={statusFilter}
-                            onChange={setStatusFilter}
-                            allowClear
-                            size="small"
-                        >
-                             <Option value="ASSIGNED">Assigned</Option>
-                             <Option value="RETURNED">Returned</Option>
-                             <Option value="UNASSIGNED">Unassigned</Option>
-                        </Select>
-                         <Select 
-                            style={{ width: 110, fontSize: '12px' }}
-                            placeholder="Type" 
-                            value={filterType}
-                            onChange={setFilterType}
-                            allowClear
-                            size="small"
-                        >
-                             <Option value="consignor">Consignor</Option>
-                             <Option value="consignee">Consignee</Option>
-                        </Select>
-                    </div>
+        <Card bordered={false} className="shadow-box" bodyStyle={{ padding: '12px' }}>
 
-                    {/* Pills Right */}
-                    <div style={{ flexShrink: 0 }}>
-                        {renderLimitPills()}
-                    </div>
-                </div>
+          {/* Controls Container */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
 
-                {/* Second Row: Pagination Right */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                     <CustomPagination />
-                </div>
-             </div>
+            {/* Top Row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap', gap: 12 }}>
 
-             <Tabs activeKey={activeTab} onChange={setActiveTab} size="small" tabBarGutter={24}>
-                 <TabPane tab="Container Assignments" key="assignments">
-                     <Table
-                        columns={columns}
-                        dataSource={assignments}
-                        rowKey={record => record.id || record._id}
-                        loading={loading}
-                        pagination={false}
-                        size="small"
-                        scroll={{ x: '100%' }}
-                        style={{ fontSize: '12px' }}
-                     />
-                 </TabPane>
-             </Tabs>
-         </Card>
+              {/* Filters Left */}
+              <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Input
+                  placeholder="Search container..."
+                  prefix={<SearchOutlined />}
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  allowClear
+                  size="small"
+                  style={{ width: 180, fontSize: '12px' }}
+                />
+                <Select
+                  style={{ width: 110, fontSize: '12px' }}
+                  placeholder="Status"
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  allowClear
+                  size="small"
+                >
+                  <Option value="ASSIGNED">Assigned</Option>
+                  <Option value="RETURNED">Returned</Option>
+                  <Option value="UNASSIGNED">Unassigned</Option>
+                </Select>
+                <Select
+                  style={{ width: 110, fontSize: '12px' }}
+                  placeholder="Type"
+                  value={filterType}
+                  onChange={setFilterType}
+                  allowClear
+                  size="small"
+                >
+                  <Option value="consignor">Consignor</Option>
+                  <Option value="consignee">Consignee</Option>
+                </Select>
+              </div>
+
+              {/* Pills Right */}
+              <div style={{ flexShrink: 0 }}>
+                {renderLimitPills()}
+              </div>
+            </div>
+
+            {/* Second Row: Pagination Right - MOVED TO TABS */}
+          </div>
+
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            size="small"
+            tabBarGutter={24}
+            tabBarExtraContent={<CustomPagination />}
+          >
+            <TabPane tab="Container Assignments" key="assignments">
+              <Table
+                columns={columns}
+                dataSource={assignments}
+                rowKey={record => record.id || record._id}
+                loading={loading}
+                pagination={false}
+                size="small"
+                scroll={{ x: '100%' }}
+                style={{ fontSize: '12px' }}
+              />
+            </TabPane>
+          </Tabs>
+        </Card>
       </div>
 
       {showTrackingMap && (

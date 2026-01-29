@@ -232,18 +232,12 @@ const MainLayout = ({ children }) => {
           alignItems: "center",
           overflow: "hidden",
           position: "sticky",
-          top: 0, // Keeps it visible if we wanted sticky, but header is separate.
-          // Note: Header above is distinct. If we want this sticky under header, we'd need more structure. 
-          // For now, it flows naturally.
+          top: 0,
+
         }}
       >
         <div className="marquee-container" style={{ width: "100%", overflow: "hidden" }}>
-          {/* Using a simple CSS animation inline or standard marquee tag if supported. 
-               React doesn't like <marquee> tag but browsers still support it. 
-               For reliability/modernity, let's use a CSS keyframe approach if we had a stylesheet.
-               Since we are in a single file component without external CSS easily modifiable right now, 
-               I'll use a style block for the keyframes.
-           */}
+
           <style>
             {`
               @keyframes marquee {
@@ -260,11 +254,11 @@ const MainLayout = ({ children }) => {
               }
             `}
           </style>
-          <div className="marquee-content">
+          {/* <div className="marquee-content">
             📢 Please note: Custom operations will remain closed on 26th
             January. Since 24th and 25th are Saturday and Sunday, kindly
             complete all pending work by 23rd January.
-          </div>
+          </div> */}
         </div>
       </div>
 

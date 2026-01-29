@@ -42,8 +42,11 @@ const ElockManagement = () => {
         page: currentPage,
         limit: itemsPerPage,
         search: searchTerm,
-        status: statusFilter,
       };
+
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
 
       const response = await apiService.getElockDetails(params);
 
@@ -275,7 +278,7 @@ const ElockManagement = () => {
               value={statusFilter}
               onChange={handleStatusFilterChange}
             >
-              <option value="">All Status</option>
+              <option value="All Status">All Status</option>
               <option value="ASSIGNED">Assigned</option>
               <option value="UNASSIGNED">Unassigned</option>
               <option value="RETURNED">Returned</option>

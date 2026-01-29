@@ -52,11 +52,11 @@ import { useSuperAdminApi } from '../../hooks/useSuperAdminApi';
 
 const ModernCustomerManagement = ({ onRefresh }) => {
   const navigate = useNavigate();
-  
+
   // Use custom hook instead of service
-  const { 
-    loading, 
-    error, 
+  const {
+    loading,
+    error,
     setError,
     getCustomers,
     updateCustomerPassword,
@@ -112,27 +112,27 @@ const ModernCustomerManagement = ({ onRefresh }) => {
 
   const filterCustomers = () => {
     let filtered = [];
-    
+
     // Get the appropriate dataset based on view mode and active tab
     switch (viewMode) {
       case 'manage':
         // Combine registered and inactive customers for comprehensive management view
         const registeredCustomers = allCustomerData.registered || [];
         const inactiveCustomers = allCustomerData.inactive || [];
-        
+
         // Merge both datasets
         filtered = [...registeredCustomers, ...inactiveCustomers];
-        
+
         // Filter by tab 
         if (activeTab === 0) {
           // Tab 0: "Registered Customers" - Show all records from customer collection
-          filtered = filtered.filter(customer => 
+          filtered = filtered.filter(customer =>
             customer.status === 'registered'
           );
         } else {
           // Tab 1: "Unregistered Customers" - Show records from customerKyc that aren't in customer collection
           // These are the 'inactive' and 'pending' status customers
-          filtered = filtered.filter(customer => 
+          filtered = filtered.filter(customer =>
             customer.status === 'inactive' || customer.status === 'pending'
           );
         }
@@ -146,7 +146,7 @@ const ModernCustomerManagement = ({ onRefresh }) => {
       default:
         filtered = allCustomerData.registered || [];
     }
-    
+
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(customer =>
@@ -155,7 +155,7 @@ const ModernCustomerManagement = ({ onRefresh }) => {
         customer.pan_number?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     // Filter by KYC approval status (only applies to unregistered customers)
     if (activeTab === 1 && approvalFilter !== 'all') {
       filtered = filtered.filter(customer => {
@@ -169,7 +169,7 @@ const ModernCustomerManagement = ({ onRefresh }) => {
         return true;
       });
     }
-    
+
     setFilteredCustomers(filtered);
   };
 
@@ -188,10 +188,10 @@ const ModernCustomerManagement = ({ onRefresh }) => {
     try {
       setIsSubmitting(true);
       await updateCustomerPassword(selectedCustomer._id, newPassword);
-      setNotification({ 
-        open: true, 
-        message: 'Password updated successfully!', 
-        type: 'success' 
+      setNotification({
+        open: true,
+        message: 'Password updated successfully!',
+        type: 'success'
       });
       setShowPasswordDialog(false);
       setNewPassword('');
@@ -237,16 +237,16 @@ const ModernCustomerManagement = ({ onRefresh }) => {
   const handleCopy = async (text, type) => {
     try {
       await navigator.clipboard.writeText(text);
-      setNotification({ 
-        open: true, 
-        message: `${type} copied to clipboard!`, 
-        type: 'success' 
+      setNotification({
+        open: true,
+        message: `${type} copied to clipboard!`,
+        type: 'success'
       });
     } catch (error) {
-      setNotification({ 
-        open: true, 
-        message: `Failed to copy ${type.toLowerCase()}`, 
-        type: 'error' 
+      setNotification({
+        open: true,
+        message: `Failed to copy ${type.toLowerCase()}`,
+        type: 'error'
       });
     }
   };
@@ -351,8 +351,8 @@ const ModernCustomerManagement = ({ onRefresh }) => {
   ];
 
   return (
-    <Box sx={{ 
-      width: '100%', 
+    <Box sx={{
+      width: '100%',
       maxWidth: '100%',
       height: '100%',
       overflow: 'visible',
@@ -383,7 +383,7 @@ const ModernCustomerManagement = ({ onRefresh }) => {
               Manage customer accounts, passwords, and module access
             </Typography>
           </Box>
-          
+
           <Box sx={{ display: 'flex', gap: 1 }}>
             <ModernButton
               variant="outlined"
@@ -454,8 +454,8 @@ const ModernCustomerManagement = ({ onRefresh }) => {
         {/* Filters and Search */}
         <Box sx={{ p: 3, borderBottom: '1px solid #F3F4F6' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Tabs 
-              value={activeTab} 
+            <Tabs
+              value={activeTab}
               onChange={(e, newValue) => setActiveTab(newValue)}
               sx={{
                 '& .MuiTab-root': {
@@ -523,14 +523,14 @@ const ModernCustomerManagement = ({ onRefresh }) => {
 
       {/* Error Display */}
       {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
+        <Alert
+          severity="error"
+          sx={{
             mt: 2,
             borderRadius: 2,
             border: '1px solid #FEE2E2',
             backgroundColor: '#FEF2F2',
-          }} 
+          }}
           onClose={() => setError(null)}
         >
           {error}
@@ -538,8 +538,8 @@ const ModernCustomerManagement = ({ onRefresh }) => {
       )}
 
       {/* Password Change Dialog */}
-      <Dialog 
-        open={showPasswordDialog} 
+      <Dialog
+        open={showPasswordDialog}
         onClose={() => setShowPasswordDialog(false)}
         maxWidth="sm"
         fullWidth

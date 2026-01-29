@@ -11,12 +11,6 @@ export const assignAdditionalIeCode = async (req, res) => {
     const { userId } = req.params;
     const { ieCodes, reason } = req.body;
 
-    console.log("Authenticated user (superadmin):", {
-      id: req.user._id,
-      role: req.user.role,
-      name: req.user.name,
-    });
-    console.log("Looking for target user with ID:", userId);
 
     const user = await EximclientUser.findById(userId);
     console.log(

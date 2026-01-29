@@ -1581,10 +1581,10 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                       >
                         {availableModules.length > 0
                           ? Math.round(
-                              (assignedModules.length /
-                                availableModules.length) *
-                                100
-                            )
+                            (assignedModules.length /
+                              availableModules.length) *
+                            100
+                          )
                           : 0}
                         %
                       </Typography>
@@ -1728,9 +1728,9 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                   >
                     {availableColumns.length > 0
                       ? Math.round(
-                          (columnPermissions.length / availableColumns.length) *
-                            100
-                        )
+                        (columnPermissions.length / availableColumns.length) *
+                        100
+                      )
                       : 0}
                     %
                   </Typography>
