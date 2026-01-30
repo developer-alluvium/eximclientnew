@@ -15,6 +15,8 @@ axios.interceptors.request.use(
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Add custom header to identify AJAX requests and prevent direct browser access
+    config.headers["X-Requested-With"] = "XMLHttpRequest";
     return config;
   },
   (error) => Promise.reject(error),

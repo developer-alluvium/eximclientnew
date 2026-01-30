@@ -485,9 +485,20 @@ export const logoutUser = async (req, res) => {
       await user.save();
     }
 
-    // Clear cookies
-    res.clearCookie("user_access_token");
-    res.clearCookie("user_refresh_token");
+    // Clear cookies (Hard clear all variants)
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.COOKIE_SAMESITE || "None",
+      path: "/",
+    };
+
+    res.clearCookie("access_token", cookieOptions);
+    res.clearCookie("refresh_token", cookieOptions);
+    res.clearCookie("user_access_token", cookieOptions);
+    res.clearCookie("user_refresh_token", cookieOptions);
+    res.clearCookie("customer_admin_access_token", cookieOptions);
+    res.clearCookie("customer_admin_refresh_token", cookieOptions);
 
     res.json({
       success: true,

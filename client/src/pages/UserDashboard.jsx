@@ -1427,7 +1427,7 @@ function UserDashboard() {
         <Dialog
           open={jobListDialogOpen}
           onClose={() => setJobListDialogOpen(false)}
-          maxWidth="lg"
+          maxWidth="md"
           fullWidth
           PaperProps={{
             sx: {

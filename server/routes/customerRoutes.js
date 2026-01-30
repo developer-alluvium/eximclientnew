@@ -19,7 +19,7 @@ import {
   // generateSSOToken,
 } from "../controllers/customerController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
-import { authenticate } from "../middlewares/authMiddleware.js";
+import { authenticateUser } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -27,8 +27,8 @@ const router = express.Router();
 router.post("/api/login", login);
 router.post("/api/forgot-password", forgotPassword);
 router.post("/api/logout", logout);
-router.post("/api/column-order", postColumnOrder);
-router.get("/api/column-order", getColumnOrder);
+router.post("/api/column-order", authenticateUser, postColumnOrder);
+router.get("/api/column-order", authenticateUser, getColumnOrder);
 
 // SuperAdmin protected customer management routes
 // SSO token generation for E-Lock redirection

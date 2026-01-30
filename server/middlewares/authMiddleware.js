@@ -517,14 +517,40 @@ export const generateUserToken = (user, userType = "user") => {
  */
 export const authenticateUser = async (req, res, next) => {
   try {
+    console.log('========== AUTH DEBUG ==========');
+    console.log('Cookies received:', req.cookies);
+    console.log('Authorization header:', req.headers.authorization);
+    console.log('================================');
 
     // Get token from cookie or Authorization header
-    const token =
-      (req.cookies && req.cookies.access_token) ||           // Standard cookie
-      (req.cookies && req.cookies.user_access_token) ||      // User-specific cookie
-      (req.cookies && req.cookies.customer_admin_access_token) || // Admin cookie
-      (req.headers.authorization && req.headers.authorization.split(" ")[1]) || // Bearer token
-      (req.headers.authorization && req.headers.authorization.replace("Bearer ", "")); // Bearer without space
+    // Get token and determine source
+    let token = null;
+    let isCookieAuth = false;
+
+    if (req.headers.authorization) {
+      if (req.headers.authorization.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      } else {
+        token = req.headers.authorization;
+      }
+    } else if (req.cookies) {
+      token =
+        req.cookies.access_token ||
+        req.cookies.user_access_token ||
+        req.cookies.customer_admin_access_token;
+
+      if (token) isCookieAuth = true;
+    }
+
+    // Security check: If authenticating via cookie, ensure it's an AJAX request
+    // This prevents users from accessing API endpoints directly in browser address bar
+    if (isCookieAuth && req.headers["x-requested-with"] !== "XMLHttpRequest") {
+      console.log('❌ CSSRF Protection: Blocked direct browser navigation to API');
+      return res.status(403).json({
+        success: false,
+        message: "Direct browser access to API is not allowed.",
+      });
+    }
 
     if (!token) {
       console.log('❌ No token found in cookies or headers');
