@@ -52,7 +52,8 @@ const FloatingChatBot = () => {
             const response = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:9003"}/api/ai/chat`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
                 },
                 credentials: "include", // Send cookies for authentication
                 body: JSON.stringify({

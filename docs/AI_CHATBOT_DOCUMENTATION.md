@@ -6,61 +6,46 @@ Built an **AI-powered conversational assistant** for a logistics/shipping manage
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture (V2 - Intelligent Hybrid)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         FRONTEND                                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              FloatingChatBot.jsx                         │   │
-│  │   • Floating chat UI (Ant Design Drawer)                 │   │
-│  │   • Real-time message rendering with ReactMarkdown       │   │
-│  │   • Cookie-based authentication (credentials: include)   │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│  (React + Ant Design Chat Interface)                            │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼ HTTP POST /api/ai/chat
+                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                         BACKEND                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              Authentication Layer                        │   │
-│  │   • JWT token validation from HTTP-only cookies          │   │
-│  │   • User context extraction (ie_code_assignments)        │   │
-│  │   • Role-based access (user vs superadmin)               │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              AI Controller (Hybrid Approach)             │   │
-│  │                                                          │   │
-│  │   ┌────────────────┐    ┌────────────────┐              │   │
-│  │   │ Counting Query │    │ Search Query   │              │   │
-│  │   │ Detection      │    │ Detection      │              │   │
-│  │   └───────┬────────┘    └───────┬────────┘              │   │
-│  │           │                     │                        │   │
-│  │           ▼                     ▼                        │   │
-│  │   ┌────────────────┐    ┌────────────────┐              │   │
-│  │   │   MongoDB      │    │   Weaviate     │              │   │
-│  │   │   Aggregation  │    │   BM25 Search  │              │   │
-│  │   └───────┬────────┘    └───────┬────────┘              │   │
-│  │           └──────────┬──────────┘                        │   │
-│  │                      ▼                                   │   │
-│  │           ┌────────────────────┐                        │   │
-│  │           │   Claude 3 Haiku   │                        │   │
-│  │           │   (Anthropic LLM)  │                        │   │
-│  │           └────────────────────┘                        │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  1. AUTHENTICATION & CONTEXT                                    │
+│     • Validate JWT from Cookie                                  │
+│     • Extract Allowed Importers (Data Isolation)                │
+│                                                                 │
+│  2. QUERY PARSER (Claude 3 Haiku)                               │
+│     • Input: "How many pending jobs for Alluvium?"              │
+│     • Output (JSON):                                            │
+│       {                                                         │
+│         "intent": "count",                                      │
+│         "filters": { "status": "pending", "importer": "Allur" },│
+│         "reasoning": "User wants statistics..."                 │
+│       }                                                         │
+│                                                                 │
+│  3. EXECUTION ENGINE (Router)                                   │
+│                                                                 │
+│     [Intent: COUNT] ──────────────┐                             │
+│     │                             │                             │
+│     ▼                             ▼ [Intent: SEARCH]            │
+│  MongoDB Aggregation           Hybrid Search (Weaviate)         │
+│  (100% Accuracy)               (BM25 + Vector Embeddings)       │
+│     │                             │                             │
+│     └──────────────┬──────────────┘                             │
+│                    │                                            │
+│  4. RESPONSE GENERATION                                         │
+│     • Combine Data + User Context + Reasoning                   │
+│     • Claude generates natural language answer                  │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-┌──────────────────────┐       ┌──────────────────────┐
-│       MongoDB        │       │       Weaviate       │
-│  (Primary Database)  │       │   (Vector Database)  │
-│  • Job Documents     │       │   • Text Embeddings  │
-│  • User Data         │       │   • BM25 Index       │
-│  • Aggregations      │       │   • Metadata Store   │
-└──────────────────────┘       └──────────────────────┘
 ```
 
 ---

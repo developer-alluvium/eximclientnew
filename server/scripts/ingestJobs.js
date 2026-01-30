@@ -44,13 +44,27 @@ const createSchema = async () => {
     console.log("[Ingest] Creating JobContext class...");
     await client.schema.classCreator().withClass({
         class: "JobContext",
-        vectorizer: "none", // No vectorizer - we'll use BM25 search
+        vectorizer: "text2vec-transformers", // Use local transformer model
+        moduleConfig: {
+            "text2vec-transformers": {
+                vectorizeClassName: false
+            }
+        },
         properties: [
-            { name: "text", dataType: ["text"] },
-            { name: "job_no", dataType: ["text"] },
-            { name: "year", dataType: ["text"] },
-            { name: "importer", dataType: ["text"] },
-            { name: "status", dataType: ["text"] },
+            {
+                name: "text",
+                dataType: ["text"],
+                moduleConfig: {
+                    "text2vec-transformers": {
+                        skip: false,
+                        vectorizePropertyName: false
+                    }
+                }
+            },
+            { name: "job_no", dataType: ["text"], moduleConfig: { "text2vec-transformers": { skip: true } } },
+            { name: "year", dataType: ["text"], moduleConfig: { "text2vec-transformers": { skip: true } } },
+            { name: "importer", dataType: ["text"], moduleConfig: { "text2vec-transformers": { skip: true } } },
+            { name: "status", dataType: ["text"], moduleConfig: { "text2vec-transformers": { skip: true } } },
         ]
     }).do();
 

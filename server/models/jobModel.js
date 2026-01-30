@@ -63,23 +63,23 @@ const jobSchema = new mongoose.Schema({
     },
   ],
   net_weight_calculator: {
-  shipping: { type: String, trim: true, default: "0.00" },
-  custom_clearance_charges: { type: String, trim: true, default: "0.00" },
-  detention: { type: String, trim: true, default: "0.00" },
-  cfs: { type: String, trim: true, default: "0.00" },
-  transport: { type: String, trim: true, default: "0.00" },
-  Labour: { type: String, trim: true, default: "0.00" },
-  weight: { type: String, trim: true, default: "0.00" },
-  total_cost: { type: String, trim: true, default: "0.00" },
-  per_kg_cost: { type: String, trim: true, default: "0.00" },
-  custom_fields: [
-    {
-      id: { type: String, required: true },
-      name: { type: String, required: true },
-      value: { type: String, default: "0.00" }
-    }
-  ]
-},
+    shipping: { type: String, trim: true, default: "0.00" },
+    custom_clearance_charges: { type: String, trim: true, default: "0.00" },
+    detention: { type: String, trim: true, default: "0.00" },
+    cfs: { type: String, trim: true, default: "0.00" },
+    transport: { type: String, trim: true, default: "0.00" },
+    Labour: { type: String, trim: true, default: "0.00" },
+    weight: { type: String, trim: true, default: "0.00" },
+    total_cost: { type: String, trim: true, default: "0.00" },
+    per_kg_cost: { type: String, trim: true, default: "0.00" },
+    custom_fields: [
+      {
+        id: { type: String, required: true },
+        name: { type: String, required: true },
+        value: { type: String, default: "0.00" }
+      }
+    ]
+  },
   ////////////////////////////////////////////////// Excel sheet
   year: { type: String, trim: true },
   job_no: { type: String, trim: true },
@@ -155,16 +155,16 @@ const jobSchema = new mongoose.Schema({
       do_validity_upto_container_level: { type: String, trim: true },
       required_do_validity_upto: { type: String, trim: true },
       seal_number: { type: String, trim: true },
-      container_rail_out_date: {type: String, trim: true},
+      container_rail_out_date: { type: String, trim: true },
       by_road_movement_date: { type: String, trim: true },
       emptyContainerOffLoadDate: { type: String, trim: true },
-       net_weight_as_per_PL_document: { type: String, trim: true },
-       delivery_chalan_file: { type: String, trim: true },
+      net_weight_as_per_PL_document: { type: String, trim: true },
+      delivery_chalan_file: { type: String, trim: true },
       delivery_date: {
         type: String,
         trim: true,
       },
-        
+
       do_revalidation: [
         {
           do_revalidation_upto: { type: String },
@@ -376,47 +376,47 @@ const jobSchema = new mongoose.Schema({
   /////////////////////////////////// Do Charges Details
 
   do_shipping_line_invoice: [{
-  document_name: { type: String, trim: true },
-  url: [{ type: String, trim: true }],
-  is_draft: { type: Boolean },
-  is_final: { type: Boolean },
-  document_check_date: { type: String, trim: true }, // This will store ISO string when checked
-  document_check_status: { type: Boolean, default: false }, // New field to track if document is checked
-  payment_mode: { type: String, trim: true }, // Odex or Wire Transfer
-  wire_transfer_method: { type: String, trim: true }, // RTGS, NEFT, IMPS (new field)
-  document_amount_details: { type: String, trim: true },
-  payment_request_date: { type: String, trim: true },
-  payment_made_date: { type: String, trim: true },
-  is_tds: { type: Boolean, default: false },
-  is_payment_made: { type: Boolean, default: false },
-  is_payment_requested: { type: Boolean, default: false },
-  is_non_tds: { type: Boolean, default: false },
-  payment_recipt: [{ type: String, trim: true }],
-  payment_recipt_date: { type: String, trim: true },
-}],
+    document_name: { type: String, trim: true },
+    url: [{ type: String, trim: true }],
+    is_draft: { type: Boolean },
+    is_final: { type: Boolean },
+    document_check_date: { type: String, trim: true }, // This will store ISO string when checked
+    document_check_status: { type: Boolean, default: false }, // New field to track if document is checked
+    payment_mode: { type: String, trim: true }, // Odex or Wire Transfer
+    wire_transfer_method: { type: String, trim: true }, // RTGS, NEFT, IMPS (new field)
+    document_amount_details: { type: String, trim: true },
+    payment_request_date: { type: String, trim: true },
+    payment_made_date: { type: String, trim: true },
+    is_tds: { type: Boolean, default: false },
+    is_payment_made: { type: Boolean, default: false },
+    is_payment_requested: { type: Boolean, default: false },
+    is_non_tds: { type: Boolean, default: false },
+    payment_recipt: [{ type: String, trim: true }],
+    payment_recipt_date: { type: String, trim: true },
+  }],
 
-insurance_copy: [{
-  document_name: { type: String, trim: true },
-  url: [{ type: String, trim: true }],
-  document_check_date: { type: String, trim: true },
-  document_amount_details: { type: String, trim: true },
-}],
+  insurance_copy: [{
+    document_name: { type: String, trim: true },
+    url: [{ type: String, trim: true }],
+    document_check_date: { type: String, trim: true },
+    document_amount_details: { type: String, trim: true },
+  }],
 
-other_do_documents:[ {
-  document_name: { type: String, trim: true },
-  url: [{ type: String, trim: true }],
-  document_check_date: { type: String, trim: true },
-  document_amount_details: { type: String, trim: true },
-}],
+  other_do_documents: [{
+    document_name: { type: String, trim: true },
+    url: [{ type: String, trim: true }],
+    document_check_date: { type: String, trim: true },
+    document_amount_details: { type: String, trim: true },
+  }],
 
-security_deposit: [{
-  document_name: { type: String, trim: true },
-  url: [{ type: String, trim: true }],
-  document_check_date: { type: String, trim: true },
-  document_amount_details: { type: String, trim: true },
-  utr: { type: Number, trim: true },
-  Validity_upto: { type: String, trim: true },
-}],
+  security_deposit: [{
+    document_name: { type: String, trim: true },
+    url: [{ type: String, trim: true }],
+    document_check_date: { type: String, trim: true },
+    document_amount_details: { type: String, trim: true },
+    utr: { type: Number, trim: true },
+    Validity_upto: { type: String, trim: true },
+  }],
 
   ////////////////////////////////////////////////////// Submission
   checklist_verified_on: { type: String },
@@ -437,24 +437,45 @@ security_deposit: [{
 // Automatically update `updatedAt` and calculate per_kg_cost before saving
 jobSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
-  
+
   // Auto-calculate per_kg_cost if duty and weight are available
   const dutyAmount = parseFloat(this.total_duty) || 0;
   const netWeight = parseFloat(this.job_net_weight) || 0;
-  
+
   if (dutyAmount > 0 && netWeight > 0) {
     const perKgCost = (dutyAmount / netWeight).toFixed(2);
-    
+
     // Initialize net_weight_calculator if it doesn't exist
     if (!this.net_weight_calculator) {
       this.net_weight_calculator = {};
     }
-    
+
     // Update per_kg_cost
     this.net_weight_calculator.per_kg_cost = perKgCost.toString();
   }
-  
+
   next();
+});
+
+// AI Real-time Sync Hooks
+jobSchema.post("save", async function (doc) {
+  try {
+    const { syncJobToWeaviate } = await import("../services/aiSyncService.js");
+    await syncJobToWeaviate(doc);
+  } catch (error) {
+    console.error("AI Sync Error (save):", error);
+  }
+});
+
+jobSchema.post("findOneAndUpdate", async function (doc) {
+  if (doc) {
+    try {
+      const { syncJobToWeaviate } = await import("../services/aiSyncService.js");
+      await syncJobToWeaviate(doc);
+    } catch (error) {
+      console.error("AI Sync Error (update):", error);
+    }
+  }
 });
 
 jobSchema.index({ importerURL: 1, year: 1, status: 1 });
