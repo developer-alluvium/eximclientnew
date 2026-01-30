@@ -1,12 +1,19 @@
+version: '3.4'
 services:
-  server:
-    container_name: customer
-    build: . # Build using the Dockerfile in the current directory
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.24.1
+    restart: on-failure:0
     ports:
-      - "9003:9003"
-    volumes:
-      - .:/server # Mount the current directory (where docker-compose.yml is) to /server
-      - /server/node_modules # Prevent overwriting node_modules
+      - "8080:8080"
+      - "50051:50051"
     environment:
-      - NODE_ENV=development
-    command: ["npm", "run", "start"]
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+volumes:
+  weaviate_data:

@@ -14,6 +14,7 @@ import ColumnPermissionsManagement from "./ColumnPermissionsManagement";
 import { modernTheme } from "../../styles/modernTheme";
 import ModernSidebar from "./ModernSidebar";
 import LoadingScreen from "../LoadingScreen.jsx";
+import AICosting from "./AICosting";
 
 const SuperAdminDashboard = () => {
   // Get context data from the layout
@@ -45,6 +46,7 @@ const SuperAdminDashboard = () => {
       component: "admin",
     },
     { label: "Module Management", icon: "settings", component: "modules" },
+    { label: "AI Costing", icon: "monetization_on", component: "aicosting" },
     // { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
     // { label: 'System Analytics', icon: 'analytics', component: 'analytics' },
     // { label: 'User Activity', icon: 'timeline', component: 'activity' },
@@ -74,6 +76,8 @@ const SuperAdminDashboard = () => {
         return <AdminManagement onRefresh={fetchDashboardData} />;
       case "modules":
         return <ModuleManagement onRefresh={fetchDashboardData} />;
+      case "aicosting":
+        return <AICosting />;
       case "columns":
         return <ColumnPermissionsManagement onRefresh={fetchDashboardData} />;
       case "analytics":

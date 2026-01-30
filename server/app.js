@@ -131,6 +131,8 @@ app.use(analytics);
 
 app.use("/api/elock", elockRoutes);
 app.use("/api/elock-details", elockDetailsRoutes);
+import aiRoutes from "./routes/aiRoutes.js";
+app.use("/api/ai", aiRoutes);
 
 // Root route
 app.get("/", (req, res) => {

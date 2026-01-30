@@ -53,6 +53,9 @@ import {
   ExpandMore,
   AccountBox,
 } from "@mui/icons-material";
+// import ActivityLog from "./ActivityLog";
+// import AICosting from "./AICosting";
+// import "./AdminManagement.css";
 import axios from "axios";
 import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
 import { Autocomplete } from "@mui/material";
@@ -193,9 +196,8 @@ const AdminManagement = ({ onRefresh }) => {
 
         // Pre-populate user search options
         const userOptions = usersData.map((user) => ({
-          label: `${user.name} - ${user.email}${
-            user.ie_code_no ? ` (${user.ie_code_no})` : ""
-          }`,
+          label: `${user.name} - ${user.email}${user.ie_code_no ? ` (${user.ie_code_no})` : ""
+            }`,
           value: user._id,
           user: user,
         }));
@@ -243,8 +245,7 @@ const AdminManagement = ({ onRefresh }) => {
       };
 
       const response = await axios.get(
-        `${
-          process.env.REACT_APP_API_STRING
+        `${process.env.REACT_APP_API_STRING
         }/superadmin/available-iec-codes?search=${encodeURIComponent(
           searchTerm
         )}`,
@@ -314,8 +315,7 @@ const AdminManagement = ({ onRefresh }) => {
         const action = isRemovingIeCode ? "removed" : "assigned";
         const ieCodesStr = selectedIeCodes.join(", ");
         setSuccess(
-          `Successfully ${action} IE Code(s) ${ieCodesStr} ${
-            isRemovingIeCode ? "from" : "to"
+          `Successfully ${action} IE Code(s) ${ieCodesStr} ${isRemovingIeCode ? "from" : "to"
           } ${selectedEntity.name}`
         );
         fetchData();
@@ -487,8 +487,7 @@ const AdminManagement = ({ onRefresh }) => {
 
       if (response.data.success) {
         setSuccess(
-          `Successfully ${newStatus ? "activated" : "deactivated"} user ${
-            user.name
+          `Successfully ${newStatus ? "activated" : "deactivated"} user ${user.name
           }`
         );
         fetchData();
@@ -721,9 +720,8 @@ const AdminManagement = ({ onRefresh }) => {
 
     const searchTerm = userSearch.value.toLowerCase();
     return users.filter((user) => {
-      const userLabel = `${user.name} - ${user.email}${
-        user.ie_code_no ? ` (${user.ie_code_no})` : ""
-      }`.toLowerCase();
+      const userLabel = `${user.name} - ${user.email}${user.ie_code_no ? ` (${user.ie_code_no})` : ""
+        }`.toLowerCase();
 
       return (
         user.name?.toLowerCase().includes(searchTerm) ||
@@ -1068,7 +1066,7 @@ const AdminManagement = ({ onRefresh }) => {
                     <TableCell>
                       <Box sx={{ maxWidth: 250 }}>
                         {user.ie_code_assignments &&
-                        user.ie_code_assignments.length > 0 ? (
+                          user.ie_code_assignments.length > 0 ? (
                           <Box
                             sx={{
                               display: "flex",
@@ -1121,7 +1119,7 @@ const AdminManagement = ({ onRefresh }) => {
                     <TableCell>
                       <Box sx={{ maxWidth: 200 }}>
                         {user.ie_code_assignments &&
-                        user.ie_code_assignments.length > 0 ? (
+                          user.ie_code_assignments.length > 0 ? (
                           <Box
                             sx={{
                               display: "flex",
@@ -1177,7 +1175,7 @@ const AdminManagement = ({ onRefresh }) => {
                         }}
                       >
                         {user.assignedModules &&
-                        user.assignedModules.length > 0 ? (
+                          user.assignedModules.length > 0 ? (
                           user.assignedModules.slice(0, 3).map((moduleId) => {
                             const module = AVAILABLE_MODULES.find(
                               (m) => m.id === moduleId
@@ -1229,9 +1227,8 @@ const AdminManagement = ({ onRefresh }) => {
                           variant="outlined"
                         />
                         <Chip
-                          label={`Gandhidham: ${
-                            user.gandhidhamTabVisible ? "On" : "Off"
-                          }`}
+                          label={`Gandhidham: ${user.gandhidhamTabVisible ? "On" : "Off"
+                            }`}
                           color={
                             user.gandhidhamTabVisible ? "success" : "default"
                           }
@@ -1420,13 +1417,11 @@ const AdminManagement = ({ onRefresh }) => {
             }
           >
             {adminAction === "promote"
-              ? `Promote${
-                  selectedIeCodes.length > 0
-                    ? ` with ${selectedIeCodes.length} IE Code${
-                        selectedIeCodes.length > 1 ? "s" : ""
-                      }`
-                    : ""
+              ? `Promote${selectedIeCodes.length > 0
+                ? ` with ${selectedIeCodes.length} IE Code${selectedIeCodes.length > 1 ? "s" : ""
                 }`
+                : ""
+              }`
               : "Revoke"}
           </Button>
         </DialogActions>

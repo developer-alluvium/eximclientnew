@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Layout, Avatar, Tooltip, Space, Typography, Divider } from "antd";
+import { Layout, Menu, Button, Avatar, Dropdown, notification, Badge, Typography, Tooltip, Space, Divider } from "antd";
+import FloatingChatBot from "../components/Chat/FloatingChatBot";
 import {
   UserOutlined,
   LogoutOutlined,
@@ -243,6 +244,7 @@ const MainLayout = ({ children }) => {
           {children}
         </div>
       </Content>
+      <FloatingChatBot />
     </Layout>
   );
 };
