@@ -9,9 +9,7 @@ const STATS_TTL = 300; // 5 minutes
 
 // Cached model
 let model = null;
-// ... (rest of getModel)
 
-// ... (parseQuery is unchanged)
 
 // MongoDB Aggregation (for "count" intent)
 const getModel = () => {
