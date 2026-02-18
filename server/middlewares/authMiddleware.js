@@ -571,6 +571,11 @@ export const authenticateUser = async (req, res, next) => {
           "adminId",
           "name email ie_code_no"
         );
+
+        if (!user) {
+          // Fallback to CustomerModel for legacy users
+          user = await CustomerModel.findById(decoded.id);
+        }
         break;
       case "admin":
         user = await AdminModel.findById(decoded.id);

@@ -31,7 +31,7 @@ const SuperAdminLayout = () => {
   // Tab configuration
   const tabs = [
     { label: "Overview", icon: "dashboard", component: "overview" },
-    { label: "Customer Management", icon: "people", component: "customers" },
+  
     { label: "Module Management", icon: "settings", component: "modules" },
     // { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
     // { label: 'System Analytics', icon: 'analytics', component: 'analytics' },

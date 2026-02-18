@@ -18,7 +18,7 @@ import userRoutes from "./routes/userRoutes.js";
 import userProfileRoutes from "./routes/userProfileRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import customerAdminRoutes from "./routes/customerAdminRoutes.js";
+
 import userManagementRoutes from "./routes/userManagementRoutes.js";
 import superAdminIeCodeRoutes from "./routes/superAdminIeCodeRoutes.js";
 import aeoIntegrationRoutes from "./routes/aeoIntegrationRoutes.js";
@@ -120,7 +120,7 @@ app.use(userProfileRoutes);
 app.use(uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/customer-admin", customerAdminRoutes);
+
 app.use("/api/user-management", userManagementRoutes);
 app.use("/api/superadmin", superAdminIeCodeRoutes);
 app.use(aeoIntegrationRoutes);

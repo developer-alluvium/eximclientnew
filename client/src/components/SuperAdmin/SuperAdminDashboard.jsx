@@ -5,12 +5,12 @@ import { ThemeProvider } from "@mui/material/styles";
 
 // Import dashboard components
 import ModernDashboardOverview from "./ModernDashboardOverview";
-import ModernCustomerManagement from "./ModernCustomerManagement";
+
 import AdminManagement from "./AdminManagement";
 import ModuleManagement from "./ModuleManagement.jsx";
 import SystemAnalytics from "./SystemAnalytics.jsx";
 import UserActivity from "./UserActivity";
-import ColumnPermissionsManagement from "./ColumnPermissionsManagement";
+
 import { modernTheme } from "../../styles/modernTheme";
 import ModernSidebar from "./ModernSidebar";
 import LoadingScreen from "../LoadingScreen.jsx";
@@ -38,7 +38,7 @@ const SuperAdminDashboard = () => {
   // Tab configuration
   const tabs = [
     { label: "Overview", icon: "dashboard", component: "overview" },
-    { label: "Customer Management", icon: "people", component: "customers" },
+  
     {
       label: "Admin Management",
       icon: "admin_panel_settings",
@@ -68,14 +68,12 @@ const SuperAdminDashboard = () => {
             loading={loading}
           />
         );
-      case "customers":
-        return <ModernCustomerManagement onRefresh={fetchDashboardData} />;
+    
       case "admin":
         return <AdminManagement onRefresh={fetchDashboardData} />;
       case "modules":
         return <ModuleManagement onRefresh={fetchDashboardData} />;
-      case "columns":
-        return <ColumnPermissionsManagement onRefresh={fetchDashboardData} />;
+
       case "analytics":
         return <SystemAnalytics data={dashboardData} />;
       case "activity":

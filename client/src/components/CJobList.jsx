@@ -192,7 +192,7 @@ function CJobList(props) {
   }, []);
 
   // Track if column order has been fetched
-  // Fixed useEffect hook - replace the problematic section around lines 170-295
+
   useEffect(() => {
     if (hasAttemptedFetch || !currentUserId) {
       return;

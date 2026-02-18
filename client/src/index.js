@@ -44,7 +44,7 @@ function migrateLocalStorageToCookies() {
         }
 
         if (clearAfter) {
-          localStorage.removeItem(key);
+        localStorage.removeItem(key);
         }
       } catch (e) {
         // Individual key migration failed — continue with others

@@ -13,8 +13,8 @@ import LoginPage from "./pages/LoginPage";
 import UserLoginPage from "./pages/UserLoginPage";
 import UserRegistrationPage from "./pages/UserRegistrationPage";
 import UserDashboard from "./pages/UserDashboard";
-import AdminLoginPage from "./pages/AdminLoginPage";
-import CustomerAdminDashboard from "./pages/CustomerAdminDashboard";
+
+
 
 import { TabValueProvider } from "./context/TabValueContext";
 import { UserContext } from "./context/UserContext";
@@ -47,7 +47,7 @@ const LayoutWrapper = ({ children }) => {
   const noHeaderPages = [
     "/login",
     "/user/login",
-    "/admin/login",
+
     "/superadmin/login",
     "/user/register",
     "/verify-email",
@@ -122,7 +122,7 @@ function App() {
                     {/* Login routes - no header */}
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/user/login" element={<UserLoginPage />} />
-                    <Route path="/admin/login" element={<AdminLoginPage />} />
+
                     <Route
                       path="/superadmin/login"
                       element={<SuperAdminLoginPage />}
@@ -175,15 +175,7 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
-                    {/* Admin routes */}
-                    <Route
-                      path="/customer-admin/dashboard"
-                      element={
-                        <ProtectedRoute requiredAuth="admin">
-                          <CustomerAdminDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
+
                     {/* SuperAdmin routes */}
                     <Route
                       path="/superadmin-dashboard"
