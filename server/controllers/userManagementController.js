@@ -1,5 +1,5 @@
 import EximclientUser from "../models/eximclientUserModel.js";
-import { logActivity } from "../utils/activityLogger.js";
+
 import mongoose from "mongoose";
 
 /**

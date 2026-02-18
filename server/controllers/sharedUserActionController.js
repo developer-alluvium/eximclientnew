@@ -3,7 +3,7 @@
 import EximclientUser from "../models/eximclientUserModel.js";
 import CustomerModel from "../models/customerModel.js";
 import Notification from "../models/notificationModel.js";
-import { logActivity } from "../utils/activityLogger.js";
+
 
 /**
  * Utility function to check if actor can manage target user based on IE code assignments

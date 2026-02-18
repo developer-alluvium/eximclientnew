@@ -4,7 +4,7 @@ import CustomerModel from "../models/customerModel.js";
 import ModuleAccess from "../models/moduleAccessModel.js";
 import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
-import { logActivity } from "../utils/activityLogger.js";
+
 import crypto from "crypto";
 import { sendVerificationEmail } from "../services/emailService.js";
 import { sendPasswordResetEmail } from "../services/emailService.js";

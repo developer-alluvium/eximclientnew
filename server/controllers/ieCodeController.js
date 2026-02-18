@@ -1,6 +1,6 @@
 import EximclientUser from '../models/eximclientUserModel.js';
 import CustomerKycModel from '../models/customerKycModel.js';
-import { logActivity } from '../utils/activityLogger.js';
+
 import Notification from '../models/notificationModel.js';
 import { validateIeCode, checkIeCodeAssignmentPermission } from '../utils/ieCodeValidator.js';
 

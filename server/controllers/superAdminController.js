@@ -5,7 +5,7 @@ import CustomerModel from "../models/customerModel.js";
 import JobModel from "../models/jobModel.js";
 import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
-import { logActivity } from "../utils/activityLogger.js";
+
 import jwt from "jsonwebtoken";
 import CustomerKycModel from "../models/customerKycModel.js";
 

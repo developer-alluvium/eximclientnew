@@ -4,7 +4,7 @@ import CustomerModel from "../models/customerModel.js";
 import ModuleAccess from "../models/moduleAccessModel.js";
 import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
-import { logActivity } from "../utils/activityLogger.js";
+
 
 /**
  * Admin Login
