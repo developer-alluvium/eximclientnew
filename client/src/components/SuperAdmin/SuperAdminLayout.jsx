@@ -16,13 +16,15 @@ const SuperAdminLayout = () => {
   const { user, setUser } = useContext(UserContext);
 
   // Use custom hook for API calls
-  const { loading, error, setError, getDashboardAnalytics, getUserActivity } =
+  const { loading, error, setError, getDashboardAnalytics, getUserActivity, getClientEngagement, getJobsBreakdown } =
     useSuperAdminApi();
 
   // Sidebar state management
   const [activeTab, setActiveTab] = useState(0);
   const [dashboardData, setDashboardData] = useState(null);
   const [userActivity, setUserActivity] = useState([]);
+  const [clientEngagement, setClientEngagement] = useState([]);
+  const [jobsBreakdown, setJobsBreakdown] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -60,13 +62,17 @@ const SuperAdminLayout = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      const [analyticsData, activityData] = await Promise.all([
+      const [analyticsData, activityData, engagementData, jobsData] = await Promise.all([
         getDashboardAnalytics(),
         getUserActivity("active", 5),
+        getClientEngagement(),
+        getJobsBreakdown(),
       ]);
 
       setDashboardData(analyticsData.data);
       setUserActivity(activityData.data);
+      setClientEngagement(engagementData.data || []);
+      setJobsBreakdown(jobsData.data || []);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -253,6 +259,8 @@ const SuperAdminLayout = () => {
             context={{
               dashboardData,
               userActivity,
+              clientEngagement,
+              jobsBreakdown,
               fetchDashboardData,
               loading,
               activeTab,

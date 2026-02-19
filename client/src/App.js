@@ -38,6 +38,7 @@ import CImportDSR from "./components/CImportDSR.jsx";
 import AnalyticsOverview from "./components/AnalyticsOverview.jsx";
 import Dashboard from "./pages/Elock/components/Dashboard.jsx"; // Elock Dashboard
 import ElockGPSOperationPage from "./pages/Elock/pages/ElockGPSOperationPage.jsx"; // Elock Operation Page
+import TransportModule from "./components/Transport/TransportModule.jsx";
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
@@ -229,6 +230,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <ImportVideoPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/transport"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <TransportModule />
                         </ProtectedRoute>
                       }
                     />

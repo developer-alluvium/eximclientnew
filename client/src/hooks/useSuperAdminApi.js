@@ -17,13 +17,7 @@ export const useSuperAdminApi = () => {
       return false;
     }
 
-    // Optional: Add token expiration check
     try {
-      // If using JWT, you can decode and check expiration
-      // const decoded = jwt_decode(token);
-      // if (decoded.exp * 1000 < Date.now()) {
-      //   return false;
-      // }
       return true;
     } catch (err) {
       console.error("Token verification failed:", err);
@@ -34,11 +28,8 @@ export const useSuperAdminApi = () => {
   // Generic API call function
   const apiCall = useCallback(
     async (endpoint, method = "GET", data = null) => {
-      // Superadmin verification before API call
       if (!verifySuperAdmin()) {
-        // Navigate to login page instead of dashboard
         navigate("/login");
-
         throw new Error("Authentication required");
       }
 
@@ -53,12 +44,10 @@ export const useSuperAdminApi = () => {
           url: `${process.env.REACT_APP_API_STRING}${endpoint}`,
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // Add auth header
+            Authorization: `Bearer ${token}`,
           },
-          //  withCredentials: true,
         };
 
-        // Only add data for non-GET requests
         if (data && method !== "GET") {
           config.data = data;
         }
@@ -72,15 +61,12 @@ export const useSuperAdminApi = () => {
           err.response?.data
         );
 
-        // Handle different error types
         if (err.response?.status === 401) {
-          // Token expired or invalid
           removeCookie("superadmin_token");
           removeCookie("superadmin_user");
           navigate("/login");
           throw new Error("Session expired. Please login again.");
         } else if (err.response?.status === 403) {
-          // Forbidden - likely a backend authorization issue
           console.error("Access forbidden. Check backend route permissions.");
           throw new Error("Access forbidden. Please check your permissions.");
         }
@@ -105,6 +91,16 @@ export const useSuperAdminApi = () => {
   const getUserActivity = useCallback(
     (type = "active", limit = 5) =>
       apiCall(`/dashboard/user-activity?type=${type}&limit=${limit}`),
+    [apiCall]
+  );
+
+  const getClientEngagement = useCallback(
+    () => apiCall("/dashboard/client-engagement"),
+    [apiCall]
+  );
+
+  const getJobsBreakdown = useCallback(
+    () => apiCall("/dashboard/jobs-breakdown"),
     [apiCall]
   );
 
@@ -141,16 +137,15 @@ export const useSuperAdminApi = () => {
     loading,
     error,
     setError,
-    // OPTIMIZED API methods
     getDashboardAnalytics,
     getUserActivity,
-    // Module management methods
+    getClientEngagement,
+    getJobsBreakdown,
     getAvailableModules,
     getCustomerModuleAssignments,
     updateCustomerModuleAssignments,
     getAllCustomersWithModules,
     bulkAssignModules,
-    // Generic method for custom calls
     apiCall,
   };
 };

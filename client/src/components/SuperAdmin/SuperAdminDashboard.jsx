@@ -20,6 +20,8 @@ const SuperAdminDashboard = () => {
   const {
     dashboardData,
     userActivity,
+    clientEngagement,
+    jobsBreakdown,
     fetchDashboardData,
     loading,
     activeTab,
@@ -64,6 +66,8 @@ const SuperAdminDashboard = () => {
         return (
           <ModernDashboardOverview
             data={dashboardData}
+            clientEngagement={clientEngagement}
+            jobsBreakdown={jobsBreakdown}
             onRefresh={fetchDashboardData}
             loading={loading}
           />
@@ -84,6 +88,8 @@ const SuperAdminDashboard = () => {
         return (
           <ModernDashboardOverview
             data={dashboardData}
+            clientEngagement={clientEngagement}
+            jobsBreakdown={jobsBreakdown}
             onRefresh={fetchDashboardData}
             loading={loading}
           />

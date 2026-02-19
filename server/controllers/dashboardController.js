@@ -1,17 +1,19 @@
 import Customer from '../models/customerModel.js';
 import CustomerKyc from '../models/customerKycModel.js';
 import Job from '../models/jobModel.js';
+import AdminModel from '../models/adminModel.js';
+import EximclientUser from '../models/eximclientUserModel.js';
 import { protectSuperAdmin } from './superAdminController.js';
 
 // Get dashboard analytics
 export const getDashboardAnalytics = async (req, res) => {
   try {
     const { timeRange = '7d' } = req.query;
-    
+
     // Calculate date range
     const now = new Date();
     let startDate;
-    
+
     switch (timeRange) {
       case '1d':
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -29,155 +31,170 @@ export const getDashboardAnalytics = async (req, res) => {
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
-    // Get total customers from customerKyc collection
-    const totalCustomers = await CustomerKyc.countDocuments();
-    
-    // Get KYC verified customers (approval = 'Approved')
-    const kycVerified = await CustomerKyc.countDocuments({ approval: 'Approved' });
-    
-    // Get active sessions (customers with lastLogin today)
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-    
-    const activeSessions = await Customer.countDocuments({
-      lastLogin: {
-        $gte: startOfDay,
-        $lt: endOfDay
-      }
-    });
-    
-    // Get additional customer stats for trends
-    const activeCustomers = await Customer.countDocuments({ isActive: true });
-    const inactiveCustomers = await Customer.countDocuments({ isActive: false });
-    
-    // Get customers with recent login activity (for trend calculation)
-    const recentLogins = await Customer.countDocuments({
-      lastLogin: { $gte: startDate }
-    });
-    
-    // Get new registrations in the time range
-    const newRegistrations = await Customer.countDocuments({
-      createdAt: { $gte: startDate }
-    });
-
-    // Get total jobs (if Job model exists)
-    let totalJobs = 0;
-    let activeJobs = 0;
-    let completedJobs = 0;
-    let pendingJobs = 0;
-    let recentJobActivity = 0;
-    
-    try {
-      totalJobs = await Job.countDocuments();
-      
-      // Count jobs by status
-      const jobStats = await Job.aggregate([
-        {
-          $group: {
-            _id: { $toLower: "$status" },
-            count: { $sum: 1 }
-          }
-        }
-      ]);
-      
-      // Process job stats
-      jobStats.forEach(stat => {
-        switch (stat._id) {
-          case 'completed':
-            completedJobs = stat.count;
-            break;
-          case 'pending':
-            pendingJobs = stat.count;
-            break;
-          case 'active':
-          case 'in-progress':
-            activeJobs += stat.count;
-            break;
-        }
-      });
-      
-      // Get recent job activity (jobs created or updated in time range)
-      recentJobActivity = await Job.countDocuments({
-        $or: [
-          { created_at: { $gte: startDate } },
-          { updated_at: { $gte: startDate } }
-        ]
-      });
-      
-    } catch (error) {
-      console.log('Job model not available, skipping job statistics');
-    }
-
-    // Calculate system uptime and performance metrics
-    const uptimeSeconds = process.uptime();
-    const memoryUsage = process.memoryUsage();
-    
-    // Calculate memory usage percentage (assuming 1GB default if not available)
-    const totalMemoryMB = (memoryUsage.heapTotal + memoryUsage.external) / 1024 / 1024;
-    const usedMemoryMB = memoryUsage.heapUsed / 1024 / 1024;
-    const memoryUsagePercent = Math.round((usedMemoryMB / totalMemoryMB) * 100);
-
-    // Mock error rate calculation (you can implement actual error logging)
-    const errorRate = Math.random() * 0.05; // Random between 0-0.05%
-    
-    // Calculate trends
-    const userGrowthTrend = totalCustomers > 0 ? ((newRegistrations / totalCustomers) * 100) : 0;
-    const activityTrend = totalCustomers > 0 ? ((recentLogins / totalCustomers) * 100) : 0;
+    // Run all counts in parallel
+    const [
+      totalCustomers,
+      activeCustomers,
+      inactiveCustomers,
+      kycApproved,
+      kycPending,
+      kycDraft,
+      totalUsers,
+      activeUsers,
+      pendingUsers,
+      totalAdmins,
+      activeAdmins,
+      totalJobs,
+    ] = await Promise.all([
+      CustomerKyc.countDocuments(),
+      Customer.countDocuments({ isActive: true }),
+      Customer.countDocuments({ isActive: false }),
+      CustomerKyc.countDocuments({ approval: 'Approved' }),
+      CustomerKyc.countDocuments({ approval: 'Pending' }),
+      CustomerKyc.countDocuments({ draft: 'save' }),
+      EximclientUser.countDocuments(),
+      EximclientUser.countDocuments({ status: 'active' }),
+      EximclientUser.countDocuments({ status: 'pending' }),
+      AdminModel.countDocuments(),
+      AdminModel.countDocuments({ isActive: true }),
+      Job.countDocuments(),
+    ]);
 
     const analytics = {
-      // Dashboard Overview specific fields
-      totalCustomers: totalCustomers,
-      kycRecords: kycVerified,
-      activeSessions: activeSessions,
-      
-      // Additional analytics data
-      users: {
-        total: totalCustomers,
-        active: activeCustomers,
-        inactive: inactiveCustomers,
-        recentLogins,
-        newRegistrations,
-        growthTrend: userGrowthTrend,
-        kycVerified: kycVerified,
-        activeSessions: activeSessions
-      },
-      jobs: {
-        total: totalJobs,
-        active: activeJobs,
-        completed: completedJobs,
-        pending: pendingJobs,
-        recentActivity: recentJobActivity
-      },
-      system: {
-        uptime: uptimeSeconds,
-        uptimePercent: 99.9, // Mock uptime percentage
-        memory: {
-          used: Math.round(usedMemoryMB),
-          total: Math.round(totalMemoryMB),
-          percentage: memoryUsagePercent
-        },
-        errorRate: errorRate,
-        platform: process.platform,
-        nodeVersion: process.version
-      },
-      activity: {
-        trend: activityTrend,
-        sessionsToday: activeSessions,
-        timeRange: timeRange
-      },
-      timestamp: new Date().toISOString()
+      // Core counts
+      totalCustomers,
+      activeCustomers,
+      inactiveCustomers,
+      // KYC
+      kycApproved,
+      kycPending,
+      kycDraft,
+      // Users
+      totalUsers,
+      activeUsers,
+      pendingUsers,
+      // Admins
+      totalAdmins,
+      activeAdmins,
+      // Jobs
+      totalJobs,
+      timestamp: new Date().toISOString(),
     };
 
     res.json({
       success: true,
-      data: analytics
+      data: analytics,
     });
   } catch (error) {
     console.error('Dashboard analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard analytics'
+      message: 'Failed to fetch dashboard analytics',
+    });
+  }
+};
+
+// Get client engagement — sorted by inactivity (most dormant first)
+export const getClientEngagement = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const customers = await Customer.find({})
+      .select('name ie_code_no lastLogin isActive')
+      .lean();
+
+    const engagementData = customers.map((customer) => {
+      let daysSinceLogin = null;
+      let status = 'never';
+
+      if (customer.lastLogin) {
+        const diffMs = now - new Date(customer.lastLogin);
+        daysSinceLogin = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (daysSinceLogin <= 7) {
+          status = 'active';
+        } else if (daysSinceLogin <= 30) {
+          status = 'moderate';
+        } else {
+          status = 'inactive';
+        }
+      }
+
+      return {
+        name: customer.name || 'Unknown',
+        ie_code_no: customer.ie_code_no || '—',
+        lastLogin: customer.lastLogin || null,
+        daysSinceLogin,
+        status,
+        isActive: customer.isActive,
+      };
+    });
+
+    // Sort: never → inactive → moderate → active
+    const statusOrder = { never: 0, inactive: 1, moderate: 2, active: 3 };
+    engagementData.sort((a, b) => {
+      const orderDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (orderDiff !== 0) return orderDiff;
+      // Within same status, sort by days inactive descending
+      if (a.daysSinceLogin === null && b.daysSinceLogin === null) return 0;
+      if (a.daysSinceLogin === null) return -1;
+      if (b.daysSinceLogin === null) return 1;
+      return b.daysSinceLogin - a.daysSinceLogin;
+    });
+
+    res.json({
+      success: true,
+      data: engagementData,
+    });
+  } catch (error) {
+    console.error('Client engagement error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch client engagement data',
+    });
+  }
+};
+
+// Get top clients by job volume (current year 25-26)
+export const getJobsBreakdown = async (req, res) => {
+  try {
+    const pipeline = [
+      {
+        $match: {
+          year: '25-26',
+          ie_code_no: { $exists: true, $ne: '', $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: '$ie_code_no',
+          importer: { $first: '$importer' },
+          jobCount: { $sum: 1 },
+        },
+      },
+      { $sort: { jobCount: -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 0,
+          ie_code_no: '$_id',
+          importer: 1,
+          jobCount: 1,
+        },
+      },
+    ];
+
+    const topClients = await Job.aggregate(pipeline);
+
+    res.json({
+      success: true,
+      data: topClients,
+    });
+  } catch (error) {
+    console.error('Jobs breakdown error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch jobs breakdown',
     });
   }
 };
@@ -186,10 +203,10 @@ export const getDashboardAnalytics = async (req, res) => {
 export const getUserActivity = async (req, res) => {
   try {
     const { type = 'active', limit = 5 } = req.query;
-    
+
     let query = {};
     let sort = { createdAt: -1 };
-    
+
     switch (type) {
       case 'active':
         query = { isActive: false };
@@ -202,7 +219,7 @@ export const getUserActivity = async (req, res) => {
         sort = { createdAt: -1 };
         break;
       default:
-        query = { isActive: true }; // Default to active users
+        query = { isActive: true };
     }
 
     const users = await Customer.find(query)
@@ -212,13 +229,13 @@ export const getUserActivity = async (req, res) => {
 
     res.json({
       success: true,
-      data: users
+      data: users,
     });
   } catch (error) {
     console.error('User activity error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch user activity'
+      message: 'Failed to fetch user activity',
     });
   }
 };
@@ -231,18 +248,18 @@ export const getSystemMetrics = async (req, res) => {
       memory: process.memoryUsage(),
       platform: process.platform,
       nodeVersion: process.version,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     res.json({
       success: true,
-      data: metrics
+      data: metrics,
     });
   } catch (error) {
     console.error('System metrics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch system metrics'
+      message: 'Failed to fetch system metrics',
     });
   }
 };
@@ -251,70 +268,68 @@ export const getSystemMetrics = async (req, res) => {
 export const getHistoricalAnalytics = async (req, res) => {
   try {
     const { timeRange = '7d' } = req.query;
-    
-    // Calculate date range and intervals
+
     const now = new Date();
     let startDate, intervals;
-    
+
     switch (timeRange) {
       case '1d':
         startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        intervals = 24; // Hours
+        intervals = 24;
         break;
       case '7d':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        intervals = 7; // Days
+        intervals = 7;
         break;
       case '30d':
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        intervals = 30; // Days
+        intervals = 30;
         break;
       case '90d':
         startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-        intervals = 12; // Weeks (approximately)
+        intervals = 12;
         break;
       default:
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         intervals = 7;
     }
 
-    // Generate mock historical data for demonstration
-    // In a real application, you would query actual historical data
     const userGrowthData = [];
     const activityData = [];
     const systemHealthData = [];
-    
+
     for (let i = intervals - 1; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * (timeRange === '1d' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
-      const label = timeRange === '1d' 
-        ? date.getHours() + ':00'
-        : timeRange === '90d'
+      const date = new Date(
+        now.getTime() -
+          i * (timeRange === '1d' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000)
+      );
+      const label =
+        timeRange === '1d'
+          ? date.getHours() + ':00'
+          : timeRange === '90d'
           ? 'Week ' + Math.ceil((intervals - i) / 7)
           : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
-      // Mock user growth data
+
       userGrowthData.push({
         period: label,
         users: Math.floor(Math.random() * 50) + 100 + i * 5,
         sessions: Math.floor(Math.random() * 30) + 50 + i * 3,
-        date: date.toISOString()
+        date: date.toISOString(),
       });
-      
-      // Mock activity data
+
       activityData.push({
         period: label,
         logins: Math.floor(Math.random() * 40) + 20,
         registrations: Math.floor(Math.random() * 10) + 2,
-        date: date.toISOString()
+        date: date.toISOString(),
       });
-      
-      // Mock system health data
+
       systemHealthData.push({
         period: label,
         cpuUsage: Math.floor(Math.random() * 20) + 25,
         memoryUsage: Math.floor(Math.random() * 15) + 40,
         responseTime: Math.floor(Math.random() * 50) + 100,
-        date: date.toISOString()
+        date: date.toISOString(),
       });
     }
 
@@ -324,14 +339,14 @@ export const getHistoricalAnalytics = async (req, res) => {
         userGrowth: userGrowthData,
         activity: activityData,
         systemHealth: systemHealthData,
-        timeRange: timeRange
-      }
+        timeRange: timeRange,
+      },
     });
   } catch (error) {
     console.error('Historical analytics error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch historical analytics'
+      message: 'Failed to fetch historical analytics',
     });
   }
 };

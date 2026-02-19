@@ -8,7 +8,9 @@ import {
   updateUserStatus,
   updateColumnPermissions,
   postColumnOrder,
-  getColumnOrder
+  getColumnOrder,
+  postTransportColumnOrder,
+  getTransportColumnOrder
 } from '../controllers/userManagementController.js';
 
 import { protectSuperAdmin } from '../controllers/superAdminController.js';
@@ -67,6 +69,9 @@ router.post('/users/bulk-column-permissions', authorize('admin', 'superadmin'), 
 router.patch('/users/:userId/columns', authorize('admin', 'superadmin'), updateColumnPermissions);
 router.post('/users/columns/order', authorize(), postColumnOrder);
 router.get('/users/columns/order', authorize(), getColumnOrder);
+
+router.post('/users/transport-columns/order', authorize(), postTransportColumnOrder);
+router.get('/users/transport-columns/order', authorize(), getTransportColumnOrder);
 
 export default router;
 

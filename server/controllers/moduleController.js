@@ -57,6 +57,12 @@ const AVAILABLE_MODULES = [
     description: "View and manage import daily status reports and track shipments",
     category: "core",
   },
+  {
+    id: "/transport",
+    name: "Transport",
+    description: "View and manage import daily status reports and track shipments",
+    category: "core",
+  },
 
 
 ];

@@ -1282,6 +1282,8 @@ export const assignModulesToUser = async (req, res) => {
       });
     }
 
+    console.log(`Assigning modules to user ${userId}:`, moduleIds);
+
     // Find user
     const user = await EximclientUser.findById(userId);
     if (!user) {
@@ -1328,6 +1330,8 @@ export const bulkAssignModulesToUsers = async (req, res) => {
         message: "User IDs and Module IDs must be arrays.",
       });
     }
+    
+    console.log(`Bulk assigning modules to ${userIds.length} users:`, moduleIds);
 
     if (userIds.length === 0 || moduleIds.length === 0) {
       return res.status(400).json({
@@ -1628,7 +1632,7 @@ export const getAvailableIecCodes = async (req, res) => {
     }
 
     // Build query based on user role
-    let query = { iec_no: { $exists: true, $ne: null, $ne: "" } };
+    let query = { iec_no: { $exists: true, $nin: [null, ""] } };
 
     // Security Check for Admins - can only see their own IEC code
     if (actor.role === "admin") {

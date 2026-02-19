@@ -628,6 +628,14 @@ function UserDashboard() {
       categoryLabel: "EXPORT MANAGEMENT",
       category: "core",
     },
+    {
+      name: "Transport",
+      description:
+        "View transport details, track shipments, and manage logistics",
+      path: "/transport",
+      categoryLabel: "TRANSPORT MANAGEMENT",
+      category: "core",
+    },
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-GB", {

@@ -181,6 +181,7 @@ class ModuleAssignmentFrontendTester {
       "/elock": "E-Lock",
       // 'http://localhost:3005': 'E-Lock (Local)',
       "/trademasterguide": "Import Video",
+      "/transport": "Transport",
     };
 
     let accessibleModules = 0;

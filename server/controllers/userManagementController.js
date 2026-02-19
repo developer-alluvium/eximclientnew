@@ -802,3 +802,57 @@ export const getColumnOrder = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error while fetching column order." });
   }
 };
+
+
+/**
+ * Save or update the Transport column order for the logged-in user.
+ */
+export const postTransportColumnOrder = async (req, res) => {
+  try {
+    const { columnOrder } = req.body;
+    const userId = req.user._id;
+
+    if (!columnOrder || !Array.isArray(columnOrder)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "A valid 'columnOrder' array is required." 
+      });
+    }
+
+    await EximclientUser.findByIdAndUpdate(userId, { transportColumnOrder: columnOrder });
+
+    res.json({ 
+      success: true, 
+      message: "Transport column order saved successfully." 
+    });
+  } catch (err) {
+    console.error("Error saving transport column order:", err);
+    res.status(500).json({ success: false, message: "Server error while saving transport column order." });
+  }
+};
+
+/**
+ * Get the Transport column order for the logged-in user.
+ */
+export const getTransportColumnOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await EximclientUser.findById(userId).select('transportColumnOrder').lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+   
+    res.json({
+      success: true,
+      columnOrder: user.transportColumnOrder || [],
+    });
+  } catch (err) {
+    console.error("Error fetching transport column order:", err);
+    res.status(500).json({ success: false, message: "Server error while fetching transport column order." });
+  }
+};

@@ -4,7 +4,7 @@ import CustomerModel from "../models/customerModel.js";
 import EximclientUser from "../models/eximclientUserModel.js";
 import AdminModel from "../models/adminModel.js";
 import SuperAdminModel from "../models/superAdminModel.js";
-import ActivityLogModel from "../models/ActivityLogModel.js";
+
 
 // Initialize environment variables
 dotenv.config();
@@ -517,10 +517,7 @@ export const generateUserToken = (user, userType = "user") => {
  */
 export const authenticateUser = async (req, res, next) => {
   try {
-    console.log('========== AUTH DEBUG ==========');
-    console.log('Cookies received:', req.cookies);
-    console.log('Authorization header:', req.headers.authorization);
-    console.log('================================');
+  
 
     // Get token from cookie or Authorization header
     // Get token and determine source

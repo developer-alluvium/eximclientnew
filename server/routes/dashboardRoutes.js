@@ -3,7 +3,9 @@ import {
   getDashboardAnalytics,
   getUserActivity,
   getSystemMetrics,
-  getHistoricalAnalytics
+  getHistoricalAnalytics,
+  getClientEngagement,
+  getJobsBreakdown,
 } from "../controllers/dashboardController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 
@@ -14,5 +16,7 @@ router.get("/api/dashboard/analytics", protectSuperAdmin, getDashboardAnalytics)
 router.get("/api/dashboard/user-activity", protectSuperAdmin, getUserActivity);
 router.get("/api/dashboard/system-metrics", protectSuperAdmin, getSystemMetrics);
 router.get("/api/dashboard/historical", protectSuperAdmin, getHistoricalAnalytics);
+router.get("/api/dashboard/client-engagement", protectSuperAdmin, getClientEngagement);
+router.get("/api/dashboard/jobs-breakdown", protectSuperAdmin, getJobsBreakdown);
 
 export default router;

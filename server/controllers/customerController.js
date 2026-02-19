@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import JobModel from "../models/jobModel.js";
 import CustomerKycModel from "../models/customerKycModel.js";
-import ActivityLogModel from "../models/ActivityLogModel.js";
+
 import { createSendTokens } from "../middlewares/authMiddleware.js";
 // Comment out missing email utility
 // import { sendEmail } from "../utils/email.js";
@@ -126,30 +126,7 @@ export const login = async (req, res) => {
           } else {
             console.log(`Password verification failed - neither stored hash nor generated password match`);
             
-            // Log failed login attempt
-            try {
-              const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
-              const userAgent = req.headers['user-agent'] || 'Unknown';
-              
-              await ActivityLogModel.create({
-                user_id: customer._id,
-                user_email: customer.email || `${customer.ie_code_no}@example.com`,
-                user_name: customer.name,
-                ie_code_no: customer.ie_code_no,
-                activity_type: 'failed_login',
-                description: 'Failed login attempt - password verification failed',
-                ip_address: ipAddress,
-                user_agent: userAgent,
-                severity: 'medium',
-                is_suspicious: true,
-                details: {
-                  reason: 'password_verification_failed',
-                  ie_code_no: ie_code_no
-                }
-              });
-            } catch (activityError) {
-              console.error('Error logging failed login activity:', activityError);
-            }
+          
             
             return res.status(401).json({
               success: false,
@@ -160,29 +137,7 @@ export const login = async (req, res) => {
           console.log(`User has custom password, but provided password doesn't match stored hash`);
           
           // Log failed login attempt
-          try {
-            const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
-            const userAgent = req.headers['user-agent'] || 'Unknown';
-            
-            await ActivityLogModel.create({
-              user_id: customer._id,
-              user_email: customer.email || `${customer.ie_code_no}@example.com`,
-              user_name: customer.name,
-              ie_code_no: customer.ie_code_no,
-              activity_type: 'failed_login',
-              description: 'Failed login attempt - incorrect password for changed account',
-              ip_address: ipAddress,
-              user_agent: userAgent,
-              severity: 'high',
-              is_suspicious: true,
-              details: {
-                reason: 'incorrect_password_changed_account',
-                ie_code_no: ie_code_no
-              }
-            });
-          } catch (activityError) {
-            console.error('Error logging failed login activity:', activityError);
-          }
+     
           
           return res.status(401).json({
             success: false,
@@ -194,30 +149,7 @@ export const login = async (req, res) => {
     await customer.save();
     console.log(`Login timestamp updated for customer`);
 
-    // Log successful login activity
-    try {
-      const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
-      const userAgent = req.headers['user-agent'] || 'Unknown';
-      
-      await ActivityLogModel.create({
-        user_id: customer._id,
-        user_email: customer.email || `${customer.ie_code_no}@example.com`,
-        user_name: customer.name,
-        ie_code_no: customer.ie_code_no,
-        activity_type: 'login',
-        description: 'User logged in successfully',
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        severity: 'low',
-        details: {
-          login_method: 'password',
-          success: true
-        }
-      });
-    } catch (activityError) {
-      console.error('Error logging login activity:', activityError);
-      // Continue with login even if activity logging fails
-    }
+  
     }
 
     // Generate JWT token
@@ -250,61 +182,7 @@ export const login = async (req, res) => {
 
 // Logout controller
 
-// export const logout = async (req, res) => {
-//   try {
-//     // Try to log logout activity and update last logout time if user info is available
-//     if (req.user || req.body.user_id) {
-//       try {
-//         const userId = req.user?.id || req.body.user_id;
-//         const customer = await CustomerModel.findById(userId);
-        
-//         if (customer) {
-//           // Update last logout time
-//           customer.lastLogout = new Date();
-//           await customer.save();
-          
-//           const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown';
-//           const userAgent = req.headers['user-agent'] || 'Unknown';
-          
-//           await ActivityLogModel.create({
-//             user_id: customer._id,
-//             user_email: customer.email || `${customer.ie_code_no}@example.com`,
-//             user_name: customer.name,
-//             ie_code_no: customer.ie_code_no,
-//             activity_type: 'logout',
-//             description: 'User logged out successfully',
-//             ip_address: ipAddress,
-//             user_agent: userAgent,
-//             severity: 'low',
-//             details: {
-//               logout_method: 'manual',
-//               logout_time: new Date().toISOString()
-//             }
-//           });
-//         }
-//       } catch (activityError) {
-//         console.error('Error logging logout activity:', activityError);
-//         // Continue with logout even if activity logging fails
-//       }
-//     }
 
-//     // Clear authentication cookies
-//     res.clearCookie('access_token');
-//     res.clearCookie('refresh_token');
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Logged out successfully",
-//     });
-//   } catch (error) {
-//     console.error("Logout error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "An error occurred during logout",
-//       error: error.message,
-//     });
-//   }
-// };
 
 /**
  * Forgot password controller

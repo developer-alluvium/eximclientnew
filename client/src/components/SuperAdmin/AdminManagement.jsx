@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -113,6 +113,12 @@ const AVAILABLE_MODULES = [
       "View and manage import daily status reports and track shipments",
     category: "core",
   },
+  {
+    id: "/transport",
+    name: "Transport",
+    description: "View transport details, track shipments, and manage logistics",
+    category: "core",
+  },
 ];
 
 const AdminManagement = ({ onRefresh }) => {
@@ -151,6 +157,10 @@ const AdminManagement = ({ onRefresh }) => {
   const [ieCodeReason, setIeCodeReason] = useState("");
   const [isRemovingIeCode, setIsRemovingIeCode] = useState(false);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+
+  // Enterprise Actions Modal state
+  const [actionsMenuUser, setActionsMenuUser] = useState(null);
+  const [actionsTab, setActionsTab] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -700,6 +710,7 @@ const AdminManagement = ({ onRefresh }) => {
     if (moduleId.includes("task") || moduleId.includes("ai")) return "🤖";
     if (moduleId.includes("elock") || moduleId.includes("lock")) return "🔐";
     if (moduleId.includes("trade")) return "📚";
+    if (moduleId.includes("transport")) return "🚚";
     return "📱";
   };
 
@@ -1032,295 +1043,197 @@ const AdminManagement = ({ onRefresh }) => {
             </Typography>
           </Alert>
 
-          <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
-            <Table>
+          <TableContainer component={Paper} sx={{ borderRadius: 2, overflow: "hidden" , }}>
+            <Table stickyHeader>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f9fafb" }}>
-                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>IE Code</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Importer</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>
-                    Assigned Modules
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Tab Visibility</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                <TableRow>
+                  {["User", "Email", "IE Code", "Importer", "Role", "Status", "Modules", "Tab Visibility", "Actions"].map((col) => (
+                    <TableCell
+                      key={col}
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        bgcolor: "#1e293b",
+                        color: "#ffffff",
+                        borderBottom: "none",
+                        whiteSpace: "nowrap",
+                        py: 1.5,
+                        px: 2,
+                      }}
+                    >
+                      {col}
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user._id} hover>
-                    <TableCell>
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <TableRow key={user._id} hover sx={{ "&:hover": { bgcolor: "#f8fafc" } }}>
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                         <Avatar
-                          sx={{ mr: 2, bgcolor: "#e5e7eb", color: "#374151" }}
+                          sx={{ width: 34, height: 34, bgcolor: "#e2e8f0", color: "#374151", fontSize: "0.85rem", fontWeight: 700, flexShrink: 0 }}
                         >
                           {user.name?.charAt(0) || "U"}
                         </Avatar>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: "0.82rem", color: "#0f172a", whiteSpace: "nowrap" }}>
                           {user.name}
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Box sx={{ maxWidth: 250 }}>
-                        {user.ie_code_assignments &&
-                        user.ie_code_assignments.length > 0 ? (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 0.5,
-                            }}
-                          >
-                            {user.ie_code_assignments.map((assignment, idx) => (
+                    <TableCell sx={{ py: 1.2, px: 2, fontSize: "0.78rem", color: "#475569" }}>{user.email}</TableCell>
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxWidth: 200 }}>
+                        {user.ie_code_assignments && user.ie_code_assignments.length > 0 ? (
+                          <>
+                            {user.ie_code_assignments.slice(0, 2).map((assignment) => (
                               <Chip
                                 key={assignment.ie_code_no}
                                 size="small"
-                                label={
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    <Typography
-                                      variant="caption"
-                                      sx={{ fontWeight: 500 }}
-                                    >
-                                      {assignment.ie_code_no}
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      (
-                                      {new Date(
-                                        assignment.assigned_at
-                                      ).toLocaleDateString()}
-                                      )
-                                    </Typography>
-                                  </Box>
-                                }
-                                color={idx === 0 ? "primary" : "default"}
+                                label={assignment.ie_code_no}
+                                color="primary"
                                 variant="outlined"
+                                sx={{ fontSize: "0.7rem", fontWeight: 600, height: 22 }}
                               />
                             ))}
-                          </Box>
+                            {user.ie_code_assignments.length > 2 && (
+                              <Chip
+                                size="small"
+                                label={`+${user.ie_code_assignments.length - 2} more`}
+                                variant="outlined"
+                                sx={{ fontSize: "0.68rem", height: 22, color: "#64748b", borderColor: "#cbd5e1" }}
+                              />
+                            )}
+                          </>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Not Assigned
-                          </Typography>
+                          <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", fontStyle: "italic" }}>—</Typography>
                         )}
                       </Box>
                     </TableCell>
-                    <TableCell>
-                      <Box sx={{ maxWidth: 200 }}>
-                        {user.ie_code_assignments &&
-                        user.ie_code_assignments.length > 0 ? (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 0.5,
-                            }}
-                          >
-                            {user.ie_code_assignments.map((assignment) => (
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
+                      <Box sx={{ maxWidth: 180 }}>
+                        {user.ie_code_assignments && user.ie_code_assignments.length > 0 ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
+                            {user.ie_code_assignments.slice(0, 2).map((assignment) => (
                               <Typography
                                 key={assignment.ie_code_no}
-                                variant="caption"
-                                color="text.secondary"
+                                sx={{ fontSize: "0.72rem", color: "#475569", lineHeight: 1.3,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 175 }}
                               >
-                                {assignment.importer_name || "No Name"}
+                                {assignment.importer_name || "—"}
                               </Typography>
                             ))}
+                            {user.ie_code_assignments.length > 2 && (
+                              <Typography sx={{ fontSize: "0.68rem", color: "#94a3b8" }}>
+                                +{user.ie_code_assignments.length - 2} more
+                              </Typography>
+                            )}
                           </Box>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            Not Assigned
-                          </Typography>
+                          <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", fontStyle: "italic" }}>—</Typography>
                         )}
                       </Box>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
                       <Chip
                         label={user.role === "admin" ? "Admin" : "User"}
-                        color={user.role === "admin" ? "secondary" : "default"}
                         size="small"
-                        icon={
-                          user.role === "admin" ? (
-                            <AdminPanelSettings />
-                          ) : (
-                            <People />
-                          )
-                        }
+                        sx={{
+                          height: 22, fontSize: "0.7rem", fontWeight: 700,
+                          bgcolor: user.role === "admin" ? "#ede9fe" : "#f1f5f9",
+                          color: user.role === "admin" ? "#7c3aed" : "#64748b",
+                          border: "none",
+                        }}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
                       <Chip
                         label={user.isActive ? "Active" : "Inactive"}
-                        color={user.isActive ? "success" : "error"}
                         size="small"
+                        sx={{
+                          height: 22, fontSize: "0.7rem", fontWeight: 700,
+                          bgcolor: user.isActive ? "#dcfce7" : "#fee2e2",
+                          color: user.isActive ? "#16a34a" : "#dc2626",
+                          border: "none",
+                        }}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 0.5,
-                          maxWidth: 300,
-                        }}
-                      >
-                        {user.assignedModules &&
-                        user.assignedModules.length > 0 ? (
-                          user.assignedModules.slice(0, 3).map((moduleId) => {
-                            const module = AVAILABLE_MODULES.find(
-                              (m) => m.id === moduleId
-                            );
-                            return (
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, maxWidth: 220 }}>
+                        {user.assignedModules && user.assignedModules.length > 0 ? (
+                          <>
+                            {user.assignedModules.slice(0, 2).map((moduleId) => {
+                              const module = AVAILABLE_MODULES.find((m) => m.id === moduleId);
+                              return (
+                                <Chip
+                                  key={moduleId}
+                                  label={module?.name || moduleId.split("/").pop() || moduleId}
+                                  size="small"
+                                  sx={{ fontSize: "0.68rem", height: 22, fontWeight: 500,
+                                    bgcolor: module?.category === "beta" ? "#fef3c7" : "#dbeafe",
+                                    color: module?.category === "beta" ? "#92400e" : "#1d4ed8",
+                                    border: "none",
+                                  }}
+                                />
+                              );
+                            })}
+                            {user.assignedModules.length > 2 && (
                               <Chip
-                                key={moduleId}
-                                label={
-                                  module?.name ||
-                                  moduleId.split("/").pop() ||
-                                  moduleId
-                                }
-                                color={getModuleCategoryColor(module?.category)}
+                                label={`+${user.assignedModules.length - 2}`}
                                 size="small"
-                                variant="outlined"
-                                sx={{ fontSize: "0.7rem" }}
+                                sx={{ fontSize: "0.68rem", height: 22, color: "#64748b", bgcolor: "#f1f5f9", border: "none" }}
                               />
-                            );
-                          })
+                            )}
+                          </>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No modules assigned
-                          </Typography>
+                          <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", fontStyle: "italic" }}>—</Typography>
                         )}
-                        {user.assignedModules &&
-                          user.assignedModules.length > 3 && (
-                            <Chip
-                              label={`+${user.assignedModules.length - 3} more`}
-                              size="small"
-                              variant="outlined"
-                              color="default"
-                              sx={{ fontSize: "0.7rem" }}
-                            />
-                          )}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.2, px: 2 }}>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: user.jobsTabVisible ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: "0.72rem", color: user.jobsTabVisible ? "#15803d" : "#9ca3af", fontWeight: user.jobsTabVisible ? 600 : 400 }}>Jobs</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: user.gandhidhamTabVisible ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: "0.72rem", color: user.gandhidhamTabVisible ? "#15803d" : "#9ca3af", fontWeight: user.gandhidhamTabVisible ? 600 : 400 }}>Gandhidham</Typography>
+                        </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Box
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setActionsMenuUser(user);
+                          setActionsTab(0);
+                          setSelectedEntity(user);
+                          setSelectedUserModules(user.assignedModules || []);
+                          setTabSettings({
+                            jobsTabVisible: user.jobsTabVisible || false,
+                            gandhidhamTabVisible: user.gandhidhamTabVisible || false,
+                          });
+                          setSelectedIeCodes([]);
+                          setIeCodeReason("");
+                          setIsRemovingIeCode(false);
+                        }}
                         sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 0.5,
+                          textTransform: "none",
+                          borderRadius: 1.5,
+                          fontSize: "0.78rem",
+                          fontWeight: 600,
+                          borderColor: "#cbd5e1",
+                          color: "#374151",
+                          px: 1.5,
+                          "&:hover": { borderColor: "#1e293b", bgcolor: "#f8fafc" },
                         }}
                       >
-                        <Chip
-                          label={`Jobs: ${user.jobsTabVisible ? "On" : "Off"}`}
-                          color={user.jobsTabVisible ? "success" : "default"}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`Gandhidham: ${
-                            user.gandhidhamTabVisible ? "On" : "Off"
-                          }`}
-                          color={
-                            user.gandhidhamTabVisible ? "success" : "default"
-                          }
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                        {/* IE Code Assignment Buttons */}
-                        <Tooltip title="Manage IE Codes">
-                          <IconButton
-                            size="small"
-                            color="info"
-                            onClick={() => openIeCodeDialog(user, false)}
-                          >
-                            <AccountBox />
-                          </IconButton>
-                        </Tooltip>
-
-                        {/* Status Toggle Button */}
-                        <Tooltip
-                          title={
-                            user.isActive ? "Deactivate User" : "Activate User"
-                          }
-                        >
-                          <IconButton
-                            size="small"
-                            color={user.isActive ? "warning" : "success"}
-                            onClick={() =>
-                              openStatusDialog(
-                                user,
-                                user.isActive ? "deactivate" : "activate"
-                              )
-                            }
-                          >
-                            {user.isActive ? <ToggleOff /> : <ToggleOn />}
-                          </IconButton>
-                        </Tooltip>
-
-                        {/* Module Assignment Button */}
-                        <Tooltip title="Assign Modules">
-                          <IconButton
-                            size="small"
-                            color="info"
-                            onClick={() => openModuleDialog(user)}
-                          >
-                            <Assignment />
-                          </IconButton>
-                        </Tooltip>
-
-                        {/* Admin Role Toggle Button */}
-                        {user.role === "admin" ? (
-                          <Tooltip title="Remove Admin Role">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() =>
-                                openAdminDialog(user, "demote", "user")
-                              }
-                            >
-                              <Delete />
-                            </IconButton>
-                          </Tooltip>
-                        ) : (
-                          <Tooltip title="Promote to Admin">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() =>
-                                openAdminDialog(user, "promote", "user")
-                              }
-                            >
-                              <AdminPanelSettings />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-
-                        <Tooltip title="Manage Tab Visibility">
-                          <IconButton
-                            size="small"
-                            color="secondary"
-                            onClick={() => openTabVisibilityDialog(user)}
-                          >
-                            <ToggleOn />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
+                        Actions
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1338,6 +1251,430 @@ const AdminManagement = ({ onRefresh }) => {
           </TableContainer>
         </Box>
       </Card>
+
+      {/* ── Enterprise Actions Modal ── */}
+      <Dialog
+        open={Boolean(actionsMenuUser)}
+        onClose={() => { setActionsMenuUser(null); setActionsTab(0); }}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.22)",
+            minHeight: 520,
+            display: "flex",
+            flexDirection: "column",
+          },
+        }}
+      >
+        {/* Top Header Bar */}
+        <Box
+          sx={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a5f 100%)",
+            px: 3.5, py: 2.5,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexShrink: 0,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Avatar
+              sx={{
+                bgcolor: "rgba(255,255,255,0.15)", color: "#fff",
+                width: 46, height: 46, fontSize: "1.2rem", fontWeight: 700,
+                border: "2px solid rgba(255,255,255,0.25)",
+                boxShadow: "0 0 0 4px rgba(255,255,255,0.06)",
+              }}
+            >
+              {actionsMenuUser?.name?.charAt(0) || "U"}
+            </Avatar>
+            <Box>
+              <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem", lineHeight: 1.3 }}>
+                {actionsMenuUser?.name}
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.3 }}>
+                <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: "0.75rem" }}>
+                  {actionsMenuUser?.email}
+                </Typography>
+                <Box sx={{ width: 4, height: 4, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.3)" }} />
+                <Chip
+                  label={actionsMenuUser?.role === "admin" ? "Admin" : "User"}
+                  size="small"
+                  sx={{
+                    height: 18, fontSize: "0.65rem", fontWeight: 700,
+                    bgcolor: actionsMenuUser?.role === "admin" ? "rgba(167,139,250,0.25)" : "rgba(255,255,255,0.12)",
+                    color: actionsMenuUser?.role === "admin" ? "#c4b5fd" : "rgba(255,255,255,0.7)",
+                    border: "none",
+                  }}
+                />
+                <Chip
+                  label={actionsMenuUser?.isActive ? "Active" : "Inactive"}
+                  size="small"
+                  sx={{
+                    height: 18, fontSize: "0.65rem", fontWeight: 700,
+                    bgcolor: actionsMenuUser?.isActive ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)",
+                    color: actionsMenuUser?.isActive ? "#6ee7b7" : "#fca5a5",
+                    border: "none",
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
+          <IconButton
+            size="small"
+            onClick={() => { setActionsMenuUser(null); setActionsTab(0); }}
+            sx={{
+              color: "rgba(255,255,255,0.6)",
+              "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
+              borderRadius: 1.5,
+            }}
+          >
+            <Close fontSize="small" />
+          </IconButton>
+        </Box>
+
+        {/* Body: Sidebar + Content */}
+        <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+
+          {/* Left Sidebar */}
+          <Box
+            sx={{
+              width: 200, flexShrink: 0,
+              bgcolor: "#f8fafc",
+              borderRight: "1px solid #e2e8f0",
+              py: 2,
+              display: "flex", flexDirection: "column", gap: 0.5,
+            }}
+          >
+            {[
+              { idx: 0, icon: <AccountBox sx={{ fontSize: 18 }} />, label: "IE Codes", desc: "Assign / Remove" },
+              { idx: 1, icon: <ToggleOn sx={{ fontSize: 18 }} />, label: "Status", desc: actionsMenuUser?.isActive ? "Active" : "Inactive" },
+              { idx: 2, icon: <Assignment sx={{ fontSize: 18 }} />, label: "Modules", desc: `${(actionsMenuUser?.assignedModules || []).length} assigned` },
+              { idx: 3, icon: <AdminPanelSettings sx={{ fontSize: 18 }} />, label: "Role", desc: actionsMenuUser?.role === "admin" ? "Admin" : "User" },
+              { idx: 4, icon: <Apps sx={{ fontSize: 18 }} />, label: "Tab Visibility", desc: "Jobs & Gandhidham" },
+            ].map(({ idx, icon, label, desc }) => (
+              <Box
+                key={idx}
+                onClick={() => setActionsTab(idx)}
+                sx={{
+                  mx: 1.5, px: 1.5, py: 1.2,
+                  borderRadius: 2, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 1.5,
+                  bgcolor: actionsTab === idx ? "#fff" : "transparent",
+                  boxShadow: actionsTab === idx ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                  borderLeft: actionsTab === idx ? "3px solid #1e293b" : "3px solid transparent",
+                  transition: "all 0.15s",
+                  "&:hover": { bgcolor: actionsTab === idx ? "#fff" : "#f1f5f9" },
+                }}
+              >
+                <Box sx={{ color: actionsTab === idx ? "#1e293b" : "#94a3b8", display: "flex", alignItems: "center", transition: "color 0.15s" }}>
+                  {icon}
+                </Box>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: actionsTab === idx ? 700 : 500, color: actionsTab === idx ? "#0f172a" : "#475569", lineHeight: 1.2 }}>
+                    {label}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.65rem", color: "#94a3b8", mt: 0.2 }}>
+                    {desc}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Right Content Panel */}
+          <Box sx={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+
+            {/* Panel 0: IE Codes */}
+            {actionsTab === 0 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>IE Code Management</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Assign or remove IE codes for this user. Multiple codes can be assigned simultaneously.</Typography>
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, px: 2, py: 1.2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: isRemovingIeCode ? "#ef4444" : "#3b82f6" }} />
+                    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "#374151" }}>Mode: {isRemovingIeCode ? "Remove IE Codes" : "Assign IE Codes"}</Typography>
+                  </Box>
+                  <Button size="small" variant="outlined" color={isRemovingIeCode ? "primary" : "error"}
+                    onClick={() => { setIsRemovingIeCode(v => !v); setSelectedIeCodes([]); }}
+                    sx={{ textTransform: "none", fontSize: "0.75rem", borderRadius: 1.5, fontWeight: 600 }}
+                  >
+                    Switch to {isRemovingIeCode ? "Assignment" : "Removal"}
+                  </Button>
+                </Box>
+
+                {actionsMenuUser?.ie_code_assignments?.length > 0 && (
+                  <Box>
+                    <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>Currently Assigned</Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
+                      {actionsMenuUser.ie_code_assignments.map((a) => (
+                        <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" color="primary" sx={{ fontSize: "0.72rem", fontWeight: 500 }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                <Box>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {isRemovingIeCode ? "Select Codes to Remove" : "Select Codes to Assign"}
+                  </Typography>
+                  <Autocomplete
+                    multiple disableCloseOnSelect
+                    options={isRemovingIeCode ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes}
+                    getOptionLabel={(opt) => opt.ie_code_no || opt.iecNo || ""}
+                    isOptionEqualToValue={(opt, val) => (opt.ie_code_no || opt.iecNo) === (val.ie_code_no || val.iecNo)}
+                    value={(() => {
+                      const opts = isRemovingIeCode ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes;
+                      return selectedIeCodes.map(code => opts.find(o => (o.ie_code_no || o.iecNo) === code) || { ie_code_no: code });
+                    })()}
+                    onChange={(_, newVal) => setSelectedIeCodes(newVal.map(v => v.ie_code_no || v.iecNo))}
+                    filterOptions={(options, { inputValue }) => {
+                      if (!inputValue) return options;
+                      const lc = inputValue.toLowerCase();
+                      return options.filter(o =>
+                        (o.ie_code_no || o.iecNo || "").toLowerCase().includes(lc) ||
+                        (o.importer_name || o.importerName || "").toLowerCase().includes(lc)
+                      );
+                    }}
+                    ListboxProps={{ style: { maxHeight: 180 } }}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.ie_code_no || option.iecNo}>
+                        <Box sx={{ py: 0.3 }}>
+                          <Typography variant="body2" fontWeight={600} color="primary.main" sx={{ fontSize: "0.82rem" }}>{option.ie_code_no || option.iecNo}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.72rem" }}>{option.importer_name || option.importerName || "No Importer Name"}</Typography>
+                        </Box>
+                      </li>
+                    )}
+                    renderTags={(tagValue, getTagProps) =>
+                      tagValue.map((option, index) => (
+                        <Chip size="small" variant="outlined" color="primary" label={option.ie_code_no || option.iecNo} {...getTagProps({ index })} key={option.ie_code_no || option.iecNo} sx={{ fontSize: "0.72rem" }} />
+                      ))
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Search by IE code or importer name..." size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                    )}
+                    noOptionsText="No IE codes found"
+                  />
+                </Box>
+
+                <Box>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Reason <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</Typography>
+                  </Typography>
+                  <TextField fullWidth size="small" placeholder="Enter reason for this operation..." value={ieCodeReason} onChange={(e) => setIeCodeReason(e.target.value)} multiline rows={2} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                </Box>
+
+                <Box sx={{ mt: "auto", pt: 1 }}>
+                  <Button variant="contained" fullWidth disabled={loading || selectedIeCodes.length === 0}
+                    onClick={async () => { await handleIeCodeOperation(); setActionsMenuUser(null); setActionsTab(0); }}
+                    color={isRemovingIeCode ? "error" : "primary"}
+                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem" }}
+                  >
+                    {loading ? "Processing..." : isRemovingIeCode
+                      ? `Remove ${selectedIeCodes.length} IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`
+                      : `Assign ${selectedIeCodes.length} IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Panel 1: Status */}
+            {actionsTab === 1 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Account Status</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Control whether this user can access the platform.</Typography>
+                </Box>
+
+                <Box sx={{ border: `1.5px solid ${actionsMenuUser?.isActive ? "#bbf7d0" : "#fecaca"}`, borderRadius: 2.5, p: 3, bgcolor: actionsMenuUser?.isActive ? "#f0fdf4" : "#fff5f5", display: "flex", alignItems: "center", gap: 2.5 }}>
+                  <Box sx={{ width: 52, height: 52, borderRadius: 2, bgcolor: actionsMenuUser?.isActive ? "#dcfce7" : "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {actionsMenuUser?.isActive ? <ToggleOn sx={{ color: "#16a34a", fontSize: 30 }} /> : <ToggleOff sx={{ color: "#dc2626", fontSize: 30 }} />}
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, fontSize: "0.95rem", color: "#0f172a" }}>Account is currently {actionsMenuUser?.isActive ? "Active" : "Inactive"}</Typography>
+                    <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.5, lineHeight: 1.5 }}>
+                      {actionsMenuUser?.isActive ? "This user can log in and access all their assigned modules." : "This user cannot log in. Their data and assignments are preserved."}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, p: 2.5 }}>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>What will happen</Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    {(actionsMenuUser?.isActive
+                      ? ["User will immediately lose access to all modules", "Active sessions will be terminated", "User data and assignments are preserved"]
+                      : ["User will regain access to all assigned modules", "User can log in with their existing credentials", "All previous settings and assignments are restored"]
+                    ).map((item, i) => (
+                      <Box key={i} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#94a3b8", mt: 0.7, flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: "0.78rem", color: "#475569" }}>{item}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                <Box sx={{ mt: "auto" }}>
+                  <Button variant="contained" fullWidth startIcon={actionsMenuUser?.isActive ? <ToggleOff /> : <ToggleOn />} disabled={loading}
+                    onClick={async () => { await handleChangeUserStatus(actionsMenuUser, !actionsMenuUser?.isActive); setActionsMenuUser(null); setActionsTab(0); }}
+                    sx={{ bgcolor: actionsMenuUser?.isActive ? "#dc2626" : "#16a34a", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: actionsMenuUser?.isActive ? "#b91c1c" : "#15803d" } }}
+                  >
+                    {loading ? "Processing..." : actionsMenuUser?.isActive ? "Deactivate Account" : "Activate Account"}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Panel 2: Modules */}
+            {actionsTab === 2 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Box>
+                      <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Module Access</Typography>
+                      <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Select which application modules this user can access.</Typography>
+                    </Box>
+                    <Chip label={`${selectedUserModules.length} / ${AVAILABLE_MODULES.length} selected`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: "0.72rem" }} />
+                  </Box>
+                </Box>
+
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <Button size="small" variant="outlined" onClick={() => setSelectedUserModules(AVAILABLE_MODULES.map(m => m.id))} sx={{ textTransform: "none", fontSize: "0.75rem", borderRadius: 1.5, fontWeight: 600, flex: 1 }}>Select All</Button>
+                  <Button size="small" variant="outlined" color="error" onClick={() => setSelectedUserModules([])} sx={{ textTransform: "none", fontSize: "0.75rem", borderRadius: 1.5, fontWeight: 600, flex: 1 }}>Clear All</Button>
+                </Box>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, overflowY: "auto", maxHeight: 260, pr: 0.5 }}>
+                  {AVAILABLE_MODULES.map((module) => {
+                    const isSelected = selectedUserModules.includes(module.id);
+                    return (
+                      <Box key={module.id}
+                        onClick={() => setSelectedUserModules(prev => isSelected ? prev.filter(m => m !== module.id) : [...prev, module.id])}
+                        sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1.2, borderRadius: 2, cursor: "pointer", border: `1.5px solid ${isSelected ? "#3b82f6" : "#e2e8f0"}`, bgcolor: isSelected ? "#eff6ff" : "#fff", transition: "all 0.15s", "&:hover": { borderColor: isSelected ? "#2563eb" : "#cbd5e1", bgcolor: isSelected ? "#dbeafe" : "#f8fafc" } }}
+                      >
+                        <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: isSelected ? "#dbeafe" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0, transition: "all 0.15s" }}>
+                          {getModuleIcon(module.id)}
+                        </Box>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: isSelected ? "#1d4ed8" : "#374151", lineHeight: 1.3 }}>{module.name}</Typography>
+                          {isSelected && <Typography sx={{ fontSize: "0.65rem", color: "#3b82f6", fontWeight: 500 }}>✓ Enabled</Typography>}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+
+                <Box sx={{ mt: "auto" }}>
+                  <Button variant="contained" fullWidth disabled={loading}
+                    onClick={async () => { await handleAssignModules(actionsMenuUser._id, selectedUserModules); setActionsMenuUser(null); setActionsTab(0); }}
+                    sx={{ bgcolor: "#1d4ed8", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: "#1e40af" } }}
+                  >
+                    {loading ? "Saving..." : `Save Module Assignments (${selectedUserModules.length} enabled)`}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Panel 3: Role */}
+            {actionsTab === 3 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Role Management</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Manage administrative privileges for this user.</Typography>
+                </Box>
+
+                <Box sx={{ border: `1.5px solid ${actionsMenuUser?.role === "admin" ? "#e9d5ff" : "#e2e8f0"}`, borderRadius: 2.5, p: 3, bgcolor: actionsMenuUser?.role === "admin" ? "#faf5ff" : "#f8fafc", display: "flex", alignItems: "center", gap: 2.5 }}>
+                  <Box sx={{ width: 52, height: 52, borderRadius: 2, bgcolor: actionsMenuUser?.role === "admin" ? "#ede9fe" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {actionsMenuUser?.role === "admin" ? <AdminPanelSettings sx={{ color: "#7c3aed", fontSize: 28 }} /> : <People sx={{ color: "#64748b", fontSize: 28 }} />}
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, fontSize: "0.95rem", color: "#0f172a" }}>Current Role: {actionsMenuUser?.role === "admin" ? "Administrator" : "Standard User"}</Typography>
+                    <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.5, lineHeight: 1.5 }}>
+                      {actionsMenuUser?.role === "admin" ? "This user has elevated privileges to manage users, modules, and settings." : "This user has standard access limited to their assigned modules."}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, p: 2.5 }}>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {actionsMenuUser?.role === "admin" ? "After removing admin role" : "After promoting to admin"}
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    {(actionsMenuUser?.role === "admin"
+                      ? ["User will lose access to admin panel", "Cannot manage other users or modules", "Retains their own module assignments"]
+                      : ["User gains access to admin management panel", "Can manage other users, modules, and settings", "Existing module assignments are preserved"]
+                    ).map((item, i) => (
+                      <Box key={i} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#94a3b8", mt: 0.7, flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: "0.78rem", color: "#475569" }}>{item}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                <Box sx={{ mt: "auto" }}>
+                  <Button variant="contained" fullWidth disabled={loading}
+                    startIcon={actionsMenuUser?.role === "admin" ? <Delete /> : <AdminPanelSettings />}
+                    onClick={async () => {
+                      if (actionsMenuUser?.role === "admin") {
+                        await handleRevokeAdmin(actionsMenuUser, "user");
+                      } else {
+                        await handlePromoteToAdmin(actionsMenuUser, "user");
+                      }
+                      setActionsMenuUser(null); setActionsTab(0);
+                    }}
+                    sx={{ bgcolor: actionsMenuUser?.role === "admin" ? "#dc2626" : "#7c3aed", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: actionsMenuUser?.role === "admin" ? "#b91c1c" : "#6d28d9" } }}
+                  >
+                    {loading ? "Processing..." : actionsMenuUser?.role === "admin" ? "Remove Admin Role" : "Promote to Administrator"}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+            {/* Panel 4: Tab Visibility */}
+            {actionsTab === 4 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Tab Visibility</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Control which navigation tabs are visible to this user in their dashboard.</Typography>
+                </Box>
+
+                {[{ key: "jobsTabVisible", label: "Jobs Tab", desc: "Show or hide the Jobs navigation tab" }, { key: "gandhidhamTabVisible", label: "Gandhidham Tab", desc: "Show or hide the Gandhidham navigation tab" }].map(({ key, label, desc }) => (
+                  <Box key={key}
+                    sx={{ border: `1.5px solid ${tabSettings[key] ? "#bbf7d0" : "#e2e8f0"}`, borderRadius: 2.5, p: 2.5, bgcolor: tabSettings[key] ? "#f0fdf4" : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.2s" }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: tabSettings[key] ? "#dcfce7" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
+                        <Apps sx={{ color: tabSettings[key] ? "#16a34a" : "#94a3b8", fontSize: 22 }} />
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.88rem", color: "#0f172a" }}>{label}</Typography>
+                        <Typography sx={{ fontSize: "0.73rem", color: "#64748b", mt: 0.2 }}>{desc}</Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Chip label={tabSettings[key] ? "Visible" : "Hidden"} size="small" color={tabSettings[key] ? "success" : "default"} variant="outlined" sx={{ fontWeight: 600, fontSize: "0.72rem" }} />
+                      <Switch checked={tabSettings[key]} onChange={(e) => setTabSettings(prev => ({ ...prev, [key]: e.target.checked }))} color="success" />
+                    </Box>
+                  </Box>
+                ))}
+
+                <Box sx={{ mt: "auto" }}>
+                  <Button variant="contained" fullWidth disabled={loading} startIcon={<Apps />}
+                    onClick={async () => { await handleUpdateTabVisibility(); setActionsMenuUser(null); setActionsTab(0); }}
+                    sx={{ bgcolor: "#16a34a", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: "#15803d" } }}
+                  >
+                    {loading ? "Saving..." : "Save Tab Visibility Settings"}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
+          </Box>
+        </Box>
+      </Dialog>
 
       <IeCodeDialog
         open={ieCodeDialog}
