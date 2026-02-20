@@ -4,6 +4,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import axios from "axios";
 import connectDB from "./config/db.js";
 import config from "./config/env.js";
 import jobRoutes from "./routes/jobRoutes.js";
@@ -133,6 +134,23 @@ app.use(analytics);
 
 app.use("/api/elock", elockRoutes);
 app.use("/api/elock-details", elockDetailsRoutes);
+
+// Proxy route for third-party notifications
+app.get("/api/notifications", async (req, res) => {
+  try {
+    const { assetIds } = req.query;
+    if (!assetIds) {
+      return res.status(400).json({ success: false, message: "assetIds param is required" });
+    }
+    const response = await axios.get("http://3.108.244.38:9005/api/notifications", {
+      params: { assetIds }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error proxying notifications:", error.response?.data || error.message);
+    res.status(500).json({ success: false, error: "Failed to fetch notifications from third-party service" });
+  }
+});
 
 // Root route
 app.get("/", (req, res) => {

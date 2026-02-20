@@ -71,6 +71,7 @@ const statusMapping = {
   be_noted_arrival_pending: "BE Noted, Arrival Pending",
   be_noted_clearance_pending: "BE Noted, Clearance Pending",
   pcv_done_duty_payment_pending: "PCV Done, Duty Payment Pending",
+  do_completed_delivery_pending: "Do completed and Delivery pending",
   custom_clearance_completed: "Custom Clearance Completed",
 };
 
@@ -78,11 +79,12 @@ const statusRank = {
   "Billing Pending": { rank: 1, field: "emptyContainerOffLoadDate" },
   "Custom Clearance Completed": { rank: 2, field: "detention_from" },
   "PCV Done, Duty Payment Pending": { rank: 3, field: "detention_from" },
-  "BE Noted, Clearance Pending": { rank: 4, field: "detention_from" },
-  "BE Noted, Arrival Pending": { rank: 5, field: "be_date" },
-  "Rail Out": { rank: 6, field: "rail_out" },
-  Discharged: { rank: 7, field: "discharge_date" },
-  "Gateway IGM Filed": { rank: 8, field: "gateway_igm_date" },
+  "Do completed and Delivery pending": { rank: 4, field: "detention_from" },
+  "BE Noted, Clearance Pending": { rank: 5, field: "detention_from" },
+  "BE Noted, Arrival Pending": { rank: 6, field: "be_date" },
+  "Rail Out": { rank: 7, field: "rail_out" },
+  Discharged: { rank: 8, field: "discharge_date" },
+  "Gateway IGM Filed": { rank: 9, field: "gateway_igm_date" },
   "Estimated Time of Arrival": { rank: 9, field: "vessel_berthing" },
 };
 

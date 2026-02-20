@@ -33,11 +33,13 @@ import {
   LeftOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  SyncOutlined
+  SyncOutlined,
+  BellOutlined
 } from "@ant-design/icons";
 import { apiService } from "../services/elockApi";
 import TrackingMap from "./TrackingMap.jsx";
 import ElockManagement from "./ElockManagement.jsx";
+import NotificationHistoryModal from "./NotificationHistoryModal.jsx";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
 
@@ -73,7 +75,20 @@ const Dashboard = () => {
   const [previewImages, setPreviewImages] = useState([]);
   const [previewTitle, setPreviewTitle] = useState('');
 
+  // Notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedNotificationElockNo, setSelectedNotificationElockNo] = useState(null);
+
   const [activeTab, setActiveTab] = useState("assignments");
+
+  const getImporterName = () => {
+    if (!userData) return "";
+    let importerObj;
+    if (userData.ieCodeAssignments && Array.isArray(userData.ieCodeAssignments)) {
+      importerObj = userData.ieCodeAssignments.find(a => a.ie_code_no === (selectedIeCode || userData.ieCodeNo));
+    }
+    return importerObj ? importerObj.importer_name : (userData.ieCodeAssignments?.[0]?.importer_name || "");
+  };
 
   useEffect(() => {
     fetchUserData();
@@ -293,6 +308,15 @@ const Dashboard = () => {
     }
   };
 
+  const handleViewNotifications = (assignment) => {
+    if (assignment.f_asset_id || assignment.elock_no) {
+      setSelectedNotificationElockNo(assignment.f_asset_id || assignment.elock_no);
+      setShowNotifications(true);
+    } else {
+      message.error("E-lock number not available");
+    }
+  };
+
   const formatFieldValue = (value) => {
     if (!value || value === "null" || value === "undefined") return "N/A";
     return value;
@@ -305,7 +329,7 @@ const Dashboard = () => {
     }
     if (!limits && filterType) {
       return <Tag icon={<ExclamationCircleOutlined />} color="warning" style={{ fontSize: '12px' }}>Sync Needed</Tag>;
-    }
+    } 
     if (limits) {
       return (
         <div className="limit-pills-container compact">
@@ -427,6 +451,16 @@ const Dashboard = () => {
           >
             Images
           </Button>
+          <Button
+            size="small"
+            type="dashed"
+            icon={<BellOutlined style={{ fontSize: '12px' }} />}
+            disabled={!(record.f_asset_id || record.elock_no)}
+            onClick={() => handleViewNotifications(record)}
+            style={{ fontSize: '11px', height: '22px', padding: '0 8px' }}
+          >
+            History
+          </Button>
         </Space>
       ),
       width: 90,
@@ -435,7 +469,7 @@ const Dashboard = () => {
       title: 'LR No',
       dataIndex: 'tr_no',
       key: 'tr_no',
-      width: 130,
+      width: 150,
       render: text => <Text style={{ fontSize: '12px' }} strong>{formatFieldValue(text)}</Text>
     },
     {
@@ -555,7 +589,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container-ant compact">
       {/* Header */}
-      <div className="dashboard-header-ant compact">
+      <div className="dashboard-header-ant compact" style={{ position: 'relative' }}>
         <Row align="middle" justify="space-between" gutter={[8, 8]}>
           <Col>
             <Space size="small">
@@ -603,6 +637,27 @@ const Dashboard = () => {
             </Space>
           </Col>
         </Row>
+        
+        {/* Centered Importer Name */}
+        {userData && getImporterName() && (
+          <Title
+            level={5}
+            style={{
+              margin: 0,
+              fontSize: '16px',
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              fontWeight: 600,
+              color: '#1e293b',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none'
+            }}
+          >
+            {getImporterName()}
+          </Title>
+        )}
       </div>
 
       <div className="main-content-ant compact" style={{ padding: '16px' }}>
@@ -611,12 +666,23 @@ const Dashboard = () => {
           {/* Controls Container */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
 
-            {/* Top Row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'nowrap', gap: 12 }}>
+            {/* Top Row ONLY PILLS */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+              {/* Pills Right */}
+              <div style={{ flexShrink: 0 }}>
+                {renderLimitPills()}
+              </div>
+            </div>
+          </div>
 
-              {/* Filters Left */}
-              <div style={{ flex: 1, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Input
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            size="small"
+            tabBarGutter={24}
+            tabBarExtraContent={
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                 <Input
                   placeholder="Search container..."
                   prefix={<SearchOutlined />}
                   value={searchTerm}
@@ -653,22 +719,7 @@ const Dashboard = () => {
                   <Option value="consignee">Consignee</Option>
                 </Select>
               </div>
-
-              {/* Pills Right */}
-              <div style={{ flexShrink: 0 }}>
-                {renderLimitPills()}
-              </div>
-            </div>
-
-            {/* Second Row: Pagination Right - MOVED TO TABS */}
-          </div>
-
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            size="small"
-            tabBarGutter={24}
-            tabBarExtraContent={<CustomPagination />}
+            }
           >
             <TabPane tab="Container Assignments" key="assignments">
               <Table
@@ -678,9 +729,13 @@ const Dashboard = () => {
                 loading={loading}
                 pagination={false}
                 size="small"
-                scroll={{ x: '100%' }}
+                scroll={{ x: 'max-content', y: 'calc(100vh - 380px)' }}
                 style={{ fontSize: '12px' }}
+                bordered
               />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', marginBottom: '4px' }}>
+                <CustomPagination />
+              </div>
             </TabPane>
           </Tabs>
         </Card>
@@ -719,6 +774,17 @@ const Dashboard = () => {
           ))}
         </div>
       </Modal>
+
+      {/* Notification History Modal */}
+      {showNotifications && selectedNotificationElockNo && (
+        <NotificationHistoryModal
+          elockNumber={selectedNotificationElockNo}
+          onClose={() => {
+            setShowNotifications(false);
+            setSelectedNotificationElockNo(null);
+          }}
+        />
+      )}
 
     </div>
   );

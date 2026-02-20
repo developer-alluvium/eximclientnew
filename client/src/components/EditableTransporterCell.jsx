@@ -1,99 +1,85 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tooltip } from "@mui/material";
 import axios from "axios";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
 
-// Add CSS for spinner animation
 const spinnerKeyframes = `
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 `;
 
-// Inject the keyframes into the document head
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
+if (typeof document !== "undefined") {
+  const style = document.createElement("style");
   style.textContent = spinnerKeyframes;
   document.head.appendChild(style);
 }
 
 const EditableTransporterCell = ({ cell }) => {
-  const {
-    _id,
-    container_nos = [],
-  } = cell.row.original;
-
-  console.log("EditableTransporterCell - Job ID:", _id);
-  console.log("EditableTransporterCell - Container data:", container_nos);
+  const { _id, container_nos = [] } = cell.row.original;
 
   const [containers, setContainers] = useState([...container_nos]);
   const [editable, setEditable] = useState(null);
-  const [tempTransporterValue, setTempTransporterValue] = useState("");
-  const [transporterError, setTransporterError] = useState("");
+  const [tempValue, setTempValue] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState("");
-  
-  // Reset data when row changes
+  const inputRefs = useRef({});
+
   useEffect(() => {
     setContainers([...container_nos]);
-    setEditable(null);
-    setTempTransporterValue("");
-    setTransporterError("");
-  }, [cell.row.original]);
 
-  // Handle initiating edit mode
-  const handleEditStart = (index) => {
-    setEditable(`transporter_${index}`);
-    setTempTransporterValue(containers[index]?.transporter || "");
-    setTransporterError("");
-  };
-
-  // Handle initiating add mode for containers without transporters
-  const handleAddStart = (index) => {
-    setEditable(`transporter_${index}`);
-    setTempTransporterValue("");
-    setTransporterError("");
-  };
-
-  // Handle transporter input change
-  const handleTransporterInputChange = (e) => {
-    setTempTransporterValue(e.target.value);
-    setTransporterError("");
-  };
-
-  // Copy transporter value to clipboard
-  const handleCopyTransporter = (text) => {
-    if (!text) return;
-    
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          setCopySuccess("Copied!");
-          setTimeout(() => setCopySuccess(""), 2000);
-        })
-        .catch((err) => {
-          console.error("Failed to copy:", err);
-        });
-    } else {
-      // Fallback approach for older browsers
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try {
-        document.execCommand("copy");
-        setCopySuccess("Copied!");
-        setTimeout(() => setCopySuccess(""), 2000);
-      } catch (err) {
-        console.error("Fallback copy failed:", err);
+    if (cell.targetContainerNumber) {
+      const index = container_nos.findIndex(
+        (c) => c.container_number === cell.targetContainerNumber
+      );
+      if (index !== -1 && !container_nos[index].transporter) {
+        setEditable(index);
+        setTempValue("");
+      } else {
+        setEditable(null);
+        setTempValue("");
       }
-      document.body.removeChild(textArea);
+    } else if (container_nos.length === 1 && !container_nos[0].transporter) {
+      setEditable(0);
+      setTempValue("");
+    } else {
+      setEditable(null);
+      setTempValue("");
     }
+    setError("");
+  }, [cell.row.original, cell.targetContainerNumber]);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (editable !== null && inputRefs.current[editable]) {
+      inputRefs.current[editable].focus();
+    }
+  }, [editable]);
+
+  const handleEditStart = (index) => {
+    setEditable(index);
+    setTempValue(containers[index]?.transporter || "");
+    setError("");
   };
 
-  // Format date for display
+  const handleCancel = () => {
+    setEditable(null);
+    setTempValue("");
+    setError("");
+  };
+
+  const handleCopy = (text) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopySuccess("Copied!");
+      setTimeout(() => setCopySuccess(""), 2000);
+    });
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -105,384 +91,342 @@ const EditableTransporterCell = ({ cell }) => {
     });
   };
 
-  // Validate transporter data
-  const validateTransporter = (value) => {
-    if (!value || value.trim() === "") {
-      setTransporterError("Transporter name cannot be empty");
-      return false;
+  const handleSubmit = (index) => {
+    if (!tempValue || tempValue.trim() === "") {
+      setError("Transporter name cannot be empty");
+      return;
     }
-    return true;
-  };
 
-  // Submit transporter changes
-  const handleTransporterSubmit = (index) => {
-    if (!validateTransporter(tempTransporterValue)) {
+    if (!_id) {
+      setError("Cannot update: Job ID is missing");
       return;
     }
 
     setIsLoading(true);
 
-    const updatedContainers = containers.map((container, i) => {
-      if (i === index) {
-        return {
-          ...container,
-          transporter: tempTransporterValue,
-          transporter_assigned_date: new Date().toISOString()
-        };
-      }
-      return container;
-    });
-
-    // Update containers in database
-    console.log("Updating job with ID:", _id);
-    console.log("Updated containers data:", updatedContainers);
-    
-    if (!_id) {
-      console.error("Job ID is missing or invalid");
-      setTransporterError("Cannot update: Job ID is missing");
-      setIsLoading(false);
-      return;
-    }
+    const updatedContainers = containers.map((c, i) =>
+      i === index
+        ? { ...c, transporter: tempValue, transporter_assigned_date: new Date().toISOString() }
+        : c
+    );
 
     axios
       .patch(`${process.env.REACT_APP_API_STRING}/jobs/${_id}`, {
         container_nos: updatedContainers,
       })
-      .then((response) => {
-        console.log("Update successful:", response.data);
+      .then(() => {
         setContainers(updatedContainers);
         setEditable(null);
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error("Error updating transporter:", err.response ? err.response.data : err.message);
-        setTransporterError(`Failed to update transporter: ${err.response ? err.response.status : 'Network error'}`);
+        setError(`Failed to update: ${err.response?.status || "Network error"}`);
         setIsLoading(false);
       });
   };
 
-  // Handle key press events
-  const handleKeyPress = (e, index) => {
-    if (e.key === "Enter") {
-      handleTransporterSubmit(index);
-    } else if (e.key === "Escape") {
-      setEditable(null);
-    }
-  };
-
-  const styles = {
-    containerWrapper: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "16px",
-      padding: "8px 0",
-    },
-    containerBox: {
-      border: "1px solid #e1e5e9",
-      borderRadius: "8px",
-      padding: "20px",
-      backgroundColor: "#ffffff",
-      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-      transition: "all 0.2s ease",
-    },
-    containerHeader: {
-      marginBottom: "16px",
-      paddingBottom: "8px",
-      borderBottom: "1px solid #f0f0f0",
-    },
-    containerNumber: {
-      fontWeight: "600",
-      fontSize: "16px",
-      color: "#1a202c",
-      letterSpacing: "0.025em",
-    },
-    transporterSection: {
-      display: "flex",
-      alignItems: "center",
-      gap: "16px",
-      minHeight: "40px",
-    },
-    transporterLabel: {
-      fontSize: "14px",
-      color: "#4a5568",
-      fontWeight: "500",
-      minWidth: "90px",
-    },
-    transporterInfo: {
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-      flex: 1,
-    },
-    transporterName: {
-      fontSize: "15px",
-      color: "#2d3748",
-      fontWeight: "500",
-      padding: "4px 8px",
-      backgroundColor: "#f7fafc",
-      borderRadius: "6px",
-      border: "1px solid #e2e8f0",
-    },
-    transporterDate: {
-      color: "#718096",
-      fontSize: "13px",
-      marginLeft: "auto",
-      fontStyle: "italic",
-    },
-    transporterNotAssigned: {
-      color: "#a0aec0",
-      fontSize: "14px",
-      fontStyle: "italic",
-      padding: "4px 8px",
-      backgroundColor: "#f8f9fa",
-      borderRadius: "6px",
-      border: "1px dashed #e2e8f0",
-    },
-    actionButton: {
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      color: "white",
-      border: "none",
-      cursor: "pointer",
-      padding: "8px 16px",
-      borderRadius: "6px",
-      fontSize: "13px",
-      fontWeight: "500",
-      transition: "all 0.2s ease",
-      boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
-    },
-    copyButton: {
-      background: "none",
-      border: "1px solid #e2e8f0",
-      cursor: "pointer",
-      padding: "6px",
-      borderRadius: "6px",
-      color: "#718096",
-      transition: "all 0.2s ease",
-      display: "flex",
-      alignItems: "center",
-      backgroundColor: "#f8f9fa",
-    },
-    copySuccess: {
-      fontSize: "12px",
-      color: "#38a169",
-      marginLeft: "8px",
-      fontWeight: "500",
-    },
-    transporterActions: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "12px",
-    },
-    transporterInput: {
-      padding: "12px 16px",
-      borderRadius: "8px",
-      border: "2px solid #e2e8f0",
-      width: "100%",
-      fontSize: "15px",
-      backgroundColor: "#ffffff",
-      transition: "all 0.2s ease",
-      fontFamily: "inherit",
-      outline: "none",
-    },
-    transporterInputFocus: {
-      borderColor: "#667eea",
-      boxShadow: "0 0 0 3px rgba(102, 126, 234, 0.1)",
-    },
-    errorInput: {
-      borderColor: "#e53e3e",
-      boxShadow: "0 0 0 3px rgba(229, 62, 62, 0.1)",
-    },
-    errorText: {
-      color: "#e53e3e",
-      fontSize: "13px",
-      marginTop: "4px",
-      fontWeight: "500",
-    },
-    buttonGroup: {
-      display: "flex",
-      gap: "12px",
-    },
-    submitButton: {
-      background: "linear-gradient(135deg, #48bb78 0%, #38a169 100%)",
-      color: "white",
-      border: "none",
-      borderRadius: "8px",
-      padding: "12px 24px",
-      cursor: "pointer",
-      fontSize: "14px",
-      fontWeight: "600",
-      transition: "all 0.2s ease",
-      boxShadow: "0 2px 4px rgba(72, 187, 120, 0.3)",
-      minWidth: "80px",
-    },
-    submitButtonDisabled: {
-      background: "#a0aec0",
-      cursor: "not-allowed",
-      boxShadow: "none",
-    },
-    cancelButton: {
-      backgroundColor: "transparent",
-      color: "#718096",
-      border: "2px solid #e2e8f0",
-      borderRadius: "8px",
-      padding: "12px 24px",
-      cursor: "pointer",
-      fontSize: "14px",
-      fontWeight: "500",
-      transition: "all 0.2s ease",
-      minWidth: "80px",
-    },
-    spinner: {
-      display: "inline-block",
-      width: "16px",
-      height: "16px",
-      border: "2px solid rgba(255,255,255,0.3)",
-      borderRadius: "50%",
-      borderTopColor: "#fff",
-      animation: "spin 1s linear infinite",
-    },
+  const handleKeyDown = (e, index) => {
+    if (e.key === "Enter") handleSubmit(index);
+    else if (e.key === "Escape") handleCancel();
   };
 
   return (
-    <div style={styles.containerWrapper}>
-      {containers.map((container, id) => (
-        <div key={id} style={styles.containerBox}>
-          <div style={styles.containerHeader}>
-            <span style={styles.containerNumber}>
-              {container.container_number || container.container_no || `Container #${id + 1}`}
-            </span>
-          </div>
-          
-          {editable !== `transporter_${id}` ? (
-            <div style={styles.transporterSection}>
-              <span style={styles.transporterLabel}>Transporter:</span>
-              <div style={styles.transporterInfo}>
-                {container.transporter ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0" }}>
+      {containers.map((container, idx) => {
+        if (
+          cell.targetContainerNumber &&
+          container.container_number !== cell.targetContainerNumber
+        )
+          return null;
+
+        const isEditing = editable === idx;
+        const hasTransporter = !!container.transporter;
+
+        return (
+          <div
+            key={idx}
+            style={{
+              border: "1px solid #e1e5e9",
+              borderRadius: 8,
+              padding: 20,
+              backgroundColor: "#ffffff",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+            }}
+          >
+            {/* Container number header */}
+            <div
+              style={{
+                marginBottom: 16,
+                paddingBottom: 8,
+                borderBottom: "1px solid #f0f0f0",
+                fontWeight: 600,
+                fontSize: 16,
+                color: "#1a202c",
+                letterSpacing: "0.025em",
+              }}
+            >
+              {container.container_number ||
+                container.container_no ||
+                `Container #${idx + 1}`}
+            </div>
+
+            {/* Transporter row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 40 }}>
+              <span
+                style={{
+                  fontSize: 14,
+                  color: "#4a5568",
+                  fontWeight: 500,
+                  minWidth: 90,
+                  flexShrink: 0,
+                }}
+              >
+                Transporter:
+              </span>
+
+              {/* === INLINE FIELD === */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                {isEditing ? (
                   <>
-                    <span style={styles.transporterName}>{container.transporter}</span>
-                    
-                    <Tooltip title="Copy transporter name">
-                      <button 
-                        onClick={() => handleCopyTransporter(container.transporter)}
-                        style={styles.copyButton}
-                        onMouseEnter={(e) => e.target.style.borderColor = '#cbd5e0'}
-                        onMouseLeave={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    {/* Inline input — sits exactly where the label/placeholder was */}
+                    <input
+                      ref={(el) => (inputRefs.current[idx] = el)}
+                      type="text"
+                      value={tempValue}
+                      onChange={(e) => {
+                        setTempValue(e.target.value);
+                        setError("");
+                      }}
+                      onKeyDown={(e) => handleKeyDown(e, idx)}
+                      placeholder="Enter transporter name"
+                      style={{
+                        flex: 1,
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        border: `2px solid ${error ? "#e53e3e" : "#667eea"}`,
+                        fontSize: 14,
+                        outline: "none",
+                        boxShadow: error
+                          ? "0 0 0 3px rgba(229,62,62,0.1)"
+                          : "0 0 0 3px rgba(102,126,234,0.1)",
+                        fontFamily: "inherit",
+                        transition: "border-color 0.15s",
+                      }}
+                    />
+
+                    {/* Confirm */}
+                    <Tooltip title="Save (Enter)">
+                      <button
+                        onClick={() => handleSubmit(idx)}
+                        disabled={isLoading}
+                        style={{
+                          background: isLoading ? "#a0aec0" : "linear-gradient(135deg,#48bb78,#38a169)",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "6px 8px",
+                          cursor: isLoading ? "not-allowed" : "pointer",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
                       >
-                        <ContentCopyIcon style={{ fontSize: 16 }} />
+                        {isLoading ? (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              width: 14,
+                              height: 14,
+                              border: "2px solid rgba(255,255,255,0.3)",
+                              borderRadius: "50%",
+                              borderTopColor: "#fff",
+                              animation: "spin 1s linear infinite",
+                            }}
+                          />
+                        ) : (
+                          <CheckIcon style={{ fontSize: 16 }} />
+                        )}
                       </button>
                     </Tooltip>
-                    
-                    {copySuccess && <span style={styles.copySuccess}>{copySuccess}</span>}
-                    
+
+                    {/* Cancel */}
+                    <Tooltip title="Cancel (Esc)">
+                      <button
+                        onClick={handleCancel}
+                        disabled={isLoading}
+                        style={{
+                          background: "transparent",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 6,
+                          padding: "6px 8px",
+                          cursor: "pointer",
+                          color: "#718096",
+                          display: "flex",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <CloseIcon style={{ fontSize: 16 }} />
+                      </button>
+                    </Tooltip>
+                  </>
+                ) : hasTransporter ? (
+                  <>
+                    {/* Assigned transporter display */}
+                    <span
+                      style={{
+                        fontSize: 14,
+                        color: "#2d3748",
+                        fontWeight: 500,
+                        padding: "5px 10px",
+                        backgroundColor: "#f7fafc",
+                        borderRadius: 6,
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      {container.transporter}
+                    </span>
+
+                    <Tooltip title="Copy">
+                      <button
+                        onClick={() => handleCopy(container.transporter)}
+                        style={{
+                          background: "none",
+                          border: "1px solid #e2e8f0",
+                          cursor: "pointer",
+                          padding: "5px 6px",
+                          borderRadius: 6,
+                          color: "#718096",
+                          display: "flex",
+                          alignItems: "center",
+                          backgroundColor: "#f8f9fa",
+                        }}
+                      >
+                        <ContentCopyIcon style={{ fontSize: 15 }} />
+                      </button>
+                    </Tooltip>
+
+                    {copySuccess && (
+                      <span style={{ fontSize: 12, color: "#38a169", fontWeight: 500 }}>
+                        {copySuccess}
+                      </span>
+                    )}
+
                     {container.transporter_assigned_date && (
-                      <span style={styles.transporterDate}>
+                      <span
+                        style={{
+                          color: "#718096",
+                          fontSize: 12,
+                          fontStyle: "italic",
+                          marginLeft: "auto",
+                        }}
+                      >
                         Assigned: {formatDate(container.transporter_assigned_date)}
                       </span>
                     )}
-                    
-                    <button
-                      onClick={() => handleEditStart(id)}
-                      style={styles.actionButton}
-                      onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                      onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                    >
-                      Edit
-                    </button>
+
+                    {/* Edit button */}
+                    <Tooltip title="Edit transporter">
+                      <button
+                        onClick={() => handleEditStart(idx)}
+                        style={{
+                          background: "linear-gradient(135deg,#667eea,#764ba2)",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: "6px 14px",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          fontWeight: 500,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <EditIcon style={{ fontSize: 14 }} /> Edit
+                      </button>
+                    </Tooltip>
                   </>
                 ) : (
                   <>
-                    <span style={styles.transporterNotAssigned}>No transporter assigned</span>
+                    {/* No transporter yet — "No transporter assigned" label + Assign + Edit side by side */}
+                    <span
+                      style={{
+                        color: "#a0aec0",
+                        fontSize: 14,
+                        fontStyle: "italic",
+                        padding: "5px 10px",
+                        backgroundColor: "#f8f9fa",
+                        borderRadius: 6,
+                        border: "1px dashed #e2e8f0",
+                        flex: 1,
+                      }}
+                    >
+                      No transporter assigned
+                    </span>
+
+                    {/* Assign */}
                     <button
-                      onClick={() => handleAddStart(id)}
-                      style={styles.actionButton}
-                      onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                      onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                      onClick={() => handleEditStart(idx)}
+                      style={{
+                        background: "linear-gradient(135deg,#667eea,#764ba2)",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "6px 14px",
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        flexShrink: 0,
+                      }}
                     >
                       Assign
                     </button>
+
+                    {/* Edit (same action, alternate entry point) */}
+                    <Tooltip title="Edit transporter">
+                      <button
+                        onClick={() => handleEditStart(idx)}
+                        style={{
+                          background: "transparent",
+                          border: "1px solid #e2e8f0",
+                          cursor: "pointer",
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          color: "#718096",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          fontSize: 13,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <EditIcon style={{ fontSize: 14 }} /> Edit
+                      </button>
+                    </Tooltip>
                   </>
                 )}
               </div>
             </div>
-          ) : (
-            <div style={styles.transporterActions}>
-              <input
-                type="text"
-                value={tempTransporterValue}
-                onChange={handleTransporterInputChange}
-                onKeyDown={(e) => handleKeyPress(e, id)}
-                placeholder="Enter transporter name"
-                autoFocus
+
+            {/* Inline error — shown beneath the row, never causes layout shift above */}
+            {isEditing && error && (
+              <div
                 style={{
-                  ...styles.transporterInput,
-                  ...(transporterError ? styles.errorInput : {})
+                  color: "#e53e3e",
+                  fontSize: 12,
+                  marginTop: 6,
+                  paddingLeft: 102, // align under the input (past the "Transporter:" label)
+                  fontWeight: 500,
                 }}
-                onFocus={(e) => {
-                  if (!transporterError) {
-                    e.target.style.borderColor = '#667eea';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                  }
-                }}
-                onBlur={(e) => {
-                  if (!transporterError) {
-                    e.target.style.borderColor = '#e2e8f0';
-                    e.target.style.boxShadow = 'none';
-                  }
-                }}
-              />
-              
-              {transporterError && (
-                <div style={styles.errorText}>{transporterError}</div>
-              )}
-              
-              <div style={styles.buttonGroup}>
-                <button
-                  style={{
-                    ...styles.submitButton,
-                    ...(isLoading ? styles.submitButtonDisabled : {})
-                  }}
-                  onClick={() => handleTransporterSubmit(id)}
-                  disabled={isLoading}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) {
-                      e.target.style.transform = 'translateY(-1px)';
-                      e.target.style.boxShadow = '0 4px 8px rgba(72, 187, 120, 0.4)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLoading) {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 2px 4px rgba(72, 187, 120, 0.3)';
-                    }
-                  }}
-                >
-                  {isLoading ? (
-                    <span style={styles.spinner}></span>
-                  ) : (
-                    "Save"
-                  )}
-                </button>
-                
-                <button
-                  style={styles.cancelButton}
-                  onClick={() => setEditable(null)}
-                  disabled={isLoading}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#f7fafc';
-                    e.target.style.borderColor = '#cbd5e0';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                    e.target.style.borderColor = '#e2e8f0';
-                  }}
-                >
-                  Cancel
-                </button>
+              >
+                {error}
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

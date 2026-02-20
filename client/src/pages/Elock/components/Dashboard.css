@@ -206,5 +206,16 @@
 /* Reduce table cell padding for compactness */
 .ant-table.ant-table-small .ant-table-thead>tr>th,
 .ant-table.ant-table-small .ant-table-tbody>tr>td {
-    padding: 4px 8px;
+    padding: 6px 8px;
+}
+
+/* Custom Table Header styling for Dashboard */
+.dashboard-container-ant .ant-table-thead > tr > th {
+    background-color: #1e293b !important;
+    color: white !important;
+    white-space: nowrap;
+}
+
+.dashboard-container-ant .ant-table-thead > tr > th::before {
+    display: none !important; /* Removes the default Ant design column dividers if needed */
 }

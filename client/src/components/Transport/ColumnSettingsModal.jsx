@@ -134,8 +134,8 @@ const ColumnSettingsModal = ({ open, onClose, columns, columnOrder, onSave }) =>
           Apply Order
         </Button>,
       ]}
-      bodyStyle={{ maxHeight: '60vh', overflowY: 'auto', padding: '16px 0' }}
-      width={400}
+      bodyStyle={{ maxHeight: '60vh', maxWidth: '100%', overflowY: 'auto', padding: '16px 0' }}
+      width={600}
     >
         <Text type="secondary" style={{ display: 'block', marginBottom: 16, padding: '0 16px' }}>
             Drag and drop items to reorder columns.

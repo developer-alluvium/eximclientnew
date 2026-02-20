@@ -1,14 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import EditableDeliveryAddressCell from "../components/EditableDeliveryAddressCell"; // Adjust the path as needed
-import {
-  IconButton,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-} from "@mui/material";
+import { Button, Tooltip, Modal } from "antd";
+import { CopyOutlined, CarOutlined } from "@ant-design/icons";
 import { MdContentCopy, MdLocalShipping } from "react-icons/md";
 // import ScaleIcon from "@mui/icons-material/Scale";
 // import LocalShippingIcon from "@mui/icons-material/LocalShipping";
@@ -33,32 +26,25 @@ function useCustomerJobList() {
 
   const [containerModalOpen, setContainerModalOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
-  const [transporterModalOpen, setTransporterModalOpen] = useState(false);
-  const [selectedTransporterContainer, setSelectedTransporterContainer] =
-    useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [modalInitialTab, setModalInitialTab] = useState("tracking");
 
-  const handleContainerClick = useCallback((container) => {
+  const handleContainerClick = useCallback((container, jobData = null, tab = "tracking") => {
     setSelectedContainer(container);
+    if (jobData) {
+        setSelectedJob(jobData);
+    }
+    setModalInitialTab(tab);
     setContainerModalOpen(true);
   }, []);
 
   const handleModalClose = useCallback(() => {
     setContainerModalOpen(false);
     setSelectedContainer(null);
+    setSelectedJob(null);
+    setModalInitialTab("tracking");
   }, []);
 
-  const handleTransporterClick = useCallback((container, jobId) => {
-    setSelectedTransporterContainer({
-      ...container,
-      jobId: jobId,
-    });
-    setTransporterModalOpen(true);
-  }, []);
-
-  const handleTransporterModalClose = useCallback(() => {
-    setTransporterModalOpen(false);
-    setSelectedTransporterContainer(null);
-  }, []);
   const handleCopy = useCallback((event, text) => {
     event.stopPropagation();
 
@@ -136,7 +122,7 @@ function useCustomerJobList() {
       {
         // Group 2: Exporter & Job Number
         accessorKey: "supplier_exporter",
-        header: "Exporter, Job Number & Free Time",
+        header: (<>Exporter,<br/> Job Number & Free Time</>),
         size: 200,
         Cell: ({ cell }) => {
           const { job_no, job_date, detailed_status, free_time } =
@@ -323,12 +309,13 @@ function useCustomerJobList() {
       // },
       {
         accessorKey: "be_no",
-        header: (
-          <div className="flex flex-col text-center whitespace-normal leading-tight">
-            <span>BE Number</span>
-            <span>and Date</span>
-          </div>
-        ),
+        // header: (
+        //   <div className="flex flex-col text-center whitespace-normal leading-tight">
+        //     <span>BE Number</span>
+        //     <span>and Date</span>
+        //   </div>
+        // ),
+         header: <>BE Number and Date</>,
         size: 230,
         Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} />,
       },
@@ -374,7 +361,8 @@ function useCustomerJobList() {
                       <div
                         style={{
                           backgroundColor: "#dbeafe",
-                          color: "#1e3a8a",
+                          // color: "#1e3a8a",
+                          color:"#1E293B",
                           wordBreak: "break-word",
                           padding: "2px 6px",
                           borderRadius: "4px",
@@ -549,7 +537,7 @@ function useCustomerJobList() {
 
       {
         accessorKey: "shipment_details",
-        header: "Shipment & Commercial Details",
+        header: <>Shipment & <br/>Commercial Details</>,
         size: 240,
         Cell: ({ cell }) => {
           const {
@@ -570,15 +558,13 @@ function useCustomerJobList() {
             <div style={{ alignItems: "center" }}>
               <strong>BL:</strong> {awb_bl_no}
               {awb_bl_no && (
-                <IconButton
+                <Button
+                  type="text"
                   size="small"
                   onClick={(event) => handleCopy(event, awb_bl_no)}
-                  sx={{ padding: "2px" }}
-                >
-                  <abbr title="Copy BL Number">
-                    <ContentCopyIcon fontSize="inherit" />
-                  </abbr>
-                </IconButton>
+                  icon={<CopyOutlined />}
+                  title="Copy BL Number"
+                />
               )}{" "}
               {awb_bl_date} <br />
               <strong>Gross Weight:</strong>
@@ -607,7 +593,7 @@ function useCustomerJobList() {
         // Group 4: Container
         accessorKey: "container_details",
         header: "Container",
-        size: 200,
+        size: 230,
         Cell: ({ cell }) => {
           const containerNos = cell.row.original.container_nos;
 
@@ -642,8 +628,15 @@ function useCustomerJobList() {
                   return (
                     <div
                       key={id}
-                      className="mb-2 text-center w-full"
-                      style={{ marginBottom: "4px" }}
+                      className="mb-2 w-full"
+                      style={{ 
+                        marginBottom: "4px", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center", 
+                        gap: "6px",
+                        whiteSpace: "nowrap" 
+                      }}
                     >
                       <Tooltip title={tooltipText} arrow placement="top">
                         <a
@@ -652,9 +645,8 @@ function useCustomerJobList() {
                             fontWeight: "bold",
                             textDecoration: "none",
                             cursor: "pointer",
-                            marginRight: "6px",
                           }}
-                          onClick={() => handleContainerClick(container)}
+                          onClick={() => handleContainerClick(container, cell.row.original, 'tracking')}
                           onMouseOver={(e) =>
                             (e.currentTarget.style.textDecoration = "underline")
                           }
@@ -666,7 +658,7 @@ function useCustomerJobList() {
                         </a>
                       </Tooltip>
 
-                      <span style={{ marginLeft: "4px", marginRight: "8px" }}>
+                      <span style={{ color: "#666" }}>
                         | "{container.size}"
                       </span>
 
@@ -674,36 +666,35 @@ function useCustomerJobList() {
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 4,
+                          gap: 2,
                         }}
                       >
                         <Tooltip title="Copy Container Number" arrow>
-                          <IconButton
+                          <Button
+                            type="text"
                             size="small"
+                            style={{ minWidth: "24px", padding: 0 }}
                             onClick={(event) =>
                               handleCopy(event, container.container_number)
                             }
-                          >
-                            <ContentCopyIcon fontSize="inherit" />
-                          </IconButton>
+                            icon={<CopyOutlined style={{ fontSize: '14px' }} />}
+                          />
                         </Tooltip>
 
                         <Tooltip title="Assign Transporter" arrow>
-                          <IconButton
+                          <Button
+                            type="text"
                             size="small"
+                            style={{ minWidth: "24px", padding: 0 }}
                             onClick={() =>
-                              handleTransporterClick(
+                              handleContainerClick(
                                 container,
-                                cell.row.original._id,
+                                cell.row.original,
+                                'transporter'
                               )
                             }
-                            sx={{ ml: 0.5, mr: 0.5 }}
-                          >
-                            <LocalShippingIcon
-                              fontSize="small"
-                              color="action"
-                            />
-                          </IconButton>
+                            icon={<CarOutlined style={{ fontSize: '14px' }} />}
+                          />
                         </Tooltip>
                       </span>
                     </div>
@@ -715,76 +706,77 @@ function useCustomerJobList() {
         },
       },
 
-      {
-        accessorKey: "container_numbers",
-        header: "Container Numbers and Size",
-        size: 230,
-        Cell: ({ cell }) => {
-          const containerNos = cell.row.original.container_nos;
-          const jobData = cell.row.original;
+      // {
+      //   accessorKey: "container_numbers",
+      //   header: "Container Numbers and Size",
+      //   size: 230,
+      //   Cell: ({ cell }) => {
+      //     const containerNos = cell.row.original.container_nos;
+      //     const jobData = cell.row.original;
 
-          // Helper function to get color based on shortage amount
-          const getShortageColor = (shortage) => {
-            if (shortage < 0) {
-              return "#e02251"; // Red for shortage
-            } else {
-              return "#2e7d32"; // Green for no shortage
-            }
-          };
+      //     // Helper function to get color based on shortage amount
+      //     const getShortageColor = (shortage) => {
+      //       if (shortage < 0) {
+      //         return "#e02251"; // Red for shortage
+      //       } else {
+      //         return "#2e7d32"; // Green for no shortage
+      //       }
+      //     };
 
-          // Helper function to get shortage text for tooltip
-          const getShortageText = (shortage) => {
-            if (shortage < 0) {
-              return `Shortage: -${Math.abs(shortage).toFixed(2)} kg`;
-            } else if (shortage > 0) {
-              return `Excess: +${Math.abs(shortage).toFixed(2)} kg`;
-            } else {
-              return "No shortage/excess";
-            }
-          };
+      //     // Helper function to get shortage text for tooltip
+      //     const getShortageText = (shortage) => {
+      //       if (shortage < 0) {
+      //         return `Shortage: -${Math.abs(shortage).toFixed(2)} kg`;
+      //       } else if (shortage > 0) {
+      //         return `Excess: +${Math.abs(shortage).toFixed(2)} kg`;
+      //       } else {
+      //         return "No shortage/excess";
+      //       }
+      //     };
 
-          return (
-            <div className="flex flex-col gap-1 w-full text-sm">
-              {containerNos?.map((container, id) => {
-                const weightShortage =
-                  parseFloat(container.weight_shortage) || 0;
-                const containerColor = getShortageColor(weightShortage);
-                const tooltipText = getShortageText(weightShortage);
+      //     return (
+      //       <div className="flex flex-col gap-1 w-full text-sm">
+      //         {containerNos?.map((container, id) => {
+      //           const weightShortage =
+      //             parseFloat(container.weight_shortage) || 0;
+      //           const containerColor = getShortageColor(weightShortage);
+      //           const tooltipText = getShortageText(weightShortage);
 
-                return (
-                  <div
-                    key={id}
-                    className="flex items-center gap-1 mb-1"
-                    title={tooltipText}
-                  >
-                    <a
-                      href={`https://www.ldb.co.in/ldb/containersearch/39/${container.container_number}/1726651147706`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-bold no-underline hover:underline"
-                      style={{ color: containerColor }}
-                    >
-                      {container.container_number}
-                    </a>
+      //           return (
+      //             <div
+      //               key={id}
+      //               className="flex items-center gap-1 mb-1"
+      //               title={tooltipText}
+      //             >
+      //               <a
+      //                 href={`https://www.ldb.co.in/ldb/containersearch/39/${container.container_number}/1726651147706`}
+      //                 target="_blank"
+      //                 rel="noopener noreferrer"
+      //                 className="font-bold no-underline hover:underline"
+      //                 style={{ color: containerColor }}
+      //               >
+      //                 {container.container_number}
+      //               </a>
 
-                    <span className="text-gray-600">| "{container.size}"</span>
+      //               <span className="text-gray-600">| "{container.size}"</span>
 
-                    <button
-                      className="p-1 hover:bg-gray-100 rounded ml-1 text-gray-500"
-                      title="Copy Container Number"
-                      onClick={(event) =>
-                        handleCopy(event, container.container_number)
-                      }
-                    >
-                      <ContentCopyIcon size={12} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        },
-      },
+      //                 <Tooltip title="Copy Container Number" arrow>
+      //                     <Button
+      //                       type="text"
+      //                       size="small"
+      //                       onClick={(event) =>
+      //                         handleCopy(event, container.container_number)
+      //                       }
+      //                       icon={<CopyOutlined />}
+      //                     />
+      //                   </Tooltip>
+      //             </div>
+      //           );
+      //         })}
+      //       </div>
+      //     );
+      //   },
+      // },
       {
         // Group 5: Movement Timeline
         accessorKey: "movement_timeline",
@@ -811,102 +803,133 @@ function useCustomerJobList() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "2px",
                 textAlign: "left",
+                gap: "2px",
+                width: "100%",
               }}
             >
               <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  ETA:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {vessel_berthing || "-"}
+                <strong>ETA:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
+                </span>
+                {/* <div>
+                  <strong>Berthing Date:</strong>
+                  <span style={{ marginLeft: "8px" }}>
+                    {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
+                  </span>
+                </div> */}
+              </div>
+              <div>
+                <strong>Discharge Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {discharge_date ? formatDate(discharge_date) : "Pending"}
                 </span>
               </div>
               <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  Discharge:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {formatDischargedate || "-"}
+                <strong>OOC Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {out_of_charge ? formatDate(out_of_charge) : "Pending"}
                 </span>
               </div>
               <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  {consignment_type === "LCL" ? "By Road:" : "Rail Out:"}
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {container_nos.length > 0
-                    ? container_nos
-                        .map((c) =>
-                          consignment_type === "LCL"
-                            ? c.by_road_movement_date?.split("T")[0]
-                            : c.container_rail_out_date?.split("T")[0],
-                        )
-                        .filter(Boolean)
-                        .join(", ") || "-"
-                    : "-"}
+                <strong>Detention From:</strong>
+                <span
+                  style={{
+                    marginLeft: "8px",
+                    fontWeight: "bold",
+                    color: detention_from ? "#b91c1c" : "inherit",
+                  }}
+                >
+                  {detention_from ? formatDate(detention_from) : "N/A"}
                 </span>
               </div>
               <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  Arrival:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {container_nos.length > 0
-                    ? container_nos
-                        .map((c) => c.arrival_date?.split("T")[0])
-                        .filter(Boolean)
-                        .join(", ") || "-"
-                    : "-"}
+                <strong>Delivery Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {delivery_date ? formatDate(delivery_date) : "Pending"}
                 </span>
               </div>
+
               <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  OOC:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {formattedOocDate || "-"}
+                <strong>Empty Offload:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {emptyContainerOffLoadDate
+                    ? formatDate(emptyContainerOffLoadDate)
+                    : "Pending"}
                 </span>
               </div>
-              <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  Detention From:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {container_nos.length > 0
-                    ? container_nos
-                        .map((c) => c.detention_from?.split("T")[0])
-                        .filter(Boolean)
-                        .join(", ") || "-"
-                    : "-"}
-                </span>
-              </div>
-              <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  Delivery:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {container_nos.length > 0
-                    ? container_nos
-                        .map((c) => c.delivery_date?.split("T")[0])
-                        .filter(Boolean)
-                        .join(", ") || "-"
-                    : "-"}
-                </span>
-              </div>
-              <div>
-                <span style={{ fontWeight: "bold", color: "#1f2937" }}>
-                  Empty Offload:
-                </span>{" "}
-                <span style={{ color: "#374151" }}>
-                  {container_nos.length > 0
-                    ? container_nos
-                        .map((c) => c.emptyContainerOffLoadDate?.split("T")[0])
-                        .filter(Boolean)
-                        .join(", ") || "-"
-                    : "-"}
-                </span>
+            </div>
+          );
+        },
+      },
+      {
+        // Group 6: D.O. Validity
+        accessorKey: "do_validity",
+        header: "D.O. Validity",
+        size: 200,
+        Cell: ({ cell }) => {
+          const { do_validity, do_copies, do_completed } = cell.row.original;
+
+          return (
+            <div style={centeredCellStyle}>
+              <div
+                style={{
+                  textAlign: "left",
+                  width: "100%",
+                }}
+              >
+                <div>
+                  <strong>Valid Upto:</strong>
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      color: do_validity ? "#d97706" : "inherit",
+                      fontWeight: do_validity ? "bold" : "normal",
+                    }}
+                  >
+                    {do_validity ? formatDate(do_validity) : "Not validated"}
+                  </span>
+                </div>
+                {/* DO Completed Date */}
+                <div>
+                  <strong>DO Completed Date:</strong>
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      fontSize: "0.9em",
+                      color: do_completed ? "#1a8917" : "#999",
+                    }}
+                  >
+                    {do_completed ? formatDate(do_completed) : "Pending"}
+                  </span>
+                </div>
+                <div>
+                  <strong>DO Copies:</strong>
+                  {Array.isArray(do_copies) && do_copies.length > 0 ? (
+                    <div style={{ marginTop: "4px" }}>
+                      {do_copies.map((url, index) => (
+                        <div key={index}>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "#007bff",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            DO Copy {index + 1}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: "5px" }}>
+                      <span style={{ color: "gray" }}> No DO copies </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -1105,66 +1128,7 @@ function useCustomerJobList() {
       containerModalOpen,
       handleModalClose,
       selectedContainer,
-      handleTransporterClick,
     ],
-  );
-
-  // Create Transporter Modal JSX
-  const transporterModal = (
-    <Dialog
-      open={transporterModalOpen}
-      onClose={handleTransporterModalClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: "12px",
-          maxWidth: "600px",
-        },
-      }}
-    >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontWeight: "bold",
-          bgcolor: "#f8f9fa",
-          borderBottom: "1px solid #e0e0e0",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <LocalShippingIcon className="text-blue-600 text-xl" />
-          Assign Transporter
-          {selectedTransporterContainer && (
-            <span
-              style={{ color: "#666", fontSize: "0.9rem", marginLeft: "8px" }}
-            >
-              ({selectedTransporterContainer.container_number})
-            </span>
-          )}
-        </div>
-      </DialogTitle>
-      <DialogContent sx={{ pt: 2, pb: 1 }}>
-        {selectedTransporterContainer && (
-          <EditableTransporterCell
-            cell={{
-              row: {
-                original: {
-                  _id: selectedTransporterContainer.jobId,
-                  container_nos: [selectedTransporterContainer],
-                },
-              },
-            }}
-          />
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e0e0e0" }}>
-        <Button onClick={handleTransporterModalClose} variant="outlined">
-          Close
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 
   return {
@@ -1172,7 +1136,8 @@ function useCustomerJobList() {
     containerModalOpen,
     handleModalClose,
     selectedContainer,
-    transporterModal,
+    selectedJob,
+    modalInitialTab,
   };
 }
 

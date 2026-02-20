@@ -17,6 +17,8 @@ export const getTableRowsClassname = (params) => {
     return "discharge";
   } else if (status === "Estimated Time of Arrival") {
     return "eta";
+  } else if (status === "Do completed and Delivery pending") {
+    return "do-completed-delivery-pending";
   }
 
   return ""; // Default class name

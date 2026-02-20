@@ -114,6 +114,8 @@ const JobExcelTable = ({ userId, gandhidham }) => {
         return "#fce4ec";
       case "PCV Done, Duty Payment Pending":
         return "#e0f2f1";
+      case "Do completed and Delivery pending":
+        return "#ccffcc";
       case "Custom Clearance Completed":
         return "#e8f5e9";
       case "Billing Pending":
@@ -574,7 +576,8 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             sx={{
               whiteSpace: "pre-line",
               fontSize: "0.75rem",
-              maxWidth: "120px",
+              minWidth: "120px",
+              wordBreak: "break-word",
             }}
           >
             {formatCustomCharges(job)}
@@ -582,14 +585,15 @@ const JobExcelTable = ({ userId, gandhidham }) => {
           <TableCell sx={{ fontSize: "0.8rem" }}>
             {job.origin_country || "-"}
           </TableCell>
-          <TableCell sx={{ fontSize: "0.8rem", maxWidth: "120px" }}>
+          <TableCell sx={{ fontSize: "0.8rem", minWidth: "120px", wordBreak: "break-word" }}>
             {job.supplier_exporter || "-"}
           </TableCell>
           <TableCell
             sx={{
               whiteSpace: "pre-line",
               fontSize: "0.75rem",
-              maxWidth: "180px",
+              minWidth: "180px",
+              wordBreak: "break-word",
             }}
           >
             {formatJobDetails(job)}
@@ -598,7 +602,8 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             sx={{
               whiteSpace: "pre-line",
               fontSize: "0.75rem",
-              maxWidth: "250px",
+              minWidth: "250px",
+              wordBreak: "break-word",
             }}
           >
             {formatShipmentDetails(job)}
@@ -607,12 +612,13 @@ const JobExcelTable = ({ userId, gandhidham }) => {
             sx={{
               whiteSpace: "pre-line",
               fontSize: "0.75rem",
-              maxWidth: "180px",
+              minWidth: "180px",
+              wordBreak: "break-word",
             }}
           >
             {formatCommercialDetails(job)}
           </TableCell>
-          <TableCell sx={{ fontSize: "0.8rem" }}>
+          <TableCell sx={{ fontSize: "0.8rem", minWidth: "100px" }}>
             {job.be_no && job.be_no !== "-" ? (
               <div>
                 <div>{job.be_no}</div>
@@ -624,7 +630,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
               "-"
             )}
           </TableCell>
-          <TableCell sx={{ fontSize: "0.8rem", maxWidth: "150px" }}>
+          <TableCell sx={{ fontSize: "0.8rem", minWidth: "150px" }}>
             <div
               style={{
                 maxHeight: "60px",
@@ -677,7 +683,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   }
 
   return (
-    <Box sx={{ mb: 3, maxWidth: "150%" }}>
+    <Box sx={{ mb: 3, width: "100%", overflowX: "auto" }}>
       <Box
         sx={{
           display: "flex",
@@ -686,9 +692,10 @@ const JobExcelTable = ({ userId, gandhidham }) => {
           mb: 2,
           flexWrap: "wrap",
           gap: 2,
+          
         }}
       >
-        <Typography variant="h6" sx={{ color: "#1F2937", fontWeight: "bold" }}>
+        <Typography variant="h6" sx={{color: "#1F2937", fontWeight: "bold" }}>
           Job Data Overview
           {totalCount > 0 && (
             <Chip
@@ -874,6 +881,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
               overflow: "auto",
               border: "1px solid #E5E7EB",
               borderRadius: "8px",
+              
             }}
           >
             <Table stickyHeader size="small">
@@ -882,7 +890,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -891,7 +899,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -900,7 +908,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -909,7 +917,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -918,7 +926,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -927,7 +935,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -936,7 +944,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -945,7 +953,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -954,7 +962,7 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "100px",
                     }}
                   >
@@ -963,31 +971,31 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "120px",
                     }}
                   >
                     Custom Charges
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: "bold", backgroundColor: "#F9FAFB" }}
+                    sx={{ fontWeight: "bold", backgroundColor: "#1F2937", color: "#fff" }}
                   >
                     Origin Country
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: "bold", backgroundColor: "#F9FAFB" }}
+                    sx={{ fontWeight: "bold", backgroundColor: "#1F2937", color: "#fff" }}
                   >
                     Exporter
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: "bold", backgroundColor: "#F9FAFB" }}
+                    sx={{ fontWeight: "bold", backgroundColor: "#1F2937", color: "#fff" }}
                   >
                     Job Details
                   </TableCell>
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "200px",
                     }}
                   >
@@ -996,21 +1004,21 @@ const JobExcelTable = ({ userId, gandhidham }) => {
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minWidth: "200px",
                     }}
                   >
                     Commercial Details
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: "bold", backgroundColor: "#F9FAFB" }}
+                    sx={{ fontWeight: "bold", backgroundColor: "#1F2937", color: "#fff" }}
                   >
                     BE No. & Date
                   </TableCell>
                   <TableCell
                     sx={{
                       fontWeight: "bold",
-                      backgroundColor: "#F9FAFB",
+                      backgroundColor: "#1F2937", color: "#fff",
                       minHeight: "70px",
                     }}
                   >

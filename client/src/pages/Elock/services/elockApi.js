@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getJsonCookie } from "../../../utils/cookies";
+import { getJsonCookie, getCookie } from "../../../utils/cookies";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_STRING;
@@ -8,16 +8,25 @@ const API_BASE_URL =
 const api = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
+    withCredentials: true,
     headers: {
         "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
     },
 });
+
+const getToken = () => {
+    return (
+        getCookie("access_token") ||
+        getCookie("refresh_token") ||
+        sessionStorage.getItem("jwt_token")
+    );
+};
 
 // Add token to every request if available
 api.interceptors.request.use((config) => {
     // Get token from cookies via helper
-    const user = getJsonCookie("exim_user");
-    const token = user?.token;
+    const token = getToken();
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -116,8 +125,8 @@ export const apiService = {
 
     getElockDetails: async (params = {}) => {
         try {
-            const response = await axios.get(
-                `${API_BASE_URL}/elock-details`,
+            const response = await api.get(
+                `/elock-details`,
                 { params }
             );
             return response.data;
@@ -231,6 +240,18 @@ export const apiService = {
             return { success: false, error: error.message };
         }
     },
+
+    getNotificationHistory: async (elockNo) => {
+        try {
+            // Using /notifications?assetIds= as proxy endpoint we created
+            const response = await api.get(`/notifications`, {
+                params: { assetIds: elockNo }
+            });
+            return response.data;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 };
 
 export { api };

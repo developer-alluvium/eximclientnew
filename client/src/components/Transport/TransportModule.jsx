@@ -141,7 +141,7 @@ const TransportModule = () => {
   return (
     <div className="transport-module-wrapper">
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, position: 'relative' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <IconButton onClick={() => window.history.back()} size="small" sx={{ mr: 1 }}>
              <ArrowBackIcon />
@@ -155,6 +155,25 @@ const TransportModule = () => {
             </Typography>
           </Box>
         </Box>
+
+        {/* Centered Importer Name */}
+        {selectedImporter && (
+          <Typography
+            variant="h6"
+            fontWeight="bold"
+            sx={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              whiteSpace: 'nowrap',
+              color: '#0e1929ff',
+              fontSize: '1rem',
+              display: { xs: 'none', md: 'block' }
+            }}
+          >
+            {selectedImporter}
+          </Typography>
+        )}
 
         {/* Actions Area */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -179,7 +198,7 @@ const TransportModule = () => {
              type="primary" 
              icon={<SaveOutlined />} 
              onClick={handleSaveLayout}
-             style={{ backgroundColor: '#1E3A8A' }} 
+             style={{ backgroundColor: '#1E293B' }} 
              disabled={!isColumnOrderLoaded}
            >
              Save Layout

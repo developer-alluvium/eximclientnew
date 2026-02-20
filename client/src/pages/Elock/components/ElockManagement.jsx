@@ -370,6 +370,7 @@ const ElockManagement = () => {
                       <button
                         onClick={() => handleTrack(elock)}
                         className="inline-flex items-center px-3 py-1 border border-green-300 rounded-md text-sm text-green-700 bg-green-50 hover:bg-green-100"
+                        title="Track"
                       >
                         <MapPin className="h-4 w-4" />
                       </button>

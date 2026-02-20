@@ -817,7 +817,7 @@ const UserManagement = () => {
                 <TableRow
                   sx={{
                     background:
-                      "linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)",
+                       "#1E293B",
                   }}
                 >
                   {canManageUsers && <TableCell padding="checkbox" />}

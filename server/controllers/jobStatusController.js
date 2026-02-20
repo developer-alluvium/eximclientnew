@@ -2,15 +2,17 @@ import JobModel from "../models/jobModel.js";
 
 // Status Rank Configuration
 const statusRank = {
-  "Billing Pending": { rank: 1, field: "emptyContainerOffLoadDate" },
-  "Custom Clearance Completed": { rank: 2, field: "detention_from" },
-  "PCV Done, Duty Payment Pending": { rank: 3, field: "detention_from" },
-  "BE Noted, Clearance Pending": { rank: 4, field: "detention_from" },
-  "BE Noted, Arrival Pending": { rank: 5, field: "be_date" },
-  "Rail Out": { rank: 6, field: "rail_out" },
-  Discharged: { rank: 7, field: "discharge_date" },
-  "Gateway IGM Filed": { rank: 8, field: "gateway_igm_date" },
-  "Estimated Time of Arrival": { rank: 9, field: "vessel_berthing" },
+ "Billing Pending": { rank: 1, field: "emptyContainerOffLoadDate" },
+    "Do completed and Delivery pending": { rank: 2, field: "do_completed" },
+    "Custom Clearance Completed": { rank: 3, field: "detention_from" },
+    "PCV Done, Duty Payment Pending": { rank: 4, field: "detention_from" },
+    "BE Noted, Clearance Pending": { rank: 5, field: "detention_from" },
+    "BE Noted, Arrival Pending": { rank: 6, field: "be_date" },
+    "Arrived, BE Note Pending": { rank: 7, field: "be_date" },
+    "Rail Out": { rank: 8, field: "container_rail_out_date" },
+    "Discharged": { rank: 9, field: "discharge_date" },
+    "Gateway IGM Filed": { rank: 10, field: "gateway_igm_date" },
+    "Estimated Time of Arrival": { rank: 11, field: "vessel_berthing" },
 };
 
 // Helper to safely parse dates

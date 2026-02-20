@@ -119,8 +119,8 @@ const MainLayout = ({ children }) => {
             src={require("../assets/images/logo.webp")}
             alt="EXIM User Portal"
             style={{
-              height: 36,
-              width: "auto",
+              height: 55,
+              width: 130,
               objectFit: "contain",
               filter: "brightness(0) invert(1)",
             }}

@@ -111,6 +111,7 @@ function CImportDSR() {
         >
           <Box
             sx={{
+              position: "relative", // Added for absolute positioning of center text
               borderBottom: "1px solid #e2e8f0",
               display: "flex",
               justifyContent: "space-between",
@@ -159,13 +160,20 @@ function CImportDSR() {
                 ))}
               </Tabs>
             </Box>
+            
+            {/* Centered Importer Name */}
             {selectedImporter && (
               <Typography
                 variant="subtitle1"
                 sx={{
                   fontWeight: 600,
                   color: "#1e293b",
-                  fontSize: "0.9rem",
+                  fontSize: "1rem",
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  whiteSpace: "nowrap",
+                  display: { xs: "none", md: "block" } // Hide on small screens if needed
                 }}
               >
                 {selectedImporter}

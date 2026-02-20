@@ -188,6 +188,7 @@ const EnhancedLineTooltip = ({ active, payload, label, eventType }) => {
 const StatusDistribution = React.memo(({ distributionData }) => {
   const statusColors = {
     "Billing Pending": "#ff6b6b",
+    
     "ETA Date Pending": "#4ecdc4",
     "Estimated Time of Arrival": "#45b7d1",
     "Gateway IGM Filed": "#96ceb4",
@@ -196,12 +197,14 @@ const StatusDistribution = React.memo(({ distributionData }) => {
     "BE Noted, Arrival Pending": "#54a0ff",
     "BE Noted, Clearance Pending": "#5f27cd",
     "PCV Done, Duty Payment Pending": "#ff9f43",
+    "Do completed and Delivery pending": "#ccffcc",
     "Custom Clearance Completed": "#1dd1a1",
   };
 
   // Define the desired order of statuses
   const statusOrder = [
     "Billing Pending",
+   
     "ETA Date Pending",
     "Estimated Time of Arrival",
     "Gateway IGM Filed",
@@ -210,6 +213,7 @@ const StatusDistribution = React.memo(({ distributionData }) => {
     "BE Noted, Arrival Pending",
     "BE Noted, Clearance Pending",
     "PCV Done, Duty Payment Pending",
+     "Do completed and Delivery pending",
     "Custom Clearance Completed",
   ];
 

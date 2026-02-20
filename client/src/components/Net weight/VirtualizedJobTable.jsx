@@ -144,7 +144,7 @@ const VirtualizedJobTable = ({ userId }) => {
       {/* Header Controls */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h6" sx={{ color: '#1F2937', fontWeight: 'bold' }}>
-          Job Data Overview 
+          Job Data Overview
           {jobData.length > 0 && (
             <Chip 
               label={`${pagination.total} total jobs`} 

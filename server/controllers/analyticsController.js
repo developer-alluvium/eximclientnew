@@ -903,6 +903,7 @@ export const getStatusDistribution = async (req, res) => {
       "BE Noted, Arrival Pending",
       "BE Noted, Clearance Pending",
       "PCV Done, Duty Payment Pending",
+      "Do completed and Delivery pending",
       "Custom Clearance Completed",
     ];
 

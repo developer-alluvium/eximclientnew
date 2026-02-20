@@ -1,7 +1,7 @@
 import { SimpleHeader } from "./SharedComponents";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getJsonCookie } from "../../utils/cookies";
-
+import axios from "axios";
 const JobDetailsPanel = ({
   years,
   selectedYear,
@@ -107,10 +107,10 @@ const JobDetailsPanel = ({
           url += `&search=${encodeURIComponent(search)}`;
         }
 
-        const response = await fetch(url);
+        const response = await axios.get(url);
 
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status === 200) {
+          const data = response.data;
           if (data.success) {
             setJobsList(data.data);
           } else {
@@ -181,11 +181,11 @@ const JobDetailsPanel = ({
           url += `&search=${encodeURIComponent(search)}`;
         }
 
-        const response = await fetch(url);
+        const response = await axios.get(url);
         console.log(response);
 
-        if (response.ok) {
-          const data = await response.json();
+        if (response.status === 200) {
+          const data = response.data;
           if (data.success) {
             setBeList(data.data);
           } else {
