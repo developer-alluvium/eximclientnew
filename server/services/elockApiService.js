@@ -9,7 +9,8 @@ class ElockApiService {
         this.fTokenExpiry = null;
 
         // Third-party API configuration
-        this.thirdPartyBaseURL = "http://3.108.244.38:9005/api";
+        this.thirdPartyBaseURL = "https://eximbot.alvision.in/transport/api";
+        // this.thirdPartyBaseURL = "http://3.108.244.38:9005/api";
     }
 
     /**

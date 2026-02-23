@@ -57,7 +57,7 @@ const Dashboard = () => {
   const [serviceStatus, setServiceStatus] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const [statusFilter, setStatusFilter] = useState("All Status");
-  const [filterType, setFilterType] = useState("All Types");
+  const [filterType, setFilterType] = useState("");
   const [userData, setUserData] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const [clientCallStates, setClientCallStates] = useState({});
@@ -114,7 +114,10 @@ const Dashboard = () => {
       fetchLimits();
     }
   }, [selectedIeCode, filterType]);
-
+  const handleFilterTypeChange = (value) => {
+    setFilterType(value);
+    setCurrentPage(1);
+  };
   const fetchLimits = async () => {
     try {
       const typeStr = filterType
@@ -709,12 +712,12 @@ const Dashboard = () => {
                   style={{ width: 110, fontSize: '12px' }}
                   placeholder="Type"
                   value={filterType}
-                  onChange={setFilterType}
+                  onChange={handleFilterTypeChange}
                   allowClear
                   size="small"
-                  defaultValue="All Type"
+                // defaultValue="All Type"
                 >
-                  <Option value="All Type">All Type</Option>
+                  <Option value="">All Types</Option>
                   <Option value="consignor">Consignor</Option>
                   <Option value="consignee">Consignee</Option>
                 </Select>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import GlobalNotificationSnackbar from "../components/GlobalNotificationSnackbar";
 import { Layout, Avatar, Tooltip, Space, Typography, Divider } from "antd";
 import {
   UserOutlined,
@@ -69,13 +70,15 @@ const MainLayout = ({ children }) => {
             background: isHovered
               ? danger
                 ? "rgba(255, 77, 79, 0.15)"
-                : "rgba(255, 255, 255, 0.15)"
-              : "rgba(255, 255, 255, 0.08)",
+                : "rgba(0, 0, 0, 0.05)"
+              : "rgba(0, 0, 0, 0.02)",
             color: isHovered
               ? danger
                 ? "#ff6b6b"
-                : "#ffffff"
-              : "rgba(255, 255, 255, 0.85)",
+                : "#1e293b"
+              : danger
+              ? "#ff4d4f"
+              : "#64748b",
           }}
           onClick={onClick}
           onMouseEnter={() => setIsHovered(true)}
@@ -91,12 +94,12 @@ const MainLayout = ({ children }) => {
     <Layout style={{ height: "100vh", overflow: "hidden", background: "#f5f7fa" }}>
       <Header
         style={{
-          background: "#1e293b",
+          background: "#ffffff",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 32px",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
           zIndex: 100,
           position: "sticky",
           top: 0,
@@ -120,9 +123,8 @@ const MainLayout = ({ children }) => {
             alt="EXIM User Portal"
             style={{
               height: 55,
-              width: 130,
+              width: 140,
               objectFit: "contain",
-              filter: "brightness(0) invert(1)",
             }}
           />
         </div>
@@ -136,24 +138,24 @@ const MainLayout = ({ children }) => {
               alignItems: "center",
               gap: 8,
               padding: "6px 14px",
-              background: "rgba(255, 255, 255, 0.08)",
+              background: "#f1f5f9",
               borderRadius: 8,
             }}
           >
             <CalendarOutlined
-              style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: 14 }}
+              style={{ color: "#64748b", fontSize: 14 }}
             />
-            <Text style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.85)" }}>
+            <Text style={{ fontSize: 13, color: "#475569" }}>
               {formattedDate}
             </Text>
             <Divider
               type="vertical"
               style={{
                 margin: "0 4px",
-                borderColor: "rgba(255, 255, 255, 0.2)",
+                borderColor: "rgba(0, 0, 0, 0.1)",
               }}
             />
-            <Text strong style={{ fontSize: 13, color: "#ffffff" }}>
+            <Text strong style={{ fontSize: 13, color: "#1e293b" }}>
               {formattedTime}
             </Text>
           </div>
@@ -161,7 +163,7 @@ const MainLayout = ({ children }) => {
           {/* Divider */}
           <Divider
             type="vertical"
-            style={{ height: 24, borderColor: "rgba(255, 255, 255, 0.2)" }}
+            style={{ height: 24, borderColor: "rgba(0, 0, 0, 0.1)" }}
           />
 
           {/* User Info */}
@@ -179,14 +181,14 @@ const MainLayout = ({ children }) => {
             <div style={{ lineHeight: 1.3 }}>
               <Text
                 strong
-                style={{ fontSize: 13, color: "#ffffff", display: "block" }}
+                style={{ fontSize: 13, color: "#1e293b", display: "block" }}
               >
                 {userName}
               </Text>
               <Text
                 style={{
                   fontSize: 11,
-                  color: "rgba(255, 255, 255, 0.65)",
+                  color: "#64748b",
                   textTransform: "capitalize",
                 }}
               >
@@ -195,10 +197,9 @@ const MainLayout = ({ children }) => {
             </div>
           </div>
 
-          {/* Divider */}
           <Divider
             type="vertical"
-            style={{ height: 24, borderColor: "rgba(255, 255, 255, 0.2)" }}
+            style={{ height: 24, borderColor: "rgba(0, 0, 0, 0.1)" }}
           />
 
           {/* Action Icons */}
@@ -243,6 +244,7 @@ const MainLayout = ({ children }) => {
           {children}
         </div>
       </Content>
+      <GlobalNotificationSnackbar />
     </Layout>
   );
 };

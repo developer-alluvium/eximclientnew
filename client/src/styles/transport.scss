@@ -91,7 +91,7 @@
             
             &.grouped-cell {
                vertical-align: top;
-               background-color: #fff; // Ensure white background for spanned cells if needed
+               background-color: inherit; // Allow conditional row coloring to show through
                border-right: 1px solid #f1f5f9; // Optional separation
             }
 

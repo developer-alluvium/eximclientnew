@@ -142,7 +142,9 @@ app.get("/api/notifications", async (req, res) => {
     if (!assetIds) {
       return res.status(400).json({ success: false, message: "assetIds param is required" });
     }
-    const response = await axios.get("http://3.108.244.38:9005/api/notifications", {
+    const response = await axios.get(
+      "https://eximbot.alvision.in/transport/api/notifications", {
+    // "http://3.108.244.38:9005/api/notifications", {
       params: { assetIds }
     });
     res.json(response.data);

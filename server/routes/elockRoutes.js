@@ -173,36 +173,32 @@ router.get("/status", async (req, res) => {
  * Proxy request to third-party limits API
  */
 router.get("/assign-limits", async (req, res) => {
-    console.log("DEBUG: /assign-limits route hit! Query:", req.query);
-    try {
-        const { type } = req.query;
-        // Force IE code from user session if standard user
-        let ieCodeNo = req.query.ieCodeNo;
-        if (req.userType === 'user') {
-            ieCodeNo = req.user.ie_code_no;
-        }
+  console.log("DEBUG: /assign-limits route hit! Query:", req.query);
+  try {
+    const { ieCodeNo, type } = req.query;
+    console.log(
+      `📨 Proxying assignment limits request for IE: ${ieCodeNo}, Type: ${type}`
+    );
 
-        console.log(
-            `📨 Proxying assignment limits request for IE: ${ieCodeNo}, Type: ${type}`
-        );
+    const response = await axios.get(
+    //   "http://3.108.244.38:9005/api/client-elock-assign-limits",
+      "https://eximbot.alvision.in/transport/api/client-elock-assign-limits",
+      {
+        params: { ieCodeNo, type },
+      }
+    );
 
-        const response = await axios.get(
-            "http://3.108.244.38:9005/api/client-elock-assign-limits",
-            {
-                params: { ieCodeNo, type },
-            }
-        );
-
-        console.log(`✅ Limits response received for IE: ${ieCodeNo}`);
-        res.json(response.data);
-    } catch (error) {
-        console.error("❌ Error proxying limits:", error.message);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            message: "Failed to fetch assignment limits from third-party service",
-        });
-    }
+    console.log(`✅ Limits response received for IE: ${ieCodeNo}`);
+    res.json(response.data);
+  } catch (error) {
+    console.error("❌ Error proxying limits:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to fetch assignment limits from third-party service",
+    });
+  }
 });
+
 
 export default router;

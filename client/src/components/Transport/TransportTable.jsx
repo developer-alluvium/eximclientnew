@@ -347,7 +347,11 @@ const TransportTable = ({
                  const isGroupLastRow = meta.isEnd;
 
                  return (
-                  <tr key={rowIndex} className={isGroupLastRow ? 'group-last-row' : ''}>
+                  <tr 
+                    key={rowIndex} 
+                    className={isGroupLastRow ? 'group-last-row' : ''}
+                    style={{ backgroundColor: row.lr_completed ? '#f5f5f5' : '#f0fae1' }}
+                  >
                     {visibleColumns.map(col => {
                       // Apply Grouping to 'sr_no', 'document_info', AND 'parties' (Consignor/Consignee)
                       if (col.id === 'sr_no' || col.id === 'document_info' || col.id === 'parties') {

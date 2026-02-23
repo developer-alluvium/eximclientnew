@@ -31,8 +31,8 @@ const TransportModule = () => {
       const assignments = userData.ie_code_assignments || [];
       setIeCodeAssignments(assignments);
       
-      // Auto-select if only one assignment
-      if (!selectedImporter && assignments.length === 1) {
+      // Auto-select the first assignment by default
+      if (!selectedImporter && assignments.length > 0) {
         setSelectedImporter(assignments[0].importer_name);
       }
     } else {
@@ -141,8 +141,8 @@ const TransportModule = () => {
   return (
     <div className="transport-module-wrapper">
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, position: 'relative' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, position: 'relative' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: '250px' }}>
           <IconButton onClick={() => window.history.back()} size="small" sx={{ mr: 1 }}>
              <ArrowBackIcon />
           </IconButton>
@@ -157,26 +157,25 @@ const TransportModule = () => {
         </Box>
 
         {/* Centered Importer Name */}
-        {selectedImporter && (
-          <Typography
-            variant="h6"
-            fontWeight="bold"
-            sx={{
-              position: 'absolute',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              whiteSpace: 'nowrap',
-              color: '#0e1929ff',
-              fontSize: '1rem',
-              display: { xs: 'none', md: 'block' }
-            }}
-          >
-            {selectedImporter}
-          </Typography>
-        )}
+        <Box sx={{ display: { xs: 'none', lg: 'flex' }, justifyContent: 'center', flex: 1, minWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {selectedImporter && (
+            <Typography
+              variant="h6"
+              fontWeight="bold"
+              sx={{
+                color: '#0e1929ff',
+                fontSize: '1rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {selectedImporter}
+            </Typography>
+          )}
+        </Box>
 
         {/* Actions Area */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, flex: 1, minWidth: '300px', flexWrap: 'wrap' }}>
           {/* Search Input */}
            <Input 
              placeholder="Search transport..." 
@@ -208,17 +207,10 @@ const TransportModule = () => {
           {ieCodeAssignments?.length > 1 && (
              <Autocomplete
              size="small"
-             options={[
-               "All Importers",
-               ...(ieCodeAssignments?.map(
-                 (assignment) => assignment.importer_name,
-               ) || []),
-             ]}
-             value={selectedImporter || "All Importers"}
+             options={ ieCodeAssignments?.map(assignment => assignment.importer_name) || [] }
+             value={selectedImporter || null}
              onChange={(event, newValue) => {
-               setSelectedImporter(
-                 newValue === "All Importers" ? null : newValue,
-               );
+               setSelectedImporter(newValue || null);
              }}
              sx={{
                width: { xs: "200px", sm: "250px" },
@@ -231,15 +223,7 @@ const TransportModule = () => {
                <TextField {...params} placeholder="Select Importer" />
              )}
              isOptionEqualToValue={(option, value) => {
-               if (value === "All Importers" && option === "All Importers")
-                 return true;
-               if (
-                 value !== "All Importers" &&
-                 option !== "All Importers" &&
-                 option === value
-               )
-                 return true;
-               return false;
+               return option === value;
              }}
            />
           )}
