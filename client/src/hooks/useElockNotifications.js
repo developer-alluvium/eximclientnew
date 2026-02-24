@@ -10,9 +10,13 @@ export const useElockNotifications = () => {
   const pollingIntervalRef = useRef(null);
 
   useEffect(() => {
-    // Clear existing interval when dependencies change
+    // Clear existing interval/EventSource when dependencies change
     if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
+      if (typeof pollingIntervalRef.current.close === 'function') {
+        pollingIntervalRef.current.close();
+      } else {
+        clearInterval(pollingIntervalRef.current);
+      }
       pollingIntervalRef.current = null;
     }
 
@@ -86,70 +90,78 @@ export const useElockNotifications = () => {
         
         previousNotificationsRef.current = initialState;
 
-        // 2. Start polling
-        pollingIntervalRef.current = setInterval(async () => {
+        // 2. Start SSE implementation instead of regular polling
+        const baseUrl = process.env.REACT_APP_API_STRING || "http://localhost:5000/api";
+        const eventSourceUrl = `${baseUrl}/notifications/stream?assetIds=${assetIdsString}`;
+        const eventSource = new EventSource(eventSourceUrl, { withCredentials: true });
+
+        eventSource.onmessage = (event) => {
             try {
-                const pollResponse = await apiService.getNotificationHistory(assetIdsString);
-                let pollData = [];
-                if (pollResponse && pollResponse.success !== false) {
-                    pollData = Array.isArray(pollResponse) ? pollResponse : (pollResponse.data || pollResponse.notifications || []);
-                }
+                const parsed = JSON.parse(event.data);
+                
+                if (parsed.type === 'new') {
+                    const pollData = parsed.data || [];
+                    const newNotifications = [];
+                    const currentState = { ...previousNotificationsRef.current };
 
-                const newNotifications = [];
-                const currentState = { ...previousNotificationsRef.current };
-
-                pollData.forEach(notif => {
-                    const assetId = notif.components?.assetId || notif.f_asset_id || notif.elock_no || "unknown";
-                    // Try to extract elock from API string if assetId is not directly provided
-                    let elockNoStr = assetId;
-                    const titleRaw = notif.components?.title || notif.title || "Event";
-                    
-                    // The API often returns title like "8294630189: Pull out lock rope"
-                    if (elockNoStr === "unknown" && titleRaw.includes(':')) {
-                        elockNoStr = titleRaw.split(':')[0].trim();
-                    }
-
-                    const timeStr = notif.components?.time || notif.createdAt || new Date().toLocaleString(); 
-                    let title = titleRaw;
-                    if (title.includes(':')) {
-                        title = title.split(':').slice(1).join(':').trim(); // Remove the elock number prefix if it exists
-                    }
-                    
-                    const uniqueKey = `${title}_${timeStr}`;
-
-                    if (!currentState[elockNoStr]) {
-                        currentState[elockNoStr] = new Set();
-                    }
-
-                    // If we haven't seen this notification before
-                    if (!currentState[elockNoStr].has(uniqueKey)) {
-                        currentState[elockNoStr].add(uniqueKey);
+                    pollData.forEach(notif => {
+                        const assetId = notif.components?.assetId || notif.f_asset_id || notif.elock_no || "unknown";
+                        // Try to extract elock from API string if assetId is not directly provided
+                        let elockNoStr = assetId;
+                        const titleRaw = notif.components?.title || notif.title || "Event";
                         
-                        const titleLower = title.toLowerCase();
-                        const isAlarm = titleLower.includes('alarm') || titleLower.includes('warning') || titleLower.includes('long-time') || titleLower.includes('cut') || titleLower.includes('abnormal');
+                        // The API often returns title like "8294630189: Pull out lock rope"
+                        if (elockNoStr === "unknown" && titleRaw.includes(':')) {
+                            elockNoStr = titleRaw.split(':')[0].trim();
+                        }
 
-                        newNotifications.push({
-                            id: Math.random().toString(36).substr(2, 9), // generate temporary unique ID for React list
-                            elockNo: elockNoStr,
-                            title: title,
-                            time: timeStr,
-                            isAlarm: isAlarm
-                        });
+                        const timeStr = notif.components?.time || notif.createdAt || new Date().toLocaleString(); 
+                        let title = titleRaw;
+                        if (title.includes(':')) {
+                            title = title.split(':').slice(1).join(':').trim(); // Remove the elock number prefix if it exists
+                        }
+                        
+                        const uniqueKey = `${title}_${timeStr}`;
+
+                        if (!currentState[elockNoStr]) {
+                            currentState[elockNoStr] = new Set();
+                        }
+
+                        // If we haven't seen this notification before
+                        if (!currentState[elockNoStr].has(uniqueKey)) {
+                            currentState[elockNoStr].add(uniqueKey);
+                            
+                            const titleLower = title.toLowerCase();
+                            const isAlarm = titleLower.includes('alarm') || titleLower.includes('warning') || titleLower.includes('long-time') || titleLower.includes('cut') || titleLower.includes('abnormal');
+
+                            newNotifications.push({
+                                id: Math.random().toString(36).substr(2, 9), // generate temporary unique ID for React list
+                                elockNo: elockNoStr,
+                                title: title,
+                                time: timeStr,
+                                isAlarm: isAlarm
+                            });
+                        }
+                    });
+
+                    // Update ref with new state
+                    previousNotificationsRef.current = currentState;
+
+                    // If we found new notifications, add them to queue
+                    if (newNotifications.length > 0) {
+                        setNotificationsQueue(prev => [...prev, ...newNotifications]);
                     }
-                });
-
-                // Update ref with new state
-                previousNotificationsRef.current = currentState;
-
-                // If we found new notifications, add them to queue
-                if (newNotifications.length > 0) {
-                    setNotificationsQueue(prev => [...prev, ...newNotifications]);
                 }
-
             } catch (pollErr) {
-                console.error("Error polling eLock notifications:", pollErr);
+                console.error("Error parsing SSE data:", pollErr);
             }
-        }, 30000); // Poll every 30 seconds
+        };
+
+        eventSource.onerror = (err) => {
+            console.error("SSE Error (reconnecting automatically expected):", err);
+        };
+
+        pollingIntervalRef.current = eventSource;
 
       } catch (err) {
         console.error("Failed to initialize notification polling:", err);
@@ -160,7 +172,11 @@ export const useElockNotifications = () => {
 
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
+        if (typeof pollingIntervalRef.current.close === 'function') {
+          pollingIntervalRef.current.close();
+        } else {
+          clearInterval(pollingIntervalRef.current);
+        }
       }
     };
   }, [selectedImporter]);

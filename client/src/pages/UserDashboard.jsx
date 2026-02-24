@@ -891,10 +891,11 @@ function UserDashboard() {
             //overflow: "auto",
             padding: { xs: 1, md: 2 },
             pb: 2,
+
           }}
         >
           {/* Welcome Banner */}
-          <WelcomeBanner elevation={0}>
+          <WelcomeBanner elevation={0} sx={{ backgroundColor: "#1e293b", color: "#ffffffff" }}>
             {/* Row 1: Welcome + AEO/Active */}
             <Box
               display="flex"
@@ -905,7 +906,7 @@ function UserDashboard() {
               <Typography
                 variant="h5"
                 fontWeight="700"
-                sx={{ color: "#1e293b" }}
+                sx={{ color: "#ffffffff" }}
               >
                 Welcome back, {userName}
               </Typography>
@@ -969,12 +970,12 @@ function UserDashboard() {
                     sx={{
                       fontWeight: 400,
                       fontSize: "0.875rem",
-                      color: "#64748b",
+                      color: "#ffffffff",
                     }}
                   >
                     {assignment.ie_code_no && (
                       <>
-                        <strong style={{ color: "#475569" }}>IE Code:</strong>{" "}
+                        <strong style={{ color: "#ffffffff" }}>IE Code:</strong>{" "}
                         {assignment.ie_code_no}
                       </>
                     )}
@@ -983,7 +984,7 @@ function UserDashboard() {
                         <span style={{ margin: "0 12px", color: "#cbd5e1" }}>
                           |
                         </span>
-                        <strong style={{ color: "#475569" }}>Importer:</strong>{" "}
+                        <strong style={{ color: "#ffffffff" }}>Importer:</strong>{" "}
                         {assignment.importer_name}
                       </>
                     )}
@@ -1028,6 +1029,7 @@ function UserDashboard() {
               minHeight: 0, // Allow nested scrolling
               overflow: "hidden",
               flexDirection: { xs: "column", lg: "row" },
+              alignItems: "flex-start",
               mt: 1,
             }}
           >
@@ -1047,11 +1049,11 @@ function UserDashboard() {
                 },
               }}
             >
-              {/* Importer Selector */}
-              <Box
-                sx={{ mb: 2, display: "flex", flexDirection: "column", gap: 2 }}
-              >
-                {ieCodeAssignments.length > 1 && (
+              {/* Importer Selector - only renders Box when selector is visible */}
+              {ieCodeAssignments.length > 1 && (
+                <Box
+                  sx={{ mb: 2, display: "flex", flexDirection: "column", gap: 2 }}
+                >
                   <FormControl
                     fullWidth
                     size="small"
@@ -1108,8 +1110,8 @@ function UserDashboard() {
                       ))}
                     </Select>
                   </FormControl>
-                )}
-              </Box>
+                </Box>
+              )}
 
               {/* Stats Grid */}
               <Paper
@@ -1119,6 +1121,9 @@ function UserDashboard() {
                   mb: 1.5,
                   borderRadius: 3,
                   border: "1px solid #e2e8f0",
+                  // mt:5 (40px) aligns with first module card row when no importer selector shown
+                  // (heading 1rem ≈24px + mb:2=16px = 40px). When selector IS shown, it already pushes down.
+                  mt: ieCodeAssignments.length > 1 ? 0 : 5,
                 }}
               >
                 <Box
@@ -1127,6 +1132,7 @@ function UserDashboard() {
                     justifyContent: "space-between",
                     alignItems: "center",
                     mb: 2,
+                   
                   }}
                 >
                   <Typography
@@ -1279,9 +1285,8 @@ function UserDashboard() {
             {/* Right Side - Modules Grid */}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                variant="h6"
                 fontWeight="600"
-                sx={{ color: "#1e293b", mb: 2 }}
+                sx={{ color: "#1e293b", mb: 2, fontSize: "1rem" }}
               >
                 Application Modules
               </Typography>

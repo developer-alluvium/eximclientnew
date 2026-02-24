@@ -154,6 +154,74 @@ app.get("/api/notifications", async (req, res) => {
   }
 });
 
+// SSE endpoint for notifications
+app.get("/api/notifications/stream", (req, res) => {
+  const { assetIds } = req.query;
+  if (!assetIds) {
+    return res.status(400).json({ success: false, message: "assetIds param is required" });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders && res.flushHeaders();
+  
+  // Establish connection immediately
+  res.write(': connected\n\n');
+
+  let previousState = new Set();
+  let isFirstFetch = true;
+
+  const fetchAndPush = async () => {
+    try {
+      const response = await axios.get("https://eximbot.alvision.in/transport/api/notifications", {
+        params: { assetIds }
+      });
+      
+      const responseData = response.data;
+      const dataArray = Array.isArray(responseData) ? responseData : (responseData.data || responseData.notifications || []);
+      
+      if (isFirstFetch) {
+        dataArray.forEach(notif => {
+          const title = notif.components?.title || notif.title || "";
+          const timeStr = notif.components?.time || notif.createdAt;
+          previousState.add(`${title}_${timeStr}`);
+        });
+        isFirstFetch = false;
+        // Initial fetch complete, clients can start receiving new pushes
+      } else {
+        const newNotifications = [];
+        dataArray.forEach(notif => {
+          const title = notif.components?.title || notif.title || "";
+          const timeStr = notif.components?.time || notif.createdAt;
+          const key = `${title}_${timeStr}`;
+          
+          if (!previousState.has(key)) {
+            previousState.add(key);
+            newNotifications.push(notif);
+          }
+        });
+
+        if (newNotifications.length > 0) {
+          res.write(`data: ${JSON.stringify({ type: 'new', data: newNotifications })}\n\n`);
+        } else {
+          // Sent heartbeat every tick to test connection
+          res.write(': heartbeat\n\n');
+        }
+      }
+    } catch (error) {
+      console.error("SSE fetch error:", error.message);
+    }
+  };
+
+  fetchAndPush();
+  const interval = setInterval(fetchAndPush, 30000);
+
+  req.on("close", () => {
+    clearInterval(interval);
+  });
+});
+
 // Root route
 app.get("/", (req, res) => {
   res.send("Hello - API is running");

@@ -203,10 +203,10 @@ const MainLayout = ({ children }) => {
           />
 
           {/* Action Icons */}
-          <Space size={8}>
+          <Space size={8} >
             {/* Profile Button */}
             <IconButton
-              icon={<UserOutlined style={{ fontSize: 16 }} />}
+              icon={<UserOutlined style={{ fontSize: 16  }} />}
               tooltip="My Profile"
               onClick={() => navigate("/user/profile")}
             />
