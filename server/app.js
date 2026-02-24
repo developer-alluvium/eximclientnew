@@ -82,6 +82,7 @@ app.use(
     allowedHeaders: [
       "Content-Type",
       "Authorization",
+      "Cache-Control",
       "user-id",
       "user-role",
       "x-username",
