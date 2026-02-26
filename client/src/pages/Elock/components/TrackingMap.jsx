@@ -80,10 +80,9 @@ Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
 
-// API Configuration
-const TOKEN_ID = "e36d2589-9dc3-4302-be7d-dc239af1846c";
-const ADMIN_API_URL = "http://icloud.assetscontrols.com:8092/OpenApi/Admin";
-const LBS_API_URL = "http://icloud.assetscontrols.com:8092/OpenApi/LBS";
+// API Configuration - Using backend proxy to avoid mixed content errors
+const BASE_API_URL = process.env.REACT_APP_API_STRING;
+const ELOCK_PROXY_URL = `${BASE_API_URL}/elock`;
 
 // Custom numbered marker icon with hover effect (From Second Code Logic)
 const createNumberIcon = (number, isFirst = false, isLast = false) => {
@@ -347,21 +346,9 @@ const TrackingMap = ({
   // --- API: Fetch Asset Info ---
   const fetchAssetInfo = useCallback(async () => {
     try {
-      const response = await fetch(ADMIN_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          FAction: "QueryAdminAssetByAssetId",
-          FTokenID: TOKEN_ID,
-          FAssetID: elockNo,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Asset request failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const response = await axios.get(`${ELOCK_PROXY_URL}/asset-info/${elockNo}`);
+      const result = response.data;
+      
       if (result.Result === 200 && result.FObject?.length > 0) {
         setAssetInfo(result.FObject[0]);
         const guid = result.FObject[0].FGUID;
@@ -397,27 +384,15 @@ const TrackingMap = ({
         //   `🔄 Fetching history for GUID: ${guid}, Time range: ${startTime.toISOString()} to ${endTime.toISOString()}`
         // );
 
-        const response = await fetch(LBS_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            FAction: "QueryLBSTrackListByFGUID",
-            FTokenID: TOKEN_ID,
-            FGUID: guid,
-            FType: 2,
-            FAssetTypeID: 3701,
-            FStartTime: startTime.toISOString(),
-            FEndTime: endTime.toISOString(),
-            FLanguage: 0,
-            FDateType: 1,
-          }),
+        const response = await axios.post(`${ELOCK_PROXY_URL}/track-history`, {
+          guid: guid,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          type: 2,
+          assetTypeId: 3701
         });
 
-        if (!response.ok) {
-          throw new Error(`History request failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
+        const result = response.data;
 
         if (result.Result === 200 && result.FObject) {
           setHistoryData((prevData) => {
@@ -458,23 +433,13 @@ const TrackingMap = ({
   async function fetchCurrentStatus(guid) {
     setCurrentLoading(true);
     try {
-      const response = await fetch(LBS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          FAction: "QueryLBSMonitorListByFGUIDs",
-          FTokenID: TOKEN_ID,
-          FGUIDs: guid,
-          FType: 2,
-        }),
+      const response = await axios.get(`${ELOCK_PROXY_URL}/location/${guid}`, {
+        params: { type: 2 }
       });
-
-      if (!response.ok) {
-        throw new Error(`Status request failed: ${response.statusText}`);
+      const result = response.data.data || response.data; // Adjusted for backend response wrapper
+      if (result.FObject && result.FObject.length > 0) {
+        setCurrentInfo(result.FObject[0]);
       }
-
-      const result = await response.json();
-      setCurrentInfo(result.FObject[0]);
     } catch (err) {
       console.error("❌ Error fetching current status:", err);
     } finally {

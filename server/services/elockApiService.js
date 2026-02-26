@@ -462,9 +462,77 @@ class ElockApiService {
     }
 
     /**
+     * Get asset info from iCloud Admin API
+     */
+    async getAssetInfo(assetId) {
+        try {
+            await this.ensureValidICloudToken();
+
+            const response = await axios.post(
+                `${this.icloudBaseURL}/Admin`,
+                {
+                    FAction: "QueryAdminAssetByAssetId",
+                    FTokenID: this.fTokenID,
+                    FAssetID: assetId,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    timeout: 15000,
+                }
+            );
+
+            console.log(`✅ Asset info retrieved for ${assetId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`❌ Failed to get asset info for ${assetId}:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get track history from iCloud LBS API
+     */
+    async getTrackHistory(params) {
+        try {
+            await this.ensureValidICloudToken();
+
+            const { guid, startTime, endTime, type = 2, assetTypeId = 3701 } = params;
+
+            const response = await axios.post(
+                `${this.icloudBaseURL}/LBS`,
+                {
+                    FAction: "QueryLBSTrackListByFGUID",
+                    FTokenID: this.fTokenID,
+                    FGUID: guid,
+                    FType: type,
+                    FAssetTypeID: assetTypeId,
+                    FStartTime: startTime,
+                    FEndTime: endTime,
+                    FLanguage: 0,
+                    FDateType: 1,
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    timeout: 20000,
+                }
+            );
+
+            console.log(`✅ Track history retrieved for GUID ${guid}`);
+            return response.data;
+        } catch (error) {
+            console.error(`❌ Failed to get track history:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Get asset location using iCloud Assets Controls LBS API
      */
-    async getAssetLocation(assetId) {
+    async getAssetLocation(assetId, type = 2) {
         try {
             await this.ensureValidICloudToken();
 
@@ -474,7 +542,7 @@ class ElockApiService {
                     FTokenID: this.fTokenID,
                     FAction: "QueryLBSMonitorListByFGUIDs",
                     FGUIDs: assetId,
-                    FType: 1, // 1 for assets
+                    FType: type, 
                 },
                 {
                     headers: {

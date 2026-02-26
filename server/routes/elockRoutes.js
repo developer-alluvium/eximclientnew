@@ -90,15 +90,43 @@ router.get("/assignments/:id", async (req, res) => {
 });
 
 /**
+ * GET /asset-info/:assetId
+ * Proxy to QueryAdminAssetByAssetId
+ */
+router.get("/asset-info/:assetId", async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        const result = await elockApiService.getAssetInfo(assetId);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /track-history
+ * Proxy to QueryLBSTrackListByFGUID
+ */
+router.post("/track-history", async (req, res) => {
+    try {
+        const result = await elockApiService.getTrackHistory(req.body);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /location/:assetId
  * Get asset location using iCloud Assets Controls LBS API
  */
 router.get("/location/:assetId", async (req, res) => {
     try {
         const { assetId } = req.params;
-        console.log("📨 Location request for asset:", assetId);
+        const { type = 2 } = req.query; // Default to type 2 as used in tracking map
+        console.log("📨 Location request for asset:", assetId, "type:", type);
 
-        const result = await elockApiService.getAssetLocation(assetId);
+        const result = await elockApiService.getAssetLocation(assetId, parseInt(type));
 
         const statusCode = result.success ? 200 : 500;
 
