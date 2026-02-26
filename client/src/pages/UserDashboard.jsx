@@ -486,13 +486,13 @@ function UserDashboard() {
             : selectedImporter,
         );
       }
-
       const { startDate, endDate } = getStartEndDate();
 
       if (startDate && endDate) {
         params.append("startDate", startDate);
         params.append("endDate", endDate);
       }
+      console.log("Stats API Request URL:", `${url}?${params.toString()}`);
 
       const response = await axios.get(`${url}?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -613,11 +613,11 @@ function UserDashboard() {
       isExternal: true,
     },
     {
-      name: "Transporter Guide",
+      name: "Trade Master Guide",
       description:
-        "Comprehensive fleet management documentation with compliance guidelines",
+        "Comprehensive trade documentation with compliance guidelines",
       path: "/trademasterguide",
-      categoryLabel: "FLEET MANAGEMENT",
+      categoryLabel: "TRADE MANAGEMENT",
       category: "core",
     },
     {

@@ -58,13 +58,8 @@ app.use(cookieParser());
 const defaultOrigins = [
   "http://localhost:3001",
   "http://localhost:3000",
-  "http://43.205.59.159",
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
-  "http://elock-tracking.s3-website.ap-south-1.amazonaws.com",
-  "http://localhost:3005",
-  "http://eximdev.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",
-  "https://d2em7m09618c7h.cloudfront.net",
 ];
 
 const allowedOrigins = [

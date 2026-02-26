@@ -523,14 +523,14 @@ export async function getUserDashboardStats(req, res) {
   try {
     const { importer, date, startDate, endDate } = req.query;
     const user = req.user;
-
+   
     // Determine start and end dates
     // Prioritize explicit start/end dates, fallback to 'date' param, then fallback to today
     let startStr, endStr;
 
     if (startDate && endDate) {
       startStr = startDate;
-      endStr = endDate;
+      endStr = `${endDate}T23:59:59`;
     } else {
       // Fallback to single date logic
       let singleDate;
@@ -545,7 +545,7 @@ export async function getUserDashboardStats(req, res) {
         singleDate = `${year}-${month}-${day}`;
       }
       startStr = singleDate;
-      endStr = singleDate;
+      endStr = `${singleDate}T23:59:59`;
     }
 
     let targetImporters = null; // null implies fetch all (for superadmin)
@@ -589,6 +589,9 @@ export async function getUserDashboardStats(req, res) {
 
     // Pass targetImporters (array or null) directly to pipeline helper
     const importerParam = targetImporters;
+    console.log("Filtering Pipeline Params:", { startStr, endStr, importerParam });
+    console.log("Filtering by Importers:", importerParam);
+    console.log("Date Range:", { startStr, endStr });
 
     // Pass the calculated start and end strings
     const pipeline = getOverviewPipeline(startStr, endStr, importerParam);
