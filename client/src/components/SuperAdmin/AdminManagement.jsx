@@ -52,6 +52,8 @@ import {
   SelectAll,
   ExpandMore,
   AccountBox,
+  AddCircle,
+  RemoveCircle,
 } from "@mui/icons-material";
 import axios from "axios";
 import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
@@ -1260,10 +1262,10 @@ const AdminManagement = ({ onRefresh }) => {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 4,
             overflow: "hidden",
             boxShadow: "0 32px 80px rgba(0,0,0,0.22)",
-            minHeight: 520,
+            minHeight: 820, // Significantly increased height
             display: "flex",
             flexDirection: "column",
           },
@@ -1394,16 +1396,46 @@ const AdminManagement = ({ onRefresh }) => {
                   <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Assign or remove IE codes for this user. Multiple codes can be assigned simultaneously.</Typography>
                 </Box>
 
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, px: 2, py: 1.2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: isRemovingIeCode ? "#ef4444" : "#3b82f6" }} />
-                    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "#374151" }}>Mode: {isRemovingIeCode ? "Remove IE Codes" : "Assign IE Codes"}</Typography>
-                  </Box>
-                  <Button size="small" variant="outlined" color={isRemovingIeCode ? "primary" : "error"}
-                    onClick={() => { setIsRemovingIeCode(v => !v); setSelectedIeCodes([]); }}
-                    sx={{ textTransform: "none", fontSize: "0.75rem", borderRadius: 1.5, fontWeight: 600 }}
+                <Box sx={{ display: "flex", p: 0.5, bgcolor: "#f1f5f9", borderRadius: 2.5, border: "1px solid #e2e8f0" }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant={!isRemovingIeCode ? "contained" : "text"}
+                    onClick={() => { setIsRemovingIeCode(false); setSelectedIeCodes([]); }}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.82rem",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      py: 1,
+                      bgcolor: !isRemovingIeCode ? "#fff" : "transparent",
+                      color: !isRemovingIeCode ? "#f8f8f8ff" : "#64748b",
+                      boxShadow: !isRemovingIeCode ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                      "&:hover": { bgcolor: !isRemovingIeCode ? "#fff" : "rgba(100, 116, 139, 0.08)" }
+                    }}
+                    startIcon={<AddCircle sx={{ fontSize: 18 }} />}
                   >
-                    Switch to {isRemovingIeCode ? "Assignment" : "Removal"}
+                    Assign IE Codes
+                  </Button>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant={isRemovingIeCode ? "contained" : "text"}
+                    onClick={() => { setIsRemovingIeCode(true); setSelectedIeCodes([]); }}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.82rem",
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      py: 1,
+                      bgcolor: isRemovingIeCode ? "#fff" : "transparent",
+                      color: isRemovingIeCode ? "#ffffffff" : "#64748b",
+                      boxShadow: isRemovingIeCode ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
+                      "&:hover": { bgcolor: isRemovingIeCode ? "#fff" : "rgba(100, 116, 139, 0.08)" }
+                    }}
+                    startIcon={<RemoveCircle sx={{ fontSize: 18 }} />}
+                  >
+                    Remove IE Codes
                   </Button>
                 </Box>
 
@@ -1440,12 +1472,18 @@ const AdminManagement = ({ onRefresh }) => {
                         (o.importer_name || o.importerName || "").toLowerCase().includes(lc)
                       );
                     }}
-                    ListboxProps={{ style: { maxHeight: 180 } }}
+                    ListboxProps={{ style: { maxHeight: 250 } }} // Increased height
                     renderOption={(props, option) => (
                       <li {...props} key={option.ie_code_no || option.iecNo}>
-                        <Box sx={{ py: 0.3 }}>
-                          <Typography variant="body2" fontWeight={600} color="primary.main" sx={{ fontSize: "0.82rem" }}>{option.ie_code_no || option.iecNo}</Typography>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.72rem" }}>{option.importer_name || option.importerName || "No Importer Name"}</Typography>
+                        <Box sx={{ py: 1, px: 0.5, width: "100%" }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.88rem" }}>
+                              {option.ie_code_no || option.iecNo}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 500, display: "block", mt: 0.2 }}>
+                            {option.importer_name || option.importerName || "No Importer Name"}
+                          </Typography>
                         </Box>
                       </li>
                     )}
@@ -1460,7 +1498,7 @@ const AdminManagement = ({ onRefresh }) => {
                     noOptionsText="No IE codes found"
                   />
                 </Box>
-
+                
                 <Box>
                   <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Reason <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</Typography>
@@ -1469,14 +1507,32 @@ const AdminManagement = ({ onRefresh }) => {
                 </Box>
 
                 <Box sx={{ mt: "auto", pt: 1 }}>
-                  <Button variant="contained" fullWidth disabled={loading || selectedIeCodes.length === 0}
+                  <Button 
+                    variant="contained" 
+                    fullWidth 
+                    disabled={loading || selectedIeCodes.length === 0}
                     onClick={async () => { await handleIeCodeOperation(); setActionsMenuUser(null); setActionsTab(0); }}
-                    color={isRemovingIeCode ? "error" : "primary"}
-                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem" }}
+                    sx={{  
+                      borderRadius: 2, 
+                      textTransform: "none", 
+                      fontWeight: 700, 
+                      py: 1.5, 
+                      fontSize: "0.9rem",
+                      bgcolor: isRemovingIeCode ? "#ef4444" : "#1e293b",
+                      color: "#ffffff !important",
+                      "&:hover": {
+                        bgcolor: isRemovingIeCode ? "#dc2626" : "#0f172a",
+                      },
+                      "&.Mui-disabled": {
+                         bgcolor: "rgba(30, 41, 59, 0.4)", // Darker background for disabled
+                         color: "rgba(255, 255, 255, 0.45) !important", // Visible white text
+                         opacity: 0.8
+                      }
+                    }}
                   >
                     {loading ? "Processing..." : isRemovingIeCode
-                      ? `Remove ${selectedIeCodes.length} IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`
-                      : `Assign ${selectedIeCodes.length} IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
+                      ? `Remove ${selectedIeCodes.length} Selected IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`
+                      : `Assign ${selectedIeCodes.length} Selected IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
                   </Button>
                 </Box>
               </Box>

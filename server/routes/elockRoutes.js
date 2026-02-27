@@ -209,8 +209,8 @@ router.get("/assign-limits", async (req, res) => {
     );
 
     const response = await axios.get(
-    //   "http://3.108.244.38:9005/api/client-elock-assign-limits",
-      "https://eximbot.alvision.in/transport/api/client-elock-assign-limits",
+       "http://3.108.244.38:9005/api/client-elock-assign-limits",
+      // "https://eximbot.alvision.in/transport/api/client-elock-assign-limits",
       {
         params: { ieCodeNo, type },
       }

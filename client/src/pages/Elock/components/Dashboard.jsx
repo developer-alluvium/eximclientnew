@@ -609,16 +609,23 @@ const Dashboard = () => {
                           setCurrentPage(1);
                         }}
                         size="small"
-                        style={{ width: 200 }}
+                        style={{ minWidth: 220 }}
                         prefix={<UserOutlined />}
+                        dropdownMatchSelectWidth={false}
                       >
-                        {userData.ieCodes.map((code, idx) => (
-                          <Option key={code} value={code}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                              <span>{code}</span>
-                            </div>
-                          </Option>
-                        ))}
+                        {userData.ieCodes.map((code) => {
+                          const assignment = userData.ieCodeAssignments?.find(a => a.ie_code_no === code);
+                          return (
+                            <Option key={code} value={code}>
+                              <div style={{ display: 'flex', flexDirection: 'column', py: 4 }}>
+                                <Text strong style={{ fontSize: '12px', color: '#1890ff' }}>{code}</Text>
+                                <Text type="secondary" style={{ fontSize: '10px', lineHeight: 1.2 }}>
+                                  {assignment?.importer_name || "No Importer Name"}
+                                </Text>
+                              </div>
+                            </Option>
+                          );
+                        })}
                       </Select>
                     ) : (
                       <div style={{ fontSize: '12px', color: '#666' }}>

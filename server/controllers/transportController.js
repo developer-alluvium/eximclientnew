@@ -17,8 +17,8 @@ export const getClientTransportData = async (req, res) => {
 
     // Call external API
     const response = await axios.get(
-      'https://eximbot.alvision.in/transport/api/client-Transport-data', {
-      // 'http://3.108.244.38:9005/api/client-Transport-data', {
+      'http://3.108.244.38:9005/api/client-Transport-data', {
+      // 'https://eximbot.alvision.in/transport/api/client-Transport-data', {
      
       params: { ieCodeNo }
     });
