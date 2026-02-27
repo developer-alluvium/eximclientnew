@@ -23,17 +23,29 @@ router.get("/assignments", async (req, res) => {
         console.log("📨 Assignment request received with query:", req.query);
 
         // Get IE Code from authenticated user session
-        // Prioritize query param if user is admin, otherwise force user's ie code
         let ieCodeNo = req.query.ieCodeNo;
 
         if (req.userType === 'user') {
-            // For standard users, force their IE code
-            ieCodeNo = req.user.ie_code_no;
-
-            // If user has multiple assignments, handling might be more complex
-            // but for now let's stick to the primary one as per old logic or usage
-            if (!ieCodeNo && req.user.ie_code_assignments?.length > 0) {
-                ieCodeNo = req.user.ie_code_assignments[0].ie_code_no;
+            // For standard users, validate against their assigned IE codes
+            const userIeCodes = req.user.ie_code_assignments?.map(a => a.ie_code_no) || [];
+            
+            if (userIeCodes.length === 1) {
+                // Single IE code - use it regardless of query param
+                ieCodeNo = userIeCodes[0];
+                console.log(`🔐 User has single IE code: ${ieCodeNo}`);
+            } else if (userIeCodes.length > 1) {
+                // Multiple IE codes - validate query param or use first
+                if (ieCodeNo && userIeCodes.includes(ieCodeNo)) {
+                    console.log(`🔐 User selected IE code: ${ieCodeNo} (validated against assigned codes)`);
+                } else {
+                    // Query param not provided or not in user's assigned codes - use first
+                    ieCodeNo = userIeCodes[0];
+                    console.log(`🔐 Using first assigned IE code for user: ${ieCodeNo}`);
+                }
+            } else {
+                // Fallback to primary IE code if available
+                ieCodeNo = req.user.ie_code_no;
+                console.log(`🔐 Using primary IE code: ${ieCodeNo}`);
             }
         }
 

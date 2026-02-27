@@ -154,6 +154,7 @@ class ElockApiService {
                 "🔍 Backend: Processing assignment request with params:",
                 queryParams
             );
+            console.log(`📌 Backend: IE Code to filter by: "${ieCodeNo}"`);
 
             // Build query parameters for third-party API
             // IMPORTANT: Fetch ALL records first, then filter and paginate locally
@@ -193,9 +194,11 @@ class ElockApiService {
             // Apply IE code filtering if provided
             if (ieCodeNo) {
                 console.log(
-                    `🔍 Backend: Filtering by IE Code: ${ieCodeNo}${filterType ? ` (filterType: ${filterType})` : ""
+                    `🔍 Backend: Filtering by IE Code: "${ieCodeNo}"${filterType ? ` (filterType: ${filterType})` : ""
                     }`
                 );
+                
+                const beforeCount = jobs.length;
                 jobs = jobs.filter((item) => {
                     const consignorIeCode = item.consignor?.ieCodeNo;
                     const consigneeIeCode = item.consignee?.ieCodeNo;
@@ -211,7 +214,11 @@ class ElockApiService {
                     }
                 });
                 console.log(
-                    `✅ Backend: After IE code filtering: ${jobs.length} assignments`
+                    `✅ Backend: After IE code filtering: ${jobs.length} assignments (filtered from ${beforeCount})`
+                );
+            } else {
+                console.log(
+                    `⚠️ Backend: No IE Code filter applied - showing all records`
                 );
             }
 

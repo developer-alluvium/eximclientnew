@@ -109,6 +109,13 @@ const Dashboard = () => {
     selectedIeCode,
   ]);
 
+  // Reset page to 1 when IE code changes to ensure correct data is fetched
+  useEffect(() => {
+    if (selectedIeCode) {
+      setCurrentPage(1);
+    }
+  }, [selectedIeCode]);
+
   useEffect(() => {
     if (selectedIeCode) {
       fetchLimits();
@@ -363,7 +370,7 @@ const Dashboard = () => {
           }}
           className="pagination-select compact"
           size="small"
-          dropdownMatchSelectWidth={false}
+          popupMatchSelectWidth={false}
           style={{ width: 60, fontSize: '12px' }}
         >
           <Option value={20}>20</Option>
@@ -606,15 +613,15 @@ const Dashboard = () => {
                         value={selectedIeCode}
                         onChange={(val) => {
                           setSelectedIeCode(val);
-                          setCurrentPage(1);
                         }}
                         size="small"
                         style={{ minWidth: 220 }}
                         prefix={<UserOutlined />}
-                        dropdownMatchSelectWidth={false}
+                        popupMatchSelectWidth={false}
                       >
                         {userData.ieCodes.map((code) => {
                           const assignment = userData.ieCodeAssignments?.find(a => a.ie_code_no === code);
+                          console.log("IE Code:", code, "Assignment:", assignment);
                           return (
                             <Option key={code} value={code}>
                               <div style={{ display: 'flex', flexDirection: 'column', py: 4 }}>
