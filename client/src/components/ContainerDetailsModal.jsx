@@ -36,6 +36,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import axios from "../utils/axiosConfig";
 
 // Styled components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -148,18 +149,11 @@ const ContainerDetailsModal = ({
 
       // Use different endpoint based on gandhidham mode
       const apiEndpoint = getApiEndpoint();
-      const response = await fetch(
+      const response = await axios.get(
         `${apiEndpoint}?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "Failed to fetch container details"
-        );
-      }
-
-      const data = await response.json();
+      const data = response.data;
       if (data.success) {
         setContainers(data.data);
         groupContainers(data.data, groupBy);

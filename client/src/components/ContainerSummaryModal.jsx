@@ -27,6 +27,7 @@ import {
 import { styled } from "@mui/material/styles";
 import { getJsonCookie } from "../utils/cookies";
 import ContainerDetailsModal from "./ContainerDetailsModal";
+import axios from "../utils/axiosConfig";
 
 // Styled components for better visual presentation
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -36,6 +37,7 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   textAlign: "center",
   fontSize: "1rem",
   padding: "12px 16px",
+  color: "#000 !important",
 }));
 
 const StyledDataCell = styled(TableCell)(({ theme }) => ({
@@ -152,18 +154,11 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
 
       // Use different endpoint based on gandhidham mode
       const apiEndpoint = getApiEndpoint();
-      const response = await fetch(
+      const response = await axios.get(
         `${apiEndpoint}?year=${year}&ie_codes=${ieCodesParam}`
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || "Failed to fetch container summary"
-        );
-      }
-
-      const data = await response.json();
+      const data = response.data;
       if (data.success) {
         setSummaryData(data.summary);
         setLastUpdated(new Date(data.last_updated).toLocaleString());
