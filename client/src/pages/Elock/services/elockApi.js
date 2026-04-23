@@ -251,6 +251,30 @@ export const apiService = {
         } catch (error) {
             return { success: false, error: error.message };
         }
+    },
+
+    uploadElockForecast: async (file) => {
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await axios.post(
+                "http://3.108.244.38:9005/api/maintenance/elock-forecast/upload",
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("❌ Error uploading elock forecast:", error);
+            return {
+                success: false,
+                error: error.response?.data?.error || error.message || "Failed to upload forecast",
+            };
+        }
     }
 };
 

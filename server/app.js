@@ -57,6 +57,7 @@ app.use(cookieParser());
 // Build allowed origins list using configured client URLs (env) and common dev hosts
 const defaultOrigins = [
   "http://localhost:3001",
+  "http://localhost:3002",
   "http://localhost:3000",
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",

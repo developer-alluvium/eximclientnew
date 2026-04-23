@@ -18,7 +18,8 @@ import {
   Spin,
   Card,
   Row,
-  Col
+  Col,
+  Upload
 } from "antd";
 import {
   SearchOutlined,
@@ -34,7 +35,8 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   SyncOutlined,
-  BellOutlined
+  BellOutlined,
+  UploadOutlined
 } from "@ant-design/icons";
 import { apiService } from "../services/elockApi";
 import TrackingMap from "./TrackingMap.jsx";
@@ -52,6 +54,8 @@ const Dashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState('1');
+  const [uploadingForecast, setUploadingForecast] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [serviceStatus, setServiceStatus] = useState(null);
@@ -78,8 +82,6 @@ const Dashboard = () => {
   // Notifications
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedNotificationElockNo, setSelectedNotificationElockNo] = useState(null);
-
-  const [activeTab, setActiveTab] = useState("assignments");
 
   const getImporterName = () => {
     if (!userData) return "";
@@ -121,6 +123,41 @@ const Dashboard = () => {
       fetchLimits();
     }
   }, [selectedIeCode, filterType]);
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
+  };
+
+  const handleForecastUpload = async (info) => {
+    const { file } = info;
+    if (file.status === 'uploading') {
+      setUploadingForecast(true);
+      return;
+    }
+    
+    // We handle the actual upload in customRequest or beforeUpload, 
+    // but here we'll just use a simple approach if the user selects a file.
+  };
+
+  const customForecastUpload = async ({ file, onSuccess, onError }) => {
+    setUploadingForecast(true);
+    try {
+      const response = await apiService.uploadElockForecast(file);
+      if (response.success || response.message === "File uploaded and data processed successfully") {
+        message.success(`${file.name} forecast uploaded successfully.`);
+        onSuccess(response);
+      } else {
+        message.error(response.error || `Failed to upload ${file.name} forecast.`);
+        onError(new Error(response.error));
+      }
+    } catch (err) {
+      message.error(`Error uploading ${file.name} forecast.`);
+      onError(err);
+    } finally {
+      setUploadingForecast(false);
+    }
+  };
+
   const handleFilterTypeChange = (value) => {
     setFilterType(value);
     setCurrentPage(1);
@@ -680,16 +717,29 @@ const Dashboard = () => {
       <div className="main-content-ant compact" style={{ padding: '16px' }}>
         <Card bordered={false} className="shadow-box" bodyStyle={{ padding: '12px' }}>
 
-          {/* Controls Container */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
-
-            {/* Top Row ONLY PILLS */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-              {/* Pills Right */}
-              <div style={{ flexShrink: 0 }}>
-                {renderLimitPills()}
-              </div>
-            </div>
+          {/* Top Row: Upload and Pills */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, justifyContent: 'flex-end' }}>
+            <Upload
+              customRequest={customForecastUpload}
+              showUploadList={false}
+              accept=".xlsx,.xls,.csv"
+            >
+              <Button
+                icon={<UploadOutlined />}
+                loading={uploadingForecast}
+                type="primary"
+                size="small"
+                style={{
+                  borderRadius: '4px',
+                  background: '#1890ff',
+                  borderColor: '#1890ff',
+                  fontSize: '12px'
+                }}
+              >
+                Upload Forecast
+              </Button>
+            </Upload>
+            {renderLimitPills()}
           </div>
 
           <Tabs
@@ -738,7 +788,7 @@ const Dashboard = () => {
               </div>
             }
           >
-            <TabPane tab="Container Assignments" key="assignments">
+            <TabPane tab={<span style={{ fontSize: '16px', color: '#000', fontWeight: '600' }}>Container Assignments</span>} key="assignments">
               <Table
                 columns={columns}
                 dataSource={assignments}
