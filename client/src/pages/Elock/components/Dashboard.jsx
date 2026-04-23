@@ -54,7 +54,7 @@ const Dashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState('assignments');
   const [uploadingForecast, setUploadingForecast] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
