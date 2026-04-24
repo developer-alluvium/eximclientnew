@@ -36,7 +36,8 @@ import {
   ExclamationCircleOutlined,
   SyncOutlined,
   BellOutlined,
-  UploadOutlined
+  UploadOutlined,
+  DownloadOutlined
 } from "@ant-design/icons";
 import { apiService } from "../services/elockApi";
 import TrackingMap from "./TrackingMap.jsx";
@@ -56,6 +57,7 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState('assignments');
   const [uploadingForecast, setUploadingForecast] = useState(false);
+  const [sampleDownloaded, setSampleDownloaded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [serviceStatus, setServiceStatus] = useState(null);
@@ -137,6 +139,13 @@ const Dashboard = () => {
     
     // We handle the actual upload in customRequest or beforeUpload, 
     // but here we'll just use a simple approach if the user selects a file.
+  };
+
+  const handleDownloadSample = () => {
+    const sampleUrl = "https://exim-images-p1.s3.ap-south-1.amazonaws.com/notes/import_organisation-1777012649789.xlsx";
+    window.open(sampleUrl, '_blank');
+    setSampleDownloaded(true);
+    message.success("Sample file download started. Upload Forecast is now enabled.");
   };
 
   const customForecastUpload = async ({ file, onSuccess, onError }) => {
@@ -723,22 +732,37 @@ const Dashboard = () => {
               customRequest={customForecastUpload}
               showUploadList={false}
               accept=".xlsx,.xls,.csv"
+              disabled={!sampleDownloaded}
             >
               <Button
                 icon={<UploadOutlined />}
                 loading={uploadingForecast}
                 type="primary"
                 size="small"
+                disabled={!sampleDownloaded}
                 style={{
                   borderRadius: '4px',
-                  background: '#1890ff',
-                  borderColor: '#1890ff',
+                  background: sampleDownloaded ? '#1890ff' : '#f5f5f5',
+                  borderColor: sampleDownloaded ? '#1890ff' : '#d9d9d9',
                   fontSize: '12px'
                 }}
               >
                 Upload Forecast
               </Button>
             </Upload>
+            <Button
+              icon={<DownloadOutlined />}
+              size="small"
+              onClick={handleDownloadSample}
+              style={{
+                borderRadius: '4px',
+                fontSize: '12px',
+                color: '#1890ff',
+                borderColor: '#1890ff'
+              }}
+            >
+              Download Sample
+            </Button>
             {renderLimitPills()}
           </div>
 
