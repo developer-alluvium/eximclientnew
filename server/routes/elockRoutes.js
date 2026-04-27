@@ -1,9 +1,14 @@
 import express from "express";
 import axios from "axios";
+import multer from "multer";
+import FormData from "form-data";
 import elockApiService from "../services/elockApiService.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
+import EximclientUser from "../models/eximclientUserModel.js";
 
 const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Apply authentication to all routes
 router.use(authenticateUser);
@@ -238,6 +243,67 @@ router.get("/assign-limits", async (req, res) => {
       message: "Failed to fetch assignment limits from third-party service",
     });
   }
+});
+
+/**
+ * POST /maintenance/forecast/upload
+ * Proxy forecast upload to maintenance service
+ */
+router.post("/maintenance/forecast/upload", upload.single("file"), async (req, res) => {
+    try {
+        console.log("📨 Proxying forecast upload request");
+        
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: "No file uploaded" });
+        }
+
+        const formData = new FormData();
+        formData.append("file", req.file.buffer, {
+            filename: req.file.originalname,
+            contentType: req.file.mimetype,
+        });
+
+        const response = await axios.post(
+            "http://3.108.244.38:9005/api/maintenance/elock-forecast/upload",
+            formData,
+            {
+                headers: {
+                    ...formData.getHeaders(),
+                },
+            }
+        );
+
+        console.log("✅ Forecast upload proxy successful");
+        res.json(response.data);
+    } catch (error) {
+        console.error("❌ Error proxying forecast upload:", error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            message: "Failed to upload forecast to maintenance service",
+        });
+    }
+});
+
+/**
+ * POST /mark-sample-downloaded
+ * Update sample_downloaded status for an IE Code assignment
+ */
+router.post("/mark-sample-downloaded", async (req, res) => {
+    try {
+        const user = await EximclientUser.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ success: false, error: "User not found" });
+        }
+
+        user.sample_downloaded = true;
+        await user.save();
+        
+        return res.json({ success: true, message: "Sample download status updated globally for user" });
+    } catch (error) {
+        console.error("❌ Error marking sample downloaded:", error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 

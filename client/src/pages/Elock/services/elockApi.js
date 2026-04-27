@@ -258,8 +258,8 @@ export const apiService = {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await axios.post(
-                "http://3.108.244.38:9005/api/maintenance/elock-forecast/upload",
+            const response = await api.post(
+                "/elock/maintenance/forecast/upload",
                 formData,
                 {
                     headers: {
@@ -274,6 +274,16 @@ export const apiService = {
                 success: false,
                 error: error.response?.data?.error || error.message || "Failed to upload forecast",
             };
+        }
+    },
+
+    markSampleDownloaded: async () => {
+        try {
+            const response = await api.post("/elock/mark-sample-downloaded");
+            return response.data;
+        } catch (error) {
+            console.error("Error marking sample downloaded:", error);
+            return { success: false, error: error.message };
         }
     }
 };

@@ -762,6 +762,7 @@ export const getCurrentUser = async (req, res) => {
           gandhidhamTabVisible: user.gandhidhamTabVisible,
           emailVerified: user.emailVerified,
           allowedColumns: user.allowedColumns,
+          sample_downloaded: user.sample_downloaded,
         },
         moduleAccess,
         documentAlerts: {

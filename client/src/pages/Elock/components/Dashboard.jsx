@@ -130,6 +130,13 @@ const Dashboard = () => {
     setActiveTab(key);
   };
 
+  // Sync sampleDownloaded state with user data
+  useEffect(() => {
+    if (userData) {
+      setSampleDownloaded(userData.sample_downloaded || false);
+    }
+  }, [userData]);
+
   const handleForecastUpload = async (info) => {
     const { file } = info;
     if (file.status === 'uploading') {
@@ -141,11 +148,25 @@ const Dashboard = () => {
     // but here we'll just use a simple approach if the user selects a file.
   };
 
-  const handleDownloadSample = () => {
+  const handleDownloadSample = async () => {
     const sampleUrl = "https://exim-images-p1.s3.ap-south-1.amazonaws.com/notes/import_organisation-1777012649789.xlsx";
     window.open(sampleUrl, '_blank');
-    setSampleDownloaded(true);
-    message.success("Sample file download started. Upload Forecast is now enabled.");
+    
+    if (!sampleDownloaded) {
+      setSampleDownloaded(true);
+      message.success("Sample file download started. Upload Forecast is now enabled.");
+      
+      // Persist to backend globally for this user
+      try {
+        await apiService.markSampleDownloaded();
+        // Update local userData state as well to reflect change immediately
+        setUserData(prev => ({ ...prev, sample_downloaded: true }));
+      } catch (err) {
+        console.error("Failed to persist sample download status:", err);
+      }
+    } else {
+      message.info("Sample file download started.");
+    }
   };
 
   const customForecastUpload = async ({ file, onSuccess, onError }) => {

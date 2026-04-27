@@ -33,6 +33,10 @@ const ieCodeAssignmentSchema = new mongoose.Schema({
 
 const eximclientUserSchema = new mongoose.Schema(
   {
+    sample_downloaded: {
+      type: Boolean,
+      default: false,
+    },
     name: {
       type: String,
       required: true,
