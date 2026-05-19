@@ -1,4 +1,5 @@
 import axios from 'axios';
+import transportAuthService from '../services/transportAuthService.js';
 
 /**
  * Get client transport data from external API
@@ -15,12 +16,19 @@ export const getClientTransportData = async (req, res) => {
       });
     }
 
+    const serviceToken = await transportAuthService.getServiceToken();
+
+    const targetBaseUrl = process.env.NODE_ENV === "development"
+        ? "http://localhost:9005/api"
+        : "https://eximbot.alvision.in/transport/api";
+
     // Call external API
     const response = await axios.get(
-      'http://3.108.244.38:9005/api/client-Transport-data', {
-      // 'https://eximbot.alvision.in/transport/api/client-Transport-data', {
-     
-      params: { ieCodeNo }
+      `${targetBaseUrl}/client-Transport-data`, {
+      params: { ieCodeNo },
+      headers: {
+        ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+      }
     });
 
     // Return data to frontend
