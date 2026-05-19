@@ -1,4 +1,5 @@
 import axios from "axios";
+import transportAuthService from "./transportAuthService.js";
 
 class ElockApiService {
     constructor() {
@@ -173,6 +174,8 @@ class ElockApiService {
 
             console.log("📡 Backend: Calling third-party API to fetch all records");
 
+            const serviceToken = await transportAuthService.getServiceToken();
+
             const response = await axios.get(
                 `${this.thirdPartyBaseURL}/client-elock-assign`,
                 {
@@ -181,7 +184,7 @@ class ElockApiService {
                     headers: {
                         Accept: "application/json",
                         "Content-Type": "application/json",
-                        ...(authToken && { Authorization: authToken }),
+                        ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
                     },
                 }
             );

@@ -5,6 +5,7 @@ import FormData from "form-data";
 import elockApiService from "../services/elockApiService.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 import EximclientUser from "../models/eximclientUserModel.js";
+import transportAuthService from "../services/transportAuthService.js";
 
 const router = express.Router();
 
@@ -243,14 +244,7 @@ router.get("/assign-limits", async (req, res) => {
       `📨 Proxying assignment limits request for IE: ${ieCodeNo}, Type: ${type}`
     );
 
-    // Extract authToken from Authorization header or cookies
-    let authToken = req.headers.authorization;
-    if (!authToken) {
-        const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
-        if (cookieToken) {
-            authToken = `Bearer ${cookieToken}`;
-        }
-    }
+    const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
         ? "http://localhost:9005/api"
@@ -261,7 +255,7 @@ router.get("/assign-limits", async (req, res) => {
       {
         params: { ieCodeNo, type },
         headers: {
-            ...(authToken && { Authorization: authToken }),
+            ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
         }
       }
     );
@@ -296,14 +290,7 @@ router.post("/maintenance/forecast/upload", upload.single("file"), async (req, r
             contentType: req.file.mimetype,
         });
 
-        // Extract authToken from Authorization header or cookies
-        let authToken = req.headers.authorization;
-        if (!authToken) {
-            const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
-            if (cookieToken) {
-                authToken = `Bearer ${cookieToken}`;
-            }
-        }
+        const serviceToken = await transportAuthService.getServiceToken();
 
         const targetBaseUrl = process.env.NODE_ENV === "development"
             ? "http://localhost:9005/api"
@@ -315,7 +302,7 @@ router.post("/maintenance/forecast/upload", upload.single("file"), async (req, r
             {
                 headers: {
                     ...formData.getHeaders(),
-                    ...(authToken && { Authorization: authToken }),
+                    ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
                 },
             }
         );

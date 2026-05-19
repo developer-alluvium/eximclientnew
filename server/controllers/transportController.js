@@ -1,4 +1,5 @@
 import axios from 'axios';
+import transportAuthService from '../services/transportAuthService.js';
 
 /**
  * Get client transport data from external API
@@ -15,14 +16,7 @@ export const getClientTransportData = async (req, res) => {
       });
     }
 
-    // Extract authToken from Authorization header or cookies
-    let authToken = req.headers.authorization;
-    if (!authToken) {
-        const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
-        if (cookieToken) {
-            authToken = `Bearer ${cookieToken}`;
-        }
-    }
+    const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
         ? "http://localhost:9005/api"
@@ -33,7 +27,7 @@ export const getClientTransportData = async (req, res) => {
       `${targetBaseUrl}/client-Transport-data`, {
       params: { ieCodeNo },
       headers: {
-        ...(authToken && { Authorization: authToken }),
+        ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
       }
     });
 

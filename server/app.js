@@ -34,6 +34,7 @@ import icegateProxy from "./routes/icegateProxy.js";
 //currency rate routes
 import currencyRate from "./routes/currencyRate.js";
 import transportRoutes from "./routes/transportRoutes.js"; // Transport module routes
+import transportAuthService from "./services/transportAuthService.js";
 // Load environment variables
 dotenv.config();
 
@@ -139,14 +140,7 @@ app.get("/api/notifications", async (req, res) => {
     if (!assetIds) {
       return res.status(400).json({ success: false, message: "assetIds param is required" });
     }
-    // Extract authToken from Authorization header or cookies
-    let authToken = req.headers.authorization;
-    if (!authToken) {
-        const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
-        if (cookieToken) {
-            authToken = `Bearer ${cookieToken}`;
-        }
-    }
+    const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
         ? "http://localhost:9005/api"
@@ -156,7 +150,7 @@ app.get("/api/notifications", async (req, res) => {
       `${targetBaseUrl}/notifications`, {
       params: { assetIds },
       headers: {
-        ...(authToken && { Authorization: authToken }),
+        ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
       }
     });
     res.json(response.data);
@@ -176,6 +170,7 @@ app.get("/api/notifications/stream", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders && res.flushHeaders();
   
   // Establish connection immediately
@@ -186,8 +181,16 @@ app.get("/api/notifications/stream", (req, res) => {
 
   const fetchAndPush = async () => {
     try {
-      const response = await axios.get("http://3.108.244.38:9005/api/notifications", {
-        params: { assetIds }
+      const serviceToken = await transportAuthService.getServiceToken();
+      const targetBaseUrl = process.env.NODE_ENV === "development"
+          ? "http://localhost:9005/api"
+          : "https://eximbot.alvision.in/transport/api";
+
+      const response = await axios.get(`${targetBaseUrl}/notifications`, {
+        params: { assetIds },
+        headers: {
+          ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+        }
       });
       
       const responseData = response.data;
