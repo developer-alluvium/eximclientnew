@@ -139,10 +139,25 @@ app.get("/api/notifications", async (req, res) => {
     if (!assetIds) {
       return res.status(400).json({ success: false, message: "assetIds param is required" });
     }
+    // Extract authToken from Authorization header or cookies
+    let authToken = req.headers.authorization;
+    if (!authToken) {
+        const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
+        if (cookieToken) {
+            authToken = `Bearer ${cookieToken}`;
+        }
+    }
+
+    const targetBaseUrl = process.env.NODE_ENV === "development"
+        ? "http://localhost:9005/api"
+        : "https://eximbot.alvision.in/transport/api";
+
     const response = await axios.get(
-      // "https://eximbot.alvision.in/transport/api/notifications", {
-    "http://3.108.244.38:9005/api/notifications", {
-      params: { assetIds }
+      `${targetBaseUrl}/notifications`, {
+      params: { assetIds },
+      headers: {
+        ...(authToken && { Authorization: authToken }),
+      }
     });
     res.json(response.data);
   } catch (error) {

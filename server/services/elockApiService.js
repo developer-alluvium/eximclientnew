@@ -9,8 +9,9 @@ class ElockApiService {
         this.fTokenExpiry = null;
 
         // Third-party API configuration
-        this.thirdPartyBaseURL = "http://3.108.244.38:9005/api";
-        // this.thirdPartyBaseURL = "https://eximbot.alvision.in/transport/api";
+        this.thirdPartyBaseURL = process.env.NODE_ENV === "development"
+            ? "http://localhost:9005/api"
+            : "https://eximbot.alvision.in/transport/api";
     }
 
     /**
@@ -139,7 +140,7 @@ class ElockApiService {
      * Get E-Lock assignments with complete data mapping
      * Now supports filtering by multiple IE codes
      */
-    async getElockAssignments(queryParams = {}) {
+    async getElockAssignments(queryParams = {}, authToken = null) {
         try {
             const {
                 page = 1,
@@ -180,6 +181,7 @@ class ElockApiService {
                     headers: {
                         Accept: "application/json",
                         "Content-Type": "application/json",
+                        ...(authToken && { Authorization: authToken }),
                     },
                 }
             );
@@ -426,7 +428,7 @@ class ElockApiService {
     /**
      * Get detailed assignment by ID
      */
-    async getAssignmentById(assignmentId) {
+    async getAssignmentById(assignmentId, authToken = null) {
         try {
             console.log(
                 "🔍 Backend: Getting assignment details for ID:",
@@ -435,7 +437,7 @@ class ElockApiService {
 
             // You can implement specific endpoint for single assignment
             // For now, we'll get all and filter by ID
-            const allAssignments = await this.getElockAssignments({ limit: 1000 });
+            const allAssignments = await this.getElockAssignments({ limit: 1000 }, authToken);
 
             if (allAssignments.success) {
                 const assignment = allAssignments.data.find(

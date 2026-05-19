@@ -59,8 +59,17 @@ router.get("/assignments", async (req, res) => {
             ieCodeNo: ieCodeNo
         };
 
+        // Extract authToken from Authorization header or cookies
+        let authToken = req.headers.authorization;
+        if (!authToken) {
+            const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
+            if (cookieToken) {
+                authToken = `Bearer ${cookieToken}`;
+            }
+        }
+
         // Pass query parameters to the service method
-        const result = await elockApiService.getElockAssignments(queryParams);
+        const result = await elockApiService.getElockAssignments(queryParams, authToken);
 
         // Set appropriate HTTP status based on result
         const statusCode = result.success ? 200 : 500;
@@ -88,7 +97,16 @@ router.get("/assignments/:id", async (req, res) => {
         const { id } = req.params;
         console.log("📨 Assignment detail request for ID:", id);
 
-        const result = await elockApiService.getAssignmentById(id);
+        // Extract authToken from Authorization header or cookies
+        let authToken = req.headers.authorization;
+        if (!authToken) {
+            const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
+            if (cookieToken) {
+                authToken = `Bearer ${cookieToken}`;
+            }
+        }
+
+        const result = await elockApiService.getAssignmentById(id, authToken);
 
         const statusCode = result.success ? 200 : 404;
 
@@ -225,11 +243,26 @@ router.get("/assign-limits", async (req, res) => {
       `📨 Proxying assignment limits request for IE: ${ieCodeNo}, Type: ${type}`
     );
 
+    // Extract authToken from Authorization header or cookies
+    let authToken = req.headers.authorization;
+    if (!authToken) {
+        const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
+        if (cookieToken) {
+            authToken = `Bearer ${cookieToken}`;
+        }
+    }
+
+    const targetBaseUrl = process.env.NODE_ENV === "development"
+        ? "http://localhost:9005/api"
+        : "https://eximbot.alvision.in/transport/api";
+
     const response = await axios.get(
-       "http://3.108.244.38:9005/api/client-elock-assign-limits",
-      // "https://eximbot.alvision.in/transport/api/client-elock-assign-limits",
+      `${targetBaseUrl}/client-elock-assign-limits`,
       {
         params: { ieCodeNo, type },
+        headers: {
+            ...(authToken && { Authorization: authToken }),
+        }
       }
     );
 
@@ -263,12 +296,26 @@ router.post("/maintenance/forecast/upload", upload.single("file"), async (req, r
             contentType: req.file.mimetype,
         });
 
+        // Extract authToken from Authorization header or cookies
+        let authToken = req.headers.authorization;
+        if (!authToken) {
+            const cookieToken = req.cookies?.access_token || req.cookies?.user_access_token || req.cookies?.customer_admin_access_token;
+            if (cookieToken) {
+                authToken = `Bearer ${cookieToken}`;
+            }
+        }
+
+        const targetBaseUrl = process.env.NODE_ENV === "development"
+            ? "http://localhost:9005/api"
+            : "https://eximbot.alvision.in/transport/api";
+
         const response = await axios.post(
-            "http://3.108.244.38:9005/api/maintenance/elock-forecast/upload",
+            `${targetBaseUrl}/maintenance/elock-forecast/upload`,
             formData,
             {
                 headers: {
                     ...formData.getHeaders(),
+                    ...(authToken && { Authorization: authToken }),
                 },
             }
         );
