@@ -34,6 +34,7 @@ import icegateProxy from "./routes/icegateProxy.js";
 //currency rate routes
 import currencyRate from "./routes/currencyRate.js";
 import transportRoutes from "./routes/transportRoutes.js"; // Transport module routes
+import exportProxyRoutes from "./routes/exportProxyRoutes.js"; // Export module proxy routes
 // Load environment variables
 dotenv.config();
 
@@ -127,6 +128,7 @@ app.use(aeoReminderRoutes);
 app.use(icegateProxy);
 app.use(currencyRate);
 app.use("/api/transport", transportRoutes);
+app.use(exportProxyRoutes); // Export module proxy routes
 app.use(analytics);
 
 app.use("/api/elock", elockRoutes);

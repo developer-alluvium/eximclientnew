@@ -35,6 +35,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import UserProfile from "./pages/UserProfile.jsx";
 import MainLayout from "./pages/MainLayout.jsx";
 import CImportDSR from "./components/CImportDSR.jsx";
+import CExportDSR from "./components/CExportDSR.jsx";
 import AnalyticsOverview from "./components/AnalyticsOverview.jsx";
 import Dashboard from "./pages/Elock/components/Dashboard.jsx"; // Elock Dashboard
 import ElockGPSOperationPage from "./pages/Elock/pages/ElockGPSOperationPage.jsx"; // Elock Operation Page
@@ -222,6 +223,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <CImportDSR />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/export"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <CExportDSR />
                         </ProtectedRoute>
                       }
                     />

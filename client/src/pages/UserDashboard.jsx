@@ -569,6 +569,14 @@ function UserDashboard() {
       category: "core",
     },
     {
+      name: "Export DSR",
+      description:
+        "Comprehensive export shipment tracking and IEC-wise data management",
+      path: "/export",
+      categoryLabel: "EXPORT MANAGEMENT",
+      category: "core",
+    },
+    {
       name: "CostIQ",
       description:
         "Advanced freight cost calculator with per-kilogram pricing analysis",
@@ -846,7 +854,6 @@ function UserDashboard() {
   };
 
   const userName = dashboardData?.user?.name || "User";
-  const userInitial = userName ? userName.charAt(0).toUpperCase() : "U";
   console.log(dashboardData);
   if (loading) {
     return (

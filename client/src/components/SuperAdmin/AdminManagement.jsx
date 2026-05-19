@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -30,6 +30,7 @@ import {
   FormControlLabel,
   Avatar,
   InputAdornment,
+  Checkbox,
 } from "@mui/material";
 import {
   AdminPanelSettings,
@@ -61,6 +62,49 @@ import { Autocomplete } from "@mui/material";
 import IeCodeDialog from "./IeCodeDialog";
 
 // Available modules for assignment (unchanged)
+const CUSTOM_HOUSE_OPTIONS = [
+  {
+    group: "Ahmedabad", branchCode: "AMD", items: [
+      { value: "AHMEDABAD AIR CARGO", label: "Ahmedabad Air Cargo", code: "INAMD4" },
+      { value: "ICD SABARMATI", label: "ICD Sabarmati", code: "INSBI6" },
+      { value: "ICD SACHANA", label: "ICD SACHANA", code: "INJKA6" },
+      { value: "ICD VIROCHAN NAGAR", label: "ICD Virochan Nagar", code: "INVCN6" },
+      { value: "THAR DRY PORT", label: "THAR DRY PORT", code: "INSAU6" },
+    ]
+  },
+  {
+    group: "Baroda", branchCode: "BRD", items: [
+      { value: "ANKLESHWAR ICD", label: "ANKLESHWAR ICD", code: "INAKV6" },
+      { value: "ICD VARNAMA", label: "ICD VARNAMA", code: "INVRM6" },
+    ]
+  },
+  {
+    group: "Gandhidham", branchCode: "GIM", items: [
+      { value: "MUNDRA SEA", label: "MUNDRA SEA", code: "INMUN1" },
+      { value: "KANDLA SEA", label: "KANDLA SEA", code: "INIXY1" },
+    ]
+  },
+  {
+    group: "Cochin", branchCode: "COK", items: [
+      { value: "COCHIN AIR CARGO", label: "COCHIN AIR CARGO", code: "INCOK4" },
+      { value: "COCHIN SEA", label: "COCHIN SEA", code: "INCOK1" },
+    ]
+  },
+  {
+    group: "Hazira", branchCode: "HAZ", items: [
+      { value: "HAZIRA", label: "HAZIRA", code: "INHZA1" },
+    ]
+  },
+];
+
+const BRANCH_OPTIONS = [
+  { code: "AMD", label: "AMD - AHMEDABAD" },
+  { code: "BRD", label: "BRD - BARODA" },
+  { code: "GIM", label: "GIM - GANDHIDHAM" },
+  { code: "COK", label: "COK - COCHIN" },
+  { code: "HAZ", label: "HAZ - HAZIRA" },
+];
+
 const AVAILABLE_MODULES = [
   {
     id: "/importdsr",
@@ -121,6 +165,12 @@ const AVAILABLE_MODULES = [
     description: "View transport details, track shipments, and manage logistics",
     category: "core",
   },
+  {
+    id: "/export",
+    name: "Export DSR",
+    description: "View and manage export shipment jobs, track IEC-wise export data from the Export module",
+    category: "core",
+  },
 ];
 
 const AdminManagement = ({ onRefresh }) => {
@@ -140,7 +190,7 @@ const AdminManagement = ({ onRefresh }) => {
   const [statusAction, setStatusAction] = useState(""); // 'activate', 'deactivate'
   const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
 
-  // Module assignment states
+  // IE Code selection states — combined import + export IEC codes
   const [selectedUserModules, setSelectedUserModules] = useState([]);
   const [bulkSelectedUsers, setBulkSelectedUsers] = useState([]);
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
@@ -157,12 +207,19 @@ const AdminManagement = ({ onRefresh }) => {
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
   const [selectedIeCodes, setSelectedIeCodes] = useState([]); // Now an array
   const [ieCodeReason, setIeCodeReason] = useState("");
-  const [isRemovingIeCode, setIsRemovingIeCode] = useState(false);
+  const [ieCodeMode, setIeCodeMode] = useState("assign_import"); // 'assign_import', 'assign_export', 'remove'
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  // Export-specific IEC codes from the Export API directory
+  const [availableExporterIeCodes, setAvailableExporterIeCodes] = useState([]);
 
   // Enterprise Actions Modal state
   const [actionsMenuUser, setActionsMenuUser] = useState(null);
-  const [actionsTab, setActionsTab] = useState(0);
+  const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Tab Visibility, 5: Branches
+
+  // Branch Assignments
+  const [selectedBranches, setSelectedBranches] = useState([]);
+  const [selectedBranchIcdCodes, setSelectedBranchIcdCodes] = useState([]);
+  const [branchAssignmentLoading, setBranchAssignmentLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -188,7 +245,7 @@ const AdminManagement = ({ onRefresh }) => {
         withCredentials: true,
       };
 
-      const [usersRes, ieCodesRes] = await Promise.all([
+      const [usersRes, ieCodesRes, exportersRes] = await Promise.all([
         axios.get(
           `${process.env.REACT_APP_API_STRING}/superadmin/all-users`,
           config
@@ -197,6 +254,13 @@ const AdminManagement = ({ onRefresh }) => {
           `${process.env.REACT_APP_API_STRING}/superadmin/available-iec-codes`,
           config
         ),
+        // Fetch exporters from Export API directory (graceful fallback if unavailable)
+        axios
+          .get(
+            `${process.env.REACT_APP_API_STRING}/superadmin/available-exporters`,
+            config
+          )
+          .catch(() => ({ data: { success: false, data: [] } })),
       ]);
 
       if (usersRes.data.success) {
@@ -214,18 +278,45 @@ const AdminManagement = ({ onRefresh }) => {
         setUserSearch((prev) => ({ ...prev, options: userOptions }));
       }
 
-      if (ieCodesRes.data.success) {
-        const ieCodesData = ieCodesRes.data.data || [];
-        setAvailableIeCodes(ieCodesData);
+      // Combine import IEC codes + export IEC codes from Export API Directory
+      let combined = [];
 
-        // Pre-populate IE code search options
-        const ieCodeOptions = ieCodesData.map((ieCode) => ({
-          label: `${ieCode.iecNo}`,
-          value: ieCode.iecNo,
-          ieCode: ieCode,
+      if (ieCodesRes.data.success) {
+        const importIeCodes = (ieCodesRes.data.data || []).map((c) => ({
+          ...c,
+          _source: "import",
         }));
-        setIeCodeSearch((prev) => ({ ...prev, options: ieCodeOptions }));
+        combined = [...importIeCodes];
+        setAvailableIeCodes(importIeCodes);
       }
+
+      if (exportersRes.data.success) {
+        const exporterIeCodes = (exportersRes.data.data || [])
+          .filter((e) => e.iecNo) // only entries with an IEC code
+          .map((e) => ({
+            iecNo: e.iecNo,
+            importerName: e.exporterName || e.alias || e.iecNo,
+            status: e.approvalStatus || "Approved",
+            _source: "export",
+          }));
+        setAvailableExporterIeCodes(exporterIeCodes);
+        // Merge: avoid duplicates by iecNo
+        const existingNos = new Set(combined.map((c) => c.iecNo));
+        const uniqueExporters = exporterIeCodes.filter(
+          (e) => !existingNos.has(e.iecNo)
+        );
+        combined = [...combined, ...uniqueExporters];
+      }
+
+      // Populate merged IE code search options
+      const ieCodeOptions = combined.map((ieCode) => ({
+        label: `${ieCode.iecNo} - ${ieCode.importerName || ieCode.exporterName || ""}${
+          ieCode._source === "export" ? " [Export]" : ""
+        }`,
+        value: ieCode.iecNo,
+        ieCode: ieCode,
+      }));
+      setIeCodeSearch((prev) => ({ ...prev, options: ieCodeOptions }));
     } catch (error) {
       console.error("Error fetching data:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -239,6 +330,7 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(false);
     }
   };
+
 
   // Search IE codes with autocomplete
   const searchIeCodes = async (searchTerm) => {
@@ -281,7 +373,7 @@ const AdminManagement = ({ onRefresh }) => {
 
   // IE Code Assignment/Removal Handler
   const handleIeCodeOperation = async () => {
-    if (!selectedEntity || (!isRemovingIeCode && selectedIeCodes.length === 0))
+    if (!selectedEntity || (ieCodeMode !== "remove" && selectedIeCodes.length === 0))
       return;
 
     try {
@@ -293,17 +385,16 @@ const AdminManagement = ({ onRefresh }) => {
         setError("SuperAdmin authentication required. Please login again.");
         return;
       }
-      console.log(superadminToken);
+      
       const config = {
         headers: {
           Authorization: `Bearer ${superadminToken}`,
           "Content-Type": "application/json",
         },
-        //withCredentials: true,
       };
 
       let response;
-      if (isRemovingIeCode) {
+      if (ieCodeMode === "remove") {
         const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`;
 
         response = await axios.delete(endpoint, {
@@ -314,6 +405,8 @@ const AdminManagement = ({ onRefresh }) => {
           },
         });
       } else {
+        // Both assign_import and assign_export use the same backend endpoint, 
+        // as the backend handles the mapping based on provided IECs.
         const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes`;
         const data = {
           ieCodes: selectedIeCodes,
@@ -323,30 +416,72 @@ const AdminManagement = ({ onRefresh }) => {
       }
 
       if (response.data.success) {
-        const action = isRemovingIeCode ? "removed" : "assigned";
+        const action = ieCodeMode === "remove" ? "removed" : "assigned";
         const ieCodesStr = selectedIeCodes.join(", ");
         setSuccess(
           `Successfully ${action} IE Code(s) ${ieCodesStr} ${
-            isRemovingIeCode ? "from" : "to"
+            ieCodeMode === "remove" ? "from" : "to"
           } ${selectedEntity.name}`
         );
         fetchData();
-        setIeCodeDialog(false);
         setSelectedIeCodes([]);
         setIeCodeReason("");
-        setIsRemovingIeCode(false);
+        setIeCodeMode("assign_import");
       }
     } catch (error) {
       console.error("Error assigning/removing IE code:", error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError("SuperAdmin authentication expired. Please login again.");
-      } else {
-        setError(
-          error.response?.data?.message || "Failed to assign/remove IE code"
-        );
-      }
+      setError(error.response?.data?.message || "Failed to assign/remove IE code");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBranchAssignment = async (isRemoval = false) => {
+    if (!selectedEntity) return;
+
+    try {
+      setBranchAssignmentLoading(true);
+      setError(null);
+
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          Authorization: `Bearer ${superadminToken}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      let response;
+      if (isRemoval) {
+        response = await axios.delete(
+          `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/branch-access`,
+          {
+            ...config,
+            data: { removeAll: true }
+          }
+        );
+      } else {
+        response = await axios.post(
+          `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/branch-access`,
+          {
+            selectedBranches,
+            selectedIcdCodes: selectedBranchIcdCodes,
+          },
+          config
+        );
+      }
+
+      if (response.data.success) {
+        setSuccess(response.data.message);
+        fetchData();
+        setActionsMenuUser(null);
+        setActionsTab(0);
+      }
+    } catch (error) {
+      console.error("Branch assignment error:", error);
+      setError(error.response?.data?.message || "Failed to update branch access");
+    } finally {
+      setBranchAssignmentLoading(false);
     }
   };
 
@@ -699,7 +834,7 @@ const AdminManagement = ({ onRefresh }) => {
     setSelectedEntity(user);
     setSelectedIeCodes([]);
     setIeCodeReason("");
-    setIsRemovingIeCode(isRemoving);
+    setIeCodeMode(isRemoving ? "remove" : "assign_import");
     setIeCodeDialog(true);
   };
 
@@ -753,21 +888,32 @@ const AdminManagement = ({ onRefresh }) => {
     });
   }, [users, userSearch.value]);
   // Filter IE codes based on search
-  // Filter IE codes based on search
-  const filteredIeCodes = useMemo(() => {
+  const filteredImportIeCodes = useMemo(() => {
     if (!ieCodeSearch.value) return availableIeCodes;
-
     const searchTerm = ieCodeSearch.value.toLowerCase();
     return availableIeCodes.filter((ieCode) => {
-      const ieCodeLabel =
-        `${ieCode.iecNo} - ${ieCode.importerName}`.toLowerCase();
       return (
         ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
-        ieCode.importerName?.toLowerCase().includes(searchTerm) ||
-        ieCodeLabel.includes(searchTerm)
+        (ieCode.importerName || "").toLowerCase().includes(searchTerm)
       );
     });
   }, [availableIeCodes, ieCodeSearch.value]);
+
+  const filteredExportIeCodes = useMemo(() => {
+    if (!ieCodeSearch.value) return availableExporterIeCodes;
+    const searchTerm = ieCodeSearch.value.toLowerCase();
+    return availableExporterIeCodes.filter((ieCode) => {
+      return (
+        ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
+        (ieCode.exporterName || "").toLowerCase().includes(searchTerm)
+      );
+    });
+  }, [availableExporterIeCodes, ieCodeSearch.value]);
+
+  const filteredIeCodes = useMemo(() => {
+    if (ieCodeMode === "assign_export") return filteredExportIeCodes;
+    return filteredImportIeCodes;
+  }, [ieCodeMode, filteredImportIeCodes, filteredExportIeCodes]);
 
   return (
     <Box>
@@ -1221,7 +1367,9 @@ const AdminManagement = ({ onRefresh }) => {
                           });
                           setSelectedIeCodes([]);
                           setIeCodeReason("");
-                          setIsRemovingIeCode(false);
+                          setIeCodeMode("assign_import");
+                          setSelectedBranches(user.selected_branches || []);
+                          setSelectedBranchIcdCodes(user.selected_icd_codes || []);
                         }}
                         sx={{
                           textTransform: "none",
@@ -1355,6 +1503,7 @@ const AdminManagement = ({ onRefresh }) => {
               { idx: 2, icon: <Assignment sx={{ fontSize: 18 }} />, label: "Modules", desc: `${(actionsMenuUser?.assignedModules || []).length} assigned` },
               { idx: 3, icon: <AdminPanelSettings sx={{ fontSize: 18 }} />, label: "Role", desc: actionsMenuUser?.role === "admin" ? "Admin" : "User" },
               { idx: 4, icon: <Apps sx={{ fontSize: 18 }} />, label: "Tab Visibility", desc: "Jobs & Gandhidham" },
+              { idx: 5, icon: <Business sx={{ fontSize: 18 }} />, label: "Branch Access", desc: `${(actionsMenuUser?.selected_branches || []).length} branches` },
             ].map(({ idx, icon, label, desc }) => (
               <Box
                 key={idx}
@@ -1396,46 +1545,48 @@ const AdminManagement = ({ onRefresh }) => {
                   <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Assign or remove IE codes for this user. Multiple codes can be assigned simultaneously.</Typography>
                 </Box>
 
-                <Box sx={{ display: "flex", p: 0.5, bgcolor: "#f1f5f9", borderRadius: 2.5, border: "1px solid #e2e8f0" }}>
+                <Box sx={{ display: "flex", p: 0.5, bgcolor: "#f1f5f9", borderRadius: 2.5, border: "1px solid #e2e8f0", gap: 0.5 }}>
                   <Button
-                    fullWidth
-                    size="small"
-                    variant={!isRemovingIeCode ? "contained" : "text"}
-                    onClick={() => { setIsRemovingIeCode(false); setSelectedIeCodes([]); }}
+                    fullWidth size="small"
+                    variant={ieCodeMode === "assign_import" ? "contained" : "text"}
+                    onClick={() => { setIeCodeMode("assign_import"); setSelectedIeCodes([]); }}
                     sx={{
-                      textTransform: "none",
-                      fontSize: "0.82rem",
-                      borderRadius: 2,
-                      fontWeight: 700,
-                      py: 1,
-                      bgcolor: !isRemovingIeCode ? "#fff" : "transparent",
-                      color: !isRemovingIeCode ? "#f8f8f8ff" : "#64748b",
-                      boxShadow: !isRemovingIeCode ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
-                      "&:hover": { bgcolor: !isRemovingIeCode ? "#fff" : "rgba(100, 116, 139, 0.08)" }
+                      textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
+                      bgcolor: ieCodeMode === "assign_import" ? "#fff" : "transparent",
+                      color: ieCodeMode === "assign_import" ? "#1e293b" : "#64748b",
+                      boxShadow: ieCodeMode === "assign_import" ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                      "&:hover": { bgcolor: ieCodeMode === "assign_import" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
                     }}
-                    startIcon={<AddCircle sx={{ fontSize: 18 }} />}
                   >
-                    Assign IE Codes
+                    Import IEC
                   </Button>
                   <Button
-                    fullWidth
-                    size="small"
-                    variant={isRemovingIeCode ? "contained" : "text"}
-                    onClick={() => { setIsRemovingIeCode(true); setSelectedIeCodes([]); }}
+                    fullWidth size="small"
+                    variant={ieCodeMode === "assign_export" ? "contained" : "text"}
+                    onClick={() => { setIeCodeMode("assign_export"); setSelectedIeCodes([]); }}
                     sx={{
-                      textTransform: "none",
-                      fontSize: "0.82rem",
-                      borderRadius: 2,
-                      fontWeight: 700,
-                      py: 1,
-                      bgcolor: isRemovingIeCode ? "#fff" : "transparent",
-                      color: isRemovingIeCode ? "#ffffffff" : "#64748b",
-                      boxShadow: isRemovingIeCode ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
-                      "&:hover": { bgcolor: isRemovingIeCode ? "#fff" : "rgba(100, 116, 139, 0.08)" }
+                      textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
+                      bgcolor: ieCodeMode === "assign_export" ? "#fff" : "transparent",
+                      color: ieCodeMode === "assign_export" ? "#1e293b" : "#64748b",
+                      boxShadow: ieCodeMode === "assign_export" ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
+                      "&:hover": { bgcolor: ieCodeMode === "assign_export" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
                     }}
-                    startIcon={<RemoveCircle sx={{ fontSize: 18 }} />}
                   >
-                    Remove IE Codes
+                    Exporter IEC
+                  </Button>
+                  <Button
+                    fullWidth size="small"
+                    variant={ieCodeMode === "remove" ? "contained" : "text"}
+                    onClick={() => { setIeCodeMode("remove"); setSelectedIeCodes([]); }}
+                    sx={{
+                      textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
+                      bgcolor: ieCodeMode === "remove" ? "#fff" : "transparent",
+                      color: ieCodeMode === "remove" ? "#ef4444" : "#64748b",
+                      boxShadow: ieCodeMode === "remove" ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
+                      "&:hover": { bgcolor: ieCodeMode === "remove" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
+                    }}
+                  >
+                    Remove
                   </Button>
                 </Box>
 
@@ -1452,15 +1603,15 @@ const AdminManagement = ({ onRefresh }) => {
 
                 <Box>
                   <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {isRemovingIeCode ? "Select Codes to Remove" : "Select Codes to Assign"}
+                    {ieCodeMode === "remove" ? "Select Codes to Remove" : `Select ${ieCodeMode === "assign_import" ? "Import" : "Exporter"} Codes to Assign`}
                   </Typography>
                   <Autocomplete
                     multiple disableCloseOnSelect
-                    options={isRemovingIeCode ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes}
+                    options={ieCodeMode === "remove" ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes}
                     getOptionLabel={(opt) => opt.ie_code_no || opt.iecNo || ""}
                     isOptionEqualToValue={(opt, val) => (opt.ie_code_no || opt.iecNo) === (val.ie_code_no || val.iecNo)}
                     value={(() => {
-                      const opts = isRemovingIeCode ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes;
+                      const opts = ieCodeMode === "remove" ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes;
                       return selectedIeCodes.map(code => opts.find(o => (o.ie_code_no || o.iecNo) === code) || { ie_code_no: code });
                     })()}
                     onChange={(_, newVal) => setSelectedIeCodes(newVal.map(v => v.ie_code_no || v.iecNo))}
@@ -1469,10 +1620,10 @@ const AdminManagement = ({ onRefresh }) => {
                       const lc = inputValue.toLowerCase();
                       return options.filter(o =>
                         (o.ie_code_no || o.iecNo || "").toLowerCase().includes(lc) ||
-                        (o.importer_name || o.importerName || "").toLowerCase().includes(lc)
+                        (o.importer_name || o.importerName || o.exporterName || "").toLowerCase().includes(lc)
                       );
                     }}
-                    ListboxProps={{ style: { maxHeight: 250 } }} // Increased height
+                    ListboxProps={{ style: { maxHeight: 250 } }}
                     renderOption={(props, option) => (
                       <li {...props} key={option.ie_code_no || option.iecNo}>
                         <Box sx={{ py: 1, px: 0.5, width: "100%" }}>
@@ -1482,7 +1633,7 @@ const AdminManagement = ({ onRefresh }) => {
                             </Typography>
                           </Box>
                           <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 500, display: "block", mt: 0.2 }}>
-                            {option.importer_name || option.importerName || "No Importer Name"}
+                            {option.importer_name || option.importerName || option.exporterName || "No Name"}
                           </Typography>
                         </Box>
                       </li>
@@ -1493,9 +1644,9 @@ const AdminManagement = ({ onRefresh }) => {
                       ))
                     }
                     renderInput={(params) => (
-                      <TextField {...params} placeholder="Search by IE code or importer name..." size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      <TextField {...params} placeholder={`Search ${ieCodeMode === "assign_export" ? "exporters" : "importers"}...`} size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
                     )}
-                    noOptionsText="No IE codes found"
+                    noOptionsText="No codes found"
                   />
                 </Box>
                 
@@ -1518,21 +1669,21 @@ const AdminManagement = ({ onRefresh }) => {
                       fontWeight: 700, 
                       py: 1.5, 
                       fontSize: "0.9rem",
-                      bgcolor: isRemovingIeCode ? "#ef4444" : "#1e293b",
+                      bgcolor: ieCodeMode === "remove" ? "#ef4444" : "#1e293b",
                       color: "#ffffff !important",
                       "&:hover": {
-                        bgcolor: isRemovingIeCode ? "#dc2626" : "#0f172a",
+                        bgcolor: ieCodeMode === "remove" ? "#dc2626" : "#0f172a",
                       },
                       "&.Mui-disabled": {
-                         bgcolor: "rgba(30, 41, 59, 0.4)", // Darker background for disabled
-                         color: "rgba(255, 255, 255, 0.45) !important", // Visible white text
+                         bgcolor: "rgba(30, 41, 59, 0.4)",
+                         color: "rgba(255, 255, 255, 0.45) !important",
                          opacity: 0.8
                       }
                     }}
                   >
-                    {loading ? "Processing..." : isRemovingIeCode
-                      ? `Remove ${selectedIeCodes.length} Selected IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`
-                      : `Assign ${selectedIeCodes.length} Selected IE Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
+                    {loading ? "Processing..." : ieCodeMode === "remove"
+                      ? `Remove ${selectedIeCodes.length} Selected Code${selectedIeCodes.length !== 1 ? "s" : ""}`
+                      : `Assign ${selectedIeCodes.length} Selected Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
                   </Button>
                 </Box>
               </Box>
@@ -1728,6 +1879,106 @@ const AdminManagement = ({ onRefresh }) => {
               </Box>
             )}
 
+            {/* Panel 5: Branch Access */}
+            {actionsTab === 5 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Branch Access Control</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Assign branches and specific custom houses/ports to control data visibility for this user.</Typography>
+                </Box>
+
+                {(actionsMenuUser?.selected_branches?.length > 0 || actionsMenuUser?.selected_icd_codes?.length > 0) && (
+                  <Box sx={{ bgcolor: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 2.5, p: 2 }}>
+                    <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#0369a1", mb: 1, textTransform: "uppercase" }}>Current Access</Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(actionsMenuUser.selected_branches || []).map(b => (
+                        <Chip key={b} label={b} size="small" sx={{ bgcolor: "#fff", fontWeight: 700, border: "1px solid #bae6fd" }} />
+                      ))}
+                      {(actionsMenuUser.selected_icd_codes || []).map(c => (
+                        <Chip key={c} label={c} size="small" variant="outlined" sx={{ bgcolor: "rgba(255,255,255,0.5)" }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                <Box>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1.2 }}>ASSIGN BRANCHES</Typography>
+                  <Grid container spacing={1}>
+                    {BRANCH_OPTIONS.map((branch) => (
+                      <Grid item xs={4} key={branch.code}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={selectedBranches.includes(branch.code)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedBranches([...selectedBranches, branch.code]);
+                                } else {
+                                  setSelectedBranches(selectedBranches.filter(b => b !== branch.code));
+                                }
+                              }}
+                            />
+                          }
+                          label={<Typography sx={{ fontSize: "0.78rem", fontWeight: 500 }}>{branch.label}</Typography>}
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+
+                <Box>
+                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1.2 }}>ASSIGN CUSTOM HOUSES / ICDs</Typography>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={CUSTOM_HOUSE_OPTIONS
+                      .filter(branch => selectedBranches.includes(branch.branchCode))
+                      .flatMap(branch => branch.items.map(item => ({
+                        value: item.value,
+                        label: `${item.label} (${item.code})`,
+                        group: branch.group
+                      })))}
+                    groupBy={(option) => option.group}
+                    getOptionLabel={(option) => option.label}
+                    value={CUSTOM_HOUSE_OPTIONS
+                      .flatMap(b => b.items)
+                      .filter(i => selectedBranchIcdCodes.includes(i.value))
+                      .map(i => ({ value: i.value, label: i.label }))}
+                    onChange={(_, newValue) => setSelectedBranchIcdCodes(newValue.map(v => v.value))}
+                    renderInput={(params) => (
+                      <TextField {...params} size="small" placeholder={selectedBranches.length === 0 ? "Select branches first..." : "Search custom houses..."} />
+                    )}
+                    renderTags={(tagValue, getTagProps) =>
+                      tagValue.map((option, index) => (
+                        <Chip size="small" label={option.label} {...getTagProps({ index })} key={option.value} sx={{ fontSize: "0.7rem" }} />
+                      ))
+                    }
+                    disabled={selectedBranches.length === 0}
+                  />
+                </Box>
+
+                <Box sx={{ mt: "auto", display: "flex", gap: 1.5 }}>
+                  <Button
+                    fullWidth variant="contained"
+                    onClick={() => handleBranchAssignment(false)}
+                    disabled={branchAssignmentLoading || selectedBranches.length === 0}
+                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, bgcolor: "#1e293b", color: "#fff !important" }}
+                  >
+                    {branchAssignmentLoading ? "Updating..." : "Save Assignments"}
+                  </Button>
+                  <Button
+                    variant="outlined" color="error"
+                    onClick={() => handleBranchAssignment(true)}
+                    disabled={branchAssignmentLoading || (!actionsMenuUser?.selected_branches?.length && !actionsMenuUser?.selected_icd_codes?.length)}
+                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, px: 3 }}
+                  >
+                    Remove All
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
           </Box>
         </Box>
       </Dialog>
@@ -1738,11 +1989,11 @@ const AdminManagement = ({ onRefresh }) => {
           setIeCodeDialog(false);
           setSelectedIeCodes([]);
           setIeCodeReason("");
-          setIsRemovingIeCode(false);
+          setIeCodeMode("assign_import");
         }}
         selectedEntity={selectedEntity}
-        isRemovingIeCode={isRemovingIeCode}
-        setIsRemovingIeCode={setIsRemovingIeCode}
+        isRemovingIeCode={ieCodeMode === "remove"}
+        setIsRemovingIeCode={(val) => setIeCodeMode(val ? "remove" : "assign_import")}
         selectedIeCodes={selectedIeCodes}
         setSelectedIeCodes={setSelectedIeCodes}
         ieCodeReason={ieCodeReason}

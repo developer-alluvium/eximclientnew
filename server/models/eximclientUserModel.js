@@ -221,6 +221,18 @@ const eximclientUserSchema = new mongoose.Schema(
         default: false
       }
     }],
+    selected_branches: {
+      type: [String],
+      default: [],
+    },
+    selected_icd_codes: {
+      type: [String],
+      default: [],
+    },
+    selected_ports: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
