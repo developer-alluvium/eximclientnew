@@ -118,6 +118,7 @@ export const proxyExportListing = async (req, res) => {
       limit = 10,
       search = "",
       exporter = "",
+      ieCode = "",
       country = "",
       consignmentType = "",
       branch = "",
@@ -141,16 +142,16 @@ export const proxyExportListing = async (req, res) => {
     };
 
     // For regular users: inject their IE codes as the ieCode filter
-    // For admins: pass the exporter filter as-is (they can search freely)
+    // For admins: pass the exporter/ieCode filter as-is (they can search freely)
     if (!isAdmin) {
       const ieCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
       if (ieCodes.length === 1) {
-        forwardParams.exporter = ieCodes[0];
+        forwardParams.ieCode = ieCodes[0];
       } else {
-        forwardParams.exporter = ieCodes.join(",");
+        forwardParams.ieCode = ieCodes.join(",");
       }
     } else {
-      if (exporter) forwardParams.exporter = exporter;
+      if (ieCode) forwardParams.ieCode = ieCode;
       
       // Inject branch restrictions
       const branchRestrictions = dbUser.selected_branches || [];
@@ -159,10 +160,18 @@ export const proxyExportListing = async (req, res) => {
       }
     }
 
+    if (exporter) {
+      forwardParams.exporter = exporter;
+    }
+
     const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
 
     const response = await axios.get(exportApiUrl, {
       params: forwardParams,
+      headers: {
+        username: "Admin",
+        "x-username": "Admin"
+      },
       timeout: 30000,
     });
 

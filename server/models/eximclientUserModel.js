@@ -313,6 +313,36 @@ eximclientUserSchema.methods.generatePasswordResetToken = function () {
   return resetToken;
 };
 
+// Add IE code assignment
+eximclientUserSchema.methods.addIeCodeAssignment = function (ieCodeNo, importerName, actor) {
+  if (!this.ie_code_assignments) {
+    this.ie_code_assignments = [];
+  }
+  const normalized = ieCodeNo.trim().toUpperCase();
+  const existing = this.ie_code_assignments.find(a => a.ie_code_no === normalized);
+  if (!existing) {
+    this.ie_code_assignments.push({
+      ie_code_no: normalized,
+      importer_name: importerName,
+      assigned_at: new Date(),
+      assigned_by: actor ? (actor.id || actor._id) : null,
+      assigned_by_model: actor ? (actor.role === 'superadmin' || actor.role === 'super_admin' ? 'SuperAdmin' : 'Admin') : 'SuperAdmin'
+    });
+  }
+};
+
+// Remove IE code assignment
+eximclientUserSchema.methods.removeIeCodeAssignment = function (ieCodeNo) {
+  if (!this.ie_code_assignments) return;
+  const normalized = ieCodeNo.trim().toUpperCase();
+  this.ie_code_assignments = this.ie_code_assignments.filter(a => a.ie_code_no !== normalized);
+};
+
+// Get assigned IE codes
+eximclientUserSchema.methods.getAssignedIeCodes = function () {
+  return this.ie_code_assignments || [];
+};
+
 // Index for better performance
 eximclientUserSchema.index({ ie_code_no: 1 });
 eximclientUserSchema.index({ adminId: 1 });

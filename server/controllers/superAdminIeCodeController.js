@@ -1,7 +1,7 @@
 import EximclientUser from "../models/eximclientUserModel.js";
 import CustomerKycModel from "../models/customerKycModel.js";
-
 import Notification from "../models/notificationModel.js";
+import axios from "axios";
 
 /**
  * Assign additional IE code to a user
@@ -52,12 +52,39 @@ export const assignAdditionalIeCode = async (req, res) => {
         continue;
       }
 
-      // Get customer KYC details for the IE code
+      // Get customer KYC details or exporter details for the IE code
+      let importerName = null;
       const customerKyc = await CustomerKycModel.findOne({ iec_no: ieCodeNo });
-      if (!customerKyc || !customerKyc.name_of_individual) {
+      
+      if (customerKyc && customerKyc.name_of_individual) {
+        importerName = customerKyc.name_of_individual;
+      } else {
+        // Fallback to Export API directory
+        try {
+          const exportApiUrl = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
+          console.log(`Checking Exporter API for IEC: ${ieCodeNo} at ${exportApiUrl}/directory/iec-codes`);
+          const response = await axios.get(`${exportApiUrl}/directory/iec-codes`, {
+            params: { search: ieCodeNo },
+            timeout: 5000
+          });
+          
+          if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            const exporter = response.data.data.find(
+              (item) => item.iecNo && item.iecNo.trim().toUpperCase() === ieCodeNo.trim().toUpperCase()
+            );
+            if (exporter) {
+              importerName = exporter.exporterName || exporter.alias || ieCodeNo;
+            }
+          }
+        } catch (err) {
+          console.error("Error querying Exporter API for IEC assignment:", err.message);
+        }
+      }
+
+      if (!importerName) {
         results.failed.push({
           ieCode: ieCodeNo,
-          reason: "No valid KYC record found",
+          reason: "No valid KYC or Exporter record found",
         });
         continue;
       }
@@ -65,7 +92,7 @@ export const assignAdditionalIeCode = async (req, res) => {
       // Add new IE code assignment
       const newAssignment = {
         ie_code_no: ieCodeNo.toUpperCase(),
-        importer_name: customerKyc.name_of_individual,
+        importer_name: importerName,
         assigned_at: new Date(),
         assigned_by: req.user._id,
         assigned_by_model: "SuperAdmin",
@@ -79,7 +106,7 @@ export const assignAdditionalIeCode = async (req, res) => {
       user.ie_code_assignments.push(newAssignment);
       results.success.push({
         ieCode: ieCodeNo,
-        importerName: customerKyc.name_of_individual,
+        importerName: importerName,
       });
 
       // Log activity
@@ -260,12 +287,38 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       });
     }
 
-    // Get customer KYC details
+    // Get customer KYC details or exporter details
+    let importerName = null;
     const customerKyc = await CustomerKycModel.findOne({ iec_no: ieCodeNo });
-    if (!customerKyc || !customerKyc.name_of_individual) {
+    if (customerKyc && customerKyc.name_of_individual) {
+      importerName = customerKyc.name_of_individual;
+    } else {
+      // Fallback to Export API directory
+      try {
+        const exportApiUrl = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
+        console.log(`Checking Exporter API for IEC: ${ieCodeNo} at ${exportApiUrl}/directory/iec-codes`);
+        const response = await axios.get(`${exportApiUrl}/directory/iec-codes`, {
+          params: { search: ieCodeNo },
+          timeout: 5000
+        });
+        
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          const exporter = response.data.data.find(
+            (item) => item.iecNo && item.iecNo.trim().toUpperCase() === ieCodeNo.trim().toUpperCase()
+          );
+          if (exporter) {
+            importerName = exporter.exporterName || exporter.alias || ieCodeNo;
+          }
+        }
+      } catch (err) {
+        console.error("Error querying Exporter API for bulk IEC assignment:", err.message);
+      }
+    }
+
+    if (!importerName) {
       return res.status(400).json({
         success: false,
-        message: `Invalid or incomplete customer KYC record for IEC ${ieCodeNo}.`,
+        message: `Invalid or incomplete customer KYC or Exporter record for IEC ${ieCodeNo}.`,
       });
     }
 
@@ -295,8 +348,8 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
         // Add IE code assignment
         user.addIeCodeAssignment(
           ieCodeNo,
-          customerKyc.name_of_individual,
-          req.superAdmin
+          importerName,
+          req.user
         );
         await user.save();
         successCount++;
@@ -321,7 +374,7 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       message: `IE code assignments completed: ${successCount} successful, ${failureCount} failed`,
       data: {
         ieCodeNo,
-        importerName: customerKyc.name_of_individual,
+        importerName,
         successCount,
         failureCount,
         errors: errors.length > 0 ? errors : undefined,

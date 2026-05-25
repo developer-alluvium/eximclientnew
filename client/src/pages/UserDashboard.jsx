@@ -628,14 +628,7 @@ function UserDashboard() {
       categoryLabel: "TRADE MANAGEMENT",
       category: "core",
     },
-    {
-      name: "Export DSR",
-      description:
-        "Export shipment tracking and daily status reporting with logistics coordination",
-      path: "/exportdsr",
-      categoryLabel: "EXPORT MANAGEMENT",
-      category: "core",
-    },
+
     {
       name: "Transport",
       description:

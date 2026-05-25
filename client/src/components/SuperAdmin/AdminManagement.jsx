@@ -1406,7 +1406,7 @@ const AdminManagement = ({ onRefresh }) => {
       <Dialog
         open={Boolean(actionsMenuUser)}
         onClose={() => { setActionsMenuUser(null); setActionsTab(0); }}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -1548,12 +1548,12 @@ const AdminManagement = ({ onRefresh }) => {
                 <Box sx={{ display: "flex", p: 0.5, bgcolor: "#f1f5f9", borderRadius: 2.5, border: "1px solid #e2e8f0", gap: 0.5 }}>
                   <Button
                     fullWidth size="small"
-                    variant={ieCodeMode === "assign_import" ? "contained" : "text"}
+                    variant="text"
                     onClick={() => { setIeCodeMode("assign_import"); setSelectedIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "assign_import" ? "#fff" : "transparent",
-                      color: ieCodeMode === "assign_import" ? "#1e293b" : "#64748b",
+                      color: ieCodeMode === "assign_import" ? "#1e293b !important" : "#64748b !important",
                       boxShadow: ieCodeMode === "assign_import" ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
                       "&:hover": { bgcolor: ieCodeMode === "assign_import" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
                     }}
@@ -1562,12 +1562,12 @@ const AdminManagement = ({ onRefresh }) => {
                   </Button>
                   <Button
                     fullWidth size="small"
-                    variant={ieCodeMode === "assign_export" ? "contained" : "text"}
+                    variant="text"
                     onClick={() => { setIeCodeMode("assign_export"); setSelectedIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "assign_export" ? "#fff" : "transparent",
-                      color: ieCodeMode === "assign_export" ? "#1e293b" : "#64748b",
+                      color: ieCodeMode === "assign_export" ? "#1e293b !important" : "#64748b !important",
                       boxShadow: ieCodeMode === "assign_export" ? "0 4px 12px rgba(0,0,0,0.08)" : "none",
                       "&:hover": { bgcolor: ieCodeMode === "assign_export" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
                     }}
@@ -1576,12 +1576,12 @@ const AdminManagement = ({ onRefresh }) => {
                   </Button>
                   <Button
                     fullWidth size="small"
-                    variant={ieCodeMode === "remove" ? "contained" : "text"}
+                    variant="text"
                     onClick={() => { setIeCodeMode("remove"); setSelectedIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "remove" ? "#fff" : "transparent",
-                      color: ieCodeMode === "remove" ? "#ef4444" : "#64748b",
+                      color: ieCodeMode === "remove" ? "#ef4444 !important" : "#64748b !important",
                       boxShadow: ieCodeMode === "remove" ? "0 4px 12px rgba(0,0,0,0.1)" : "none",
                       "&:hover": { bgcolor: ieCodeMode === "remove" ? "#fff" : "rgba(100, 116, 139, 0.08)" }
                     }}
@@ -1753,20 +1753,20 @@ const AdminManagement = ({ onRefresh }) => {
                   <Button size="small" variant="outlined" color="error" onClick={() => setSelectedUserModules([])} sx={{ textTransform: "none", fontSize: "0.75rem", borderRadius: 1.5, fontWeight: 600, flex: 1 }}>Clear All</Button>
                 </Box>
 
-                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, overflowY: "auto", maxHeight: 260, pr: 0.5 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, overflowY: "auto", maxHeight: 500, pr: 0.5 }}>
                   {AVAILABLE_MODULES.map((module) => {
                     const isSelected = selectedUserModules.includes(module.id);
                     return (
                       <Box key={module.id}
                         onClick={() => setSelectedUserModules(prev => isSelected ? prev.filter(m => m !== module.id) : [...prev, module.id])}
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1.2, borderRadius: 2, cursor: "pointer", border: `1.5px solid ${isSelected ? "#3b82f6" : "#e2e8f0"}`, bgcolor: isSelected ? "#eff6ff" : "#fff", transition: "all 0.15s", "&:hover": { borderColor: isSelected ? "#2563eb" : "#cbd5e1", bgcolor: isSelected ? "#dbeafe" : "#f8fafc" } }}
+                        sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.5, borderRadius: 2, cursor: "pointer", border: `1.5px solid ${isSelected ? "#3b82f6" : "#e2e8f0"}`, bgcolor: isSelected ? "#eff6ff" : "#fff", transition: "all 0.15s", "&:hover": { borderColor: isSelected ? "#2563eb" : "#cbd5e1", bgcolor: isSelected ? "#dbeafe" : "#f8fafc" } }}
                       >
-                        <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: isSelected ? "#dbeafe" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0, transition: "all 0.15s" }}>
+                        <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: isSelected ? "#dbeafe" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem", flexShrink: 0, transition: "all 0.15s" }}>
                           {getModuleIcon(module.id)}
                         </Box>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: isSelected ? "#1d4ed8" : "#374151", lineHeight: 1.3 }}>{module.name}</Typography>
-                          {isSelected && <Typography sx={{ fontSize: "0.65rem", color: "#3b82f6", fontWeight: 500 }}>✓ Enabled</Typography>}
+                          <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: isSelected ? "#1d4ed8" : "#374151", lineHeight: 1.3 }}>{module.name}</Typography>
+                          {isSelected && <Typography sx={{ fontSize: "0.68rem", color: "#3b82f6", fontWeight: 500 }}>✓ Enabled</Typography>}
                         </Box>
                       </Box>
                     );
