@@ -341,4 +341,70 @@ router.post("/mark-sample-downloaded", async (req, res) => {
 });
 
 
+/**
+ * GET /elock-status-history/:containerId
+ * Proxy to transport API elock-status-history
+ */
+router.get("/elock-status-history/:containerId", async (req, res) => {
+    try {
+        const { containerId } = req.params;
+        const serviceToken = await transportAuthService.getServiceToken();
+
+        const targetBaseUrl = process.env.NODE_ENV === "development"
+            ? "http://localhost:9005/api"
+            : "https://eximbot.alvision.in/transport/api";
+
+        console.log(`📨 Proxying status history request for container: ${containerId}`);
+        const response = await axios.get(
+            `${targetBaseUrl}/elock-status-history/${containerId}`,
+            {
+                headers: {
+                    ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                }
+            }
+        );
+        res.json(response.data);
+    } catch (error) {
+        console.error("❌ Error proxying status history:", error.message);
+        res.status(error.response?.status || 500).json({
+            success: false,
+            error: error.message,
+            message: "Failed to fetch status history from transport service",
+        });
+    }
+});
+
+/**
+ * GET /elock-status-history-others/:containerId
+ * Proxy to transport API elock-status-history-others
+ */
+router.get("/elock-status-history-others/:containerId", async (req, res) => {
+    try {
+        const { containerId } = req.params;
+        const serviceToken = await transportAuthService.getServiceToken();
+
+        const targetBaseUrl = process.env.NODE_ENV === "development"
+            ? "http://localhost:9005/api"
+            : "https://eximbot.alvision.in/transport/api";
+
+        console.log(`📨 Proxying others status history request for container: ${containerId}`);
+        const response = await axios.get(
+            `${targetBaseUrl}/elock-status-history-others/${containerId}`,
+            {
+                headers: {
+                    ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                }
+            }
+        );
+        res.json(response.data);
+    } catch (error) {
+        console.error("❌ Error proxying others status history:", error.message);
+        res.status(error.response?.status || 500).json({
+            success: false,
+            error: error.message,
+            message: "Failed to fetch others status history from transport service",
+        });
+    }
+});
+
 export default router;
