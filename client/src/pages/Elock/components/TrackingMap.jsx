@@ -648,10 +648,8 @@ const TrackingMap = ({
       try {
         const apiUrl =
           source === "containers"
-            ? `https://eximbot.alvision.in/transport/api/elock-status-history/${containerId}`
-            : `https://eximbot.alvision.in/transport/api/elock-status-history-others/${containerId}`;
-            // ? `http://3.108.244.38:9005/api/elock-status-history/${containerId}`
-            // : `http://3.108.244.38:9005/api/elock-status-history-others/${containerId}`;
+            ? `${ELOCK_PROXY_URL}/elock-status-history/${containerId}`
+            : `${ELOCK_PROXY_URL}/elock-status-history-others/${containerId}`;
 
         console.log(apiUrl);
         const response = await axios.get(apiUrl);
