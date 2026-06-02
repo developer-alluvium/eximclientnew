@@ -425,6 +425,7 @@ export const sanitizeUserData = (user) => {
           },
         ]
         : []),
+    exporter_ie_code_assignments: user.exporter_ie_code_assignments || [],
     primary_ie_code: user.ie_code_no, // Primary IE code for compatibility
     ie_code_no: user.ie_code_no, // Keep for backward compatibility
     has_multiple_ie_codes:

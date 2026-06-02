@@ -150,7 +150,7 @@ function CExportDSR() {
 
   // Exporters list from user assignments
   const ieCodeAssignments = React.useMemo(() => {
-    return user?.ie_code_assignments || [];
+    return user?.exporter_ie_code_assignments || [];
   }, [user]);
 
   // States
@@ -179,14 +179,8 @@ function CExportDSR() {
   const [excelDownloadLoading, setExcelDownloadLoading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
   const [expandedContainers, setExpandedContainers] = React.useState({});
-  
-  // File menu states
-  const [filesAnchorEl, setFilesAnchorEl] = React.useState(null);
-  const [selectedFilesJob, setSelectedFilesJob] = React.useState(null);
-
-  // Status Action menu states
-  const [actionDocsAnchorEl, setActionDocsAnchorEl] = React.useState(null);
-  const [selectedActionJob, setSelectedActionJob] = React.useState(null);
+  const [filesMenuAnchorEl, setFilesMenuAnchorEl] = React.useState(null);
+  const [selectedFilesMenuJob, setSelectedFilesMenuJob] = React.useState(null);
 
   // Dynamically populated filters from returned jobs
   const customHousesList = React.useMemo(() => {
@@ -418,6 +412,13 @@ function CExportDSR() {
     if (job.bill_of_lading_copy) files.push({ name: "Bill of Lading Copy", url: job.bill_of_lading_copy });
     if (job.billing_copy) files.push({ name: "Billing Copy", url: job.billing_copy });
     
+    // Handover documents from status Details
+    if (job.operations && job.operations.length > 0 && job.operations[0].statusDetails && job.operations[0].statusDetails.length > 0) {
+      if (job.operations[0].statusDetails[0].handoverImageUpload) {
+        files.push({ name: "Handover Copy", url: job.operations[0].statusDetails[0].handoverImageUpload });
+      }
+    }
+    
     if (job.other_documents && Array.isArray(job.other_documents)) {
       job.other_documents.forEach((doc, idx) => {
         if (doc) files.push({ name: `Other Document ${idx + 1}`, url: doc });
@@ -619,17 +620,7 @@ function CExportDSR() {
             ))}
           </select>
 
-          {/* Job Owner Filter */}
-          <select
-            style={selectStyle}
-            value={jobOwner}
-            onChange={(e) => { setJobOwner(e.target.value); setPage(0); }}
-          >
-            <option value="">All Job Owners</option>
-            {jobOwnersList.map(opt => (
-              <option key={opt.username} value={opt.username}>{opt.fullName}</option>
-            ))}
-          </select>
+         
 
           {/* Exporter Filter (if multiple assigned) */}
           {ieCodeAssignments.length > 0 && (
@@ -707,33 +698,7 @@ function CExportDSR() {
             <option value="DOCK">DOCK</option>
           </select>
 
-          {/* Pending Qs Button Toggle */}
-          <button
-            onClick={() => { setPendingQueries(!pendingQueries); setPage(0); }}
-            style={{
-              height: "28px",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              padding: "0 8px",
-              borderRadius: "4px",
-              border: "1px solid",
-              backgroundColor: pendingQueries ? "#fee2e2" : "#f8fafc",
-              borderColor: pendingQueries ? "#ef4444" : "#cbd5e1",
-              color: pendingQueries ? "#dc2626" : "#475569",
-              fontSize: "12px",
-              fontWeight: "600",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all 0.15s"
-            }}
-          >
-            <div style={{
-              width: 8, height: 8, borderRadius: "50%",
-              backgroundColor: pendingQueries ? "#dc2626" : "#94a3b8"
-            }} />
-            Pending Qs
-          </button>
+         
 
           {/* Search Box on Right */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto", minWidth: "160px" }}>
@@ -784,35 +749,33 @@ function CExportDSR() {
             
             {/* Setting precise column widths */}
             <colgroup>
-              <col style={{ width: "13%" }} /> {/* Job No */}
-              <col style={{ width: "18%" }} /> {/* Exporter */}
-              <col style={{ width: "12%" }} /> {/* Invoice */}
-              <col style={{ width: "10%" }} /> {/* SB No */}
-              <col style={{ width: "16%" }} /> {/* Port */}
+              <col style={{ width: "12%" }} /> {/* Job No */}
+              <col style={{ width: "17%" }} /> {/* Exporter */}
+              <col style={{ width: "11%" }} /> {/* Invoice */}
+              <col style={{ width: "9%" }} /> {/* SB No */}
+              <col style={{ width: "23%" }} /> {/* Port */}
               <col style={{ width: "11%" }} /> {/* Container */}
-              <col style={{ width: "10%" }} /> {/* Handover */}
-              <col style={{ width: "5%" }} />  {/* Docs */}
-              <col style={{ width: "9%" }} />  {/* Status */}
+              <col style={{ width: "7%" }} /> {/* Handover */}
+              <col style={{ width: "10%" }} />  {/* Docs */}
             </colgroup>
 
             <TableHead>
               <TableRow>
-                <TableCell style={tableHeaderStyle}>Job No</TableCell>
-                <TableCell style={tableHeaderStyle}>Exporter</TableCell>
-                <TableCell style={tableHeaderStyle}>Invoice</TableCell>
-                <TableCell style={tableHeaderStyle}>SB No</TableCell>
-                <TableCell style={tableHeaderStyle}>Port</TableCell>
-                <TableCell style={tableHeaderStyle}>Container</TableCell>
-                <TableCell style={tableHeaderStyle}>Handover</TableCell>
-                <TableCell style={tableHeaderStyle} align="center">Docs</TableCell>
-                <TableCell style={{ ...tableHeaderStyle, borderRight: "none" }} align="center">Status</TableCell>
+                <TableCell style={tableHeaderStyle}>JOB NO</TableCell>
+                <TableCell style={tableHeaderStyle}>EXPORTER</TableCell>
+                <TableCell style={tableHeaderStyle}>INVOICE</TableCell>
+                <TableCell style={tableHeaderStyle}>SB NO</TableCell>
+                <TableCell style={tableHeaderStyle}>PORT</TableCell>
+                <TableCell style={tableHeaderStyle}>CONTAINER</TableCell>
+                <TableCell style={tableHeaderStyle}>HANDOVER</TableCell>
+                <TableCell style={{ ...tableHeaderStyle, borderRight: "none" }}>DOCS</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 12 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 12 }}>
                     <CircularProgress size={30} thickness={4} sx={{ color: "#1e3a8a" }} />
                     <Typography variant="body2" sx={{ mt: 1.5, color: "#64748b", fontWeight: 600 }}>
                       Loading DSR records...
@@ -821,7 +784,7 @@ function CExportDSR() {
                 </TableRow>
               ) : jobs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 12 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 12 }}>
                     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
                       <Business sx={{ fontSize: 40, color: "#cbd5e1" }} />
                       <Typography sx={{ color: "#475569", fontWeight: 700, fontSize: "14px" }}>
@@ -853,12 +816,12 @@ function CExportDSR() {
                     >
                       {/* Job No Column */}
                       <TableCell style={tableCellStyle}>
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                           <Typography 
                             variant="subtitle2" 
                             onClick={() => handleCopyText(job.job_no)}
                             sx={{ 
-                              fontWeight: 800, 
+                              fontWeight: 700, 
                               color: "#2563eb", 
                               fontSize: "11px",
                               cursor: "pointer",
@@ -868,7 +831,7 @@ function CExportDSR() {
                             {job.job_no}
                           </Typography>
                           <IconButton size="small" onClick={(e) => handleCopyText(job.job_no, e)} sx={{ p: 0.2 }}>
-                            <ContentCopy sx={{ fontSize: 10, color: "#64748b" }} />
+                            <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                           </IconButton>
                         </Box>
                         
@@ -888,11 +851,7 @@ function CExportDSR() {
                               {job.consignmentType}
                             </span>
                           )}
-                          {job.job_owner && (
-                            <span style={pillStyle}>
-                              {job.job_owner}
-                            </span>
-                          )}
+                         
                         </Box>
                       </TableCell>
 
@@ -929,7 +888,7 @@ function CExportDSR() {
                               Bk No: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.booking_no}</span>
                             </Typography>
                             <IconButton size="small" onClick={(e) => handleCopyText(job.booking_no, e)} sx={{ p: 0.2 }}>
-                              <ContentCopy sx={{ fontSize: 9, color: "#94a3b8" }} />
+                              <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                             </IconButton>
                           </Box>
                         )}
@@ -939,12 +898,12 @@ function CExportDSR() {
                       <TableCell style={tableCellStyle}>
                         {job.invoices?.[0] ? (
                           <>
-                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                               <Typography sx={{ fontWeight: 700, fontSize: "11px", color: "#0f172a" }}>
                                 {job.invoices[0].invoiceNumber}
                               </Typography>
                               <IconButton size="small" onClick={(e) => handleCopyText(job.invoices[0].invoiceNumber, e)} sx={{ p: 0.2 }}>
-                                <ContentCopy sx={{ fontSize: 10, color: "#cbd5e1" }} />
+                                <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                               </IconButton>
                             </Box>
                             
@@ -952,22 +911,9 @@ function CExportDSR() {
                               {formatDate(job.invoices[0].invoiceDate)}
                             </Typography>
 
-                            <Typography 
-                              sx={{ 
-                                display: "inline-block", 
-                                mt: 0.5, 
-                                py: 0.2, 
-                                px: 0.5, 
-                                borderRadius: "4px", 
-                                bgcolor: "rgba(0,0,0,0.03)", 
-                                fontWeight: 800, 
-                                fontSize: "10px", 
-                                color: "#0f172a" 
-                              }}
-                            >
-                              <span style={{ color: "#64748b", fontWeight: 500 }}>{job.invoices[0].termsOfInvoice}</span>{" "}
-                              {job.invoices[0].currency}{" "}
-                              {job.invoices[0].invoiceValue?.toLocaleString()}
+                            <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.5 }}>
+                              <span style={{ color: "#64748b", fontWeight: 600 }}>{job.invoices[0].termsOfInvoice}</span>{" "}
+                              <span style={{ fontWeight: 700 }}>{job.invoices[0].currency} {job.invoices[0].invoiceValue?.toLocaleString()}</span>
                             </Typography>
                           </>
                         ) : (
@@ -979,12 +925,12 @@ function CExportDSR() {
                       <TableCell style={tableCellStyle}>
                         {job.sb_no ? (
                           <>
-                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                               <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#2563eb", textDecoration: "underline" }}>
                                 {job.sb_no}
                               </Typography>
                               <IconButton size="small" onClick={(e) => handleCopyText(job.sb_no, e)} sx={{ p: 0.2 }}>
-                                <ContentCopy sx={{ fontSize: 10, color: "#cbd5e1" }} />
+                                <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                               </IconButton>
                             </Box>
                             <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
@@ -992,7 +938,7 @@ function CExportDSR() {
                             </Typography>
                           </>
                         ) : (
-                          <Typography sx={{ fontSize: "10px", color: "#ef4444", fontWeight: 600 }}>N/A</Typography>
+                          <span style={{ color: "#ef4444", fontWeight: 700, fontSize: "12px" }}>-</span>
                         )}
                       </TableCell>
 
@@ -1000,35 +946,51 @@ function CExportDSR() {
                       <TableCell style={tableCellStyle}>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                           <Box sx={{ display: "flex", gap: 1 }}>
-                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "30px" }}>DEST</span>
-                            <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 700 }}>
-                              {job.destination_port} {job.destination_country ? `(${job.destination_country})` : ""}
-                            </span>
+                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DEST</span>
+                            <Box sx={{ display: "flex", flexDirection: "column" }}>
+                              <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 700 }}>
+                                {job.destination_port}
+                              </span>
+                              {job.destination_country && (
+                                <span style={{ fontSize: "9px", color: "#64748b", fontWeight: 500 }}>
+                                  ({job.destination_country})
+                                </span>
+                              )}
+                            </Box>
                           </Box>
                           <Box sx={{ display: "flex", gap: 1 }}>
-                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "30px" }}>POL</span>
-                            <span style={{ fontSize: "10px", color: "#475569" }}>{job.port_of_loading}</span>
+                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>POL</span>
+                            <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_loading}</span>
                           </Box>
                           <Box sx={{ display: "flex", gap: 1 }}>
-                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "30px" }}>DISCH</span>
-                            <span style={{ fontSize: "10px", color: "#475569" }}>{job.port_of_discharge}</span>
+                            <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DISCH</span>
+                            <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_discharge}</span>
                           </Box>
                         </Box>
                       </TableCell>
 
                       {/* Container Column */}
                       <TableCell style={tableCellStyle}>
-                        {job.containers && job.containers.length > 0 ? (
-                          (() => {
-                            const validContainers = job.containers.filter(c => c.containerNo);
-                            const key = job._id || job.job_no;
-                            const isExpanded = !!expandedContainers[key];
-                            const visible = isExpanded ? validContainers : validContainers.slice(0, 2);
-                            const hiddenCount = validContainers.length - visible.length;
+                        {(() => {
+                          const validContainers = (job.containers || []).filter(c => c.containerNo);
+                          
+                          // Calculate total pkgs, gross weight, net weight
+                          const totalPkgs = job.total_no_of_pkgs || (job.containers && job.containers.length > 0 ? job.containers.reduce((sum, c) => sum + (c.pkgsStuffed || 0), 0) : null);
+                          const pkgUnit = job.package_unit || "PKG";
+                          
+                          const totalGrossWt = job.gross_weight_kg || (job.containers && job.containers.length > 0 ? job.containers.reduce((sum, c) => sum + (c.grossWeight || 0), 0) : null);
+                          const totalNetWt = job.net_weight_kg || null;
 
-                            return (
-                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                                {visible.map((container, cIdx) => (
+                          const key = job._id || job.job_no;
+                          const isExpanded = !!expandedContainers[key];
+                          const visible = isExpanded ? validContainers : validContainers.slice(0, 2);
+                          const hiddenCount = validContainers.length - visible.length;
+
+                          return (
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                              {/* Container pills */}
+                              {validContainers.length > 0 ? (
+                                visible.map((container, cIdx) => (
                                   <Box 
                                     key={cIdx} 
                                     sx={{ 
@@ -1039,15 +1001,20 @@ function CExportDSR() {
                                     }}
                                   >
                                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                      <a 
-                                        href={`https://www.ldb.co.in/ldb/containersearch/39/${container.containerNo}/1726651147706`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{ color: "#2563eb", fontWeight: 700, fontSize: "10px", textDecoration: "none" }}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {container.containerNo}
-                                      </a>
+                                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                                        <a 
+                                          href={`https://www.ldb.co.in/ldb/containersearch/39/${container.containerNo}/1726651147706`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{ color: "#2563eb", fontWeight: 700, fontSize: "10px", textDecoration: "none" }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {container.containerNo}
+                                        </a>
+                                        <IconButton size="small" onClick={(e) => handleCopyText(container.containerNo, e)} sx={{ p: 0.1, ml: 0.5 }}>
+                                          <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                                        </IconButton>
+                                      </Box>
                                       {container.type && (
                                         <span style={{ fontSize: "8px", fontWeight: 900, bgcolor: "#e2e8f0", px: 0.5, borderRadius: "2px" }}>
                                           {getContainerSizeLabel(container.type)}
@@ -1055,70 +1022,72 @@ function CExportDSR() {
                                       )}
                                     </Box>
                                   </Box>
-                                ))}
-                                
-                                {hiddenCount > 0 && (
-                                  <span 
-                                    onClick={(e) => toggleContainers(e, key)}
-                                    style={{ fontSize: "9px", color: "#b45309", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
-                                  >
-                                    Show {hiddenCount} more
-                                  </span>
-                                )}
-                                {isExpanded && (
-                                  <span 
-                                    onClick={(e) => toggleContainers(e, key)}
-                                    style={{ fontSize: "9px", color: "#475569", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
-                                  >
-                                    Show less
-                                  </span>
-                                )}
+                                ))
+                              ) : (
+                                <Typography sx={{ fontSize: "11px", color: "#64748b" }}>-</Typography>
+                              )}
+                              
+                              {hiddenCount > 0 && (
+                                <span 
+                                  onClick={(e) => toggleContainers(e, key)}
+                                  style={{ fontSize: "9px", color: "#b45309", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                                >
+                                  Show {hiddenCount} more
+                                </span>
+                              )}
+                              {isExpanded && (
+                                <span 
+                                  onClick={(e) => toggleContainers(e, key)}
+                                  style={{ fontSize: "9px", color: "#475569", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                                >
+                                  Show less
+                                </span>
+                              )}
 
-                                <Typography sx={{ fontSize: "9px", color: "#64748b", mt: 0.5 }}>
-                                  Pkgs: {job.containers[0]?.pkgsStuffed || "-"} {job.package_unit || ""}
+                              {/* Package details */}
+                              {totalPkgs && (
+                                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#1e293b", mt: 0.5 }}>
+                                  {totalPkgs} {pkgUnit}
                                 </Typography>
+                              )}
+                              
+                              {/* Weight details */}
+                              {(totalGrossWt || totalNetWt) && (
                                 <Typography sx={{ fontSize: "9px", color: "#64748b" }}>
-                                  GW: {job.containers[0]?.grossWeight?.toLocaleString() || "-"} kg
+                                  G: {totalGrossWt ? `${parseFloat(totalGrossWt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg` : "-"}
+                                  {totalNetWt ? ` | N: ${parseFloat(totalNetWt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg` : ""}
                                 </Typography>
-                              </Box>
-                            );
-                          })()
-                        ) : (
-                          <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
-                        )}
+                              )}
+                            </Box>
+                          );
+                        })()}
                       </TableCell>
 
                       {/* Handover Column */}
                       <TableCell style={tableCellStyle}>
                         {(() => {
                           const opDetails = job.operations?.[0]?.statusDetails?.[0] || {};
-                          const milestones = [];
+                          const isRoad = opDetails.railRoad === "road";
                           
-                          if (opDetails.leoDate) {
-                            milestones.push({ label: "Leo", val: formatDate(opDetails.leoDate) });
-                          }
-                          if (opDetails.handoverForwardingNoteDate) {
-                            milestones.push({ label: "DHo", val: formatDate(opDetails.handoverForwardingNoteDate) });
-                          }
-                          if (opDetails.handoverConcorTharSanganaRailRoadDate) {
-                            const lbl = opDetails.railRoad === "road" ? "Road Out" : "Rail Out";
-                            milestones.push({ label: lbl, val: formatDate(opDetails.handoverConcorTharSanganaRailRoadDate) });
-                          }
-                          if (opDetails.railOutReachedDate) {
-                            const lbl = opDetails.railRoad === "road" ? "Road Rch" : "Rail Rch";
-                            milestones.push({ label: lbl, val: formatDate(opDetails.railOutReachedDate) });
-                          }
-                          if (opDetails.billingDocsSentDt) {
-                            milestones.push({ label: "Bill", val: formatDate(opDetails.billingDocsSentDt) });
-                          }
-
-                          if (milestones.length === 0) return <span style={{ color: "#94a3b8" }}>-</span>;
+                          const milestoneItems = [
+                            { label: "LEO", val: opDetails.leoDate ? formatDate(opDetails.leoDate) : null },
+                            { label: "DHO", val: opDetails.handoverForwardingNoteDate ? formatDate(opDetails.handoverForwardingNoteDate) : null },
+                            { label: isRoad ? "ROAD OUT" : "RAIL OUT", val: opDetails.handoverConcorTharSanganaRailRoadDate ? formatDate(opDetails.handoverConcorTharSanganaRailRoadDate) : null },
+                            { label: isRoad ? "ROAD RCH" : "RAIL RCH", val: opDetails.railOutReachedDate ? formatDate(opDetails.railOutReachedDate) : null },
+                          ];
 
                           return (
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.2 }}>
-                              {milestones.map((m, mIdx) => (
-                                <Typography key={mIdx} sx={{ fontSize: "10px", color: "#1e293b", fontWeight: 600 }}>
-                                  <span style={{ color: "#64748b" }}>{m.label}:</span> {m.val}
+                              {milestoneItems.map((m, mIdx) => (
+                                <Typography 
+                                  key={mIdx} 
+                                  sx={{ 
+                                    fontSize: "10px", 
+                                    fontWeight: m.val ? 700 : 500, 
+                                    color: m.val ? "#1e293b" : "#94a3b8" 
+                                  }}
+                                >
+                                  {m.label}{m.val ? `: ${m.val}` : ""}
                                 </Typography>
                               ))}
                             </Box>
@@ -1127,118 +1096,35 @@ function CExportDSR() {
                       </TableCell>
 
                       {/* Docs Column */}
-                      <TableCell style={tableCellStyle} align="center">
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={(e) => {
-                            setFilesAnchorEl(e.currentTarget);
-                            setSelectedFilesJob(job);
-                          }}
-                          disabled={files.length === 0}
-                          endIcon={<ArrowDropDown sx={{ ml: -0.5 }} />}
-                          sx={{ 
-                            textTransform: "none", 
-                            fontSize: "10px", 
-                            height: "24px", 
-                            py: 0.5, 
-                            px: 1, 
-                            borderRadius: "4px",
-                            borderColor: "#cbd5e1",
-                            color: "#475569"
-                          }}
-                        >
-                          Files
-                        </Button>
-                      </TableCell>
-
-                      {/* Status Column */}
-                      <TableCell style={{ ...tableCellStyle, borderRight: "none" }} align="center">
-                        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center", mb: 0.8 }}>
-                          {/* Sign button */}
-                          <Tooltip title="DSC Document Signing">
-                            <Button 
-                              variant="contained" 
-                              onClick={() => setSnackbar({ open: true, message: "DSC Signing is only available in Exim-Export Internal App", severity: "info" })}
-                              sx={{ 
-                                minWidth: "auto", 
-                                px: 1, 
-                                py: 0.2, 
-                                fontSize: "9px", 
-                                bgcolor: "#7c3aed", 
-                                color: "#fff",
-                                textTransform: "none",
-                                height: "20px",
-                                fontWeight: 700,
-                                "&:hover": { bgcolor: "#6d28d9" }
-                              }}
-                            >
-                              & Sign
-                            </Button>
-                          </Tooltip>
-
-                          {/* Copy button */}
-                          <Button 
-                            variant="contained" 
-                            onClick={(e) => handleCopyText(job.job_no, e)}
-                            sx={{ 
-                              minWidth: "auto", 
-                              px: 1, 
-                              py: 0.2, 
-                              fontSize: "9px", 
-                              bgcolor: "#10b981", 
-                              color: "#fff",
-                              textTransform: "none",
-                              height: "20px",
-                              fontWeight: 700,
-                              "&:hover": { bgcolor: "#059669" }
-                            }}
-                          >
-                            Copy
-                          </Button>
-
-                          {/* Docs dropdown */}
-                          <Button 
-                            variant="outlined" 
+                      <TableCell style={{ ...tableCellStyle, borderRight: "none" }} align="left">
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "left" }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            endIcon={<ArrowDropDown style={{ fontSize: 14, marginLeft: -4 }} />}
                             onClick={(e) => {
-                              setActionDocsAnchorEl(e.currentTarget);
-                              setSelectedActionJob(job);
+                              setFilesMenuAnchorEl(e.currentTarget);
+                              setSelectedFilesMenuJob(job);
                             }}
-                            sx={{ 
-                              minWidth: "auto", 
-                              px: 0.5, 
-                              py: 0.2, 
-                              fontSize: "9px", 
-                              borderColor: "#3b82f6", 
-                              color: "#3b82f6",
+                            sx={{
                               textTransform: "none",
-                              height: "20px",
-                              fontWeight: 700,
-                              "&:hover": { bgcolor: "#eff6ff" }
+                              fontSize: "11px",
+                              height: "24px",
+                              borderColor: "#cbd5e1",
+                              color: "#334155",
+                              bgcolor: "#fff",
+                              fontWeight: 600,
+                              px: 1,
+                              py: 0.2,
+                              minWidth: "75px",
+                              "&:hover": {
+                                bgcolor: "#f8fafc",
+                                borderColor: "#94a3b8"
+                              }
                             }}
                           >
-                            Docs
+                            Files
                           </Button>
-                        </Box>
-
-                        {/* Status Badge */}
-                        <Box
-                          sx={{
-                            display: "inline-block",
-                            width: "100%",
-                            textAlign: "center",
-                            fontSize: "10px",
-                            fontWeight: 800,
-                            textTransform: "uppercase",
-                            backgroundColor: theme.light,
-                            color: theme.text,
-                            border: `1px solid ${theme.border}`,
-                            py: 0.5,
-                            borderRadius: "4px",
-                            letterSpacing: "0.2px"
-                          }}
-                        >
-                          {currentStatus}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1287,41 +1173,41 @@ function CExportDSR() {
         </TableContainer>
       </Box>
 
-      {/* Docs Action Menu */}
+      {/* Docs Dropdown Menu */}
       <Menu
-        anchorEl={actionDocsAnchorEl}
-        open={Boolean(actionDocsAnchorEl)}
-        onClose={() => setActionDocsAnchorEl(null)}
+        anchorEl={filesMenuAnchorEl}
+        open={Boolean(filesMenuAnchorEl)}
+        onClose={() => {
+          setFilesMenuAnchorEl(null);
+          setSelectedFilesMenuJob(null);
+        }}
+        PaperProps={{
+          sx: {
+            mt: 0.5,
+            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+            border: "1px solid #e2e8f0"
+          }
+        }}
       >
-        <MenuItem onClick={() => { setActionDocsAnchorEl(null); setSnackbar({ open: true, message: "Standard documents generation is handled inside Exim-Export Internal App.", severity: "info" }); }} sx={{ fontSize: "12px" }}>
-          Checklist
-        </MenuItem>
-        <MenuItem onClick={() => { setActionDocsAnchorEl(null); setSnackbar({ open: true, message: "Standard documents generation is handled inside Exim-Export Internal App.", severity: "info" }); }} sx={{ fontSize: "12px" }}>
-          Consignment Note
-        </MenuItem>
-        <MenuItem onClick={() => { setActionDocsAnchorEl(null); setSnackbar({ open: true, message: "Standard documents generation is handled inside Exim-Export Internal App.", severity: "info" }); }} sx={{ fontSize: "12px" }}>
-          Annexure C
-        </MenuItem>
-      </Menu>
-
-      {/* Files List Menu */}
-      <Menu
-        anchorEl={filesAnchorEl}
-        open={Boolean(filesAnchorEl)}
-        onClose={() => setFilesAnchorEl(null)}
-      >
-        {selectedFilesJob && getJobFilesList(selectedFilesJob).map((file, idx) => (
-          <MenuItem 
-            key={idx}
-            onClick={() => {
-              window.open(file.url, "_blank");
-              setFilesAnchorEl(null);
-            }}
-            sx={{ fontSize: "12px" }}
-          >
-            {file.name}
+        {selectedFilesMenuJob && getJobFilesList(selectedFilesMenuJob).length > 0 ? (
+          getJobFilesList(selectedFilesMenuJob).map((file, idx) => (
+            <MenuItem 
+              key={idx} 
+              onClick={() => {
+                window.open(file.url, "_blank");
+                setFilesMenuAnchorEl(null);
+                setSelectedFilesMenuJob(null);
+              }}
+              sx={{ fontSize: "12px", py: 1, px: 2 }}
+            >
+              {file.name}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled sx={{ fontSize: "12px" }}>
+            No files available
           </MenuItem>
-        ))}
+        )}
       </Menu>
 
       {/* Create Job Informative Dialog */}
@@ -1373,34 +1259,42 @@ const selectStyle = {
 };
 
 const tableHeaderStyle = {
-  background: "linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)",
-  fontWeight: "700",
-  fontSize: "12px",
-  color: "#ffffff",
-  padding: "8px 10px",
+  backgroundColor: "#1e293b",
+  color: "white",
+  padding: "10px 12px",
+  textAlign: "left",
+  fontWeight: "600",
+  fontSize: "0.75rem",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  whiteSpace: "nowrap",
+  userSelect: "none",
   borderBottom: "2px solid #0f172a",
-  borderRight: "1px solid rgba(255, 255, 255, 0.08)",
+  borderRight: "1px solid rgba(255, 255, 255, 0.15)",
+  position: "sticky",
+  top: 0,
   zIndex: 10
 };
 
 const tableCellStyle = {
-  padding: "8px 10px",
-  borderBottom: "1px solid #cbd5e1",
-  borderRight: "1px solid #e2e8f0",
-  color: "#1e293b",
-  fontSize: "11px",
+  padding: "10px 12px",
+  borderBottom: "1px solid #e2e8f0",
+  borderRight: "1px solid #f1f5f9",
+  color: "#334155",
+  fontSize: "0.8rem",
   verticalAlign: "top",
-  wordBreak: "break-word"
+  wordBreak: "break-word",
+  whiteSpace: "normal"
 };
 
 const pillStyle = {
   display: "inline-block",
   padding: "2px 6px",
-  background: "#f1f5f9",
+  background: "#fff",
   border: "1px solid #e2e8f0",
   borderRadius: "3px",
   fontSize: "9px",
-  fontWeight: "700",
+  fontWeight: "600",
   color: "#475569"
 };
 

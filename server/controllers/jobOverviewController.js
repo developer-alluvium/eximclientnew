@@ -611,11 +611,64 @@ export async function getJobsOverview(req, res) {
     const { year } = req.params;
     const status = req.query.status;
     const search = req.query.search;
+    const importer = req.query.importer;
+    const user = req.user;
 
     const statusLower = status ? status.toLowerCase() : null;
 
     // Start building the match query
     const matchQuery = { $and: [{ year: year }] };
+
+    let targetImporters = null;
+
+    // Check if user is restricted (not superadmin)
+    if (user && user.role !== "superadmin") {
+      const assignments = user.ie_code_assignments || [];
+      let assignedNames = assignments.map((a) => a.importer_name);
+
+      // Fallback for legacy single assignment
+      if (assignedNames.length === 0 && user.assignedImporterName) {
+        assignedNames = [user.assignedImporterName];
+      }
+
+      // If user has no assignments, return empty result
+      if (assignedNames.length === 0) {
+        return res.json({
+          pendingJobs: 0,
+          completedJobs: 0,
+          cancelledJobs: 0,
+          totalJobs: 0,
+        });
+      }
+
+      // If importer requested, filter against assignments
+      if (importer) {
+        const requested = importer.split(",");
+        targetImporters = requested.filter((name) =>
+          assignedNames.includes(name)
+        );
+      } else {
+        targetImporters = assignedNames;
+      }
+
+      if (targetImporters.length === 0) {
+        return res.json({
+          pendingJobs: 0,
+          completedJobs: 0,
+          cancelledJobs: 0,
+          totalJobs: 0,
+        });
+      }
+    } else {
+      // Superadmin can filter by requested importer
+      if (importer) {
+        targetImporters = importer.split(",");
+      }
+    }
+
+    if (targetImporters && targetImporters.length > 0) {
+      matchQuery.$and.push({ importer: { $in: targetImporters } });
+    }
 
     // Conditions based on status
     if (statusLower === "pending") {

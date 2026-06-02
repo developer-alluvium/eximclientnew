@@ -1020,377 +1020,115 @@ function UserDashboard() {
           {/* Alerts */}
           {/* Alerts Section */}
 
-          {/* Main Content with Analytics Sidebar */}
-          <Box
-            sx={{
-              display: "flex",
-              gap: 5,
-              flex: 1, // Fill remaining space
-              minHeight: 0, // Allow nested scrolling
-              overflow: "hidden",
-              flexDirection: { xs: "column", lg: "row" },
-              alignItems: "flex-start",
-              mt: 1,
-            }}
-          >
-            {/* Left Sidebar - Analytics */}
+          {/* Main Content - Modules Grid */}
+          <Box sx={{ width: "100%", minWidth: 0, mt: 3 }}>
+            <Typography
+              fontWeight="600"
+              sx={{ color: "#1e293b", mb: 2, fontSize: "1.1rem" }}
+            >
+              Application Modules
+            </Typography>
+
             <Box
               sx={{
-                width: { xs: "100%", lg: "40%" },
-                flexShrink: 0,
-                overflowY: "auto",
-                height: "100%",
-                pr: 1,
-                "&::-webkit-scrollbar": { width: "4px" },
-                "&::-webkit-scrollbar-track": { background: "transparent" },
-                "&::-webkit-scrollbar-thumb": {
-                  background: "#cbd5e1",
-                  borderRadius: "4px",
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, 1fr)",
+                  md: "repeat(3, 1fr)",
+                  lg: "repeat(4, 1fr)",
                 },
+                gap: 2.5,
+                rowGap: 2.5,
+                pb: 2,
+                overflowY: "auto",
+                maxHeight: "100%",
               }}
             >
-              {/* Importer Selector - only renders Box when selector is visible */}
-              {ieCodeAssignments.length > 1 && (
-                <Box
-                  sx={{ mb: 2, display: "flex", flexDirection: "column", gap: 2 }}
-                >
-                  <FormControl
-                    fullWidth
-                    size="small"
-                    sx={{ bgcolor: "white", borderRadius: 1 }}
-                  >
-                    <Select
-                      multiple
-                      displayEmpty
-                      value={
-                        Array.isArray(selectedImporter) ? selectedImporter : []
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        // If "all" is selected (empty string passed), reset to empty array
-                        if (val.includes("")) {
-                          setSelectedImporter([]);
-                        } else {
-                          setSelectedImporter(
-                            typeof val === "string" ? val.split(",") : val,
-                          );
-                        }
-                      }}
-                      renderValue={(selected) => {
-                        if (!Array.isArray(selected) || selected.length === 0) {
-                          return <em>All Importers</em>;
-                        }
-                        return selected.join(", ");
-                      }}
-                      sx={{ color: "#1e293b !important" }}
-                      MenuProps={{
-                        PaperProps: {
-                          sx: {
-                            "& .MuiMenuItem-root": {
-                              color: "#1e293b !important",
-                            },
-                          },
-                        },
-                      }}
-                    >
-                      <MenuItem value="" dense sx={{ color: "#1e293b !important", py: 0.5 }}>
-                        <Radio size="small" checked={!Array.isArray(selectedImporter) || selectedImporter.length === 0} sx={{ p: 0.5 }} />
-                        <ListItemText primary="All Importers" primaryTypographyProps={{ variant: "body2", fontSize: "0.85rem" }} />
-                      </MenuItem>
-                      {ieCodeAssignments.map((assignment, index) => (
-                        <MenuItem
-                          key={index}
-                          value={assignment.importer_name}
-                          dense
-                          sx={{ color: "#1e293b !important", py: 0.5 }}
-                        >
-                          <Checkbox size="small" checked={Array.isArray(selectedImporter) && selectedImporter.indexOf(assignment.importer_name) > -1} sx={{ p: 0.5 }} />
-                          <ListItemText primary={assignment.importer_name} primaryTypographyProps={{ variant: "body2", fontSize: "0.85rem" }} />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-              )}
-
-              {/* Stats Grid */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  mb: 1.5,
-                  borderRadius: 3,
-                  border: "1px solid #e2e8f0",
-                  // mt:5 (40px) aligns with first module card row when no importer selector shown
-                  // (heading 1rem ≈24px + mb:2=16px = 40px). When selector IS shown, it already pushes down.
-                  mt: ieCodeAssignments.length > 1 ? 0 : 5,
-                }}
-              >
-                <Box
+              {modules.map((module, index) => (
+                <StyledCard
+                  key={index}
+                  onClick={() =>
+                    handleCardClick(
+                      module.path,
+                      module.isExternal,
+                      module.isLocked,
+                      module.name,
+                    )
+                  }
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 2,
-                   
+                    ...(module.isLocked
+                      ? { opacity: 0.6, filter: "grayscale(100%)" }
+                      : {}),
                   }}
                 >
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={600}
-                    color="#1e293b"
-                  >
-                    📊 Overview
-                  </Typography>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Select
-                      value={dateFilterType}
-                      onChange={(e) => setDateFilterType(e.target.value)}
-                      size="small"
+                  {module.category === "beta" && <BetaBadge>BETA</BetaBadge>}
+
+                  {module.isLocked && (
+                    <Box
                       sx={{
-                        height: 32,
-                        fontSize: "0.75rem",
-                        bgcolor: "#f8fafc",
-                        "& .MuiSelect-select": { py: 0 },
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        color: "#94a3b8",
+                        zIndex: 2,
                       }}
                     >
-                      <MenuItem value="daily">Daily</MenuItem>
-                      <MenuItem value="weekly">Weekly</MenuItem>
-                      <MenuItem value="monthly">Monthly</MenuItem>
-                      <MenuItem value="quarterly">Quarterly</MenuItem>
-                      <MenuItem value="yearly">Yearly</MenuItem>
-                      <MenuItem value="custom">Custom</MenuItem>
-                    </Select>
+                      <LockIcon fontSize="small" />
+                    </Box>
+                  )}
 
-                    {dateFilterType === "custom" ? (
-                      <>
-                        <TextField
-                          type="date"
-                          size="small"
-                          value={customStartDate}
-                          onChange={(e) => setCustomStartDate(e.target.value)}
-                          sx={{
-                            bgcolor: "#f8fafc",
-                            borderRadius: 1,
-                            width: 130,
-                            "& .MuiOutlinedInput-root": {
-                              height: 32,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                        />
-                        <TextField
-                          type="date"
-                          size="small"
-                          value={customEndDate}
-                          onChange={(e) => setCustomEndDate(e.target.value)}
-                          sx={{
-                            bgcolor: "#f8fafc",
-                            borderRadius: 1,
-                            width: 130,
-                            "& .MuiOutlinedInput-root": {
-                              height: 32,
-                              fontSize: "0.75rem",
-                            },
-                          }}
-                        />
-                      </>
-                    ) : dateFilterType === "monthly" ? (
-                      <TextField
-                        type="month"
-                        size="small"
-                        value={selectedDate.slice(0, 7)}
-                        onChange={(e) => setSelectedDate(e.target.value + "-01")}
-                        sx={{
-                          bgcolor: "#f8fafc",
-                          borderRadius: 1,
-                          width: 140,
-                          "& .MuiOutlinedInput-root": {
-                            height: 32,
-                            fontSize: "0.75rem",
-                          },
-                        }}
-                      />
-                    ) : dateFilterType === "yearly" ? (
-                      <TextField
-                        type="number"
-                        size="small"
-                        placeholder="Year"
-                        value={selectedDate.split("-")[0]}
-                        onChange={(e) => setSelectedDate(`${e.target.value}-01-01`)}
-                        sx={{
-                          bgcolor: "#f8fafc",
-                          borderRadius: 1,
-                          width: 100,
-                          "& .MuiOutlinedInput-root": {
-                            height: 32,
-                            fontSize: "0.75rem",
-                          },
-                        }}
-                      />
-                    ) : (
-                      <TextField
-                        type="date"
-                        size="small"
-                        InputLabelProps={{ shrink: true }}
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        sx={{
-                          bgcolor: "#f8fafc",
-                          borderRadius: 1,
-                          width: 140,
-                          "& .MuiOutlinedInput-root": {
-                            height: 32,
-                            fontSize: "0.75rem",
-                          },
-                        }}
-                      />
-                    )}
-
-                    <IconButton
-                      onClick={fetchStats}
-                      size="small"
-                      sx={{
-                        bgcolor: "#3b82f6",
-                        color: "white",
-                        borderRadius: 1,
-                        width: 32,
-                        height: 32,
-                        "&:hover": { bgcolor: "#2563eb" },
-                      }}
-                    >
-                      <RefreshIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Stack>
-                </Box>
-
-                {stats && stats.summary ? (
-                  <Box sx={{ minHeight: 350, py: 1 }}>
-                    <ReactApexChart
-                      options={barOptions}
-                      series={barSeries}
-                      type="bar"
-                      width="100%"
-                      height={350}
-                    />
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    Loading stats...
-                  </Typography>
-                )}
-              </Paper>
-            </Box>
-
-            {/* Right Side - Modules Grid */}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography
-                fontWeight="600"
-                sx={{ color: "#1e293b", mb: 2, fontSize: "1rem" }}
-              >
-                Application Modules
-              </Typography>
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, 1fr)",
-                    lg: "repeat(3, 1fr)",
-                  },
-                  gap: 2,
-                  rowGap: 2,
-                  pb: 2,
-                  overflowY: "auto",
-                  maxHeight: "100%",
-                }}
-              >
-                {modules.map((module, index) => (
-                  <StyledCard
-                    key={index}
-                    onClick={() =>
-                      handleCardClick(
-                        module.path,
-                        module.isExternal,
-                        module.isLocked,
-                        module.name,
-                      )
-                    }
+                  <CardContent
                     sx={{
-                      ...(module.isLocked
-                        ? { opacity: 0.6, filter: "grayscale(100%)" }
-                        : {}),
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      padding: "16px",
                     }}
                   >
-                    {module.category === "beta" && <BetaBadge>BETA</BetaBadge>}
-
-                    {module.isLocked && (
-                      <Box
+                    <Box>
+                      <Typography
+                        variant="h6"
                         sx={{
-                          position: "absolute",
-                          top: 12,
-                          right: 12,
-                          color: "#94a3b8",
-                          zIndex: 2,
+                          fontWeight: 600,
+                          fontSize: "1rem",
+                          color: "#1e293b",
+                          mb: 1,
                         }}
                       >
-                        <LockIcon fontSize="small" />
-                      </Box>
-                    )}
-
-                    <CardContent
-                      sx={{
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        padding: "16px",
-                      }}
-                    >
-                      <Box>
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: "1rem",
-                            color: "#1e293b",
-                            mb: 1,
-                          }}
-                        >
-                          {module.name}
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "#64748b",
-                            fontSize: "0.8rem",
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {module.isLocked
-                            ? "Contact Admin for Access"
-                            : module.description}
-                        </Typography>
-                      </Box>
+                        {module.name}
+                      </Typography>
 
                       <Typography
-                        variant="caption"
+                        variant="body2"
                         sx={{
-                          color: module.isLocked ? "#94a3b8" : "#6366f1",
-                          fontSize: "0.7rem",
-                          fontWeight: 500,
-                          letterSpacing: "0.5px",
-                          mt: 2,
+                          color: "#64748b",
+                          fontSize: "0.8rem",
+                          lineHeight: 1.5,
                         }}
                       >
-                        {module.categoryLabel || "MODULE"}
+                        {module.isLocked
+                          ? "Contact Admin for Access"
+                          : module.description}
                       </Typography>
-                    </CardContent>
-                  </StyledCard>
-                ))}
-              </Box>
+                    </Box>
+
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: module.isLocked ? "#94a3b8" : "#6366f1",
+                        fontSize: "0.7rem",
+                        fontWeight: 500,
+                        letterSpacing: "0.5px",
+                        mt: 2,
+                      }}
+                    >
+                      {module.categoryLabel || "MODULE"}
+                    </Typography>
+                  </CardContent>
+                </StyledCard>
+              ))}
             </Box>
           </Box>
         </Box>

@@ -16,6 +16,7 @@ import {
   getContainerDetails,
   getJobNumbersByMultipleIECodes,
   getBeNumbersByMultipleIECodes,
+  getImporterUsers,
 } from "../controllers/jobController.js";
 import {
   getJobsByStatusAndImporter,
@@ -101,6 +102,7 @@ router.patch("/api/jobs/container/:id", authenticateUser, updateContainerTranspo
 // Route to get jobs overview
 router.get("/api/user-dashboard-stats", authenticateUser, getUserDashboardStats);
 router.get("/api/get-jobs-overview/:year", authenticateUser, getJobsOverview);
+router.get("/api/get-importer-users", authenticateUser, getImporterUsers);
 router.get("/api/get-years", authenticateUser, getYears);
 router.get("/api/get-exporters", authenticateUser, getExporters);
 router.get("/api/gandhidham/get-exporters", authenticateUser, getExportersGandhidham);

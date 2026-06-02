@@ -69,8 +69,10 @@ const eximclientUserSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
-    // New field for multiple IE code assignments
+    // Importer IE code assignments (Import DSR module)
     ie_code_assignments: [ieCodeAssignmentSchema],
+    // Exporter IE code assignments (Export DSR module)
+    exporter_ie_code_assignments: [ieCodeAssignmentSchema],
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",

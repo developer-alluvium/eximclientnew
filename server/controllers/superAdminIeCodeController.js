@@ -9,8 +9,9 @@ import axios from "axios";
 export const assignAdditionalIeCode = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { ieCodes, reason } = req.body;
-
+    const { ieCodes, reason, module: moduleType } = req.body;
+    // moduleType: 'import' (default) or 'export'
+    const isExport = moduleType === 'export';
 
     const user = await EximclientUser.findById(userId);
     console.log(
@@ -38,16 +39,22 @@ export const assignAdditionalIeCode = async (req, res) => {
       failed: [],
     };
 
+    // Determine which array to use
+    const assignmentField = isExport ? 'exporter_ie_code_assignments' : 'ie_code_assignments';
+    if (!user[assignmentField]) {
+      user[assignmentField] = [];
+    }
+
     for (const ieCodeNo of ieCodeList) {
-      // Check if this IE code is already assigned
-      const existingAssignment = user.ie_code_assignments?.find(
+      // Check if this IE code is already assigned in the target array
+      const existingAssignment = user[assignmentField]?.find(
         (assignment) => assignment.ie_code_no === ieCodeNo.toUpperCase()
       );
 
       if (existingAssignment) {
         results.failed.push({
           ieCode: ieCodeNo,
-          reason: "IE code already assigned to the user",
+          reason: `IE code already assigned to the user in ${isExport ? 'exporter' : 'importer'} module`,
         });
         continue;
       }
@@ -77,7 +84,7 @@ export const assignAdditionalIeCode = async (req, res) => {
             }
           }
         } catch (err) {
-          console.error("Error querying Exporter API for IEC assignment:", err.message);
+          console.error("Error querying Exporter API for IEC assignment:", err);
         }
       }
 
@@ -89,7 +96,7 @@ export const assignAdditionalIeCode = async (req, res) => {
         continue;
       }
 
-      // Add new IE code assignment
+      // Add new IE code assignment to the correct array
       const newAssignment = {
         ie_code_no: ieCodeNo.toUpperCase(),
         importer_name: importerName,
@@ -98,12 +105,7 @@ export const assignAdditionalIeCode = async (req, res) => {
         assigned_by_model: "SuperAdmin",
       };
 
-      // Initialize ie_code_assignments array if it doesn't exist
-      if (!user.ie_code_assignments) {
-        user.ie_code_assignments = [];
-      }
-
-      user.ie_code_assignments.push(newAssignment);
+      user[assignmentField].push(newAssignment);
       results.success.push({
         ieCode: ieCodeNo,
         importerName: importerName,
@@ -114,8 +116,6 @@ export const assignAdditionalIeCode = async (req, res) => {
 
     // Save the user with all successful assignments
     await user.save();
-
-    // Create notification for the user
 
     return res.status(200).json({
       success: true,
@@ -138,19 +138,15 @@ export const assignAdditionalIeCode = async (req, res) => {
 export const removeIeCodeFromUser = async (req, res) => {
   try {
     const { userId } = req.params;
+    const { ieCodes, module: moduleType } = req.body;
+    // moduleType: 'import' | 'export' | undefined (undefined = remove from both)
 
-    const { ieCodes } = req.body;
-    const ieCodeNo =
-      Array.isArray(ieCodes) && ieCodes.length > 0 ? ieCodes[0] : null;
-
-    if (!ieCodeNo) {
+    if (!Array.isArray(ieCodes) || ieCodes.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "IE code to remove is required.",
+        message: "IE codes to remove are required.",
       });
     }
-
-    console.log(req.body);
 
     const user = await EximclientUser.findById(userId);
     if (!user) {
@@ -160,66 +156,64 @@ export const removeIeCodeFromUser = async (req, res) => {
       });
     }
 
-    // Check if this IE code is assigned
-    console.log("Checking IE code assignments for user:", user._id);
-    user.ie_code_assignments?.forEach((assignment, index) => {
-      console.log(`Assignment #${index}:`, assignment);
-    });
+    const removedFrom = { import: [], export: [] };
+    const notFound = [];
 
-    const processedIeCodeNo = ieCodeNo ? ieCodeNo.trim().toUpperCase() : null;
+    for (const ieCodeNo of ieCodes) {
+      const processedIeCodeNo = ieCodeNo.trim().toUpperCase();
+      let found = false;
 
-    const existingAssignment = user.ie_code_assignments?.find((assignment) => {
-      if (!assignment.ie_code_no) {
-        console.warn(`Assignment at index missing ie_code_no:`, assignment);
-        return false; // skip this
+      // Remove from importer array (unless explicitly exporter-only)
+      if (moduleType !== 'export') {
+        const beforeLen = (user.ie_code_assignments || []).length;
+        user.ie_code_assignments = (user.ie_code_assignments || []).filter(
+          (a) => a.ie_code_no && a.ie_code_no.trim().toUpperCase() !== processedIeCodeNo
+        );
+        if ((user.ie_code_assignments || []).length < beforeLen) {
+          removedFrom.import.push(processedIeCodeNo);
+          found = true;
+        }
       }
-      const normalizedAssignmentIeCode = assignment.ie_code_no
-        .trim()
-        .toUpperCase();
-      console.log(
-        `Comparing ${normalizedAssignmentIeCode} with ${processedIeCodeNo}`
-      );
-      return normalizedAssignmentIeCode === processedIeCodeNo;
-    });
 
-    if (!existingAssignment) {
-      return res.status(400).json({
-        success: false,
-        message: "This IE code is not assigned to the user.",
-      });
+      // Remove from exporter array (unless explicitly importer-only)
+      if (moduleType !== 'import') {
+        const beforeLen = (user.exporter_ie_code_assignments || []).length;
+        user.exporter_ie_code_assignments = (user.exporter_ie_code_assignments || []).filter(
+          (a) => a.ie_code_no && a.ie_code_no.trim().toUpperCase() !== processedIeCodeNo
+        );
+        if ((user.exporter_ie_code_assignments || []).length < beforeLen) {
+          removedFrom.export.push(processedIeCodeNo);
+          found = true;
+        }
+      }
+
+      if (!found) {
+        notFound.push(processedIeCodeNo);
+      }
     }
 
-    // Don't allow removing the last IE code if user is an admin
-    if (user.role === "admin" && user.ie_code_assignments.length === 1) {
+    // Don't allow removing all IE codes from an admin user
+    // Check: admin must retain at least 1 importer or 1 exporter code total
+    const remainingImporter = (user.ie_code_assignments || []).length;
+    const remainingExporter = (user.exporter_ie_code_assignments || []).length;
+    if (user.role === "admin" && remainingImporter === 0 && remainingExporter === 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "Cannot remove the last IE code from an admin user. Demote the user first.",
+        message: "Cannot remove all IE codes from an admin user. The admin must retain at least one importer or exporter IE code. Demote the user first.",
       });
     }
-
-    // Remove IE code assignment
-
-    user.ie_code_assignments = user.ie_code_assignments.filter(
-      (assignment) =>
-        !(
-          assignment.ie_code_no &&
-          assignment.ie_code_no.trim().toUpperCase() === processedIeCodeNo
-        )
-    );
 
     await user.save();
 
-    // Create notification
-
-    // Log activity
-
     res.json({
       success: true,
-      message: "IE code removed successfully.",
+      message: "IE code(s) removed successfully.",
       data: {
         userId: user._id,
-        remainingIeCodes: user.ie_code_assignments,
+        removedFrom,
+        notFound,
+        remainingImporterCodes: user.ie_code_assignments,
+        remainingExporterCodes: user.exporter_ie_code_assignments,
       },
     });
   } catch (error) {
@@ -253,6 +247,9 @@ export const listUserIeCodes = async (req, res) => {
         userId: user._id,
         userName: user.name,
         userEmail: user.email,
+        importerIeCodes: user.ie_code_assignments,
+        exporterIeCodes: user.exporter_ie_code_assignments || [],
+        // Keep legacy field for backwards compat
         ieCodes: user.ie_code_assignments,
       },
     });
@@ -268,10 +265,13 @@ export const listUserIeCodes = async (req, res) => {
 
 /**
  * Bulk assign additional IE codes to users
+ * Supports module='import' (default) or module='export'
  */
 export const bulkAssignAdditionalIeCodes = async (req, res) => {
   try {
-    const { userIds, ieCodeNo, reason } = req.body;
+    const { userIds, ieCodeNo, reason, module: moduleType } = req.body;
+    const isExport = moduleType === 'export';
+    const assignmentField = isExport ? 'exporter_ie_code_assignments' : 'ie_code_assignments';
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
@@ -287,11 +287,11 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       });
     }
 
-    // Get customer KYC details or exporter details
-    let importerName = null;
+    // Resolve entity name: check importer KYC first, then Exporter API directory
+    let entityName = null;
     const customerKyc = await CustomerKycModel.findOne({ iec_no: ieCodeNo });
     if (customerKyc && customerKyc.name_of_individual) {
-      importerName = customerKyc.name_of_individual;
+      entityName = customerKyc.name_of_individual;
     } else {
       // Fallback to Export API directory
       try {
@@ -307,15 +307,15 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
             (item) => item.iecNo && item.iecNo.trim().toUpperCase() === ieCodeNo.trim().toUpperCase()
           );
           if (exporter) {
-            importerName = exporter.exporterName || exporter.alias || ieCodeNo;
+            entityName = exporter.exporterName || exporter.alias || ieCodeNo;
           }
         }
       } catch (err) {
-        console.error("Error querying Exporter API for bulk IEC assignment:", err.message);
+        console.error("Error querying Exporter API for bulk IEC assignment:", err);
       }
     }
 
-    if (!importerName) {
+    if (!entityName) {
       return res.status(400).json({
         success: false,
         message: `Invalid or incomplete customer KYC or Exporter record for IEC ${ieCodeNo}.`,
@@ -330,27 +330,32 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
 
     for (const user of users) {
       try {
-        // Skip if already assigned
-        if (
-          user.ie_code_assignments?.some(
-            (a) => a.ie_code_no === ieCodeNo.toUpperCase()
-          )
-        ) {
+        // Ensure the target array exists
+        if (!user[assignmentField]) user[assignmentField] = [];
+
+        // Skip if already assigned in the target module
+        const alreadyAssigned = user[assignmentField].some(
+          (a) => a.ie_code_no === ieCodeNo.toUpperCase()
+        );
+        if (alreadyAssigned) {
           errors.push({
             userId: user._id,
             name: user.name,
-            error: "IE code already assigned",
+            error: `IE code already assigned in ${isExport ? 'exporter' : 'importer'} module`,
           });
           failureCount++;
           continue;
         }
 
-        // Add IE code assignment
-        user.addIeCodeAssignment(
-          ieCodeNo,
-          importerName,
-          req.user
-        );
+        // Add IE code assignment to correct array
+        const newAssignment = {
+          ie_code_no: ieCodeNo.toUpperCase(),
+          importer_name: entityName,
+          assigned_at: new Date(),
+          assigned_by: req.user._id,
+          assigned_by_model: "SuperAdmin",
+        };
+        user[assignmentField].push(newAssignment);
         await user.save();
         successCount++;
       } catch (error) {
@@ -364,7 +369,7 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       }
     }
 
-    // Create notifications in bulk
+    // Create notifications in bulk (if any)
     if (notifications.length > 0) {
       await Notification.insertMany(notifications);
     }
@@ -374,7 +379,8 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
       message: `IE code assignments completed: ${successCount} successful, ${failureCount} failed`,
       data: {
         ieCodeNo,
-        importerName,
+        entityName,
+        module: isExport ? 'export' : 'import',
         successCount,
         failureCount,
         errors: errors.length > 0 ? errors : undefined,

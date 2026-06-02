@@ -1,5 +1,6 @@
 import JobModel from "../models/jobModel.js";
 import CthModel from "../models/CthUtil.mjs";
+import EximclientUser from "../models/eximclientUserModel.js";
 // Utility function to format importer name
 function formatImporter(importer) {
   return importer
@@ -1684,3 +1685,37 @@ export const getContainerDetails = async (req, res) => {
     });
   }
 };
+
+// GET users assigned to a specific importer
+export async function getImporterUsers(req, res) {
+  try {
+    const { importerName } = req.query;
+
+    if (!importerName) {
+      return res.status(400).json({ error: "Importer name is required" });
+    }
+
+    // Find users who have this importer in their ie_code_assignments array.
+    const users = await EximclientUser.find({
+      "ie_code_assignments.importer_name": importerName,
+    }).select("username first_name last_name");
+
+    const userNames = users.map((u) => {
+      const nameParts = [];
+      if (u.first_name) nameParts.push(u.first_name);
+      if (u.last_name) nameParts.push(u.last_name);
+
+      if (nameParts.length > 0) {
+        return nameParts.join(" ");
+      }
+      return u.username;
+    });
+
+    userNames.sort();
+
+    res.status(200).json(userNames);
+  } catch (error) {
+    console.error("Error fetching importer users:", error);
+    res.status(500).json({ error: "Failed to fetch assigned users" });
+  }
+}

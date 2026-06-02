@@ -299,7 +299,7 @@ export const loginUser = async (req, res) => {
       ],
     })
       .select(
-        "name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified ie_code_assignments documents"
+        "name email password ie_code_no isAdmin adminId status isActive lastLogin assignedModules role importer assignedImporterName jobsTabVisible gandhidhamTabVisible emailVerified ie_code_assignments exporter_ie_code_assignments documents"
       )
       .populate("adminId", "name ie_code_no"); // Populating customer as admin
 
@@ -751,6 +751,7 @@ export const getCurrentUser = async (req, res) => {
           role: user.role,
           ie_code_no: user.ie_code_no,
           ie_code_assignments: user.ie_code_assignments,
+          exporter_ie_code_assignments: user.exporter_ie_code_assignments || [],
           documents: user.documents,
           aeo_reminder_days: user.aeo_reminder_days,
           aeo_reminder_enabled: user.aeo_reminder_enabled,

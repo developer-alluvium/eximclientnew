@@ -32,12 +32,12 @@ import axios from "../utils/axiosConfig";
 // Styled components for better visual presentation
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   fontWeight: "bold",
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor: "#000000ff",
   border: "1px solid #e0e0e0",
   textAlign: "center",
   fontSize: "1rem",
   padding: "12px 16px",
-  color: "#000 !important",
+  color: "#000000ff !important",
 }));
 
 const StyledDataCell = styled(TableCell)(({ theme }) => ({

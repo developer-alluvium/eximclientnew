@@ -190,7 +190,7 @@ const AdminManagement = ({ onRefresh }) => {
   const [statusAction, setStatusAction] = useState(""); // 'activate', 'deactivate'
   const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
 
-  // IE Code selection states — combined import + export IEC codes
+  // IE Code selection states — separate arrays for import and export modules
   const [selectedUserModules, setSelectedUserModules] = useState([]);
   const [bulkSelectedUsers, setBulkSelectedUsers] = useState([]);
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
@@ -203,9 +203,13 @@ const AdminManagement = ({ onRefresh }) => {
     gandhidhamTabVisible: false,
   });
 
-  // IE Code selection states
+  // IE Code selection states — separate per module
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
-  const [selectedIeCodes, setSelectedIeCodes] = useState([]); // Now an array
+  // selectedIeCodes is used for the currently active mode
+  const [selectedIeCodes, setSelectedIeCodes] = useState([]); // import codes to assign
+  const [selectedExporterIeCodes, setSelectedExporterIeCodes] = useState([]); // export codes to assign
+  // Remove mode: track which module to remove from ('import' | 'export' | 'both')
+  const [removeModule, setRemoveModule] = useState('both'); // 'import' | 'export' | 'both'
   const [ieCodeReason, setIeCodeReason] = useState("");
   const [ieCodeMode, setIeCodeMode] = useState("assign_import"); // 'assign_import', 'assign_export', 'remove'
   const [isDropdownOpen, setDropdownOpen] = useState(false);
@@ -371,9 +375,15 @@ const AdminManagement = ({ onRefresh }) => {
 
   // Filter users based on search
 
-  // IE Code Assignment/Removal Handler
   const handleIeCodeOperation = async () => {
-    if (!selectedEntity || (ieCodeMode !== "remove" && selectedIeCodes.length === 0))
+    const codesInUse = ieCodeMode === "assign_import" ? selectedIeCodes
+      : ieCodeMode === "assign_export" ? selectedExporterIeCodes
+      : [...selectedIeCodes, ...selectedExporterIeCodes]; // remove mode — union
+
+    if (!selectedEntity || (ieCodeMode !== "remove" && codesInUse.length === 0))
+      return;
+    // In remove mode we need at least one code in either list
+    if (ieCodeMode === "remove" && selectedIeCodes.length === 0 && selectedExporterIeCodes.length === 0)
       return;
 
     try {
@@ -393,41 +403,50 @@ const AdminManagement = ({ onRefresh }) => {
         },
       };
 
-      let response;
       if (ieCodeMode === "remove") {
-        const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`;
-
-        response = await axios.delete(endpoint, {
-          ...config,
-          data: {
-            ieCodes: selectedIeCodes,
-            reason: ieCodeReason,
-          },
-        });
+        // Handle import removal
+        if (selectedIeCodes.length > 0) {
+          await axios.delete(
+            `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`,
+            {
+              ...config,
+              data: { ieCodes: selectedIeCodes, module: "import", reason: ieCodeReason },
+            }
+          );
+        }
+        // Handle export removal
+        if (selectedExporterIeCodes.length > 0) {
+          await axios.delete(
+            `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes/remove-ie-codes`,
+            {
+              ...config,
+              data: { ieCodes: selectedExporterIeCodes, module: "export", reason: ieCodeReason },
+            }
+          );
+        }
+        const totalRemoved = selectedIeCodes.length + selectedExporterIeCodes.length;
+        setSuccess(`Successfully removed ${totalRemoved} IE Code(s) from ${selectedEntity.name}`);
       } else {
-        // Both assign_import and assign_export use the same backend endpoint, 
-        // as the backend handles the mapping based on provided IECs.
+        const isExport = ieCodeMode === "assign_export";
+        const codes = isExport ? selectedExporterIeCodes : selectedIeCodes;
         const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${selectedEntity._id}/ie-codes`;
-        const data = {
-          ieCodes: selectedIeCodes,
+        const response = await axios.post(endpoint, {
+          ieCodes: codes,
+          module: isExport ? "export" : "import",
           reason: ieCodeReason,
-        };
-        response = await axios.post(endpoint, data, config);
+        }, config);
+
+        if (response.data.success) {
+          const ieCodesStr = codes.join(", ");
+          setSuccess(`Successfully assigned IE Code(s) ${ieCodesStr} to ${selectedEntity.name}`);
+        }
       }
 
-      if (response.data.success) {
-        const action = ieCodeMode === "remove" ? "removed" : "assigned";
-        const ieCodesStr = selectedIeCodes.join(", ");
-        setSuccess(
-          `Successfully ${action} IE Code(s) ${ieCodesStr} ${
-            ieCodeMode === "remove" ? "from" : "to"
-          } ${selectedEntity.name}`
-        );
-        fetchData();
-        setSelectedIeCodes([]);
-        setIeCodeReason("");
-        setIeCodeMode("assign_import");
-      }
+      fetchData();
+      setSelectedIeCodes([]);
+      setSelectedExporterIeCodes([]);
+      setIeCodeReason("");
+      setIeCodeMode("assign_import");
     } catch (error) {
       console.error("Error assigning/removing IE code:", error);
       setError(error.response?.data?.message || "Failed to assign/remove IE code");
@@ -833,6 +852,7 @@ const AdminManagement = ({ onRefresh }) => {
   const openIeCodeDialog = (user, isRemoving = false) => {
     setSelectedEntity(user);
     setSelectedIeCodes([]);
+    setSelectedExporterIeCodes([]);
     setIeCodeReason("");
     setIeCodeMode(isRemoving ? "remove" : "assign_import");
     setIeCodeDialog(true);
@@ -1366,6 +1386,7 @@ const AdminManagement = ({ onRefresh }) => {
                             gandhidhamTabVisible: user.gandhidhamTabVisible || false,
                           });
                           setSelectedIeCodes([]);
+                          setSelectedExporterIeCodes([]);
                           setIeCodeReason("");
                           setIeCodeMode("assign_import");
                           setSelectedBranches(user.selected_branches || []);
@@ -1549,7 +1570,7 @@ const AdminManagement = ({ onRefresh }) => {
                   <Button
                     fullWidth size="small"
                     variant="text"
-                    onClick={() => { setIeCodeMode("assign_import"); setSelectedIeCodes([]); }}
+                    onClick={() => { setIeCodeMode("assign_import"); setSelectedIeCodes([]); setSelectedExporterIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "assign_import" ? "#fff" : "transparent",
@@ -1563,7 +1584,7 @@ const AdminManagement = ({ onRefresh }) => {
                   <Button
                     fullWidth size="small"
                     variant="text"
-                    onClick={() => { setIeCodeMode("assign_export"); setSelectedIeCodes([]); }}
+                    onClick={() => { setIeCodeMode("assign_export"); setSelectedIeCodes([]); setSelectedExporterIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "assign_export" ? "#fff" : "transparent",
@@ -1577,7 +1598,7 @@ const AdminManagement = ({ onRefresh }) => {
                   <Button
                     fullWidth size="small"
                     variant="text"
-                    onClick={() => { setIeCodeMode("remove"); setSelectedIeCodes([]); }}
+                    onClick={() => { setIeCodeMode("remove"); setSelectedIeCodes([]); setSelectedExporterIeCodes([]); }}
                     sx={{
                       textTransform: "none", fontSize: "0.75rem", borderRadius: 2, fontWeight: 700, py: 1,
                       bgcolor: ieCodeMode === "remove" ? "#fff" : "transparent",
@@ -1590,65 +1611,189 @@ const AdminManagement = ({ onRefresh }) => {
                   </Button>
                 </Box>
 
-                {actionsMenuUser?.ie_code_assignments?.length > 0 && (
+                {/* Currently Assigned — split by module */}
+                {(actionsMenuUser?.ie_code_assignments?.length > 0 || actionsMenuUser?.exporter_ie_code_assignments?.length > 0) && (
                   <Box>
                     <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>Currently Assigned</Typography>
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
-                      {actionsMenuUser.ie_code_assignments.map((a) => (
-                        <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" color="primary" sx={{ fontSize: "0.72rem", fontWeight: 500 }} />
-                      ))}
-                    </Box>
+                    
+                    {/* Importer codes */}
+                    {actionsMenuUser?.ie_code_assignments?.length > 0 && (
+                      <Box sx={{ mb: 1.2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 0.6 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#3b82f6", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.04em" }}>Importer IEC</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, pl: 1.5 }}>
+                          {actionsMenuUser.ie_code_assignments.map((a) => (
+                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" color="primary" sx={{ fontSize: "0.72rem", fontWeight: 500 }} />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Exporter codes */}
+                    {actionsMenuUser?.exporter_ie_code_assignments?.length > 0 && (
+                      <Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 0.6 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981", flexShrink: 0 }} />
+                          <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.04em" }}>Exporter IEC</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, pl: 1.5 }}>
+                          {actionsMenuUser.exporter_ie_code_assignments.map((a) => (
+                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669" }} />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
                   </Box>
                 )}
 
-                <Box>
-                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {ieCodeMode === "remove" ? "Select Codes to Remove" : `Select ${ieCodeMode === "assign_import" ? "Import" : "Exporter"} Codes to Assign`}
-                  </Typography>
-                  <Autocomplete
-                    multiple disableCloseOnSelect
-                    options={ieCodeMode === "remove" ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes}
-                    getOptionLabel={(opt) => opt.ie_code_no || opt.iecNo || ""}
-                    isOptionEqualToValue={(opt, val) => (opt.ie_code_no || opt.iecNo) === (val.ie_code_no || val.iecNo)}
-                    value={(() => {
-                      const opts = ieCodeMode === "remove" ? (actionsMenuUser?.ie_code_assignments || []) : filteredIeCodes;
-                      return selectedIeCodes.map(code => opts.find(o => (o.ie_code_no || o.iecNo) === code) || { ie_code_no: code });
-                    })()}
-                    onChange={(_, newVal) => setSelectedIeCodes(newVal.map(v => v.ie_code_no || v.iecNo))}
-                    filterOptions={(options, { inputValue }) => {
-                      if (!inputValue) return options;
-                      const lc = inputValue.toLowerCase();
-                      return options.filter(o =>
-                        (o.ie_code_no || o.iecNo || "").toLowerCase().includes(lc) ||
-                        (o.importer_name || o.importerName || o.exporterName || "").toLowerCase().includes(lc)
-                      );
-                    }}
-                    ListboxProps={{ style: { maxHeight: 250 } }}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.ie_code_no || option.iecNo}>
-                        <Box sx={{ py: 1, px: 0.5, width: "100%" }}>
-                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.88rem" }}>
-                              {option.ie_code_no || option.iecNo}
+                {/* Assign/Remove form */}
+                {ieCodeMode !== "remove" ? (
+                  // ASSIGN MODE
+                  <Box>
+                    <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      {`Select ${ieCodeMode === "assign_import" ? "Import" : "Exporter"} Codes to Assign`}
+                    </Typography>
+                    <Autocomplete
+                      multiple disableCloseOnSelect
+                      options={ieCodeMode === "assign_export" ? filteredExportIeCodes : filteredImportIeCodes}
+                      getOptionLabel={(opt) => opt.ie_code_no || opt.iecNo || ""}
+                      isOptionEqualToValue={(opt, val) => (opt.ie_code_no || opt.iecNo) === (val.ie_code_no || val.iecNo)}
+                      value={(() => {
+                        const opts = ieCodeMode === "assign_export" ? filteredExportIeCodes : filteredImportIeCodes;
+                        const codes = ieCodeMode === "assign_export" ? selectedExporterIeCodes : selectedIeCodes;
+                        return codes.map(code => opts.find(o => (o.ie_code_no || o.iecNo) === code) || { ie_code_no: code });
+                      })()}
+                      onChange={(_, newVal) => {
+                        const vals = newVal.map(v => v.ie_code_no || v.iecNo);
+                        if (ieCodeMode === "assign_export") setSelectedExporterIeCodes(vals);
+                        else setSelectedIeCodes(vals);
+                      }}
+                      filterOptions={(options, { inputValue }) => {
+                        if (!inputValue) return options;
+                        const lc = inputValue.toLowerCase();
+                        return options.filter(o =>
+                          (o.ie_code_no || o.iecNo || "").toLowerCase().includes(lc) ||
+                          (o.importer_name || o.importerName || o.exporterName || "").toLowerCase().includes(lc)
+                        );
+                      }}
+                      ListboxProps={{ style: { maxHeight: 220 } }}
+                      renderOption={(props, option) => (
+                        <li {...props} key={option.ie_code_no || option.iecNo}>
+                          <Box sx={{ py: 1, px: 0.5, width: "100%" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.88rem" }}>
+                                {option.ie_code_no || option.iecNo}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 500, display: "block", mt: 0.2 }}>
+                              {option.importer_name || option.importerName || option.exporterName || "No Name"}
                             </Typography>
                           </Box>
-                          <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 500, display: "block", mt: 0.2 }}>
-                            {option.importer_name || option.importerName || option.exporterName || "No Name"}
-                          </Typography>
-                        </Box>
-                      </li>
-                    )}
-                    renderTags={(tagValue, getTagProps) =>
-                      tagValue.map((option, index) => (
-                        <Chip size="small" variant="outlined" color="primary" label={option.ie_code_no || option.iecNo} {...getTagProps({ index })} key={option.ie_code_no || option.iecNo} sx={{ fontSize: "0.72rem" }} />
-                      ))
-                    }
-                    renderInput={(params) => (
-                      <TextField {...params} placeholder={`Search ${ieCodeMode === "assign_export" ? "exporters" : "importers"}...`} size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                    )}
-                    noOptionsText="No codes found"
-                  />
-                </Box>
+                        </li>
+                      )}
+                      renderTags={(tagValue, getTagProps) =>
+                        tagValue.map((option, index) => (
+                          <Chip size="small" variant="outlined"
+                            color={ieCodeMode === "assign_export" ? "success" : "primary"}
+                            label={option.ie_code_no || option.iecNo}
+                            {...getTagProps({ index })} key={option.ie_code_no || option.iecNo}
+                            sx={{ fontSize: "0.72rem" }} />
+                        ))
+                      }
+                      renderInput={(params) => (
+                        <TextField {...params} placeholder={`Search ${ieCodeMode === "assign_export" ? "exporters" : "importers"}...`} size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                      )}
+                      noOptionsText="No codes found"
+                    />
+                  </Box>
+                ) : (
+                  // REMOVE MODE — two separate autocompletes
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.8 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#3b82f6", flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: "0.73rem", fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em" }}>Remove from Importer</Typography>
+                      </Box>
+                      <Autocomplete
+                        multiple disableCloseOnSelect
+                        options={actionsMenuUser?.ie_code_assignments || []}
+                        getOptionLabel={(opt) => opt.ie_code_no || ""}
+                        isOptionEqualToValue={(opt, val) => opt.ie_code_no === val.ie_code_no}
+                        value={(actionsMenuUser?.ie_code_assignments || []).filter(a => selectedIeCodes.includes(a.ie_code_no))}
+                        onChange={(_, newVal) => setSelectedIeCodes(newVal.map(v => v.ie_code_no))}
+                        filterOptions={(options, { inputValue }) => {
+                          if (!inputValue) return options;
+                          const lc = inputValue.toLowerCase();
+                          return options.filter(o =>
+                            (o.ie_code_no || "").toLowerCase().includes(lc) ||
+                            (o.importer_name || "").toLowerCase().includes(lc)
+                          );
+                        }}
+                        ListboxProps={{ style: { maxHeight: 200 } }}
+                        renderOption={(props, option) => (
+                          <li {...props} key={option.ie_code_no}>
+                            <Box sx={{ py: 0.8, px: 0.5, width: "100%" }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.86rem" }}>{option.ie_code_no}</Typography>
+                              <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b" }}>{option.importer_name || ""}</Typography>
+                            </Box>
+                          </li>
+                        )}
+                        renderTags={(tagValue, getTagProps) =>
+                          tagValue.map((option, index) => (
+                            <Chip size="small" variant="outlined" color="primary" label={option.ie_code_no} {...getTagProps({ index })} key={option.ie_code_no} sx={{ fontSize: "0.72rem" }} />
+                          ))
+                        }
+                        renderInput={(params) => (
+                          <TextField {...params} placeholder="Select importer codes to remove..." size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                        )}
+                        noOptionsText={actionsMenuUser?.ie_code_assignments?.length === 0 ? "No importer codes assigned" : "No codes found"}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.8 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981", flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: "0.73rem", fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em" }}>Remove from Exporter</Typography>
+                      </Box>
+                      <Autocomplete
+                        multiple disableCloseOnSelect
+                        options={actionsMenuUser?.exporter_ie_code_assignments || []}
+                        getOptionLabel={(opt) => opt.ie_code_no || ""}
+                        isOptionEqualToValue={(opt, val) => opt.ie_code_no === val.ie_code_no}
+                        value={(actionsMenuUser?.exporter_ie_code_assignments || []).filter(a => selectedExporterIeCodes.includes(a.ie_code_no))}
+                        onChange={(_, newVal) => setSelectedExporterIeCodes(newVal.map(v => v.ie_code_no))}
+                        filterOptions={(options, { inputValue }) => {
+                          if (!inputValue) return options;
+                          const lc = inputValue.toLowerCase();
+                          return options.filter(o =>
+                            (o.ie_code_no || "").toLowerCase().includes(lc) ||
+                            (o.importer_name || "").toLowerCase().includes(lc)
+                          );
+                        }}
+                        ListboxProps={{ style: { maxHeight: 200 } }}
+                        renderOption={(props, option) => (
+                          <li {...props} key={option.ie_code_no}>
+                            <Box sx={{ py: 0.8, px: 0.5, width: "100%" }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#1e293b", fontSize: "0.86rem" }}>{option.ie_code_no}</Typography>
+                              <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "#64748b" }}>{option.importer_name || ""}</Typography>
+                            </Box>
+                          </li>
+                        )}
+                        renderTags={(tagValue, getTagProps) =>
+                          tagValue.map((option, index) => (
+                            <Chip size="small" variant="outlined" color="success" label={option.ie_code_no} {...getTagProps({ index })} key={option.ie_code_no} sx={{ fontSize: "0.72rem" }} />
+                          ))
+                        }
+                        renderInput={(params) => (
+                          <TextField {...params} placeholder="Select exporter codes to remove..." size="small" sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                        )}
+                        noOptionsText={actionsMenuUser?.exporter_ie_code_assignments?.length === 0 ? "No exporter codes assigned" : "No codes found"}
+                      />
+                    </Box>
+                  </Box>
+                )}
                 
                 <Box>
                   <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -1661,7 +1806,11 @@ const AdminManagement = ({ onRefresh }) => {
                   <Button 
                     variant="contained" 
                     fullWidth 
-                    disabled={loading || selectedIeCodes.length === 0}
+                    disabled={loading || (
+                      ieCodeMode === "assign_import" ? selectedIeCodes.length === 0
+                      : ieCodeMode === "assign_export" ? selectedExporterIeCodes.length === 0
+                      : (selectedIeCodes.length === 0 && selectedExporterIeCodes.length === 0)
+                    )}
                     onClick={async () => { await handleIeCodeOperation(); setActionsMenuUser(null); setActionsTab(0); }}
                     sx={{  
                       borderRadius: 2, 
@@ -1682,8 +1831,8 @@ const AdminManagement = ({ onRefresh }) => {
                     }}
                   >
                     {loading ? "Processing..." : ieCodeMode === "remove"
-                      ? `Remove ${selectedIeCodes.length} Selected Code${selectedIeCodes.length !== 1 ? "s" : ""}`
-                      : `Assign ${selectedIeCodes.length} Selected Code${selectedIeCodes.length !== 1 ? "s" : ""}`}
+                      ? `Remove ${selectedIeCodes.length + selectedExporterIeCodes.length} Selected Code${(selectedIeCodes.length + selectedExporterIeCodes.length) !== 1 ? "s" : ""}`
+                      : `Assign ${ieCodeMode === "assign_export" ? selectedExporterIeCodes.length : selectedIeCodes.length} Selected Code${(ieCodeMode === "assign_export" ? selectedExporterIeCodes.length : selectedIeCodes.length) !== 1 ? "s" : ""}`}
                   </Button>
                 </Box>
               </Box>

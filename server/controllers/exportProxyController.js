@@ -36,7 +36,7 @@ export const getAvailableExporters = async (req, res) => {
       message: "No exporters found",
     });
   } catch (error) {
-    console.error("Get available exporters (Export API) error:", error.message);
+    console.error("Get available exporters (Export API) error:", error);
 
     if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return res.status(503).json({
@@ -83,15 +83,15 @@ export const proxyExportListing = async (req, res) => {
 
     // Fetch fresh user data to get IE code assignments
     const dbUser = await EximclientUser.findById(user.id || user._id)
-      .select("ie_code_assignments role name email")
+      .select("exporter_ie_code_assignments role name email selected_branches")
       .lean();
 
     if (!dbUser) {
       return res.status(401).json({ success: false, message: "User not found." });
     }
 
-    const isAdmin = dbUser.role === "admin";
-    const ieCodeAssignments = dbUser.ie_code_assignments || [];
+    const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
+    const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
 
     // Regular users with no IE code assignments get empty result
     if (!isAdmin && ieCodeAssignments.length === 0) {
@@ -177,7 +177,7 @@ export const proxyExportListing = async (req, res) => {
 
     return res.json(response.data);
   } catch (error) {
-    console.error("Export proxy listing error:", error.message);
+    console.error("Export proxy listing error:", error);
 
     if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return res.status(503).json({
