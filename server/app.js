@@ -63,6 +63,7 @@ const defaultOrigins = [
   "http://localhost:3000",
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",
+  "https://eximbot.alvision.in",
   /^https:\/\/.*\.ngrok-free\.app$/
 ];
 
