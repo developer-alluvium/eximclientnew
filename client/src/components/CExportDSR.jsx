@@ -46,7 +46,8 @@ import {
   Anchor,
   ArrowDropDown,
   Close,
-  ChevronRight
+  ChevronRight,
+  PictureAsPdf
 } from "@mui/icons-material";
 import axios from "axios";
 import { getJsonCookie } from "../utils/cookies";
@@ -179,8 +180,6 @@ function CExportDSR() {
   const [excelDownloadLoading, setExcelDownloadLoading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
   const [expandedContainers, setExpandedContainers] = React.useState({});
-  const [filesMenuAnchorEl, setFilesMenuAnchorEl] = React.useState(null);
-  const [selectedFilesMenuJob, setSelectedFilesMenuJob] = React.useState(null);
 
   // Dynamically populated filters from returned jobs
   const customHousesList = React.useMemo(() => {
@@ -402,26 +401,53 @@ function CExportDSR() {
     setExpandedContainers(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Doc lists resolver
+  // Doc lists resolver - returns only PDF files
   const getJobFilesList = (job) => {
     const files = [];
-    if (job.booking_copy) files.push({ name: "Booking Copy", url: job.booking_copy });
-    if (job.shipping_bill_copy) files.push({ name: "Shipping Bill Copy", url: job.shipping_bill_copy });
-    if (job.gate_in_copy) files.push({ name: "Gate In Copy", url: job.gate_in_copy });
-    if (job.leo_copy) files.push({ name: "LEO Copy", url: job.leo_copy });
-    if (job.bill_of_lading_copy) files.push({ name: "Bill of Lading Copy", url: job.bill_of_lading_copy });
-    if (job.billing_copy) files.push({ name: "Billing Copy", url: job.billing_copy });
-    
-    // Handover documents from status Details
-    if (job.operations && job.operations.length > 0 && job.operations[0].statusDetails && job.operations[0].statusDetails.length > 0) {
-      if (job.operations[0].statusDetails[0].handoverImageUpload) {
-        files.push({ name: "Handover Copy", url: job.operations[0].statusDetails[0].handoverImageUpload });
+    const isPdf = (url) => {
+      if (typeof url !== "string") return false;
+      return url.toLowerCase().split(/[?#]/)[0].endsWith(".pdf");
+    };
+
+    const addFiles = (fieldVal, displayName) => {
+      if (!fieldVal) return;
+      if (Array.isArray(fieldVal)) {
+        fieldVal.forEach((url, idx) => {
+          if (isPdf(url)) {
+            files.push({
+              name: fieldVal.length > 1 ? `${displayName} ${idx + 1}` : displayName,
+              url,
+            });
+          }
+        });
+      } else if (isPdf(fieldVal)) {
+        files.push({ name: displayName, url: fieldVal });
       }
+    };
+
+    addFiles(job.booking_copy, "Booking Copy");
+    addFiles(job.shipping_bill_copy, "Shipping Bill Copy");
+    addFiles(job.gate_in_copy, "Gate In Copy");
+    addFiles(job.leo_copy, "LEO Copy");
+    addFiles(job.bill_of_lading_copy, "Bill of Lading Copy");
+    addFiles(job.billing_copy, "Billing Copy");
+
+    // Handover documents from status Details
+    if (
+      job.operations &&
+      job.operations.length > 0 &&
+      job.operations[0].statusDetails &&
+      job.operations[0].statusDetails.length > 0
+    ) {
+      const handoverVal = job.operations[0].statusDetails[0].handoverImageUpload;
+      addFiles(handoverVal, "Handover Copy");
     }
-    
+
     if (job.other_documents && Array.isArray(job.other_documents)) {
       job.other_documents.forEach((doc, idx) => {
-        if (doc) files.push({ name: `Other Document ${idx + 1}`, url: doc });
+        if (doc) {
+          addFiles(doc, `Other Document ${idx + 1}`);
+        }
       });
     }
     return files;
@@ -1097,34 +1123,44 @@ function CExportDSR() {
 
                       {/* Docs Column */}
                       <TableCell style={{ ...tableCellStyle, borderRight: "none" }} align="left">
-                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "left" }}>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            endIcon={<ArrowDropDown style={{ fontSize: 14, marginLeft: -4 }} />}
-                            onClick={(e) => {
-                              setFilesMenuAnchorEl(e.currentTarget);
-                              setSelectedFilesMenuJob(job);
-                            }}
-                            sx={{
-                              textTransform: "none",
-                              fontSize: "11px",
-                              height: "24px",
-                              borderColor: "#cbd5e1",
-                              color: "#334155",
-                              bgcolor: "#fff",
-                              fontWeight: 600,
-                              px: 1,
-                              py: 0.2,
-                              minWidth: "75px",
-                              "&:hover": {
-                                bgcolor: "#f8fafc",
-                                borderColor: "#94a3b8"
-                              }
-                            }}
-                          >
-                            Files
-                          </Button>
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-start" }}>
+                          {files.map((file, fIdx) => (
+                            <Box 
+                              key={fIdx}
+                              sx={{ 
+                                display: "flex", 
+                                alignItems: "center", 
+                                gap: 0.5 
+                              }}
+                            >
+                              <PictureAsPdf sx={{ fontSize: 13, color: "#ef4444" }} />
+                              <a
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 600,
+                                  color: "#2563eb",
+                                  textDecoration: "none",
+                                  transition: "color 0.15s ease",
+                                  display: "inline-block",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  maxWidth: "100px"
+                                }}
+                                title={file.name}
+                                onMouseEnter={(e) => e.target.style.color = "#1d4ed8"}
+                                onMouseLeave={(e) => e.target.style.color = "#2563eb"}
+                              >
+                                {file.name}
+                              </a>
+                            </Box>
+                          ))}
+                          {files.length === 0 && (
+                            <Typography sx={{ fontSize: "11px", color: "#94a3b8" }}>-</Typography>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -1173,42 +1209,7 @@ function CExportDSR() {
         </TableContainer>
       </Box>
 
-      {/* Docs Dropdown Menu */}
-      <Menu
-        anchorEl={filesMenuAnchorEl}
-        open={Boolean(filesMenuAnchorEl)}
-        onClose={() => {
-          setFilesMenuAnchorEl(null);
-          setSelectedFilesMenuJob(null);
-        }}
-        PaperProps={{
-          sx: {
-            mt: 0.5,
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
-            border: "1px solid #e2e8f0"
-          }
-        }}
-      >
-        {selectedFilesMenuJob && getJobFilesList(selectedFilesMenuJob).length > 0 ? (
-          getJobFilesList(selectedFilesMenuJob).map((file, idx) => (
-            <MenuItem 
-              key={idx} 
-              onClick={() => {
-                window.open(file.url, "_blank");
-                setFilesMenuAnchorEl(null);
-                setSelectedFilesMenuJob(null);
-              }}
-              sx={{ fontSize: "12px", py: 1, px: 2 }}
-            >
-              {file.name}
-            </MenuItem>
-          ))
-        ) : (
-          <MenuItem disabled sx={{ fontSize: "12px" }}>
-            No files available
-          </MenuItem>
-        )}
-      </Menu>
+
 
       {/* Create Job Informative Dialog */}
       <Dialog
