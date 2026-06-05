@@ -96,6 +96,10 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    verifiedEmail: {
+      type: Boolean,
+      default: true,
+    },
 
     // AEO Certificate Reminder Settings - MOVED TO MAIN SCHEMA
     aeo_reminder_days: {

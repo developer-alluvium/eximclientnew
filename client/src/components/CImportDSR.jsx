@@ -14,7 +14,7 @@ import CJobTabs from "./CJobTabs";
 import { useNavigate } from "react-router-dom";
 import BackButton from "./BackButton";
 import { useImportersContext } from "../context/importersContext";
-import AnalyticsTab from "./AnalyticsTab";
+// import AnalyticsTab from "./AnalyticsTab";
 
 function CImportDSR() {
   const { a11yProps, CustomTabPanel } = useTabs();
@@ -79,8 +79,8 @@ function CImportDSR() {
   // Tabs config
   const visibleTabs = [];
 
-  if (tabVisibility.analyticsTabVisible)
-    visibleTabs.push({ label: "Dashboard", key: "analytics" });
+  // if (tabVisibility.analyticsTabVisible)
+  //   visibleTabs.push({ label: "Dashboard", key: "analytics" });
   if (tabVisibility.jobsTabVisible)
     visibleTabs.push({ label: "Jobs", key: "jobs" });
   if (tabVisibility.gandhidhamTabVisible)
@@ -183,11 +183,11 @@ function CImportDSR() {
 
           {visibleTabs.map((tab, idx) => (
             <CustomTabPanel value={tabValue} index={idx} key={tab.key}>
-              {tab.key === "analytics" ? (
+              {/* {tab.key === "analytics" ? (
                 <AnalyticsTab />
-              ) : (
+              ) : ( */}
                 <CJobTabs gandhidham={tab.key === "gandhidham"} />
-              )}
+              {/* )} */}
             </CustomTabPanel>
           ))}
         </Box>
