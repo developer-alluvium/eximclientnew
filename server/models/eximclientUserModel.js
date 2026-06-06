@@ -75,7 +75,7 @@ const eximclientUserSchema = new mongoose.Schema(
     exporter_ie_code_assignments: [ieCodeAssignmentSchema],
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer",
+      ref: "EximclientUser",
       required: false,
     },
     status: {

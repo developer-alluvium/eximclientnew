@@ -7,7 +7,7 @@ import mongoose from "mongoose";
  */
 export const getUsersByIECode = async (req, res) => {
   try {
-    const { ie_code_nos, importer, page = 1, limit = 50 } = req.query;
+    const { ie_code_nos, importer, search, page = 1, limit = 50 } = req.query;
     const requestingUser = req.user;
 
     // Parse IE codes - support both single and multiple
@@ -15,8 +15,10 @@ export const getUsersByIECode = async (req, res) => {
     if (ie_code_nos) {
       ieCodeArray = ie_code_nos.split(',').map(code => code.trim().toUpperCase()).filter(code => code);
     } else {
-      // Fallback to user's assigned IE codes
-      ieCodeArray = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      // Fallback to user's assigned IE codes (both import and export)
+      const importIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const exportIeCodes = requestingUser.exporter_ie_code_assignments?.map(a => a.ie_code_no) || [];
+      ieCodeArray = Array.from(new Set([...importIeCodes, ...exportIeCodes]));
     }
 
     if (ieCodeArray.length === 0) {
@@ -28,8 +30,10 @@ export const getUsersByIECode = async (req, res) => {
 
     // Super admin can view any IE codes' users
     if (requestingUser.role !== 'superadmin') {
-      const userIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
-      const hasAccess = ieCodeArray.every(code => userIeCodes.includes(code));
+      const importIeCodes = requestingUser.ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const exportIeCodes = requestingUser.exporter_ie_code_assignments?.map(a => a.ie_code_no) || [];
+      const allUserIeCodes = Array.from(new Set([...importIeCodes, ...exportIeCodes]));
+      const hasAccess = ieCodeArray.every(code => allUserIeCodes.includes(code));
       
       if (!hasAccess) {
         return res.status(403).json({
@@ -39,10 +43,31 @@ export const getUsersByIECode = async (req, res) => {
       }
     }
 
-    // Build base query - only use ie_code_assignments (no legacy support)
+    // Build base query matching both import and export assignments
     let query = {
-      'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+      $or: [
+        { 'ie_code_assignments.ie_code_no': { $in: ieCodeArray } },
+        { 'exporter_ie_code_assignments.ie_code_no': { $in: ieCodeArray } }
+      ]
     };
+
+    if (requestingUser.role === 'admin') {
+      query.role = 'user'; // Admin should only see regular users, not other admins
+      query.adminId = requestingUser._id; // Admin should only see users assigned to them
+    }
+
+    // Add search filter if provided
+    if (search) {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      query.$and = [
+        {
+          $or: [
+            { name: searchRegex },
+            { email: searchRegex }
+          ]
+        }
+      ];
+    }
 
     // Add importer filter if provided
     if (importer && importer !== "All Importers") {
@@ -69,11 +94,17 @@ export const getUsersByIECode = async (req, res) => {
       .lean();
 
     // Get unique importers for filtering dropdown (only from ie_code_assignments)
+    const importerMatchStage = { 
+      'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
+    };
+    if (requestingUser.role === 'admin') {
+      importerMatchStage.role = 'user';
+      importerMatchStage.adminId = requestingUser._id;
+    }
+
     const importerAggregation = await EximclientUser.aggregate([
       { 
-        $match: { 
-          'ie_code_assignments.ie_code_no': { $in: ieCodeArray }
-        } 
+        $match: importerMatchStage
       },
       { $unwind: '$ie_code_assignments' },
       {
@@ -168,11 +199,17 @@ export const getAvailableImporters = async (req, res) => {
     }
 
     // Aggregate unique importers for the specified IE codes (only from ie_code_assignments)
+    const matchStage = {
+      'ie_code_assignments': { $exists: true, $ne: [] }
+    };
+    if (requestingUser.role === 'admin') {
+      matchStage.role = 'user';
+      matchStage.adminId = requestingUser._id;
+    }
+
     const importerAggregation = await EximclientUser.aggregate([
       {
-        $match: {
-          'ie_code_assignments': { $exists: true, $ne: [] }
-        }
+        $match: matchStage
       },
       { $unwind: '$ie_code_assignments' },
       {
@@ -256,11 +293,17 @@ export const getUserStatsByImporter = async (req, res) => {
     }
 
     // Get detailed statistics (only from ie_code_assignments)
+    const statsMatchStage = {
+      'ie_code_assignments': { $exists: true, $ne: [] }
+    };
+    if (requestingUser.role === 'admin') {
+      statsMatchStage.role = 'user';
+      statsMatchStage.adminId = requestingUser._id;
+    }
+
     const stats = await EximclientUser.aggregate([
       {
-        $match: {
-          'ie_code_assignments': { $exists: true, $ne: [] }
-        }
+        $match: statsMatchStage
       },
       { $unwind: '$ie_code_assignments' },
       {
@@ -403,6 +446,7 @@ export const inviteUser = async (req, res) => {
         assigned_by: requestingUser._id,
         assigned_by_model: requestingUser.role === 'superadmin' ? 'SuperAdmin' : 'Admin'
       })),
+      adminId: requestingUser.role === 'admin' ? requestingUser._id : undefined,
       // Keep legacy fields for backward compatibility
       ie_code_no: assignments[0]?.ie_code_no,
       assignedImporterName: assignments[0]?.importer_name,

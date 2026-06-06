@@ -23,6 +23,7 @@ import {
   DialogActions,
   TextField,
   FormControl,
+  InputAdornment,
   InputLabel,
   Select,
   MenuItem,
@@ -71,6 +72,7 @@ import {
   Business as BusinessIcon,
   AccessTime as AccessTimeIcon,
   Security as SecurityIcon,
+  Search as SearchIcon,
 } from "@mui/icons-material";
 import InviteUserDialog from "./components/InviteUserDialog";
 import EditUserDialog from "./components/EditUserDialog";
@@ -115,6 +117,9 @@ const UserManagement = () => {
     total_count: 0,
     total_pages: 0,
   });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const theme = useTheme();
   const navigate = useNavigate();
@@ -133,10 +138,27 @@ const UserManagement = () => {
     const ieCodes = currentUser.ie_code_assignments.map((a) => a.ie_code_no);
     setSelectedIeCodes(ieCodes);
 
-    fetchUsers(ieCodes);
+    fetchUsers(ieCodes, "All Importers", 1, "");
     fetchAvailableColumns();
     fetchAvailableImporters(ieCodes);
+    setIsInitialized(true);
   }, [navigate]);
+
+  // Debounce search query changes
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Fetch users when debounced search query changes
+  useEffect(() => {
+    if (isInitialized && selectedIeCodes.length > 0) {
+      fetchUsers(selectedIeCodes, selectedImporter, 1, debouncedSearchQuery);
+      setPagination((prev) => ({ ...prev, current_page: 1 }));
+    }
+  }, [debouncedSearchQuery]);
 
   const showToast = (message, severity = "success") => {
     setToast({ open: true, message, severity });
@@ -194,7 +216,8 @@ const UserManagement = () => {
     async (
       ieCodes = selectedIeCodes,
       importer = selectedImporter,
-      page = 1
+      page = 1,
+      search = searchQuery
     ) => {
       try {
         if (!ieCodes?.length) {
@@ -212,6 +235,10 @@ const UserManagement = () => {
 
         if (importer && importer !== "All Importers") {
           params.append("importer", importer);
+        }
+
+        if (search) {
+          params.append("search", search);
         }
 
         const response = await apiClient.get(
@@ -472,13 +499,13 @@ const UserManagement = () => {
   // Handle importer filter change
   const handleImporterChange = (event, newValue) => {
     setSelectedImporter(newValue || "All Importers");
-    fetchUsers(selectedIeCodes, newValue || "All Importers", 1);
+    fetchUsers(selectedIeCodes, newValue || "All Importers", 1, searchQuery);
     setPagination((prev) => ({ ...prev, current_page: 1 }));
   };
 
   // Handle pagination
   const handlePageChange = (event, newPage) => {
-    fetchUsers(selectedIeCodes, selectedImporter, newPage + 1);
+    fetchUsers(selectedIeCodes, selectedImporter, newPage + 1, searchQuery);
   };
 
   // Check if current user can manage other users
@@ -769,21 +796,23 @@ const UserManagement = () => {
       {/* Filtering Controls */}
       <Paper elevation={1} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
         <Stack direction="row" spacing={3} alignItems="center">
-          <Typography variant="h6">Filters:</Typography>
+      
 
-          <Autocomplete
-            value={selectedImporter}
-            onChange={handleImporterChange}
-            options={availableImporters}
+          <TextField
+            label="Search User"
+            variant="outlined"
+            size="small"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or email..."
             sx={{ minWidth: 250 }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Filter by Importer"
-                variant="outlined"
-                size="small"
-              />
-            )}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
           />
 
           <Chip

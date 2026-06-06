@@ -22,7 +22,9 @@ import {
     // IE Code assignment functions
   assignIeCodeToUser,
   bulkAssignIeCodeToUsers,
-  getAvailableIecCodes
+  getAvailableIecCodes,
+  assignAdminToUser,
+  assignUsersToAdmin
 } from "../controllers/superAdminController.js";
 
 import { 
@@ -100,5 +102,9 @@ router.post("/api/superadmin/customers/bulk-column-permissions", protectSuperAdm
 router.get("/api/superadmin/customer/:customerId/tab-visibility", getCustomerTabVisibility);
 // Update tab visibility for a customer
 router.patch("/api/superadmin/customer/:customerId/tab-visibility", updateCustomerTabVisibility);
+
+// Admin-User assignment routes
+router.put("/api/superadmin/users/:userId/assign-admin", protectSuperAdmin, assignAdminToUser);
+router.put("/api/superadmin/admins/:adminId/assign-users", protectSuperAdmin, assignUsersToAdmin);
 
 export default router;

@@ -913,7 +913,7 @@ export const getAllUsers = async (req, res) => {
   try {
     const users = await EximclientUser.find({})
       .select("-password")
-      .populate("adminId", "name ie_code_no")
+      .populate("adminId", "name email ie_code_no")
       .sort({ createdAt: -1 });
 
     // Get users with their admin status and corresponding customer info
@@ -1675,3 +1675,104 @@ export const getAvailableIecCodes = async (req, res) => {
     });
   }
 };
+
+/**
+ * Assign an Admin to a specific standard user
+ */
+export const assignAdminToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { adminId } = req.body; // Can be null or empty string to unassign
+
+    // Find the target user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    if (adminId) {
+      // Validate that the admin exists and has role 'admin'
+      const admin = await EximclientUser.findById(adminId);
+      if (!admin || admin.role !== "admin") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Admin. The assigned user must exist and have the 'admin' role."
+        });
+      }
+      user.adminId = adminId;
+    } else {
+      user.adminId = undefined; // Clear assignment
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: adminId ? "User successfully assigned to Admin." : "User successfully unassigned from Admin.",
+      data: user
+    });
+  } catch (error) {
+    console.error("Assign admin to user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign admin to user.",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Assign multiple users to a specific Admin
+ */
+export const assignUsersToAdmin = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const { userIds } = req.body; // Array of user IDs to assign to this Admin
+
+    // Validate that the admin exists and is actually an Admin
+    const admin = await EximclientUser.findById(adminId);
+    if (!admin || admin.role !== "admin") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Admin. The target user must exist and have the 'admin' role."
+      });
+    }
+
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "userIds must be an array."
+      });
+    }
+
+    // 1. Unassign this admin from any other users
+    await EximclientUser.updateMany(
+      { adminId: adminId },
+      { $unset: { adminId: "" } }
+    );
+
+    // 2. Assign this admin to the specified users
+    if (userIds.length > 0) {
+      await EximclientUser.updateMany(
+        { _id: { $in: userIds }, role: "user" },
+        { $set: { adminId: adminId } }
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully assigned ${userIds.length} users to Admin: ${admin.name}.`
+    });
+  } catch (error) {
+    console.error("Assign users to admin error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign users to admin.",
+      error: error.message
+    });
+  }
+};
+

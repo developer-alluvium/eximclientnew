@@ -12,18 +12,31 @@ const canManageUser = (actor, targetUser) => {
   if (actor.role === "superadmin") return true;
 
   if (actor.role === "admin") {
-    // Get actor's assigned IE codes
-    const actorIeCodes = actor.ie_code_assignments?.map(
-      (a) => a.ie_code_no
-    ) || [actor.ie_code_no];
+    // Check if the target user is assigned to this admin
+    const targetAdminId = targetUser.adminId?._id?.toString() || targetUser.adminId?.toString();
+    const actorId = actor._id?.toString();
+    if (targetAdminId !== actorId) {
+      return false;
+    }
 
-    // Get target user's assigned IE codes
-    const targetIeCodes = targetUser.ie_code_assignments?.map(
-      (a) => a.ie_code_no
-    ) || [targetUser.ie_code_no];
+    // Get actor's assigned IE codes (both import and export)
+    const actorIeCodes = actor.ie_code_assignments?.map((a) => a.ie_code_no) || [];
+    const actorExportIeCodes = actor.exporter_ie_code_assignments?.map((a) => a.ie_code_no) || [];
+    const actorAllIeCodes = Array.from(new Set([...actorIeCodes, ...actorExportIeCodes]));
+    if (actorAllIeCodes.length === 0 && actor.ie_code_no) {
+      actorAllIeCodes.push(actor.ie_code_no);
+    }
+
+    // Get target user's assigned IE codes (both import and export)
+    const targetIeCodes = targetUser.ie_code_assignments?.map((a) => a.ie_code_no) || [];
+    const targetExportIeCodes = targetUser.exporter_ie_code_assignments?.map((a) => a.ie_code_no) || [];
+    const targetAllIeCodes = Array.from(new Set([...targetIeCodes, ...targetExportIeCodes]));
+    if (targetAllIeCodes.length === 0 && targetUser.ie_code_no) {
+      targetAllIeCodes.push(targetUser.ie_code_no);
+    }
 
     // Check if there's any overlap between actor's and target's IE codes
-    return targetIeCodes.some((code) => actorIeCodes.includes(code));
+    return targetAllIeCodes.some((code) => actorAllIeCodes.includes(code));
   }
 
   return false;
@@ -246,7 +259,7 @@ export const getCustomerTabVisibility = async (req, res) => {
 
     const { userId } = req.params;
     const user = await EximclientUser.findById(userId).select(
-      "jobsTabVisible gandhidhamTabVisible ie_code_assignments ie_code_no"
+      "jobsTabVisible gandhidhamTabVisible ie_code_assignments ie_code_no adminId"
     );
 
     if (!user) {
@@ -397,7 +410,7 @@ export const getUserColumnPermissions = async (req, res) => {
 
     const { userId } = req.params;
     const user = await EximclientUser.findById(userId).select(
-      "name email ie_code_assignments ie_code_no allowedColumns role"
+      "name email ie_code_assignments ie_code_no allowedColumns role adminId"
     );
 
     if (!user) {

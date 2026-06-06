@@ -31,6 +31,7 @@ import {
   Avatar,
   InputAdornment,
   Checkbox,
+  Divider,
 } from "@mui/material";
 import {
   AdminPanelSettings,
@@ -224,6 +225,11 @@ const AdminManagement = ({ onRefresh }) => {
   const [selectedBranches, setSelectedBranches] = useState([]);
   const [selectedBranchIcdCodes, setSelectedBranchIcdCodes] = useState([]);
   const [branchAssignmentLoading, setBranchAssignmentLoading] = useState(false);
+
+  // Admin-User assignment states
+  const [tempAdminId, setTempAdminId] = useState("");
+  const [tempAssignedUserIds, setTempAssignedUserIds] = useState([]);
+  const [adminUserSearchQuery, setAdminUserSearchQuery] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -816,6 +822,64 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
+  const handleSaveAdminAssignment = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      };
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_STRING}/superadmin/users/${actionsMenuUser._id}/assign-admin`,
+        { adminId: tempAdminId || null },
+        config
+      );
+      if (response.data.success) {
+        setSuccess("Admin assigned successfully.");
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Error assigning admin:", error);
+      setError(error.response?.data?.message || "Failed to assign admin.");
+    } finally {
+      setLoading(false);
+      setActionsMenuUser(null);
+    }
+  };
+
+  const handleSaveUserAssignments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      };
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_STRING}/superadmin/admins/${actionsMenuUser._id}/assign-users`,
+        { userIds: tempAssignedUserIds },
+        config
+      );
+      if (response.data.success) {
+        setSuccess("Users assigned to admin successfully.");
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Error assigning users:", error);
+      setError(error.response?.data?.message || "Failed to assign users.");
+    } finally {
+      setLoading(false);
+      setActionsMenuUser(null);
+    }
+  };
+
   // Dialog helper functions
   const openAdminDialog = (entity, action, type) => {
     setSelectedEntity({ ...entity, type });
@@ -1313,8 +1377,14 @@ const AdminManagement = ({ onRefresh }) => {
                           bgcolor: user.role === "admin" ? "#ede9fe" : "#f1f5f9",
                           color: user.role === "admin" ? "#7c3aed" : "#64748b",
                           border: "none",
+                          mb: user.role !== "admin" && user.adminId ? 0.5 : 0
                         }}
                       />
+                      {user.role !== "admin" && user.adminId && (
+                        <Typography sx={{ fontSize: "0.68rem", color: "#64748b", fontWeight: 500, display: "block" }}>
+                          Admin: {user.adminId.name || user.adminId.email || "Assigned"}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell sx={{ py: 1.2, px: 2 }}>
                       <Chip
@@ -1391,6 +1461,10 @@ const AdminManagement = ({ onRefresh }) => {
                           setIeCodeMode("assign_import");
                           setSelectedBranches(user.selected_branches || []);
                           setSelectedBranchIcdCodes(user.selected_icd_codes || []);
+                          setTempAdminId(user.adminId?._id || user.adminId || "");
+                          const assigned = users.filter(u => u.adminId?._id === user._id || u.adminId === user._id);
+                          setTempAssignedUserIds(assigned.map(u => u._id));
+                          setAdminUserSearchQuery("");
                         }}
                         sx={{
                           textTransform: "none",
@@ -1937,8 +2011,8 @@ const AdminManagement = ({ onRefresh }) => {
             {actionsTab === 3 && (
               <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
                 <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Role Management</Typography>
-                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Manage administrative privileges for this user.</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Role & User Assignment Management</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Manage administrative privileges and user assignments.</Typography>
                 </Box>
 
                 <Box sx={{ border: `1.5px solid ${actionsMenuUser?.role === "admin" ? "#e9d5ff" : "#e2e8f0"}`, borderRadius: 2.5, p: 3, bgcolor: actionsMenuUser?.role === "admin" ? "#faf5ff" : "#f8fafc", display: "flex", alignItems: "center", gap: 2.5 }}>
@@ -1953,25 +2027,8 @@ const AdminManagement = ({ onRefresh }) => {
                   </Box>
                 </Box>
 
-                <Box sx={{ bgcolor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 2, p: 2.5 }}>
-                  <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {actionsMenuUser?.role === "admin" ? "After removing admin role" : "After promoting to admin"}
-                  </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    {(actionsMenuUser?.role === "admin"
-                      ? ["User will lose access to admin panel", "Cannot manage other users or modules", "Retains their own module assignments"]
-                      : ["User gains access to admin management panel", "Can manage other users, modules, and settings", "Existing module assignments are preserved"]
-                    ).map((item, i) => (
-                      <Box key={i} sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#94a3b8", mt: 0.7, flexShrink: 0 }} />
-                        <Typography sx={{ fontSize: "0.78rem", color: "#475569" }}>{item}</Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-
-                <Box sx={{ mt: "auto" }}>
-                  <Button variant="contained" fullWidth disabled={loading}
+                <Box sx={{ mt: 0.5 }}>
+                  <Button variant="outlined" fullWidth disabled={loading}
                     startIcon={actionsMenuUser?.role === "admin" ? <Delete /> : <AdminPanelSettings />}
                     onClick={async () => {
                       if (actionsMenuUser?.role === "admin") {
@@ -1981,11 +2038,125 @@ const AdminManagement = ({ onRefresh }) => {
                       }
                       setActionsMenuUser(null); setActionsTab(0);
                     }}
-                    sx={{ bgcolor: actionsMenuUser?.role === "admin" ? "#dc2626" : "#7c3aed", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: actionsMenuUser?.role === "admin" ? "#b91c1c" : "#6d28d9" } }}
+                    sx={{ borderColor: actionsMenuUser?.role === "admin" ? "#dc2626" : "#7c3aed", color: actionsMenuUser?.role === "admin" ? "#dc2626" : "#7c3aed", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1, fontSize: "0.8rem", "&:hover": { bgcolor: actionsMenuUser?.role === "admin" ? "#fef2f2" : "#f5f3ff", borderColor: actionsMenuUser?.role === "admin" ? "#b91c1c" : "#6d28d9" } }}
                   >
-                    {loading ? "Processing..." : actionsMenuUser?.role === "admin" ? "Remove Admin Role" : "Promote to Administrator"}
+                    {loading ? "Processing..." : actionsMenuUser?.role === "admin" ? "Demote to Standard User" : "Promote to Administrator"}
                   </Button>
                 </Box>
+
+                <Divider sx={{ my: 1 }} />
+
+                {actionsMenuUser?.role !== "admin" ? (
+                  // Regular User: Assign to an Admin
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Assign to Admin</Typography>
+                    <FormControl fullWidth size="small">
+                      <InputLabel id="assign-admin-label">Select Admin</InputLabel>
+                      <Select
+                        labelId="assign-admin-label"
+                        value={tempAdminId}
+                        label="Select Admin"
+                        onChange={(e) => setTempAdminId(e.target.value)}
+                      >
+                        <MenuItem value="">
+                          <em>None (Unassigned)</em>
+                        </MenuItem>
+                        {users.filter(u => u.role === "admin").map((admin) => (
+                          <MenuItem key={admin._id} value={admin._id}>
+                            {admin.name} ({admin.email})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveAdminAssignment}
+                      disabled={loading}
+                      sx={{ textTransform: "none", borderRadius: 2, bgcolor: "#1e293b", "&:hover": { bgcolor: "#0f172a" }, py: 1 }}
+                    >
+                      Save Admin Assignment
+                    </Button>
+                  </Box>
+                ) : (
+                  // Admin User: Assign Users in Bulk
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, flexGrow: 1 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Assign Users to this Admin</Typography>
+                    
+                    <TextField
+                      placeholder="Search users to assign..."
+                      size="small"
+                      value={adminUserSearchQuery}
+                      onChange={(e) => setAdminUserSearchQuery(e.target.value)}
+                      sx={{
+                        "& .MuiInputBase-root": {
+                          height: 32,
+                          fontSize: "0.78rem",
+                        }
+                      }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Search sx={{ color: "text.secondary", fontSize: "1rem" }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+
+                    <Box sx={{ border: "1px solid #cbd5e1", borderRadius: 2, p: 1.5, maxHeight: 150, overflowY: "auto", bgcolor: "#fff" }}>
+                      {users
+                        .filter(u => u.role !== "admin")
+                        .filter(u => {
+                          if (!adminUserSearchQuery) return true;
+                          const search = adminUserSearchQuery.toLowerCase();
+                          return u.name?.toLowerCase().includes(search) || u.email?.toLowerCase().includes(search);
+                        })
+                        .map((userItem) => {
+                          const isChecked = tempAssignedUserIds.includes(userItem._id);
+                          return (
+                            <FormControlLabel
+                              key={userItem._id}
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setTempAssignedUserIds(prev => [...prev, userItem._id]);
+                                    } else {
+                                      setTempAssignedUserIds(prev => prev.filter(id => id !== userItem._id));
+                                    }
+                                  }}
+                                />
+                              }
+                              label={
+                                <Typography sx={{ fontSize: "0.78rem" }}>
+                                  {userItem.name} ({userItem.email})
+                                </Typography>
+                              }
+                              sx={{ display: "flex", mb: 0.5 }}
+                            />
+                          );
+                        })}
+                      {users.filter(u => u.role !== "admin").filter(u => {
+                        if (!adminUserSearchQuery) return true;
+                        const search = adminUserSearchQuery.toLowerCase();
+                        return u.name?.toLowerCase().includes(search) || u.email?.toLowerCase().includes(search);
+                      }).length === 0 && (
+                        <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", fontStyle: "italic", textAlign: "center", py: 2 }}>
+                          No users match the search.
+                        </Typography>
+                      )}
+                    </Box>
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveUserAssignments}
+                      disabled={loading}
+                      sx={{ textTransform: "none", borderRadius: 2, bgcolor: "#1e293b", "&:hover": { bgcolor: "#0f172a" }, py: 1 }}
+                    >
+                      Save User Assignments
+                    </Button>
+                  </Box>
+                )}
               </Box>
             )}
 

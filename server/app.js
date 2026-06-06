@@ -87,6 +87,7 @@ app.use(
       "user-role",
       "x-username",
       "X-Requested-With",
+      "Access-Control-Allow-Origin",
     ],
   })
 );
