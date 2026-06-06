@@ -52,7 +52,7 @@ import {
   Delete
 } from "@mui/icons-material";
 import axios from "axios";
-import { getJsonCookie } from "../utils/cookies";
+import { getJsonCookie, getCookie } from "../utils/cookies";
 import BackButton from "./BackButton";
 import { useNavigate } from "react-router-dom";
 import { uploadFileToS3 } from "../utils/AwsFileUpload";
@@ -231,6 +231,25 @@ function CExportDSR() {
 
   const [columnOrder, setColumnOrder] = React.useState(exportColumnDefinitions.map((col) => col.id));
   const [columnSettingsOpen, setColumnSettingsOpen] = React.useState(false);
+
+  // Fetch saved column order on mount
+  React.useEffect(() => {
+    const fetchColumnOrder = async () => {
+      try {
+        const token = getCookie("access_token");
+        const res = await axios.get(
+          `${process.env.REACT_APP_API_STRING}/user-management/users/export-columns/order`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.data.columnOrder?.length) {
+          setColumnOrder(res.data.columnOrder);
+        }
+      } catch (error) {
+        console.error("Failed to fetch column order", error);
+      }
+    };
+    fetchColumnOrder();
+  }, []);
   const [docsMenuAnchor, setDocsMenuAnchor] = React.useState(null);
   const [selectedJobForDocs, setSelectedJobForDocs] = React.useState(null);
   const [pendingUploadMeta, setPendingUploadMeta] = React.useState(null);
@@ -280,7 +299,7 @@ function CExportDSR() {
       };
 
       if (selectedExporter !== "all") {
-        params.exporter = selectedExporter;
+        params.ieCode = selectedExporter;
       }
 
       if (detailedStatus && detailedStatus.length > 0) {
@@ -550,8 +569,8 @@ function CExportDSR() {
       const dotPath = getDotPath(fileDef, idx);
 
       const endpoint = `/jobs/${selectedJobForDocs._id}`;
-      const response = await axios.put(
-        `${process.env.REACT_APP_API_STRING}/api${endpoint}`,
+      const response = await axios.patch(
+        `${process.env.REACT_APP_API_STRING}${endpoint}`,
         { [dotPath]: updatedUrls },
         { withCredentials: true }
       );
@@ -584,13 +603,18 @@ function CExportDSR() {
   const handleRemoveDoc = async (fileDef, url, idx = 0) => {
     if (!selectedJobForDocs || !fileDef || !url) return;
 
+    if (!url.includes("export-job-documents")) {
+      setSnackbar({ open: true, message: "Only client uploaded documents can be deleted.", severity: "error" });
+      return;
+    }
+
     const currentUrls = getJobDocumentUrls(selectedJobForDocs, fileDef, idx);
     const updatedUrls = currentUrls.filter((item) => item !== url);
     const dotPath = getDotPath(fileDef, idx);
 
     try {
       const endpoint = `/jobs/${selectedJobForDocs._id}`;
-      const response = await axios.put(
+      const response = await axios.patch(
         `${process.env.REACT_APP_API_STRING}${endpoint}`,
         { [dotPath]: updatedUrls },
         { withCredentials: true }
@@ -1059,7 +1083,7 @@ function CExportDSR() {
   const categoryItems = getDisplayableCategoryItems();
 
   return (
-    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", p: 0, fontFamily: "sans-serif" }}>
+    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", p: 0, fontFamily: "sans-serif", maxWidth: "100%", overflowX: "hidden" }}>
       <input
         ref={hiddenFileInputRef}
         type="file"
@@ -1160,7 +1184,7 @@ function CExportDSR() {
                       >
                         <CloudUpload sx={{ fontSize: 16, color: "#2563eb" }} />
                       </IconButton>
-                      {hasUrl && (
+                      {hasUrl && firstUrl.includes("export-job-documents") && (
                         <IconButton
                           size="small"
                           onClick={(e) => {
@@ -1293,7 +1317,7 @@ function CExportDSR() {
       </Paper>
 
       {/* Main DSR Table Layout & Filters */}
-      <Box sx={{ p: 2 }}>
+      <Box sx={{ p: 2, maxWidth: "100%", overflow: "hidden" }}>
         
         {/* Filters Toolbar */}
         <Box 
@@ -1388,8 +1412,8 @@ function CExportDSR() {
             >
               <option value="all">All Assigned Exporters</option>
               {ieCodeAssignments.map(a => (
-                <option key={a.ie_code_no} value={a.importer_name || a.ie_code_no}>
-                  {a.importer_name || a.ie_code_no}
+                <option key={a.ie_code_no} value={a.ie_code_no}>
+                  {a.importer_name} ({a.ie_code_no})
                 </option>
               ))}
             </select>
@@ -1647,7 +1671,21 @@ function CExportDSR() {
         onClose={() => setColumnSettingsOpen(false)}
         columns={exportColumnDefinitions.map((col) => ({ id: col.id, header: col.label }))}
         columnOrder={columnOrder}
-        onSave={(newOrder) => setColumnOrder(newOrder)}
+        onSave={async (newOrder) => {
+          setColumnOrder(newOrder);
+          try {
+            const token = getCookie("access_token");
+            await axios.post(
+              `${process.env.REACT_APP_API_STRING}/user-management/users/export-columns/order`,
+              { columnOrder: newOrder },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setSnackbar({ open: true, message: "Column order saved successfully.", severity: "success" });
+          } catch (error) {
+            console.error("Failed to save column order", error);
+            setSnackbar({ open: true, message: "Failed to save column order.", severity: "error" });
+          }
+        }}
       />
 
       {/* Global Snackbar */}

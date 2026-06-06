@@ -10,7 +10,9 @@ import {
   postColumnOrder,
   getColumnOrder,
   postTransportColumnOrder,
-  getTransportColumnOrder
+  getTransportColumnOrder,
+  postExportColumnOrder,
+  getExportColumnOrder
 } from '../controllers/userManagementController.js';
 
 import { protectSuperAdmin } from '../controllers/superAdminController.js';
@@ -72,6 +74,9 @@ router.get('/users/columns/order', authorize(), getColumnOrder);
 
 router.post('/users/transport-columns/order', authorize(), postTransportColumnOrder);
 router.get('/users/transport-columns/order', authorize(), getTransportColumnOrder);
+
+router.post('/users/export-columns/order', authorize(), postExportColumnOrder);
+router.get('/users/export-columns/order', authorize(), getExportColumnOrder);
 
 export default router;
 

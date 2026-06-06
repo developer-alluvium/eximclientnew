@@ -13,6 +13,8 @@ const customerSchema = new mongoose.Schema(
       required: true,
     },
     columnOrder: [String],
+    transportColumnOrder: [String],
+    exportColumnOrder: [String],
     ie_code_no: { type: String, trim: true },
     pan_id: {
       type: mongoose.Schema.Types.ObjectId,

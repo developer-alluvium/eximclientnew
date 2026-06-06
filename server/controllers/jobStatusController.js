@@ -1,4 +1,5 @@
 import JobModel from "../models/jobModel.js";
+import axios from "axios";
 
 // Status Rank Configuration
 const statusRank = {
@@ -109,7 +110,66 @@ export async function updateJob(req, res) {
     const job = await JobModel.findById(jobId);
     
     if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
+      // It might be an Export job! Attempt to sync/bridge this request to the Export backend.
+      try {
+        const exportApiBaseUrl = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
+        const exportApiUrl = `${exportApiBaseUrl}/id/${jobId}/fields`;
+
+        // Transform updateData { [dotPath]: updatedUrls } to the Export API fieldUpdates format:
+        // { fieldUpdates: [{ field: dotPath, value: newValue }] }
+        const fieldUpdates = Object.entries(updateData).map(([field, value]) => ({
+          field,
+          value,
+        }));
+
+        console.log(`[Bridge Sync] Forwarding document update for Export job ID ${jobId} to: ${exportApiUrl}`);
+        const response = await axios.patch(
+          exportApiUrl,
+          { fieldUpdates },
+          {
+            headers: {
+              username: req.headers["username"] || "Admin",
+              "x-username": req.headers["x-username"] || "Admin",
+            },
+            timeout: 30000,
+          }
+        );
+
+        if (response.data && response.data.data) {
+          const updatedExportJob = response.data.data;
+          console.log(`[Bridge Sync] Export job ${updatedExportJob.job_no} successfully updated in Export database.`);
+
+          // Bidirectional sync/mapping:
+          // Check if there is a matching job in the Client (Import) database with the same job_no
+          // so that both systems are kept in sync if mapped.
+          if (updatedExportJob.job_no) {
+            const matchingClientJob = await JobModel.findOne({ job_no: updatedExportJob.job_no });
+            if (matchingClientJob) {
+              console.log(`[Bridge Sync] Found matching Client job ${matchingClientJob.job_no}. Mirroring document updates.`);
+              // Apply the same updates to the client-side job record
+              await JobModel.findByIdAndUpdate(
+                matchingClientJob._id,
+                { $set: updateData },
+                { new: true }
+              );
+            }
+          }
+
+          // Return the updated Export job to the frontend
+          return res.status(200).json(updatedExportJob);
+        } else {
+          throw new Error("Invalid response structure from Export API");
+        }
+      } catch (err) {
+        console.error("[Bridge Sync] Export job document sync failed:", err.response?.data || err.message);
+        if (err.response?.status === 404) {
+          return res.status(404).json({ message: "Job not found in Client or Export databases." });
+        }
+        return res.status(err.response?.status || 500).json({
+          message: "Failed to synchronize document update to the Export system.",
+          error: err.response?.data?.message || err.message,
+        });
+      }
     }
     
     // Update the job with the new data

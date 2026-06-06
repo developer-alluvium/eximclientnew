@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Box, ThemeProvider, Alert } from "@mui/material";
+import { Box, ThemeProvider, Alert, Typography, IconButton } from "@mui/material";
+import { Menu as MenuIcon } from "@mui/icons-material";
 import { UserContext } from "../../context/UserContext";
 import { getJsonCookie, removeCookie, getCookie } from "../../utils/cookies";
 import { useSuperAdminApi } from "../../hooks/useSuperAdminApi";
@@ -226,6 +227,33 @@ const SuperAdminLayout = () => {
           overflow: "hidden",
         }}
       >
+        {/* Mobile Header Bar */}
+        <Box
+          sx={{
+            display: { xs: "flex", md: "none" },
+            alignItems: "center",
+            px: 2.5,
+            height: 56,
+            bgcolor: "#000000",
+            color: "#ffffff",
+            borderBottom: "1px solid #1f1f1f",
+            position: "sticky",
+            top: 0,
+            zIndex: 1000,
+          }}
+        >
+          <IconButton
+            color="inherit"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            edge="start"
+            sx={{ mr: 1.5 }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="body1" sx={{ fontWeight: 700, fontSize: "0.95rem" }}>
+            SuperAdmin Control Panel
+          </Typography>
+        </Box>
         {/* Content Area */}
         <Box
           sx={{

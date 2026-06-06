@@ -965,7 +965,7 @@ function UserDashboard() {
               <Box display="flex" flexDirection="column" gap={0.5}>
                 {ieCodeAssignments.map((assignment, index) => (
                   <Typography
-                    key={index}
+                    key={`importer-${index}`}
                     variant="body2"
                     sx={{
                       fontWeight: 400,
@@ -985,6 +985,34 @@ function UserDashboard() {
                           |
                         </span>
                         <strong style={{ color: "#ffffffff" }}>Importer:</strong>{" "}
+                        {assignment.importer_name}
+                      </>
+                    )}
+                  </Typography>
+                ))}
+                
+                {(parsedUser?.exporter_ie_code_assignments || []).map((assignment, index) => (
+                  <Typography
+                    key={`exporter-${index}`}
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      fontSize: "0.875rem",
+                      color: "#ffffffff",
+                    }}
+                  >
+                    {assignment.ie_code_no && (
+                      <>
+                        <strong style={{ color: "#ffffffff" }}>Exporter IE Code:</strong>{" "}
+                        {assignment.ie_code_no}
+                      </>
+                    )}
+                    {assignment.importer_name && (
+                      <>
+                        <span style={{ margin: "0 12px", color: "#cbd5e1" }}>
+                          |
+                        </span>
+                        <strong style={{ color: "#ffffffff" }}>Exporter:</strong>{" "}
                         {assignment.importer_name}
                       </>
                     )}
@@ -1016,6 +1044,31 @@ function UserDashboard() {
               </Box>
             </Box>
           </WelcomeBanner>
+
+          {/* Assigned Exporters List */}
+          {/* {parsedUser?.exporter_ie_code_assignments && parsedUser.exporter_ie_code_assignments.length > 0 && (
+            <Card sx={{ mt: 2, mb: 2, borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)" }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Typography variant="subtitle1" fontWeight="600" sx={{ color: "#1e293b", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                  <span>💼</span> Assigned Exporters
+                </Typography>
+                <Grid container spacing={2}>
+                  {parsedUser.exporter_ie_code_assignments.map((assignment, index) => (
+                    <Grid item xs={12} sm={6} md={4} key={index}>
+                      <Paper sx={{ p: 1.5, borderRadius: "8px", border: "1px solid #eaeef2", bgcolor: "#f8fafc" }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#f59e0b" }}>
+                          {assignment.importer_name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5, color: "#64748b", fontSize: "0.8rem", fontWeight: 500 }}>
+                          IE Code: {assignment.ie_code_no}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          )} */}
 
           {/* Alerts */}
           {/* Alerts Section */}

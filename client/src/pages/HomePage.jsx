@@ -464,17 +464,54 @@ function HomePage() {
               <Typography variant="h4" fontWeight="600" gutterBottom>
                 {greeting}, {userName}
               </Typography>
-              {/* <Typography 
-      variant="subtitle1" 
-      sx={{ 
-        opacity: 0.9,
-        maxWidth: '600px'
-      }}
-    >
-      Welcome to EXIM Management System. Select a module below to get started.
-    </Typography> */}
+              {user?.exporter_ie_code_assignments && user.exporter_ie_code_assignments.length > 0 && (
+                <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500 }}>
+                    Assigned Exporters:
+                  </Typography>
+                  {user.exporter_ie_code_assignments.map((assignment, index) => (
+                    <Chip
+                      key={index}
+                      label={`${assignment.importer_name} (${assignment.ie_code_no})`}
+                      size="small"
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                        color: 'white',
+                        fontWeight: 600,
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        '& .MuiChip-label': { px: 1.5, py: 0.5 }
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
           </WelcomeBanner>
+
+          {/* Assigned Exporters Card */}
+          {user?.exporter_ie_code_assignments && user.exporter_ie_code_assignments.length > 0 && (
+            <Card sx={{ mb: 4, borderRadius: "16px", boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)", border: "none" }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: "text.primary", display: "flex", alignItems: "center", gap: 1 }}>
+                  <span>💼</span> Assigned Exporters
+                </Typography>
+                <Grid container spacing={2}>
+                  {user.exporter_ie_code_assignments.map((assignment, index) => (
+                    <Grid item xs={12} sm={6} md={4} key={index}>
+                      <Paper sx={{ p: 2, borderRadius: "12px", border: "1px solid", borderColor: "divider", bgcolor: "background.neutral" }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "warning.main" }}>
+                          {assignment.importer_name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: "0.85rem" }}>
+                          IE Code: {assignment.ie_code_no}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Core Modules Section */}
           <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>

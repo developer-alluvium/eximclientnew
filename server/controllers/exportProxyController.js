@@ -93,25 +93,6 @@ export const proxyExportListing = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
     const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
 
-    // Regular users with no IE code assignments get empty result
-    if (!isAdmin && ieCodeAssignments.length === 0) {
-      return res.json({
-        success: true,
-        data: {
-          jobs: [],
-          pagination: {
-            currentPage: 1,
-            totalPages: 0,
-            totalCount: 0,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-        },
-        message: "No exporter assigned. Please contact your administrator.",
-        noAccess: true,
-      });
-    }
-
     // Build query params to forward to the Export API
     const {
       page = 1,
@@ -141,19 +122,41 @@ export const proxyExportListing = async (req, res) => {
       month,
     };
 
-    // For regular users: inject their IE codes as the ieCode filter
-    // For admins: pass the exporter/ieCode filter as-is (they can search freely)
-    if (!isAdmin) {
+    // Check if the user has assigned exporters (both Admin and Client User roles can have assignments)
+    if (ieCodeAssignments.length > 0) {
       const ieCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
-      if (ieCodes.length === 1) {
-        forwardParams.ieCode = ieCodes[0];
+      if (ieCode && ieCodes.includes(ieCode)) {
+        // Safe: they are filtering by a specific ieCode that is assigned to them
+        forwardParams.ieCode = ieCode;
       } else {
+        // Default: combined data of all assigned exporters
         forwardParams.ieCode = ieCodes.join(",");
       }
     } else {
-      if (ieCode) forwardParams.ieCode = ieCode;
-      
-      // Inject branch restrictions
+      // Regular users with no IE code assignments get empty result immediately
+      if (!isAdmin) {
+        return res.json({
+          success: true,
+          data: {
+            jobs: [],
+            pagination: {
+              currentPage: 1,
+              totalPages: 0,
+              totalCount: 0,
+              hasNextPage: false,
+              hasPrevPage: false,
+            },
+          },
+          message: "No exporter assigned. Please contact your administrator.",
+          noAccess: true,
+        });
+      } else {
+        if (ieCode) forwardParams.ieCode = ieCode;
+      }
+    }
+
+    // Branch restrictions for admins
+    if (isAdmin) {
       const branchRestrictions = dbUser.selected_branches || [];
       if (branchRestrictions.length > 0) {
         forwardParams.branch = branchRestrictions.join(",");

@@ -1006,8 +1006,10 @@ const AdminManagement = ({ onRefresh }) => {
         sx={{
           mb: 3,
           display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: { xs: "stretch", sm: "center" },
+          gap: 2,
         }}
       >
         <Box>
@@ -1186,7 +1188,15 @@ const AdminManagement = ({ onRefresh }) => {
       {/* Main Content Card */}
       <Card sx={{ borderRadius: 2, border: "1px solid #e5e7eb" }}>
         <Box sx={{ p: 3 }}>
-          <Box sx={{ mb: 3, display: "flex", gap: 2, alignItems: "center" }}>
+          <Box
+            sx={{
+              mb: 3,
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 2,
+              alignItems: { xs: "stretch", md: "center" },
+            }}
+          >
             {/* User Search with Autocomplete */}
             <Autocomplete
               freeSolo
@@ -1254,7 +1264,7 @@ const AdminManagement = ({ onRefresh }) => {
                       <Business sx={{ mr: 1, color: "text.secondary" }} />
                     ),
                   }}
-                  sx={{ minWidth: 300 }}
+                  sx={{ minWidth: { xs: "100%", md: 300 } }}
                 />
               )}
             />
@@ -1275,7 +1285,7 @@ const AdminManagement = ({ onRefresh }) => {
             </Typography>
           </Alert>
 
-          <TableContainer component={Paper} sx={{ borderRadius: 2, overflow: "hidden" , }}>
+          <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: "auto" }}>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
@@ -1508,7 +1518,8 @@ const AdminManagement = ({ onRefresh }) => {
             borderRadius: 4,
             overflow: "hidden",
             boxShadow: "0 32px 80px rgba(0,0,0,0.22)",
-            minHeight: 820, // Significantly increased height
+            minHeight: { xs: "auto", md: 680 },
+            maxHeight: { xs: "95vh", md: "90vh" },
             display: "flex",
             flexDirection: "column",
           },
@@ -1580,16 +1591,30 @@ const AdminManagement = ({ onRefresh }) => {
         </Box>
 
         {/* Body: Sidebar + Content */}
-        <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            flex: 1,
+            overflow: "hidden",
+          }}
+        >
 
           {/* Left Sidebar */}
           <Box
             sx={{
-              width: 200, flexShrink: 0,
+              width: { xs: "100%", md: 200 },
+              flexShrink: 0,
               bgcolor: "#f8fafc",
-              borderRight: "1px solid #e2e8f0",
-              py: 2,
-              display: "flex", flexDirection: "column", gap: 0.5,
+              borderRight: { xs: "none", md: "1px solid #e2e8f0" },
+              borderBottom: { xs: "1px solid #e2e8f0", md: "none" },
+              py: { xs: 1, md: 2 },
+              px: { xs: 1.5, md: 0 },
+              display: "flex",
+              flexDirection: { xs: "row", md: "column" },
+              gap: 0.5,
+              overflowX: { xs: "auto", md: "visible" },
+              whiteSpace: "nowrap",
             }}
           >
             {[
@@ -1604,12 +1629,25 @@ const AdminManagement = ({ onRefresh }) => {
                 key={idx}
                 onClick={() => setActionsTab(idx)}
                 sx={{
-                  mx: 1.5, px: 1.5, py: 1.2,
-                  borderRadius: 2, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 1.5,
+                  mx: { xs: 0.5, md: 1.5 },
+                  px: 1.5,
+                  py: { xs: 0.8, md: 1.2 },
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  flexShrink: 0,
                   bgcolor: actionsTab === idx ? "#fff" : "transparent",
                   boxShadow: actionsTab === idx ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                  borderLeft: actionsTab === idx ? "3px solid #1e293b" : "3px solid transparent",
+                  borderLeft: {
+                    xs: "none",
+                    md: actionsTab === idx ? "3px solid #1e293b" : "3px solid transparent",
+                  },
+                  borderBottom: {
+                    xs: actionsTab === idx ? "3px solid #1e293b" : "3px solid transparent",
+                    md: "none",
+                  },
                   transition: "all 0.15s",
                   "&:hover": { bgcolor: actionsTab === idx ? "#fff" : "#f1f5f9" },
                 }}

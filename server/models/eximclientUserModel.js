@@ -125,6 +125,10 @@ const eximclientUserSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    exportColumnOrder: {
+      type: [String],
+      default: [],
+    },
     allowedColumns: {
       type: [String],
       default: [],
