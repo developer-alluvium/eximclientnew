@@ -218,6 +218,18 @@ function CExportDSR() {
   const [goodsStuffedAt, setGoodsStuffedAt] = React.useState("");
   const [pendingQueries, setPendingQueries] = React.useState(false);
 
+  // Dynamically calculate the exporter name to display in the top header
+  const displayExporterName = React.useMemo(() => {
+    if (selectedExporter && selectedExporter !== "all") {
+      const match = ieCodeAssignments.find(a => a.ie_code_no === selectedExporter);
+      return match ? match.importer_name : "";
+    }
+    if (ieCodeAssignments.length === 1) {
+      return ieCodeAssignments[0].importer_name;
+    }
+    return "";
+  }, [selectedExporter, ieCodeAssignments]);
+
   const exportColumnDefinitions = React.useMemo(() => [
     { id: "job_no", label: "JOB NO", width: "12%" },
     { id: "exporter", label: "EXPORTER", width: "17%" },
@@ -227,6 +239,7 @@ function CExportDSR() {
     { id: "container", label: "CONTAINER", width: "11%" },
     { id: "handover", label: "HANDOVER", width: "7%" },
     { id: "docs", label: "DOCS", width: "12%" },
+    { id: "query", label: "QUERY", width: "10%" },
   ], []);
 
   const [columnOrder, setColumnOrder] = React.useState(exportColumnDefinitions.map((col) => col.id));
@@ -242,7 +255,11 @@ function CExportDSR() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data.columnOrder?.length) {
-          setColumnOrder(res.data.columnOrder);
+          let loadedOrder = res.data.columnOrder;
+          if (!loadedOrder.includes("query")) {
+            loadedOrder = [...loadedOrder, "query"];
+          }
+          setColumnOrder(loadedOrder);
         }
       } catch (error) {
         console.error("Failed to fetch column order", error);
@@ -261,6 +278,23 @@ function CExportDSR() {
   const [excelDownloadLoading, setExcelDownloadLoading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
   const [expandedContainers, setExpandedContainers] = React.useState({});
+
+  const [clientQueriesStatus, setClientQueriesStatus] = React.useState({});
+  const [queryChatOpen, setQueryChatOpen] = React.useState(false);
+  const [queryChatJob, setQueryChatJob] = React.useState(null);
+  const [queryChatData, setQueryChatData] = React.useState([]);
+  const [queryChatLoading, setQueryChatLoading] = React.useState(false);
+  const [queryChatReply, setQueryChatReply] = React.useState("");
+  const [queryChatSending, setQueryChatSending] = React.useState(false);
+  const [activeQueryIndex, setActiveQueryIndex] = React.useState(0);
+  const chatEndRef = React.useRef(null);
+
+  // For raising a query:
+  const [raiseQueryOpen, setRaiseQueryOpen] = React.useState(false);
+  const [raiseQueryJob, setRaiseQueryJob] = React.useState(null);
+  const [raiseQuerySubject, setRaiseQuerySubject] = React.useState("");
+  const [raiseQueryMessage, setRaiseQueryMessage] = React.useState("");
+  const [raiseQuerySending, setRaiseQuerySending] = React.useState(false);
 
   // Dynamically populated filters from returned jobs
   const customHousesList = React.useMemo(() => {
@@ -312,10 +346,27 @@ function CExportDSR() {
       });
 
       if (response.data.success) {
-        setJobs(response.data.data.jobs || []);
+        const loadedJobs = response.data.data.jobs || [];
+        setJobs(loadedJobs);
         setTotalCount(response.data.data.total || response.data.data.pagination?.totalCount || 0);
+        
+        // Fetch client query status map
+        const jobNos = loadedJobs.map(j => j.job_no).filter(Boolean);
+        if (jobNos.length > 0) {
+          axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
+            jobNos,
+            isClient: true
+          }, { withCredentials: true }).then(statusRes => {
+            if (statusRes.data?.success) {
+              setClientQueriesStatus(statusRes.data.data || {});
+            }
+          }).catch(err => console.error("Error fetching client query status map:", err));
+        } else {
+          setClientQueriesStatus({});
+        }
       } else {
         setJobs([]);
+        setClientQueriesStatus({});
         setSnackbar({ open: true, message: response.data.message || "Failed to fetch jobs", severity: "error" });
       }
     } catch (error) {
@@ -330,6 +381,16 @@ function CExportDSR() {
   React.useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // Auto-scroll chat to bottom
+  React.useEffect(() => {
+    if (queryChatOpen) {
+      const timer = setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [queryChatOpen, queryChatData, activeQueryIndex]);
 
   // Clear filters
   const handleClearFilters = () => {
@@ -701,14 +762,15 @@ function CExportDSR() {
       case "exporter":
         return (
           <TableCell style={cellStyle}>
-            <Typography sx={{ fontWeight: 700, fontSize: "11px", color: "#0f172a" }}>
+            {/* Exporter name hidden per user request; displayed in top center header */}
+            {/* <Typography sx={{ fontWeight: 700, fontSize: "11px", color: "#0f172a" }}>
               {job.exporter}
               {job.exporter_branch_name && job.exporter_branch_name.toLowerCase() !== "main" && (
                 <span style={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}>
                   {` (${job.exporter_branch_name})`}
                 </span>
               )}
-            </Typography>
+            </Typography> */}
 
             {job.consignees?.[0]?.consignee_name && (
               <Typography sx={{ fontSize: "10px", color: "#475569", mt: 0.5, display: "flex", gap: 0.5 }}>
@@ -959,6 +1021,75 @@ function CExportDSR() {
         );
       }
 
+      case "query": {
+        const queryStat = clientQueriesStatus[job.job_no] || { hasQueries: false, hasUnseen: false, hasOpenQueries: false };
+        return (
+          <TableCell style={cellStyle} align="left">
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, alignItems: "flex-start" }}>
+              {queryStat.hasQueries ? (
+                <span
+                  style={{
+                    ...pillStyle,
+                    backgroundColor: queryStat.hasUnseen ? "#fee2e2" : queryStat.hasOpenQueries ? "#fef3c7" : "#dcfce7",
+                    borderColor: queryStat.hasUnseen ? "#ef4444" : queryStat.hasOpenQueries ? "#f59e0b" : "#22c55e",
+                    color: queryStat.hasUnseen ? "#b91c1c" : queryStat.hasOpenQueries ? "#b45309" : "#15803d",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  onClick={() => handleOpenQueryChat(job)}
+                >
+                  {queryStat.hasUnseen ? "● New Message" : queryStat.hasOpenQueries ? "Open Query" : "Resolved"}
+                </span>
+              ) : (
+                <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
+                  No queries
+                </Typography>
+              )}
+              <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
+                {queryStat.hasQueries && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleOpenQueryChat(job)}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "9px",
+                      py: 0.1,
+                      px: 0.75,
+                      borderRadius: "4px",
+                      color: "#4f46e5",
+                      borderColor: "#c7d2fe",
+                      "&:hover": { bgcolor: "#f5f3ff" }
+                    }}
+                  >
+                    Chat
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => handleOpenRaiseQuery(job)}
+                  sx={{
+                    textTransform: "none",
+                    fontSize: "9px",
+                    py: 0.1,
+                    px: 0.75,
+                    borderRadius: "4px",
+                    color: "#2563eb",
+                    borderColor: "#bfdbfe",
+                    "&:hover": { bgcolor: "#eff6ff" }
+                  }}
+                >
+                  Raise
+                </Button>
+              </Box>
+            </Box>
+          </TableCell>
+        );
+      }
+
       default:
         return <TableCell style={cellStyle}>-</TableCell>;
     }
@@ -1078,6 +1209,121 @@ function CExportDSR() {
 
       return { name: category.name, items };
     });
+  };
+
+  const handleOpenQueryChat = async (job) => {
+    setQueryChatJob(job);
+    setQueryChatOpen(true);
+    setActiveQueryIndex(0);
+    setQueryChatLoading(true);
+    try {
+      const resp = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/client-queries`,
+        { params: { job_no: job.job_no } }
+      );
+      const queries = resp.data?.queries || [];
+      setQueryChatData(queries);
+      
+      if (queries.length > 0) {
+        // Mark as seen by client
+        const unseenIds = queries.filter(q => !q.seenByClient).map(q => q._id);
+        if (unseenIds.length > 0) {
+          await axios.put(`${process.env.REACT_APP_API_STRING}/client-queries/mark-seen`, {
+            queryIds: unseenIds,
+            isClient: true
+          });
+          // Update local status map
+          setClientQueriesStatus(prev => ({
+            ...prev,
+            [job.job_no]: { ...prev[job.job_no], hasUnseen: false }
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load client queries:", error);
+      setSnackbar({ open: true, message: "Failed to load queries", severity: "error" });
+    } finally {
+      setQueryChatLoading(false);
+    }
+  };
+
+  const handleSendReply = async (queryId) => {
+    if (!queryChatReply.trim()) return;
+    setQueryChatSending(true);
+    try {
+      await axios.put(
+        `${process.env.REACT_APP_API_STRING}/client-queries/${queryId}/reply`,
+        {
+          message: queryChatReply.trim(),
+          repliedBy: user?.name || "Client",
+          senderType: "client",
+        }
+      );
+      // Reload chat
+      const resp = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/client-queries`,
+        { params: { job_no: queryChatJob.job_no } }
+      );
+      setQueryChatData(resp.data?.queries || []);
+      setQueryChatReply("");
+    } catch (error) {
+      console.error("Failed to send reply:", error);
+      setSnackbar({ open: true, message: "Failed to send reply", severity: "error" });
+    } finally {
+      setQueryChatSending(false);
+    }
+  };
+
+  const handleOpenRaiseQuery = (job) => {
+    setRaiseQueryJob(job);
+    setRaiseQuerySubject("");
+    setRaiseQueryMessage("");
+    setRaiseQueryOpen(true);
+  };
+
+  const handleRaiseQuerySubmit = async () => {
+    if (!raiseQuerySubject.trim() || !raiseQueryMessage.trim()) {
+      setSnackbar({ open: true, message: "Subject and Message are required", severity: "warning" });
+      return;
+    }
+    setRaiseQuerySending(true);
+    try {
+      const payload = {
+        job_no: raiseQueryJob.job_no,
+        job_id: raiseQueryJob._id,
+        subject: raiseQuerySubject.trim(),
+        message: raiseQueryMessage.trim(),
+        client_id: user?.ie_code_no || user?.email,
+        client_name: user?.name || "Client",
+      };
+
+      await axios.post(
+        `${process.env.REACT_APP_API_STRING}/client-queries`,
+        payload
+      );
+
+      setSnackbar({ open: true, message: "Query raised successfully", severity: "success" });
+      setRaiseQueryOpen(false);
+      
+      // Refresh status map for this job
+      if (raiseQueryJob?.job_no) {
+        const statusRes = await axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
+          jobNos: [raiseQueryJob.job_no],
+          isClient: true
+        });
+        if (statusRes.data?.success) {
+          setClientQueriesStatus(prev => ({
+            ...prev,
+            ...statusRes.data.data
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to raise query:", error);
+      setSnackbar({ open: true, message: "Failed to raise query", severity: "error" });
+    } finally {
+      setRaiseQuerySending(false);
+    }
   };
 
   const categoryItems = getDisplayableCategoryItems();
@@ -1207,14 +1453,33 @@ function CExportDSR() {
       </Menu>
       {/* Header bar matching standalone design */}
       <Paper elevation={0} sx={{ borderBottom: "1px solid #e2e8f0", borderRadius: 0, bgcolor: "#fff", px: { xs: 1.5, sm: 3 }, py: { xs: 1, sm: 1.5 } }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: { xs: 1, sm: 2 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: { xs: 1, sm: 2 }, position: "relative" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <BackButton />
             <Typography variant="h6" sx={{ fontWeight: 800, color: "#0f172a", fontSize: "18px" }}>
-              Export Jobs {totalCount > 0 && <span style={{ color: "#64748b", fontWeight: 500, fontSize: "14px" }}>({totalCount})</span>}
+              Export DSR {totalCount > 0 && <span style={{ color: "#64748b", fontWeight: 500, fontSize: "14px" }}>({totalCount})</span>}
             </Typography>
             <Chip label="Beta" size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700 }} />
           </Box>
+
+          {/* Centered Exporter Name */}
+          {displayExporterName && (
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 600,
+                color: "#1e293b",
+                fontSize: "1rem",
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                whiteSpace: "nowrap",
+                display: { xs: "none", md: "block" }
+              }}
+            >
+              {displayExporterName}
+            </Typography>
+          )}
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <Button
@@ -1698,6 +1963,500 @@ function CExportDSR() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Client Query Chat Dialog */}
+      <Dialog
+        open={queryChatOpen}
+        onClose={() => {
+          setQueryChatOpen(false);
+          setQueryChatJob(null);
+          setQueryChatData([]);
+          setQueryChatReply("");
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "12px", overflow: "hidden" } }}
+      >
+        {(() => {
+          const getChatDateString = (dateStr) => {
+            if (!dateStr) return "";
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "";
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            if (d.toDateString() === today.toDateString()) return "Today";
+            if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+            return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          };
+
+          const getChatTimeString = (dateStr) => {
+            if (!dateStr) return "";
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "";
+            return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+          };
+
+          const activeQuery = queryChatData[activeQueryIndex];
+
+          const chatMessages = [];
+          if (activeQuery) {
+            chatMessages.push({
+              id: "original",
+              senderName: activeQuery.client_name || "Client",
+              senderEmail: activeQuery.client_email || "",
+              senderUsername: activeQuery.client_username || "",
+              message: activeQuery.message,
+              subject: activeQuery.subject,
+              createdAt: activeQuery.createdAt,
+              align: "left",
+              isReply: false,
+              senderType: "client"
+            });
+
+            if (activeQuery.replies) {
+              activeQuery.replies.forEach((r, ri) => {
+                chatMessages.push({
+                  id: r._id || `reply-${ri}`,
+                  senderName: r.repliedBy,
+                  senderEmail: r.email || "",
+                  senderUsername: r.username || "",
+                  message: r.message,
+                  createdAt: r.repliedAt,
+                  align: r.senderType === "client" ? "left" : "right",
+                  isReply: true,
+                  senderType: r.senderType || "admin"
+                });
+              });
+            }
+          }
+
+          return (
+            <>
+              {/* Blue Dialog Header */}
+              <DialogTitle
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid #1e62d4",
+                  py: 1.5,
+                  px: 3,
+                  background: "#1e62d4",
+                  color: "#fff"
+                }}
+              >
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                    Queries &amp; Replies
+                  </Typography>
+                  {queryChatJob?.job_no && (
+                    <Typography variant="caption" sx={{ opacity: 0.9, display: "block", mt: 0.2 }}>
+                      Job: {queryChatJob.job_no}
+                    </Typography>
+                  )}
+                </Box>
+                <IconButton
+                  onClick={() => {
+                    setQueryChatOpen(false);
+                    setQueryChatJob(null);
+                    setQueryChatData([]);
+                    setQueryChatReply("");
+                  }}
+                  size="small"
+                  sx={{ color: "#fff" }}
+                >
+                  <Close sx={{ fontSize: 20 }} />
+                </IconButton>
+              </DialogTitle>
+
+              {/* Thread selector pills if multiple queries exist */}
+              {queryChatData.length > 1 && (
+                <div style={{ display: "flex", gap: "8px", padding: "8px 12px", borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", overflowX: "auto", whiteSpace: "nowrap" }}>
+                  {queryChatData.map((q, idx) => (
+                    <button
+                      key={q._id || idx}
+                      onClick={() => setActiveQueryIndex(idx)}
+                      style={{
+                        padding: "4px 12px",
+                        borderRadius: "16px",
+                        border: "1px solid",
+                        borderColor: activeQueryIndex === idx ? "#1e62d4" : "#d1d5db",
+                        backgroundColor: activeQueryIndex === idx ? "#eff6ff" : "#fff",
+                        color: activeQueryIndex === idx ? "#1e62d4" : "#374151",
+                        fontWeight: "600",
+                        fontSize: "11px",
+                        cursor: "pointer",
+                        outline: "none",
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      {q.subject ? (q.subject.length > 22 ? `${q.subject.substring(0, 20)}...` : q.subject) : `Query ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <DialogContent sx={{ p: 0, display: "flex", flexDirection: "column", height: 500, backgroundColor: "#efeae2" }}>
+                {queryChatLoading ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", flex: 1, color: "#6b7280" }}>
+                    <CircularProgress size={28} sx={{ color: "#1e62d4", mb: 1 }} />
+                    <Typography variant="body2" sx={{ fontWeight: "500" }}>Loading conversation...</Typography>
+                  </Box>
+                ) : queryChatData.length === 0 ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, p: 3 }}>
+                    <Typography variant="body2" sx={{ color: "#9ca3af", fontStyle: "italic" }}>
+                      No queries raised for this job yet.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    {/* Client Info Banner */}
+                    {activeQuery && (
+                      <div style={{
+                        backgroundColor: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "10px 16px",
+                        margin: "12px 12px 6px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                        flexShrink: 0
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          {/* Avatar Circle */}
+                          <div style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "50%",
+                            backgroundColor: "#3f51b5",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: "700",
+                            fontSize: "15px"
+                          }}>
+                            {activeQuery.client_name ? activeQuery.client_name[0].toUpperCase() : "C"}
+                          </div>
+                          
+                          {/* Info Text */}
+                          <div>
+                            <div style={{ fontWeight: "700", fontSize: "13.5px", color: "#1f2937" }}>
+                              {activeQuery.client_name || activeQuery.client_id || "Client"}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                              {activeQuery.client_email || "no-email@client.com"}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Status Pill */}
+                        <span style={{
+                          fontSize: "10px",
+                          fontWeight: "800",
+                          padding: "3px 8px",
+                          borderRadius: "12px",
+                          textTransform: "uppercase",
+                          backgroundColor: activeQuery.status === "resolved" ? "#dcfce7" : activeQuery.status === "rejected" ? "#fee2e2" : "#fef3c7",
+                          color: activeQuery.status === "resolved" ? "#166534" : activeQuery.status === "rejected" ? "#991b1b" : "#92400e",
+                          border: `1px solid ${activeQuery.status === 'resolved' ? '#bbf7d0' : activeQuery.status === 'rejected' ? '#fecaca' : '#ffe4e6'}`
+                        }}>
+                          {activeQuery.status}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Messages Body */}
+                    <div style={{
+                      flex: 1,
+                      overflowY: "auto",
+                      padding: "10px 16px 16px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px"
+                    }}>
+                      {chatMessages.map((msg, index) => {
+                        const showDateSeparator = index === 0 || 
+                          getChatDateString(chatMessages[index - 1].createdAt) !== getChatDateString(msg.createdAt);
+                          
+                        return (
+                          <React.Fragment key={msg.id}>
+                            {showDateSeparator && (
+                              <div style={{ display: "flex", justifyContent: "center", margin: "6px 0" }}>
+                                <span style={{
+                                  backgroundColor: "#e1f3fd",
+                                  color: "#1c2d3a",
+                                  padding: "4px 12px",
+                                  borderRadius: "8px",
+                                  fontSize: "11px",
+                                  fontWeight: "600",
+                                  boxShadow: "0 1px 1px rgba(0,0,0,0.05)"
+                                }}>
+                                  {getChatDateString(msg.createdAt)}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <div style={{
+                              display: "flex",
+                              justifyContent: msg.align === "right" ? "flex-end" : "flex-start",
+                              width: "100%"
+                            }}>
+                              <div style={{
+                                maxWidth: "75%",
+                                backgroundColor: msg.align === "right" ? "#e7ffdb" : "#ffffff",
+                                borderRadius: msg.align === "right" ? "12px 0px 12px 12px" : "0px 12px 12px 12px",
+                                padding: "8px 12px",
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+                                position: "relative"
+                              }}>
+                                {/* Sender header info */}
+                                <div style={{
+                                  fontSize: "11px",
+                                  fontWeight: "700",
+                                  color: msg.align === "right" ? "#15803d" : "#3f51b5",
+                                  marginBottom: "3px"
+                                }}>
+                                  {msg.senderName} {msg.senderEmail ? `(${msg.senderEmail})` : ""} {msg.senderUsername ? `[${msg.senderUsername}]` : ""}
+                                </div>
+                                
+                                {/* Subject Header */}
+                                {msg.subject && !msg.isReply && (
+                                  <div style={{
+                                    fontWeight: "700",
+                                    fontSize: "12px",
+                                    color: "#1a237e",
+                                    marginBottom: "4px",
+                                    borderBottom: "1px solid #f0f2f5",
+                                    paddingBottom: "2px"
+                                  }}>
+                                    Subject: {msg.subject}
+                                  </div>
+                                )}
+                                
+                                {/* Message text */}
+                                <div style={{
+                                  fontSize: "13px",
+                                  color: "#1f2937",
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word"
+                                }}>
+                                  {msg.message}
+                                </div>
+                                
+                                {/* Timestamp / double ticks */}
+                                <div style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "flex-end",
+                                  gap: "4px",
+                                  marginTop: "4px"
+                                }}>
+                                  <span style={{ fontSize: "10px", color: "#6b7280" }}>
+                                    {getChatTimeString(msg.createdAt)}
+                                  </span>
+                                  {msg.align === "right" && (
+                                    <span style={{ color: "#34b7f1", fontSize: "12px", fontWeight: "700", lineHeight: 1 }}>
+                                      ✓✓
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Bottom reply area */}
+                    {activeQuery && activeQuery.status === "open" ? (
+                      <div style={{
+                        backgroundColor: "#f0f2f5",
+                        padding: "10px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        borderTop: "1px solid #e5e7eb",
+                        flexShrink: 0
+                      }}>
+                        {/* Smile Emoji Icon */}
+                        <button
+                          type="button"
+                          title="Add Emoji"
+                          style={{
+                            border: "none",
+                            background: "none",
+                            cursor: "pointer",
+                            padding: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#6b7280"
+                          }}
+                        >
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                          </svg>
+                        </button>
+
+                        {/* Rounded Pill Textfield */}
+                        <div style={{
+                          backgroundColor: "#fff",
+                          borderRadius: "24px",
+                          padding: "6px 16px",
+                          display: "flex",
+                          alignItems: "center",
+                          flex: 1,
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Type your reply here..."
+                            value={queryChatReply}
+                            onChange={(e) => setQueryChatReply(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !queryChatSending) {
+                                handleSendReply(activeQuery._id);
+                              }
+                            }}
+                            style={{
+                              border: "none",
+                              outline: "none",
+                              width: "100%",
+                              fontSize: "13px",
+                              color: "#374151"
+                            }}
+                          />
+                          
+                          {/* Attachment Icon */}
+                          <button
+                            type="button"
+                            title="Attach file"
+                            style={{
+                              border: "none",
+                              background: "none",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#6b7280",
+                              marginLeft: "8px"
+                            }}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                            </svg>
+                          </button>
+                        </div>
+
+                        {/* Send Button */}
+                        <button
+                          onClick={() => handleSendReply(activeQuery._id)}
+                          disabled={queryChatSending || !queryChatReply.trim()}
+                          style={{
+                            width: "38px",
+                            height: "38px",
+                            borderRadius: "50%",
+                            backgroundColor: "#00a884",
+                            border: "none",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            opacity: (queryChatSending || !queryChatReply.trim()) ? 0.6 : 1,
+                            transition: "all 0.15s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
+                          }}
+                        >
+                          {queryChatSending ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="22" y1="2" x2="11" y2="13"></line>
+                              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{
+                        backgroundColor: "#d1fae5",
+                        color: "#065f46",
+                        padding: "10px",
+                        textAlign: "center",
+                        fontWeight: "700",
+                        fontSize: "13px",
+                        borderTop: "1px solid #a7f3d0",
+                        flexShrink: 0
+                      }}>
+                        This query has been marked as RESOLVED.
+                      </div>
+                    )}
+                  </>
+                )}
+              </DialogContent>
+            </>
+          );
+        })()}
+      </Dialog>
+
+      {/* Raise Query Dialog */}
+      <Dialog
+        open={raiseQueryOpen}
+        onClose={() => setRaiseQueryOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #e2e8f0", py: 2 }}>
+          Raise Query for Job {raiseQueryJob?.job_no}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <TextField
+            fullWidth
+            label="Subject"
+            size="small"
+            placeholder="e.g., Missing document, Wrong weight"
+            value={raiseQuerySubject}
+            onChange={(e) => setRaiseQuerySubject(e.target.value)}
+            sx={{ mb: 2, mt: 1 }}
+          />
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Message"
+            placeholder="Write detail message..."
+            value={raiseQueryMessage}
+            onChange={(e) => setRaiseQueryMessage(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
+          <Button
+            onClick={() => setRaiseQueryOpen(false)}
+            sx={{ textTransform: "none", fontSize: "12px" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleRaiseQuerySubmit}
+            disabled={raiseQuerySending || !raiseQuerySubject.trim() || !raiseQueryMessage.trim()}
+            sx={{ textTransform: "none", fontSize: "12px", bgcolor: "#2563eb" }}
+          >
+            {raiseQuerySending ? "Submitting..." : "Submit Query"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
