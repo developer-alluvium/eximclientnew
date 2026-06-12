@@ -84,7 +84,7 @@ const StatusChip = styled(Chip)(({ theme, status }) => ({
   }),
 }));
 
-const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
+const ContainerSummaryModal = ({ open, onClose, gandhidham = false, branch = "" }) => {
   // Add gandhidham prop
   const [summaryData, setSummaryData] = useState(null);
   const [selectedYear, setSelectedYear] = useState("25-26");
@@ -154,9 +154,12 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
 
       // Use different endpoint based on gandhidham mode
       const apiEndpoint = getApiEndpoint();
-      const response = await axios.get(
-        `${apiEndpoint}?year=${year}&ie_codes=${ieCodesParam}`
-      );
+      let apiUrl = `${apiEndpoint}?year=${year}&ie_codes=${ieCodesParam}`;
+      if (branch) {
+        apiUrl += `&branchId=${encodeURIComponent(branch)}`;
+      }
+
+      const response = await axios.get(apiUrl);
 
       const data = response.data;
       if (data.success) {
@@ -181,12 +184,12 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
     fetchContainerSummary(newYear);
   };
 
-  // Fetch data when modal opens or gandhidham mode changes
+  // Fetch data when modal opens or gandhidham mode/branch changes
   useEffect(() => {
     if (open) {
       fetchContainerSummary(selectedYear);
     }
-  }, [open, gandhidham]); // Add gandhidham as dependency
+  }, [open, gandhidham, branch]); // Add gandhidham and branch as dependencies
 
   // Handle modal close
   const handleClose = () => {
@@ -545,6 +548,7 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false }) => {
         size={detailsModalSize}
         year={detailsModalYear}
         gandhidham={gandhidham} // Pass gandhidham prop to details modal too
+        branch={branch}
       />
     </Dialog>
   );

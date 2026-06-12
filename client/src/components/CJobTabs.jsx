@@ -4,6 +4,9 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import FormControl from "@mui/material/FormControl";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
 import JobList from "./CJobList";
 import ContainerSummaryModal from "./ContainerSummaryModal";
 import { useImportersContext } from "../context/importersContext";
@@ -12,6 +15,7 @@ import Typography from "@mui/material/Typography";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney"; // Added for new button
 import CurrencyRateDialog from "./CurrencyRateDialog"; // Added import for the dialog
+import axios from "axios";
 
 function CustomTabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -52,12 +56,39 @@ function CJobTabs({ gandhidham = false }) {
   const { importers } = React.useContext(useImportersContext) || {};
   const [userImporterName, setUserImporterName] = React.useState(null);
 
+  // Branch states
+  const [branches, setBranches] = React.useState([]);
+  const [selectedBranch, setSelectedBranch] = React.useState("");
+
   React.useEffect(() => {
     const parsedUser = getJsonCookie("exim_user");
     if (parsedUser && parsedUser.name) {
       setUserImporterName(parsedUser.name);
     }
   }, []);
+
+  // Fetch branches
+  React.useEffect(() => {
+    async function fetchBranches() {
+      try {
+        const baseApiUrl = process.env.REACT_APP_API_STRING || "";
+        const res = await axios.get(`${baseApiUrl}/get-branches`);
+        setBranches(res.data || []);
+      } catch (error) {
+        console.error("Error fetching branches in CJobTabs:", error);
+      }
+    }
+    fetchBranches();
+  }, []);
+
+  // Lock selected branch to GIM if gandhidham mode is on
+  React.useEffect(() => {
+    if (gandhidham) {
+      setSelectedBranch("GIM");
+    } else {
+      setSelectedBranch("");
+    }
+  }, [gandhidham]);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -124,7 +155,32 @@ function CJobTabs({ gandhidham = false }) {
         </Tabs>
 
         {/* Action Buttons */}
-        <Box sx={{ display: "flex", gap: 1.5 }}>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+          {!gandhidham && branches.length > 0 && (
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <Select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                displayEmpty
+                sx={{
+                  borderRadius: 2,
+                  fontSize: "0.8rem",
+                  height: 36,
+                  "& .MuiSelect-select": {
+                    py: 1,
+                  }
+                }}
+              >
+                <MenuItem value="">All Branches</MenuItem>
+                {branches.map((b) => (
+                  <MenuItem key={b.branch_code} value={b.branch_code}>
+                    {b.branch_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
           <Button
             variant="outlined"
             size="small"
@@ -174,13 +230,13 @@ function CJobTabs({ gandhidham = false }) {
       </Box>
 
       <CustomTabPanel value={value} index={0}>
-        <JobList status="Pending" gandhidham={gandhidham} />
+        <JobList status="Pending" gandhidham={gandhidham} branch={selectedBranch} />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={1}>
-        <JobList status="Completed" gandhidham={gandhidham} />
+        <JobList status="Completed" gandhidham={gandhidham} branch={selectedBranch} />
       </CustomTabPanel>
       <CustomTabPanel value={value} index={2}>
-        <JobList status="Cancelled" gandhidham={gandhidham} />
+        <JobList status="Cancelled" gandhidham={gandhidham} branch={selectedBranch} />
       </CustomTabPanel>
 
       {/* Container Summary Modal */}
@@ -188,6 +244,7 @@ function CJobTabs({ gandhidham = false }) {
         open={containerSummaryOpen}
         onClose={handleContainerSummaryClose}
         gandhidham={gandhidham}
+        branch={selectedBranch}
       />
 
       {/* --- New Currency Rate Dialog --- */}

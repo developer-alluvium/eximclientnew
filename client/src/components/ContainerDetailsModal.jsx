@@ -88,6 +88,7 @@ const ContainerDetailsModal = ({
   size,
   year,
   gandhidham = false,
+  branch = "",
 }) => {
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -149,9 +150,12 @@ const ContainerDetailsModal = ({
 
       // Use different endpoint based on gandhidham mode
       const apiEndpoint = getApiEndpoint();
-      const response = await axios.get(
-        `${apiEndpoint}?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`
-      );
+      let apiUrl = `${apiEndpoint}?year=${year}&status=${status}&ie_codes=${ieCodesParam}${sizeParam}`;
+      if (branch) {
+        apiUrl += `&branchId=${encodeURIComponent(branch)}`;
+      }
+
+      const response = await axios.get(apiUrl);
 
       const data = response.data;
       if (data.success) {
@@ -252,12 +256,12 @@ const ContainerDetailsModal = ({
     groupContainers(containers, newGroupBy);
   };
 
-  // Fetch data when modal opens or gandhidham mode changes
+  // Fetch data when modal opens or gandhidham mode/branch changes
   useEffect(() => {
     if (open && status && year) {
       fetchContainerDetails();
     }
-  }, [open, status, year, size, gandhidham]);
+  }, [open, status, year, size, gandhidham, branch]);
 
   // Update grouping when containers or groupBy changes
   useEffect(() => {

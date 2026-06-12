@@ -129,6 +129,7 @@ function CJobList(props) {
                       importer: selectedImporter,
                       year: selectedYear,
                       status: props.status || "all",
+                      branch: props.branch,
                   },
               });
               
@@ -142,7 +143,7 @@ function CJobList(props) {
           }
       }
       fetchExporters();
-  }, [selectedImporter, selectedYear, props.status, props.gandhidham]);
+  }, [selectedImporter, selectedYear, props.status, props.gandhidham, props.branch]);
 
   // Reset Exporter on change
   useEffect(() => {
@@ -238,7 +239,8 @@ function CJobList(props) {
       selectedImporter,
       selectedExporter,
       custom_house,
-      props.gandhidham
+      props.gandhidham,
+      props.branch
   );
 
   // Fetch Years

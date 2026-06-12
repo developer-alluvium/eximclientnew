@@ -231,6 +231,39 @@ const AdminManagement = ({ onRefresh }) => {
   const [tempAssignedUserIds, setTempAssignedUserIds] = useState([]);
   const [adminUserSearchQuery, setAdminUserSearchQuery] = useState("");
 
+  // Drag scroll for main user table
+  const tableContainerRef = React.useRef(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+
+  const handleMouseDown = (e) => {
+    const isInteractive = e.target.closest('button, input, select, textarea, a, [role="button"], .MuiChip-root, .MuiAvatar-root');
+    if (isInteractive || !tableContainerRef.current) return;
+    setIsMouseDown(true);
+    setStartX(e.pageX - tableContainerRef.current.offsetLeft);
+    setScrollLeftState(tableContainerRef.current.scrollLeft);
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+    document.body.style.userSelect = 'auto';
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+    document.body.style.userSelect = 'auto';
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isMouseDown || !tableContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - tableContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // multiplier for scroll speed
+    tableContainerRef.current.scrollLeft = scrollLeftState - walk;
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -1285,7 +1318,20 @@ const AdminManagement = ({ onRefresh }) => {
             </Typography>
           </Alert>
 
-          <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: "auto" }}>
+          <TableContainer
+            ref={tableContainerRef}
+            component={Paper}
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+            sx={{
+              borderRadius: 2,
+              overflowX: "auto",
+              cursor: isMouseDown ? "grabbing" : "grab",
+              userSelect: isMouseDown ? "none" : "auto",
+            }}
+          >
             <Table stickyHeader>
               <TableHead>
                 <TableRow>

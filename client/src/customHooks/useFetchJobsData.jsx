@@ -70,7 +70,8 @@ function useFetchJobsData(
   selectedImporter,
   selectedExporter = "all",
   custom_house = "all",
-  gandhidham = false
+  gandhidham = false,
+  branch = ""
 ) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -163,6 +164,9 @@ function useFetchJobsData(
         if (formattedExporter) {
           apiUrl += `&exporter=${formattedExporter}`;
         }
+        if (branch) {
+          apiUrl += `&branch=${encodeURIComponent(branch)}`;
+        }
 
         console.log("Fetching jobs data with IE codes from:", apiUrl);
 
@@ -225,6 +229,10 @@ function useFetchJobsData(
         }`;
       }
 
+      if (branch) {
+        apiUrl += `&branch=${encodeURIComponent(branch)}`;
+      }
+
       console.log("Fetching jobs data from fallback endpoint:", apiUrl);
 
       const response = await axios.get(apiUrl);
@@ -258,6 +266,7 @@ function useFetchJobsData(
       selectedImporter,
       selectedExporter,
       custom_house,
+      branch,
     });
 
     // Always attempt to fetch if we have the year
@@ -273,6 +282,7 @@ function useFetchJobsData(
     selectedImporter,
     selectedExporter,
     custom_house,
+    branch,
   ]);
 
   // Handle manual page change

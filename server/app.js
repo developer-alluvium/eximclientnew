@@ -7,7 +7,6 @@ import cookieParser from "cookie-parser";
 import axios from "axios";
 import connectDB from "./config/db.js";
 import config from "./config/env.js";
-import jobRoutes from "./routes/jobRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import deliveryRoutes from "./routes/deliveryRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
@@ -35,6 +34,7 @@ import icegateProxy from "./routes/icegateProxy.js";
 import currencyRate from "./routes/currencyRate.js";
 import transportRoutes from "./routes/transportRoutes.js"; // Transport module routes
 import exportProxyRoutes from "./routes/exportProxyRoutes.js"; // Export module proxy routes
+import importProxyRoutes from "./routes/importProxyRoutes.js"; // Import module proxy routes
 import transportAuthService from "./services/transportAuthService.js";
 // Load environment variables
 dotenv.config();
@@ -112,7 +112,6 @@ connectDB()
   });
 
 // Routes
-app.use(jobRoutes);
 app.use(customerRoutes);
 app.use(deliveryRoutes);
 app.use(analyticsRoutes);
@@ -133,6 +132,7 @@ app.use(icegateProxy);
 app.use(currencyRate);
 app.use("/api/transport", transportRoutes);
 app.use(exportProxyRoutes); // Export module proxy routes
+app.use(importProxyRoutes); // Import module proxy routes
 app.use(analytics);
 
 app.use("/api/elock", elockRoutes);

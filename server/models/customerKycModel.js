@@ -126,5 +126,5 @@ const customerKycSchema = new mongoose.Schema(
   }
 );
 
-const CustomerKycModel = mongoose.model("customerKyc", customerKycSchema);
+const CustomerKycModel = mongoose.model("customerKyc", customerKycSchema, "customerkycsimp");
 export default CustomerKycModel;

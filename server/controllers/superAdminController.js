@@ -5,11 +5,13 @@ import CustomerModel from "../models/customerModel.js";
 import JobModel from "../models/jobModel.js";
 import Notification from "../models/notificationModel.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
+import axios from "axios";
 
 import jwt from "jsonwebtoken";
 import CustomerKycModel from "../models/customerKycModel.js";
 
 // Environment variables
+const IMPORT_API_BASE_URL = process.env.IMPORT_API_BASE_URL || "http://localhost:9006/api";
 const JWT_SECRET = process.env.JWT_ACCESS_SECRET || "your-secret-key";
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "12h";
 // Get tab visibility for a customer
@@ -1631,48 +1633,24 @@ export const getAvailableIecCodes = async (req, res) => {
         .json({ success: false, message: "Authentication required." });
     }
 
-    // Build query based on user role
-    let query = { iec_no: { $exists: true, $nin: [null, ""] } };
-
-    // Security Check for Admins - can only see their own IEC code
-    if (actor.role === "admin") {
-      query.iec_no = actor.ie_code_no;
-    }
-
-    // Add search functionality
     const { search } = req.query;
-    if (search && search.trim() !== "") {
-      const searchRegex = new RegExp(search.trim(), "i");
-      query.$or = [
-        { iec_no: searchRegex },
-        { name_of_individual: searchRegex },
-      ];
-    }
 
-    const iecCodes = await CustomerKycModel.find(query)
-      .select("iec_no name_of_individual status approval")
-      .sort({ name_of_individual: 1 });
-
-    const formattedData = iecCodes.map((kyc) => ({
-      iecNo: kyc.iec_no,
-      importerName: kyc.name_of_individual,
-      status: kyc.status,
-      approval: kyc.approval,
-      id: kyc._id,
-    }));
-
-    res.json({
-      success: true,
-      data: formattedData,
-      message: `Found ${formattedData.length} IEC codes`,
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/available-iec-codes`, {
+      params: {
+        search,
+        role: actor.role,
+        ie_code_no: actor.ie_code_no || actor.assignedIeCode
+      },
+      headers: { username: "Admin" },
+      timeout: 15000,
     });
+
+    res.json(response.data);
   } catch (error) {
-    console.error("Get available IEC codes error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get available IEC codes.",
-      error: error.message,
-    });
+    console.error("Proxy getAvailableIecCodes error:", error.message);
+    res.status(error.response?.status || 500).json(
+      error.response?.data || { success: false, message: "Failed to get available IEC codes from third-party API." }
+    );
   }
 };
 
