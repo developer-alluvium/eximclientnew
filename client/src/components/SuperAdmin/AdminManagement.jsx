@@ -189,7 +189,7 @@ const AdminManagement = ({ onRefresh }) => {
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [adminAction, setAdminAction] = useState(""); // 'promote', 'demote'
   const [statusAction, setStatusAction] = useState(""); // 'activate', 'deactivate'
-  const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false);
+  const [tabVisibilityDialog, setTabVisibilityDialog] = useState(false); // kept for legacy but unused
 
   // IE Code selection states — separate arrays for import and export modules
   const [selectedUserModules, setSelectedUserModules] = useState([]);
@@ -199,10 +199,7 @@ const AdminManagement = ({ onRefresh }) => {
   // Search states
   const [userSearch, setUserSearch] = useState({ value: "", options: [] });
   const [ieCodeSearch, setIeCodeSearch] = useState({ value: "", options: [] }); // New IE Code search
-  const [tabSettings, setTabSettings] = useState({
-    jobsTabVisible: false,
-    gandhidhamTabVisible: false,
-  });
+
 
   // IE Code selection states — separate per module
   const [availableIeCodes, setAvailableIeCodes] = useState([]);
@@ -219,7 +216,7 @@ const AdminManagement = ({ onRefresh }) => {
 
   // Enterprise Actions Modal state
   const [actionsMenuUser, setActionsMenuUser] = useState(null);
-  const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Tab Visibility, 5: Branches
+  const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Branch Access
 
   // Branch Assignments
   const [selectedBranches, setSelectedBranches] = useState([]);
@@ -808,52 +805,6 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-  const handleUpdateTabVisibility = async () => {
-    if (!selectedEntity) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const superadminToken = getCookie("superadmin_token");
-      if (!superadminToken) {
-        setError("SuperAdmin authentication required. Please login again.");
-        return;
-      }
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${superadminToken}`,
-          "Content-Type": "application/json",
-        },
-        withCredentials: true,
-      };
-
-      const endpoint = `${process.env.REACT_APP_API_STRING}/user-management/superadmin/user/${selectedEntity._id}/tab-visibility`;
-      const data = tabSettings;
-
-      const response = await axios.patch(endpoint, data, config);
-
-      if (response.data.success) {
-        setSuccess(
-          `Tab visibility for ${selectedEntity.name} updated successfully.`
-        );
-        fetchData();
-        setTabVisibilityDialog(false);
-      }
-    } catch (error) {
-      console.error("Error updating tab visibility:", error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError("SuperAdmin authentication expired. Please login again.");
-      } else {
-        setError(
-          error.response?.data?.message || "Failed to update tab visibility"
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveAdminAssignment = async () => {
     try {
@@ -936,14 +887,7 @@ const AdminManagement = ({ onRefresh }) => {
     setBulkModuleDialog(true);
   };
 
-  const openTabVisibilityDialog = (user) => {
-    setSelectedEntity(user);
-    setTabSettings({
-      jobsTabVisible: user.jobsTabVisible || false,
-      gandhidhamTabVisible: user.gandhidhamTabVisible || false,
-    });
-    setTabVisibilityDialog(true);
-  };
+
 
   // IE Code dialog opener
   const openIeCodeDialog = (user, isRemoving = false) => {
@@ -1335,7 +1279,7 @@ const AdminManagement = ({ onRefresh }) => {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  {["User", "Email", "IE Code", "Importer", "Role", "Status", "Modules", "Tab Visibility", "Actions"].map((col) => (
+                  {["User", "Email", "IE Code", "Importer", "Role", "Status", "Modules", "Actions"].map((col) => (
                     <TableCell
                       key={col}
                       sx={{
@@ -1486,18 +1430,6 @@ const AdminManagement = ({ onRefresh }) => {
                         )}
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ py: 1.2, px: 2 }}>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: user.jobsTabVisible ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "0.72rem", color: user.jobsTabVisible ? "#15803d" : "#9ca3af", fontWeight: user.jobsTabVisible ? 600 : 400 }}>Jobs</Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
-                          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: user.gandhidhamTabVisible ? "#16a34a" : "#d1d5db", flexShrink: 0 }} />
-                          <Typography sx={{ fontSize: "0.72rem", color: user.gandhidhamTabVisible ? "#15803d" : "#9ca3af", fontWeight: user.gandhidhamTabVisible ? 600 : 400 }}>Gandhidham</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
                     <TableCell>
                       <Button
                         size="small"
@@ -1507,10 +1439,6 @@ const AdminManagement = ({ onRefresh }) => {
                           setActionsTab(0);
                           setSelectedEntity(user);
                           setSelectedUserModules(user.assignedModules || []);
-                          setTabSettings({
-                            jobsTabVisible: user.jobsTabVisible || false,
-                            gandhidhamTabVisible: user.gandhidhamTabVisible || false,
-                          });
                           setSelectedIeCodes([]);
                           setSelectedExporterIeCodes([]);
                           setIeCodeReason("");
@@ -1668,8 +1596,7 @@ const AdminManagement = ({ onRefresh }) => {
               { idx: 1, icon: <ToggleOn sx={{ fontSize: 18 }} />, label: "Status", desc: actionsMenuUser?.isActive ? "Active" : "Inactive" },
               { idx: 2, icon: <Assignment sx={{ fontSize: 18 }} />, label: "Modules", desc: `${(actionsMenuUser?.assignedModules || []).length} assigned` },
               { idx: 3, icon: <AdminPanelSettings sx={{ fontSize: 18 }} />, label: "Role", desc: actionsMenuUser?.role === "admin" ? "Admin" : "User" },
-              { idx: 4, icon: <Apps sx={{ fontSize: 18 }} />, label: "Tab Visibility", desc: "Jobs & Gandhidham" },
-              { idx: 5, icon: <Business sx={{ fontSize: 18 }} />, label: "Branch Access", desc: `${(actionsMenuUser?.selected_branches || []).length} branches` },
+              { idx: 4, icon: <Business sx={{ fontSize: 18 }} />, label: "Branch Access", desc: `${(actionsMenuUser?.selected_branches || []).length} branches` },
             ].map(({ idx, icon, label, desc }) => (
               <Box
                 key={idx}
@@ -2244,47 +2171,8 @@ const AdminManagement = ({ onRefresh }) => {
               </Box>
             )}
 
-            {/* Panel 4: Tab Visibility */}
+            {/* Panel 4: Branch Access */}
             {actionsTab === 4 && (
-              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
-                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Tab Visibility</Typography>
-                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Control which navigation tabs are visible to this user in their dashboard.</Typography>
-                </Box>
-
-                {[{ key: "jobsTabVisible", label: "Jobs Tab", desc: "Show or hide the Jobs navigation tab" }, { key: "gandhidhamTabVisible", label: "Gandhidham Tab", desc: "Show or hide the Gandhidham navigation tab" }].map(({ key, label, desc }) => (
-                  <Box key={key}
-                    sx={{ border: `1.5px solid ${tabSettings[key] ? "#bbf7d0" : "#e2e8f0"}`, borderRadius: 2.5, p: 2.5, bgcolor: tabSettings[key] ? "#f0fdf4" : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.2s" }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                      <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: tabSettings[key] ? "#dcfce7" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>
-                        <Apps sx={{ color: tabSettings[key] ? "#16a34a" : "#94a3b8", fontSize: 22 }} />
-                      </Box>
-                      <Box>
-                        <Typography sx={{ fontWeight: 700, fontSize: "0.88rem", color: "#0f172a" }}>{label}</Typography>
-                        <Typography sx={{ fontSize: "0.73rem", color: "#64748b", mt: 0.2 }}>{desc}</Typography>
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <Chip label={tabSettings[key] ? "Visible" : "Hidden"} size="small" color={tabSettings[key] ? "success" : "default"} variant="outlined" sx={{ fontWeight: 600, fontSize: "0.72rem" }} />
-                      <Switch checked={tabSettings[key]} onChange={(e) => setTabSettings(prev => ({ ...prev, [key]: e.target.checked }))} color="success" />
-                    </Box>
-                  </Box>
-                ))}
-
-                <Box sx={{ mt: "auto" }}>
-                  <Button variant="contained" fullWidth disabled={loading} startIcon={<Apps />}
-                    onClick={async () => { await handleUpdateTabVisibility(); setActionsMenuUser(null); setActionsTab(0); }}
-                    sx={{ bgcolor: "#16a34a", borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, fontSize: "0.88rem", "&:hover": { bgcolor: "#15803d" } }}
-                  >
-                    {loading ? "Saving..." : "Save Tab Visibility Settings"}
-                  </Button>
-                </Box>
-              </Box>
-            )}
-
-            {/* Panel 5: Branch Access */}
-            {actionsTab === 5 && (
               <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
                 <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
                   <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Branch Access Control</Typography>
@@ -2843,65 +2731,6 @@ const AdminManagement = ({ onRefresh }) => {
             startIcon={<GroupWork />}
           >
             Assign to {bulkSelectedUsers.length} Users
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Tab Visibility Dialog */}
-      <Dialog
-        open={tabVisibilityDialog}
-        onClose={() => setTabVisibilityDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Manage Tab Visibility for {selectedEntity?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Control which data tabs are visible to this specific user.
-          </Typography>
-          <Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={tabSettings.jobsTabVisible}
-                  onChange={(e) =>
-                    setTabSettings((prev) => ({
-                      ...prev,
-                      jobsTabVisible: e.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Jobs Tab Visibility"
-            />
-          </Box>
-          <Box sx={{ mt: 1 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={tabSettings.gandhidhamTabVisible}
-                  onChange={(e) =>
-                    setTabSettings((prev) => ({
-                      ...prev,
-                      gandhidhamTabVisible: e.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Gandhidham Tab Visibility"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTabVisibilityDialog(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleUpdateTabVisibility}
-            disabled={loading}
-          >
-            Save Settings
           </Button>
         </DialogActions>
       </Dialog>

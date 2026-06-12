@@ -4,7 +4,7 @@ import Tab from "@mui/material/Tab";
 import { Box, Typography } from "@mui/material";
 import "../styles/import-dsr.scss";
 import axios from "axios";
-import { getJsonCookie } from "../utils/cookies";
+
 import { SelectedYearContext } from "../context/SelectedYearContext";
 import Snackbar from "@mui/material/Snackbar";
 import useTabs from "../customHooks/useTabs";
@@ -41,50 +41,11 @@ function CImportDSR() {
     });
   };
 
-  // Get tab visibility from localStorage
-  const [tabVisibility, setTabVisibility] = React.useState({
-    analyticsTabVisible: true,
-    jobsTabVisible: true,
-    gandhidhamTabVisible: false,
-  });
-
-  React.useEffect(() => {
-    const parsedUser = getJsonCookie("exim_user");
-    if (parsedUser) {
-      try {
-        setTabVisibility({
-          analyticsTabVisible:
-            parsedUser.analyticsTabVisible !== undefined
-              ? parsedUser.analyticsTabVisible
-              : true,
-          jobsTabVisible:
-            parsedUser.jobsTabVisible !== undefined
-              ? parsedUser.jobsTabVisible
-              : true,
-          gandhidhamTabVisible:
-            parsedUser.gandhidhamTabVisible !== undefined
-              ? parsedUser.gandhidhamTabVisible
-              : false,
-        });
-      } catch (e) {
-        setTabVisibility({
-          analyticsTabVisible: true,
-          jobsTabVisible: true,
-          gandhidhamTabVisible: false,
-        });
-      }
-    }
-  }, []);
-
-  // Tabs config
-  const visibleTabs = [];
-
-  // if (tabVisibility.analyticsTabVisible)
-  //   visibleTabs.push({ label: "Dashboard", key: "analytics" });
-  if (tabVisibility.jobsTabVisible)
-    visibleTabs.push({ label: "Jobs", key: "jobs" });
-  if (tabVisibility.gandhidhamTabVisible)
-    visibleTabs.push({ label: "Gandhidham", key: "gandhidham" });
+  // Both tabs always visible — Tab Visibility replaced by Branch Management
+  const visibleTabs = [
+    { label: "Jobs", key: "jobs" },
+    // { label: "Gandhidham", key: "gandhidham" },
+  ];
 
   return (
     <Box

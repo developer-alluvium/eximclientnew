@@ -41,23 +41,9 @@ const { Title: AntTitle, Text: AntText } = AntTypography;
 const NetPage = () => {
   // Tabs for Jobs/Gandhidham
 
-  const userDataFromStorage = getJsonCookie("exim_user");
-  const getTabVisibility = () => {
-    if (userDataFromStorage) {
-      try {
-        const parsedUser = userDataFromStorage;
-        return {
-          showJobsTab: !!parsedUser?.jobsTabVisible,
-          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
-        };
-      } catch {
-        return { showJobsTab: true, showGandhidhamTab: true };
-      }
-    }
-    return { showJobsTab: true, showGandhidhamTab: true };
-  };
-
-  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
+  // Both Jobs and Gandhidham tabs are always visible — Tab Visibility removed
+  const showJobsTab = true;
+  const showGandhidhamTab = true;
   const { user, setUser } = useContext(UserContext);
   const navigate = useNavigate();
   const years = ["25-26", "24-25"];

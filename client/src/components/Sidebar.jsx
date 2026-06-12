@@ -31,24 +31,7 @@ import {
 const drawerWidth = 280;
 
 const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
-  // Tab visibility logic from cookies
-  const getTabVisibility = () => {
-    const userDataFromStorage = getJsonCookie("exim_user");
-    if (userDataFromStorage) {
-      try {
-        const parsedUser = userDataFromStorage;
-        return {
-          showJobsTab: !!parsedUser?.jobsTabVisible,
-          showGandhidhamTab: !!parsedUser?.gandhidhamTabVisible,
-        };
-      } catch {
-        return { showJobsTab: true, showGandhidhamTab: true };
-      }
-    }
-    return { showJobsTab: true, showGandhidhamTab: true };
-  };
-
-  const { showJobsTab, showGandhidhamTab } = getTabVisibility();
+  // Both Jobs and Gandhidham tabs are always visible — Tab Visibility removed
   const [selectedView, setSelectedView] = useState("jobs"); // "jobs" or "gandhidham"
   // If initial job counts are provided, use them, otherwise default to zeros
   const [jobCounts, setJobCounts] = useState(initialJobCounts || [0, 0, 0, 0]);
@@ -143,19 +126,10 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
           // .replace(/\]/g, "")
           // .replace(/,/g, "");
 
-          let apiUrl = "";
-          if (showJobsTab && !showGandhidhamTab) {
-            apiUrl = `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
-          } else if (!showJobsTab && showGandhidhamTab) {
-            apiUrl = `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
-          } else if (showJobsTab && showGandhidhamTab) {
-            apiUrl =
-              selectedView === "jobs"
-                ? `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
-                : `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
-          }
-
-          if (!apiUrl) return;
+          const apiUrl =
+            selectedView === "jobs"
+              ? `${process.env.REACT_APP_API_STRING}/get-importer-jobs/${sanitizedImporter}/${selectedYear}`
+              : `${process.env.REACT_APP_API_STRING}/gandhidham/get-importer-jobs/${sanitizedImporter}/${selectedYear}`;
 
           const res = await axios.get(apiUrl);
           if (res.data && Array.isArray(res.data) && res.data.length === 4) {
@@ -171,14 +145,7 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
       }
     }
     getImporterData();
-  }, [
-    selectedImporter,
-    selectedYear,
-    setParentJobCounts,
-    showJobsTab,
-    showGandhidhamTab,
-    selectedView,
-  ]);
+  }, [selectedImporter, selectedYear, setParentJobCounts, selectedView]);
 
   // Handle year change
   const handleYearChange = (event) => {
@@ -215,22 +182,20 @@ const Sidebar = ({ setParentJobCounts, initialJobCounts }) => {
           Job Analytics
         </Typography>
 
-        {/* Dropdown/toggle for jobs/gandhidham if both are visible */}
-        {showJobsTab && showGandhidhamTab && (
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Select View
-            </Typography>
-            <Select
-              value={selectedView}
-              onChange={(e) => setSelectedView(e.target.value)}
-              size="small"
-            >
-              <MenuItem value="jobs">Jobs</MenuItem>
-              <MenuItem value="gandhidham">Gandhidham Jobs</MenuItem>
-            </Select>
-          </FormControl>
-        )}
+        {/* Toggle between Jobs / Gandhidham analytics */}
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Select View
+          </Typography>
+          <Select
+            value={selectedView}
+            onChange={(e) => setSelectedView(e.target.value)}
+            size="small"
+          >
+            <MenuItem value="jobs">Jobs</MenuItem>
+            <MenuItem value="gandhidham">Gandhidham Jobs</MenuItem>
+          </Select>
+        </FormControl>
 
         {/* Year Selection */}
         {years.length > 0 && (

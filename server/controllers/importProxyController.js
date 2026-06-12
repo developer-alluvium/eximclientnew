@@ -20,19 +20,23 @@ const escapeRegex = (string) => {
 };
 
 // Dynamic branch resolver from database
-const getBranchIdByCodeOrQuery = async (branchQuery) => {
+const getBranchIdByCodeOrQuery = async (branchQuery, category = null) => {
   if (!branchQuery) return null;
   if (mongoose.Types.ObjectId.isValid(branchQuery)) {
     return new mongoose.Types.ObjectId(branchQuery);
   }
   try {
     const branchesCol = mongoose.connection.db.collection("branches");
-    const branch = await branchesCol.findOne({
+    const query = {
       $or: [
         { branch_code: branchQuery.toUpperCase().trim() },
         { branch_name: new RegExp(`^${branchQuery.trim()}$`, "i") }
       ]
-    });
+    };
+    if (category) {
+      query.category = category.toUpperCase().trim();
+    }
+    const branch = await branchesCol.findOne(query);
     return branch ? branch._id : null;
   } catch (err) {
     console.error("Error looking up branch:", err);
@@ -51,7 +55,7 @@ export const getImporterJobCounts = async (req, res) => {
 
     const params = {};
     if (isGandhidham) {
-      const gimBranchId = await getBranchIdByCodeOrQuery("GIM");
+      const gimBranchId = await getBranchIdByCodeOrQuery("GIM", "SEA");
       if (gimBranchId) {
         params.branchId = gimBranchId.toString();
       }
@@ -61,7 +65,7 @@ export const getImporterJobCounts = async (req, res) => {
       `${IMPORT_API_BASE_URL}/get-importer-jobs/${encodeURIComponent(importerURL)}/${encodeURIComponent(year)}`,
       {
         params,
-        headers: { username: "Admin" },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 15000,
       }
     );
@@ -85,7 +89,7 @@ export const getJobByNumber = async (req, res) => {
       `${IMPORT_API_BASE_URL}/${encodeURIComponent(year)}/jobs/all/all/all/all`,
       {
         params: { search: jobNo, limit: 100 },
-        headers: { username: "Admin" },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 20000,
       }
     );
@@ -111,7 +115,7 @@ export const getJobByNumber = async (req, res) => {
  */
 export const proxyImportListing = async (req, res) => {
   try {
-    const { year, status, detailedStatus, customHouse = "all", importer = "all" } = req.params;
+    const { year, status, detailedStatus, customHouse = "all", importer: paramImporter = "all" } = req.params;
     const isGandhidham = req.path.includes("/gandhidham/");
 
     const {
@@ -121,7 +125,10 @@ export const proxyImportListing = async (req, res) => {
       exporter = "",
       branchId: queryBranchId,
       branch: queryBranch,
+      importer: queryImporter,
     } = req.query;
+
+    const importer = queryImporter || paramImporter || "all";
 
     const user = req.user;
     if (!user) {
@@ -158,13 +165,33 @@ export const proxyImportListing = async (req, res) => {
       exporter,
     };
 
+    // Check if branch filter is a special mode selector (Sea / Air only, no branch restriction)
+    const SEA_MODE_KEY = "__SEA__";
+    const AIR_MODE_KEY = "__AIR__";
+    const branchFilterQuery = queryBranchId || queryBranch;
+    const isModeOnlyFilter = branchFilterQuery === SEA_MODE_KEY || branchFilterQuery === AIR_MODE_KEY;
+
+    // Check if composite "BRANCHCODE:CATEGORY" key (e.g. "AHM:SEA" or "AHM:AIR")
+    const isCompositeKey = branchFilterQuery && branchFilterQuery.includes(":");
+    let compositeCode = null;
+    let compositeCategory = null;
+    if (isCompositeKey) {
+      [compositeCode, compositeCategory] = branchFilterQuery.split(":");
+    }
+
+    const isModeFilter = isModeOnlyFilter || isCompositeKey;
+
     // If a branch is specified in the filter, resolve its branch ID
     let resolvedBranchId = null;
-    const branchFilterQuery = queryBranchId || queryBranch;
-    if (branchFilterQuery) {
-      resolvedBranchId = await getBranchIdByCodeOrQuery(branchFilterQuery);
-    } else if (isGandhidham) {
-      resolvedBranchId = await getBranchIdByCodeOrQuery("GIM");
+    if (!isModeFilter) {
+      if (branchFilterQuery) {
+        resolvedBranchId = await getBranchIdByCodeOrQuery(branchFilterQuery);
+      } else if (isGandhidham) {
+        resolvedBranchId = await getBranchIdByCodeOrQuery("GIM", "SEA");
+      }
+    } else if (isCompositeKey && compositeCode) {
+      // For composite keys, still resolve branch ID to pass to the backend for filtering
+      resolvedBranchId = await getBranchIdByCodeOrQuery(compositeCode, compositeCategory);
     }
 
     if (resolvedBranchId) {
@@ -177,7 +204,7 @@ export const proxyImportListing = async (req, res) => {
 
     const response = await axios.get(targetUrl, {
       params: forwardParams,
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 30000,
     });
 
@@ -192,24 +219,43 @@ export const proxyImportListing = async (req, res) => {
       });
     }
 
-    // Filter by branch code dynamically in-memory
-    let filterBranchCode = null;
-    if (resolvedBranchId) {
-      const branchesCol = mongoose.connection.db.collection("branches");
-      const branchDoc = await branchesCol.findOne({ _id: resolvedBranchId });
-      if (branchDoc) {
-        filterBranchCode = branchDoc.branch_code;
-      }
-    } else if (isGandhidham) {
-      filterBranchCode = "GIM";
-    }
-
-    if (filterBranchCode) {
+    // Apply mode filter (Sea / Air) in-memory
+    if (isModeOnlyFilter) {
+      const modeValue = branchFilterQuery === SEA_MODE_KEY ? "sea" : "air";
       jobs = jobs.filter((j) => {
-        const jCode = (j.branch_code || "").toUpperCase().trim();
-        const jInfoCode = (j.branch_info?.branch_code || "").toUpperCase().trim();
-        return jCode === filterBranchCode || jInfoCode === filterBranchCode;
+        // j.mode stores the transport mode, falling back to type_of_b_e if missing
+        const jobMode = (j.mode || j.type_of_b_e || "").toLowerCase();
+        return jobMode === modeValue;
       });
+    } else if (isCompositeKey) {
+      // Filter by both branch code AND transport mode
+      const filterCode = (compositeCode || "").toUpperCase().trim();
+      const filterMode = (compositeCategory || "SEA").toLowerCase();
+      jobs = jobs.filter((j) => {
+        const jCode = (j.branch_code || j.branch_info?.branch_code || "").toUpperCase().trim();
+        const jMode = (j.mode || j.type_of_b_e || "").toLowerCase();
+        return jCode === filterCode && jMode === filterMode;
+      });
+    } else {
+      // Filter by branch code dynamically in-memory
+      let filterBranchCode = null;
+      if (resolvedBranchId) {
+        const branchesCol = mongoose.connection.db.collection("branches");
+        const branchDoc = await branchesCol.findOne({ _id: resolvedBranchId });
+        if (branchDoc) {
+          filterBranchCode = branchDoc.branch_code;
+        }
+      } else if (isGandhidham) {
+        filterBranchCode = "GIM";
+      }
+
+      if (filterBranchCode) {
+        jobs = jobs.filter((j) => {
+          const jCode = (j.branch_code || "").toUpperCase().trim();
+          const jInfoCode = (j.branch_info?.branch_code || "").toUpperCase().trim();
+          return jCode === filterBranchCode || jInfoCode === filterBranchCode;
+        });
+      }
     }
 
     // Specific importer filter from route param
@@ -254,6 +300,7 @@ export const updateJob = async (req, res) => {
       headers: {
         username: req.headers["username"] || "Admin",
         "x-username": req.headers["x-username"] || "Admin",
+        "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET
       },
       timeout: 15000,
     });
@@ -286,6 +333,7 @@ export const updateContainerTransporter = async (req, res) => {
       headers: {
         username: req.headers["username"] || "Admin",
         "x-username": req.headers["x-username"] || "Admin",
+        "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET
       },
       timeout: 15000,
     });
@@ -309,7 +357,7 @@ export const getContainerSummary = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/container-summary`, {
       params: { year, ie_codes, branchId: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -333,7 +381,7 @@ export const getContainerDetails = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/container-details`, {
       params: { year, status, size, ie_codes, branchId: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -355,9 +403,16 @@ export const getExporters = async (req, res) => {
     const isGandhidham = req.path.includes("/gandhidham/");
     const targetBranch = branch || (isGandhidham ? "GIM" : undefined);
 
+    // When no specific importer is given (e.g., "All Importers" or admin user),
+    // pass a wildcard regex so the target returns exporters for all importers.
+    const importerParam =
+      !importer || importer === "All Importers" || importer === "all"
+        ? ".*"
+        : importer;
+
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-exporters`, {
-      params: { importer, year, status, branch: targetBranch },
-      headers: { username: "Admin" },
+      params: { importer: importerParam, year, status, branch: targetBranch },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -375,7 +430,7 @@ export const getExporters = async (req, res) => {
 export const getYears = async (req, res) => {
   try {
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-years`, {
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 10000,
     });
     res.json(response.data);
@@ -426,7 +481,7 @@ export const getJobNumbersByMultipleIECodes = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-job-numbers/multiple`, {
       params: { ieCodes, year, search, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -450,7 +505,7 @@ export const getBeNumbersByMultipleIECodes = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-be-numbers/multiple`, {
       params: { ieCodes, year, search, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -485,7 +540,7 @@ export const lookup = async (req, res) => {
 
     const response = await axios.get(url, {
       params: { ie_code_nos, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -510,7 +565,7 @@ export const storeCalculatorData = async (req, res) => {
 
     const response = await axios.post(`${IMPORT_API_BASE_URL}/store-calculator-data/${encodeURIComponent(jobNo)}`, req.body, {
       params: { year, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -534,7 +589,7 @@ export const updatePerKgCost = async (req, res) => {
 
     const response = await axios.patch(`${IMPORT_API_BASE_URL}/update-per-kg-cost`, req.body, {
       params: { year, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -559,7 +614,7 @@ export const updateJobDutyAndWeight = async (req, res) => {
 
     const response = await axios.patch(`${IMPORT_API_BASE_URL}/update-job-duty-weight/${encodeURIComponent(jobNo)}`, req.body, {
       params: { year, branch: targetBranch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -578,7 +633,7 @@ export const getduty = async (req, res) => {
   try {
     const { job_no } = req.params;
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-duties/${encodeURIComponent(job_no)}`, {
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
     res.json(response.data);
@@ -592,37 +647,43 @@ export const getduty = async (req, res) => {
 
 /**
  * GET /api/get-branches
+ * Returns all active branches including category (SEA/AIR).
+ * Branches with the same city but different modes appear as separate entries.
  */
 export const getBranches = async (req, res) => {
   try {
     const response = await axios.get(`${IMPORT_API_BASE_URL}/admin/get-branches`, {
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 10000,
     });
-    res.json(response.data);
+
+    // Include category in each branch entry so Sea/Air can be shown distinctly
+    const branches = (response.data || []).filter(b => b.is_active !== false).map(b => ({
+      _id: b._id,
+      branch_name: b.branch_name,
+      branch_code: b.branch_code,
+      category: b.category || "SEA",  // SEA or AIR
+    }));
+
+    res.json(branches);
   } catch (error) {
     console.error("Proxy get branches error:", error.message);
     try {
       const branchesCol = mongoose.connection.db.collection("branches");
       const branches = await branchesCol.find({ is_active: true }).toArray();
-      const uniqueBranches = [];
-      const seenCodes = new Set();
-      for (const b of branches) {
-        if (!seenCodes.has(b.branch_code)) {
-          seenCodes.add(b.branch_code);
-          uniqueBranches.push({
-            _id: b._id,
-            branch_name: b.branch_name,
-            branch_code: b.branch_code,
-          });
-        }
-      }
-      res.json(uniqueBranches);
+      const result = branches.map(b => ({
+        _id: b._id,
+        branch_name: b.branch_name,
+        branch_code: b.branch_code,
+        category: b.category || "SEA",
+      }));
+      res.json(result);
     } catch (dbErr) {
       res.status(500).json({ error: "Failed to fetch branches." });
     }
   }
 };
+
 
 /**
  * GET /api/get-job-numbers/:ie_code_no
@@ -634,7 +695,7 @@ export const getJobNumbersByIECode = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-job-numbers/multiple`, {
       params: { ieCodes: ie_code_no, year, search, branch },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
 
@@ -670,7 +731,7 @@ export const getJobsByIECode = async (req, res) => {
       `${IMPORT_API_BASE_URL}/optimized/${encodeURIComponent(year)}/jobs/${encodeURIComponent(ieCode)}/${encodeURIComponent(status)}`,
       {
         params: { page, limit, search },
-        headers: { username: "Admin" },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 25000,
       }
     );
@@ -694,7 +755,7 @@ export const getJobsMultiStatus = async (req, res) => {
       `${IMPORT_API_BASE_URL}/optimized/${encodeURIComponent(year)}/jobs/${encodeURIComponent(ieCode)}/all`,
       {
         params: { page, limit, search },
-        headers: { username: "Admin" },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 25000,
       }
     );
@@ -761,7 +822,7 @@ export const getUserDashboardStats = async (req, res) => {
         startDate,
         endDate
       },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 20000
     });
 
@@ -839,7 +900,7 @@ export const getJobsOverview = async (req, res) => {
         branch,
         branchId
       },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 20000
     });
 
@@ -859,7 +920,7 @@ export const getHsCodes = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-hs-codes`, {
       params: { importer, year, status },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
 
@@ -879,7 +940,7 @@ export const getSuppliers = async (req, res) => {
 
     const response = await axios.get(`${IMPORT_API_BASE_URL}/get-suppliers`, {
       params: { importer, year, status },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
 

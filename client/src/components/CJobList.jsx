@@ -113,11 +113,6 @@ function CJobList(props) {
   // Fetch Exporters
   useEffect(() => {
       async function fetchExporters() {
-          if (!selectedImporter || selectedImporter === "all") {
-              setExporters([]);
-              setSelectedExporter("all");
-              return;
-          }
           try {
               const baseApiUrl = process.env.REACT_APP_API_STRING || "";
               const exportersUrl = props.gandhidham
@@ -126,7 +121,7 @@ function CJobList(props) {
               
               const res = await axios.get(exportersUrl, {
                   params: {
-                      importer: selectedImporter,
+                      importer: (selectedImporter && selectedImporter !== "All Importers") ? selectedImporter : undefined,
                       year: selectedYear,
                       status: props.status || "all",
                       branch: props.branch,

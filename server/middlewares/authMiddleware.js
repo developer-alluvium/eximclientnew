@@ -65,14 +65,6 @@ export const generateRefreshToken = (user) => {
   return jwt.sign(
     {
       id: user._id,
-      ie_code_assignments: user.ie_code_assignments || [
-        {
-          ie_code_no: user.ie_code_no,
-          importer_name: user.assignedImporterName,
-          assigned_at: user.ieCodeAssignedAt || new Date(),
-          is_primary: true,
-        },
-      ],
       primary_ie_code: user.ie_code_no,
       role: user.role,
       has_multiple_ie_codes:
@@ -183,14 +175,20 @@ export const createSendTokens = (
 //* Authentication middleware that verifies JWT in cookie or Authorization header
 export const authenticate = async (req, res, next) => {
   try {
-    // Get token from various sources - check different user type cookies
-    const token =
-      (req.cookies && req.cookies.access_token) ||
-      (req.cookies && req.cookies.customer_admin_access_token) ||
-      (req.cookies && req.cookies.user_access_token) ||
-      (req.headers.authorization && req.headers.authorization.split(" ")[1]) ||
-      (req.headers.authorization &&
-        req.headers.authorization.replace("Bearer ", ""));
+    // Get token from various sources - prioritize Authorization header first
+    let token = null;
+    if (req.headers.authorization) {
+      if (req.headers.authorization.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      } else {
+        token = req.headers.authorization;
+      }
+    } else if (req.cookies) {
+      token =
+        req.cookies.access_token ||
+        req.cookies.customer_admin_access_token ||
+        req.cookies.user_access_token;
+    }
 
     if (!token) {
       // Log only specific routes or in debug mode to reduce log noise

@@ -38,7 +38,47 @@ export function getCookie(name) {
   return null;
 }
 
+
+// Helpers for JSON values
+export function setJsonCookie(name, valueObj, days = 7, opts = {}) {
+  if (name === "exim_user" || name === "ie_code_assignments") {
+    try {
+      localStorage.setItem(name, JSON.stringify(valueObj));
+    } catch (e) {
+      console.error(`Failed to set localStorage for ${name}`, e);
+    }
+    return;
+  }
+  try {
+    setCookie(name, JSON.stringify(valueObj), days, opts);
+  } catch (e) {
+    console.error("Failed to set JSON cookie", e);
+  }
+}
+
+export function getJsonCookie(name) {
+  if (name === "exim_user" || name === "ie_code_assignments") {
+    const val = localStorage.getItem(name);
+    if (!val) return null;
+    try {
+      return JSON.parse(val);
+    } catch (e) {
+      return null;
+    }
+  }
+  const val = getCookie(name);
+  if (!val) return null;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return null;
+  }
+}
+
 export function removeCookie(name, opts = {}) {
+  if (name === "exim_user" || name === "ie_code_assignments") {
+    localStorage.removeItem(name);
+  }
   // To remove, set expiry in the past
   const cookieParts = [
     `${encodeURIComponent(name)}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
@@ -50,25 +90,6 @@ export function removeCookie(name, opts = {}) {
     cookieParts.push("SameSite=None");
   }
   document.cookie = cookieParts.join("; ");
-}
-
-// Helpers for JSON values
-export function setJsonCookie(name, valueObj, days = 7, opts = {}) {
-  try {
-    setCookie(name, JSON.stringify(valueObj), days, opts);
-  } catch (e) {
-    console.error("Failed to set JSON cookie", e);
-  }
-}
-
-export function getJsonCookie(name) {
-  const val = getCookie(name);
-  if (!val) return null;
-  try {
-    return JSON.parse(val);
-  } catch (e) {
-    return null;
-  }
 }
 
 export default {

@@ -138,57 +138,6 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
   const [columnError, setColumnError] = useState(null);
   const [columnSaving, setColumnSaving] = useState(false);
 
-  // Tab visibility state
-  const [tabVisibility, setTabVisibility] = useState({
-    jobsTabVisible: true,
-    gandhidhamTabVisible: false,
-  });
-  const [tabVisibilityLoading, setTabVisibilityLoading] = useState(false);
-  const [tabVisibilitySaving, setTabVisibilitySaving] = useState(false);
-
-  useEffect(() => {
-    if (customerId) {
-      setTabVisibilityLoading(true);
-      axios
-        .get(
-          `${process.env.REACT_APP_API_STRING}/superadmin/customer/${customerId}/tab-visibility`,
-          getSuperAdminHeaders()
-        )
-        .then((res) => {
-          setTabVisibility({
-            jobsTabVisible: res.data.jobsTabVisible,
-            gandhidhamTabVisible: res.data.gandhidhamTabVisible,
-          });
-        })
-        .catch(() => {
-          setTabVisibility({
-            jobsTabVisible: true,
-            gandhidhamTabVisible: false,
-          });
-        })
-        .finally(() => setTabVisibilityLoading(false));
-    }
-  }, [customerId]);
-
-  // Save tab visibility
-  const handleSaveTabVisibility = async () => {
-    setTabVisibilitySaving(true);
-    try {
-      await axios.patch(
-        `${process.env.REACT_APP_API_STRING}/superadmin/customer/${customerId}/tab-visibility`,
-        tabVisibility,
-        getSuperAdminHeaders()
-      );
-      setNotification({ message: "Tab visibility updated!", type: "success" });
-    } catch (error) {
-      setNotification({
-        message: "Failed to update tab visibility",
-        type: "error",
-      });
-    } finally {
-      setTabVisibilitySaving(false);
-    }
-  };
 
   useEffect(() => {
     if (customer) {
@@ -1273,70 +1222,6 @@ const ModernCustomerDetailView = ({ customer, onBack, onRefresh }) => {
                   </Box>
                 }
               >
-                {/* Tab Visibility Management Section */}
-                {isRegistered && (
-                  <Box
-                    sx={{
-                      mb: 3,
-                      p: 2,
-                      border: "1px solid #F3F4F6",
-                      borderRadius: 2,
-                      background: "#F9FAFB",
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ mb: 1, fontWeight: 600 }}
-                    >
-                      Import DSR Tab Visibility
-                    </Typography>
-                    <FormGroup row>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={tabVisibility.jobsTabVisible}
-                            onChange={(e) =>
-                              setTabVisibility((v) => ({
-                                ...v,
-                                jobsTabVisible: e.target.checked,
-                              }))
-                            }
-                            disabled={
-                              tabVisibilityLoading || tabVisibilitySaving
-                            }
-                          />
-                        }
-                        label="Jobs Tab"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={tabVisibility.gandhidhamTabVisible}
-                            onChange={(e) =>
-                              setTabVisibility((v) => ({
-                                ...v,
-                                gandhidhamTabVisible: e.target.checked,
-                              }))
-                            }
-                            disabled={
-                              tabVisibilityLoading || tabVisibilitySaving
-                            }
-                          />
-                        }
-                        label="Gandhidham Tab"
-                      />
-                    </FormGroup>
-                    <ModernButton
-                      variant="contained"
-                      startIcon={<Save />}
-                      onClick={handleSaveTabVisibility}
-                      loading={tabVisibilitySaving}
-                      sx={{ mt: 1 }}
-                    >
-                      Save Tab Visibility
-                    </ModernButton>
-                  </Box>
-                )}
                 {/* ...existing module management code... */}
                 {!isRegistered ? (
                   <Box sx={{ textAlign: "center", py: 4 }}>

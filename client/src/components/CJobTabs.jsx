@@ -172,11 +172,16 @@ function CJobTabs({ gandhidham = false }) {
                 }}
               >
                 <MenuItem value="">All Branches</MenuItem>
-                {branches.map((b) => (
-                  <MenuItem key={b.branch_code} value={b.branch_code}>
-                    {b.branch_name}
-                  </MenuItem>
-                ))}
+             
+                {branches.map((b) => {
+                  const modeLabel = b.category === "AIR" ? "Air" : "Sea";
+                  const compositeKey = `${b.branch_code}:${b.category}`;
+                  return (
+                    <MenuItem key={compositeKey} value={compositeKey}>
+                      {b.branch_name} ({modeLabel})
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           )}

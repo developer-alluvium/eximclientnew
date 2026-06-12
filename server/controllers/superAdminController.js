@@ -1641,7 +1641,7 @@ export const getAvailableIecCodes = async (req, res) => {
         role: actor.role,
         ie_code_no: actor.ie_code_no || actor.assignedIeCode
       },
-      headers: { username: "Admin" },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
       timeout: 15000,
     });
 

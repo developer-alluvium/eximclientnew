@@ -160,14 +160,10 @@ const JobExcelTable = ({ userId, gandhidham }) => {
   }, [searchQuery]);
 
   const fetchExporters = async () => {
-    if (!selectedImporter || selectedImporter === "All Importers") {
-      setExporters([]);
-      setSelectedExporter("all");
-      return;
-    }
-
     try {
-      const sanitizedImporter = selectedImporter.replace(/\u00A0/g, " ").trim();
+      const sanitizedImporter = selectedImporter && selectedImporter !== "All Importers"
+        ? selectedImporter.replace(/\u00A0/g, " ").trim()
+        : undefined;
       const baseApiUrl = process.env.REACT_APP_API_STRING || "";
       const exportersUrl = gandhidham
         ? `${baseApiUrl}/gandhidham/get-exporters`
