@@ -156,7 +156,7 @@ export const proxyImportListing = async (req, res) => {
       });
     }
 
-    // Call eximdev's search listing for year/status/detailedStatus/customHouse/all
+    // Call eximdev's search listing for year/status/detailedStatus/customHouse/importer
     // Passing all query params to eximdev API
     const forwardParams = {
       page: 1,
@@ -164,6 +164,51 @@ export const proxyImportListing = async (req, res) => {
       search,
       exporter,
     };
+
+    if (isAdmin) {
+      if (importer && importer.toLowerCase() !== "all") {
+        forwardParams.importer = importer;
+      }
+      const clientIeCodes = req.query.ieCodes || req.query.ie_codes;
+      if (clientIeCodes) {
+        forwardParams.ieCodes = clientIeCodes;
+        forwardParams.ie_codes = clientIeCodes;
+      }
+    } else {
+      // Non-admins: restrict to their assigned IE codes and importer names
+      const assignedIECodes = ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()).filter(Boolean);
+      const requestedIECodes = (req.query.ieCodes || req.query.ie_codes || "")
+        .split(",")
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean);
+
+      let targetIECodes = [];
+      if (requestedIECodes.length > 0) {
+        // Intersect requested with assigned
+        targetIECodes = requestedIECodes.filter((code) => assignedIECodes.includes(code));
+      } else {
+        targetIECodes = assignedIECodes;
+      }
+
+      if (targetIECodes.length > 0) {
+        forwardParams.ieCodes = targetIECodes.join(",");
+        forwardParams.ie_codes = targetIECodes.join(",");
+      } else {
+        forwardParams.ieCodes = "unauthorized_ie_code_placeholder";
+        forwardParams.ie_codes = "unauthorized_ie_code_placeholder";
+      }
+
+      // Enforce importer filter if requested and allowed
+      const allowedImporterNames = ieCodeAssignments.map((a) => a.importer_name.trim().toLowerCase());
+      if (importer && importer.toLowerCase() !== "all") {
+        const isAllowed = allowedImporterNames.some((name) => name === importer.trim().toLowerCase());
+        if (isAllowed) {
+          forwardParams.importer = importer;
+        } else {
+          forwardParams.importer = "unauthorized_importer_placeholder";
+        }
+      }
+    }
 
     // Check if branch filter is a special mode selector (Sea / Air only, no branch restriction)
     const SEA_MODE_KEY = "__SEA__";
@@ -198,7 +243,8 @@ export const proxyImportListing = async (req, res) => {
       forwardParams.branchId = resolvedBranchId.toString();
     }
 
-    const targetUrl = `${IMPORT_API_BASE_URL}/${encodeURIComponent(year)}/jobs/${encodeURIComponent(status)}/${encodeURIComponent(detailedStatus)}/${encodeURIComponent(customHouse)}/all`;
+    const targetImporterPath = forwardParams.importer || "all";
+    const targetUrl = `${IMPORT_API_BASE_URL}/${encodeURIComponent(year)}/jobs/${encodeURIComponent(status)}/${encodeURIComponent(detailedStatus)}/${encodeURIComponent(customHouse)}/${encodeURIComponent(targetImporterPath)}`;
 
     console.log(`[Import Proxy] Calling target listing: ${targetUrl}`);
 
@@ -213,9 +259,19 @@ export const proxyImportListing = async (req, res) => {
     // Filter by assigned IE codes for regular users
     if (!isAdmin) {
       const allowedIECodes = new Set(ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()));
+      const allowedImporterNames = new Set(
+        ieCodeAssignments.map((a) => formatImporter(a.importer_name)).filter(Boolean)
+      );
+
       jobs = jobs.filter((j) => {
         const jIec = (j.ie_code_no || "").toUpperCase().trim();
-        return allowedIECodes.has(jIec);
+        if (jIec && allowedIECodes.has(jIec)) {
+          return true;
+        }
+
+        // Fallback to match by importer name if ie_code_no is not populated on the job object
+        const jImporter = formatImporter(j.importer);
+        return allowedImporterNames.has(jImporter);
       });
     }
 
