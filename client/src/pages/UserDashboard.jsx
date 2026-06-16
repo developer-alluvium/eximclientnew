@@ -637,6 +637,13 @@ function UserDashboard() {
       categoryLabel: "TRANSPORT MANAGEMENT",
       category: "core",
     },
+    {
+      name: "Open Points",
+      description: "Manage project discussion points, task assignments, and review timelines",
+      path: "/open-points",
+      categoryLabel: "TASK MANAGEMENT",
+      category: "core",
+    },
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-GB", {

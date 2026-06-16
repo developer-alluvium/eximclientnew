@@ -1,0 +1,260 @@
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// Premium Design Variables
+$primary: #0f172a;
+$secondary: #64748b;
+$accent: #0ea5e9;
+$success: #10b981;
+$warning: #f59e0b;
+$danger: #ef4444;
+$background: #f8fafc;
+$card-bg: #ffffff;
+$text-main: #1e293b;
+$text-secondary: #64748b;
+
+.open-points-container {
+  padding: 24px;
+  background-color: $background;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: $text-main;
+    font-weight: 600;
+  }
+
+  .header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .premium-card {
+    background: $card-bg;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+  }
+
+  .project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+  }
+
+  .status-badge {
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+
+    &.status-Green {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: $success;
+    }
+
+    &.status-Yellow {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: $warning;
+    }
+
+    &.status-Red {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: $danger;
+    }
+
+    &.status-Orange {
+      background-color: rgba(249, 115, 22, 0.1);
+      color: #f97316;
+    }
+  }
+
+  .kanban-board {
+    display: flex;
+    gap: 24px;
+    overflow-x: auto;
+    padding-bottom: 20px;
+
+    .kanban-column {
+      min-width: 320px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 16px;
+
+      .column-header {
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+  }
+}
+
+/* Excel Grid Styles */
+.excel-table-container {
+  overflow-x: auto;
+  margin-top: 20px;
+  background: white;
+  padding: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Arial', sans-serif;
+  /* Excel-like font */
+  font-size: 13px;
+}
+
+.excel-table th {
+  background-color: #FFFF00;
+  /* Yellow Header */
+  border: 1px solid #000;
+  /* Strong border for header */
+  padding: 8px;
+  text-align: center;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.excel-table td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  vertical-align: middle;
+}
+
+.excel-table input,
+.excel-table select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+}
+
+.excel-table input:focus,
+.excel-table select:focus {
+  background-color: #e6f7ff;
+  /* Highlight on focus */
+}
+
+/* Status Colors */
+.status-cell-Green {
+  background-color: #00FF00;
+  text-align: center;
+  font-weight: bold;
+}
+
+.status-cell-Red {
+  background-color: #FF0000;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+}
+
+.status-cell-Yellow {
+  background-color: #FFFF00;
+  text-align: center;
+  font-weight: bold;
+}
+
+.status-cell-Orange {
+  background-color: #FFA500;
+  text-align: center;
+  font-weight: bold;
+}
+
+/* Summary Table */
+.summary-section {
+  margin-top: 40px;
+  background: white;
+  padding: 10px;
+}
+
+.summary-header {
+  background-color: #663399;
+  /* Deep Purple like in image */
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  padding: 8px;
+  border: 1px solid #000;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.summary-table th {
+  border: 1px solid #000;
+  padding: 8px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.summary-table td {
+  border: 1px solid #000;
+  padding: 8px;
+  text-align: center;
+}
+
+.header-green {
+  background-color: #00FF00;
+}
+
+.header-yellow {
+  background-color: #FFFF00;
+}
+
+.header-red {
+  background-color: #FF0000;
+  color: white;
+}
+
+.header-orange {
+  background-color: #FFA500;
+}
+
+/* Hide text in status cells */
+td[class*='status-cell-'] select {
+  color: transparent;
+}
+
+td[class*='status-cell-'] select option {
+  color: black;
+}
+
+.excel-table textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  min-height: 32px;
+  vertical-align: top;
+}

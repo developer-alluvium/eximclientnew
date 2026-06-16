@@ -47,9 +47,20 @@ const superAdminSchema = new mongoose.Schema(
   },
   { 
     timestamps: true,
-    collection: 'superadmins'
+    collection: 'superadmins',
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual properties for Open Points integration compatibility
+superAdminSchema.virtual("first_name").get(function () {
+  return this.username || "SuperAdmin";
+});
+
+superAdminSchema.virtual("last_name").get(function () {
+  return "";
+});
 
 // Hash password before save
 superAdminSchema.pre("save", async function (next) {

@@ -84,9 +84,24 @@ const adminSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    collection: 'admins'
+    collection: 'admins',
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual properties for Open Points integration compatibility
+adminSchema.virtual("username").get(function () {
+  return this.email;
+});
+
+adminSchema.virtual("first_name").get(function () {
+  return this.name ? this.name.split(" ")[0] : "";
+});
+
+adminSchema.virtual("last_name").get(function () {
+  return this.name ? this.name.split(" ").slice(1).join(" ") : "";
+});
 
 // Virtual for locked account
 adminSchema.virtual('isLocked').get(function () {

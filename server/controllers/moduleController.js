@@ -63,8 +63,12 @@ const AVAILABLE_MODULES = [
     description: "View and manage import daily status reports and track shipments",
     category: "core",
   },
-
-
+  {
+    id: "/open-points",
+    name: "Open Points",
+    description: "Manage project discussion points, task assignments, and review timelines",
+    category: "core",
+  }
 ];
 
 /**

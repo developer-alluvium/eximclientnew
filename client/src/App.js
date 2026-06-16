@@ -40,6 +40,9 @@ import AnalyticsOverview from "./components/AnalyticsOverview.jsx";
 import Dashboard from "./pages/Elock/components/Dashboard.jsx"; // Elock Dashboard
 import ElockGPSOperationPage from "./pages/Elock/pages/ElockGPSOperationPage.jsx"; // Elock Operation Page
 import TransportModule from "./components/Transport/TransportModule.jsx";
+import OpenPointsHome from "./components/open-points/OpenPointsHome";
+import MyOpenPoints from "./components/open-points/MyOpenPoints";
+import ProjectWorkspace from "./components/open-points/ProjectWorkspace";
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
@@ -247,6 +250,46 @@ function App() {
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <TransportModule />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/open-points"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <OpenPointsHome />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/open-points/my-points"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <MyOpenPoints />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/open-points/assigned-by-me"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <MyOpenPoints viewMode="assigned-by-me" />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/open-points/user/:username/points"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <MyOpenPoints />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/open-points/project/:projectId"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <ProjectWorkspace />
                         </ProtectedRoute>
                       }
                     />

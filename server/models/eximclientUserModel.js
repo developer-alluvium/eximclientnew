@@ -246,12 +246,42 @@ const eximclientUserSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual properties for Open Points integration compatibility
+eximclientUserSchema.virtual("username").get(function () {
+  return this.email;
+});
+
+eximclientUserSchema.virtual("first_name").get(function () {
+  return this.name ? this.name.split(" ")[0] : "";
+});
+
+eximclientUserSchema.virtual("last_name").get(function () {
+  return this.name ? this.name.split(" ").slice(1).join(" ") : "";
+});
 
 // Virtual for locked account
 eximclientUserSchema.virtual('isLocked').get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
+});
+
+// Clean up corrupted ie_code_assignments containing empty objects before validation runs
+eximclientUserSchema.pre("validate", function (next) {
+  if (this.ie_code_assignments && Array.isArray(this.ie_code_assignments)) {
+    this.ie_code_assignments = this.ie_code_assignments.filter(
+      (assignment) => assignment && assignment.ie_code_no
+    );
+  }
+  if (this.exporter_ie_code_assignments && Array.isArray(this.exporter_ie_code_assignments)) {
+    this.exporter_ie_code_assignments = this.exporter_ie_code_assignments.filter(
+      (assignment) => assignment && assignment.ie_code_no
+    );
+  }
+  next();
 });
 
 // Hash password before save

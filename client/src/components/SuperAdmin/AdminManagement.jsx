@@ -172,6 +172,12 @@ const AVAILABLE_MODULES = [
     description: "View and manage export shipment jobs, track IEC-wise export data from the Export module",
     category: "core",
   },
+  {
+    id: "/open-points",
+    name: "Open Points",
+    description: "Manage project discussion points, task assignments, and review timelines",
+    category: "core",
+  },
 ];
 
 const AdminManagement = ({ onRefresh }) => {
