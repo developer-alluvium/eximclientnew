@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, TextField, Autocomplete, Alert, IconButton } from '@mui/material'; // Removed unused MenuItem
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
-import { Button, Input, message } from 'antd';
+import { Button, Input, Switch, message } from 'antd';
 import { SaveOutlined, SettingOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import TransportTable from './TransportTable';
@@ -20,6 +20,7 @@ const TransportModule = () => {
   const [columnOrder, setColumnOrder] = useState([]);
   const [isColumnOrderLoaded, setIsColumnOrderLoaded] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+  const [filterActive, setFilterActive] = useState(true);
 
   // Context for selected importer (name)
   const { selectedImporter, setSelectedImporter } = useImportersContext();
@@ -101,7 +102,7 @@ const TransportModule = () => {
 
         const token = getCookie("access_token");
         const res = await axios.get(`${process.env.REACT_APP_API_STRING}/transport/data`, {
-          params: { ieCodeNo },
+          params: { ieCodeNo, filter: filterActive ? 'active' : 'all' },
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -115,7 +116,7 @@ const TransportModule = () => {
           } else if (Array.isArray(res.data)) {
              fetchedData = res.data;
           } else {
-            console.warn("Unexpected data format:", res.data);
+             console.warn("Unexpected data format:", res.data);
           }
           setData(fetchedData);
         } else {
@@ -130,7 +131,7 @@ const TransportModule = () => {
     };
 
     fetchData();
-  }, [selectedImporter, ieCodeAssignments]);
+  }, [selectedImporter, ieCodeAssignments, filterActive]);
 
   const handleRefresh = () => {
     const current = selectedImporter;
@@ -185,6 +186,17 @@ const TransportModule = () => {
              onChange={e => setSearchText(e.target.value)}
              style={{ width: 250 }}
            />
+
+           {/* Active Jobs Toggle Switch */}
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>Active Jobs Only</span>
+             <Switch 
+               checked={filterActive}
+               onChange={(checked) => setFilterActive(checked)}
+               checkedChildren="Active"
+               unCheckedChildren="All"
+             />
+           </Box>
 
            {/* Toolbar Buttons */}
            <Button 

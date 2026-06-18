@@ -3,6 +3,16 @@ import { Tag, Pagination, Spin, Empty, Tooltip } from 'antd';
 import ColumnSettingsModal from './ColumnSettingsModal';
 import '../../styles/transport.scss';
 
+const formatDate = (dateVal) => {
+  if (!dateVal) return '';
+  const date = new Date(dateVal);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 const TransportTable = ({ 
   data, 
   loading, 
@@ -37,6 +47,16 @@ const TransportTable = ({
             <span className="t-sub">
               {row.original.document_date ? new Date(row.original.document_date).toLocaleDateString() : 'NA'}
             </span>
+          </div>
+        ),
+      },
+      {
+        id: 'be_no',
+        header: <>BE No.</>,
+        minWidth: 120,
+        Cell: ({ row }) => (
+          <div className="t-cell">
+            <span className="t-main">{row.original.be_no || 'NA'}</span>
           </div>
         ),
       },
@@ -90,16 +110,30 @@ const TransportTable = ({
         id: 'shipping_do',
         header: <>Shipping Line &<br />DO Validity</>,
         minWidth: 200,
-        Cell: ({ row }) => (
-          <div className="t-cell">
-             <Tooltip title={row.original.shipping_line}>
-                <span className="t-main" style={{ fontWeight: 500 }}>{row.original.shipping_line || 'NA'}</span>
-             </Tooltip>
-             <span className={`t-sub ${row.original.do_validity ? 't-error' : ''}`}>
-               Valid: {row.original.do_validity ? new Date(row.original.do_validity).toLocaleDateString() : 'NA'}
-             </span>
-          </div>
-        ),
+        Cell: ({ row }) => {
+          const displayDoValidity = row.original.lr_do_validity || row.original.do_validity;
+          return (
+            <div className="t-cell">
+               <Tooltip title={row.original.shipping_line}>
+                  <span className="t-main" style={{ fontWeight: 500 }}>{row.original.shipping_line || 'NA'}</span>
+               </Tooltip>
+               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 6, marginTop: 4 }}>
+                 <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>DO Validity:</div>
+                 <span className={`t-sub ${displayDoValidity ? 't-error' : ''}`} style={{ fontWeight: 500 }}>
+                   {displayDoValidity ? formatDate(displayDoValidity) : 'NA'}
+                 </span>
+               </div>
+               {Array.isArray(row.original.do_revalidity) && row.original.do_revalidity.map((rev, index) => (
+                 <div key={rev._id || index} style={{ marginTop: 6 }}>
+                   <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Revalidation {index + 1}:</div>
+                   <span className="t-sub" style={{ fontWeight: 500 }}>
+                     {rev.date ? formatDate(rev.date) : 'NA'}
+                   </span>
+                 </div>
+               ))}
+            </div>
+          );
+        },
       },
       {
         id: 'parties',
@@ -222,28 +256,28 @@ const TransportTable = ({
       );
     }
     
-    // Sort by Document No then Consignor
+    // Sort by BE No (fallback to Document No) then Consignor
     result = [...result].sort((a, b) => {
-        const docA = a.document_no || '';
-        const docB = b.document_no || '';
-        const docResult = docA.localeCompare(docB);
+        const keyA = a.be_no || a.document_no || '';
+        const keyB = b.be_no || b.document_no || '';
+        const keyResult = keyA.localeCompare(keyB);
         
-        if (docResult !== 0) return docResult;
+        if (keyResult !== 0) return keyResult;
         
         const consignorA = a.consignor || '';
         const consignorB = b.consignor || '';
         return consignorA.localeCompare(consignorB);
     });
 
-    // Assign Group Serial Numbers based on Doc No + Consignor
-    let currentDocNo = null;
+    // Assign Group Serial Numbers based on Group Key (BE No || Doc No) + Consignor
+    let currentGroupKey = null;
     let currentConsignor = null;
     let groupCounter = 0;
     
     return result.map((item) => {
-        // Check if either changed
-        if (item.document_no !== currentDocNo || item.consignor !== currentConsignor) {
-            currentDocNo = item.document_no;
+        const groupKey = item.be_no || item.document_no || '';
+        if (groupKey !== currentGroupKey || item.consignor !== currentConsignor) {
+            currentGroupKey = groupKey;
             currentConsignor = item.consignor;
             groupCounter++;
         }
@@ -263,7 +297,7 @@ const TransportTable = ({
     const meta = {};
     if (paginatedData.length === 0) return meta;
 
-    let currentDocNo = null;
+    let currentGroupKey = null;
     let currentConsignor = null;
     let spanCount = 0;
     let startIndex = -1;
@@ -285,17 +319,17 @@ const TransportTable = ({
         // Initialize meta for this row if not present
         if (!meta[index]) meta[index] = {};
 
-        const docNo = row.document_no;
+        const groupKey = row.be_no || row.document_no || '';
         const consignor = row.consignor;
         
         // Check if belongs to same group
-        if (docNo === currentDocNo && consignor === currentConsignor) {
+        if (groupKey === currentGroupKey && consignor === currentConsignor) {
             spanCount++;
         } else {
             commitSpan(startIndex, spanCount);
             
             // New Group
-            currentDocNo = docNo;
+            currentGroupKey = groupKey;
             currentConsignor = consignor;
             spanCount = 1;
             startIndex = index;
@@ -353,8 +387,8 @@ const TransportTable = ({
                     style={{ backgroundColor: row.lr_completed ? '#f5f5f5' : '#f0fae1' }}
                   >
                     {visibleColumns.map(col => {
-                      // Apply Grouping to 'sr_no', 'document_info', AND 'parties' (Consignor/Consignee)
-                      if (col.id === 'sr_no' || col.id === 'document_info' || col.id === 'parties') {
+                      // Apply Grouping to 'sr_no', 'document_info', 'parties' (Consignor/Consignee), AND 'be_no'
+                      if (col.id === 'sr_no' || col.id === 'document_info' || col.id === 'parties' || col.id === 'be_no') {
                           if (!meta.isStart) return null; // Skip rendering subsumed cells
                           
                           return (

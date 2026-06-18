@@ -7,7 +7,7 @@ import transportAuthService from '../services/transportAuthService.js';
  */
 export const getClientTransportData = async (req, res) => {
   try {
-    const { ieCodeNo } = req.query;
+    const { ieCodeNo, filter } = req.query;
     
     if (!ieCodeNo) {
       return res.status(400).json({
@@ -25,7 +25,10 @@ export const getClientTransportData = async (req, res) => {
     // Call external API
     const response = await axios.get(
       `${targetBaseUrl}/client-Transport-data`, {
-      params: { ieCodeNo },
+      params: { 
+        ieCodeNo,
+        ...(filter && { filter })
+      },
       headers: {
         ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
       }
