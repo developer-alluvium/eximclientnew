@@ -2119,9 +2119,10 @@ const AdminManagement = ({ onRefresh }) => {
                       }}
                     />
 
-                    <Box sx={{ border: "1px solid #cbd5e1", borderRadius: 2, p: 1.5, maxHeight: 150, overflowY: "auto", bgcolor: "#fff" }}>
+
+                    <Box sx={{ border: "1px solid #cbd5e1", borderRadius: 2, p: 1.5, maxHeight: 280, overflowY: "auto", bgcolor: "#f8fafc" }}>
                       {users
-                        .filter(u => u.role !== "admin")
+                        .filter(u => u._id !== actionsMenuUser?._id)
                         .filter(u => {
                           if (!adminUserSearchQuery) return true;
                           const search = adminUserSearchQuery.toLowerCase();
@@ -2129,32 +2130,100 @@ const AdminManagement = ({ onRefresh }) => {
                         })
                         .map((userItem) => {
                           const isChecked = tempAssignedUserIds.includes(userItem._id);
+                          const isAssignedToOther = userItem.adminId && (userItem.adminId?._id || userItem.adminId) !== actionsMenuUser?._id;
+                          const otherAdminName = isAssignedToOther ? (userItem.adminId?.name || "Other Admin") : null;
+
                           return (
-                            <FormControlLabel
+                            <Box
                               key={userItem._id}
-                              control={
+                              onClick={() => {
+                                if (isChecked) {
+                                  setTempAssignedUserIds(prev => prev.filter(id => id !== userItem._id));
+                                } else {
+                                  setTempAssignedUserIds(prev => [...prev, userItem._id]);
+                                }
+                              }}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                p: 1.2,
+                                mb: 1,
+                                borderRadius: 2,
+                                border: `1.5px solid ${isChecked ? "#3b82f6" : "#e2e8f0"}`,
+                                bgcolor: isChecked ? "#eff6ff" : "#fff",
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                                "&:hover": {
+                                  borderColor: isChecked ? "#2563eb" : "#cbd5e1",
+                                  bgcolor: isChecked ? "#dbeafe" : "#f8fafc"
+                                }
+                              }}
+                            >
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, flex: 1 }}>
+                                <Avatar
+                                  sx={{
+                                    width: 32,
+                                    height: 32,
+                                    fontSize: "0.78rem",
+                                    fontWeight: 700,
+                                    bgcolor: isChecked ? "#3b82f6" : "#94a3b8",
+                                    color: "#fff"
+                                  }}
+                                >
+                                  {userItem.name ? userItem.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "?"}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#1e293b" }}>
+                                      {userItem.name}
+                                    </Typography>
+                                    {userItem.role === "admin" && (
+                                      <Chip
+                                        label="Admin"
+                                        size="small"
+                                        sx={{
+                                          fontSize: "0.62rem",
+                                          height: 16,
+                                          bgcolor: "#f3e8ff",
+                                          color: "#7e22ce",
+                                          fontWeight: 700,
+                                          px: 0.5,
+                                          border: "none"
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                  <Typography sx={{ fontSize: "0.72rem", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {userItem.email}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                {isAssignedToOther && (
+                                  <Chip
+                                    label={`Assigned to ${otherAdminName}`}
+                                    size="small"
+                                    sx={{
+                                      fontSize: "0.65rem",
+                                      height: 20,
+                                      bgcolor: "#fee2e2",
+                                      color: "#dc2626",
+                                      fontWeight: 600,
+                                      border: "none"
+                                    }}
+                                  />
+                                )}
                                 <Checkbox
                                   size="small"
                                   checked={isChecked}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setTempAssignedUserIds(prev => [...prev, userItem._id]);
-                                    } else {
-                                      setTempAssignedUserIds(prev => prev.filter(id => id !== userItem._id));
-                                    }
-                                  }}
+                                  sx={{ p: 0.5 }}
                                 />
-                              }
-                              label={
-                                <Typography sx={{ fontSize: "0.78rem" }}>
-                                  {userItem.name} ({userItem.email})
-                                </Typography>
-                              }
-                              sx={{ display: "flex", mb: 0.5 }}
-                            />
+                              </Box>
+                            </Box>
                           );
                         })}
-                      {users.filter(u => u.role !== "admin").filter(u => {
+                      {users.filter(u => u._id !== actionsMenuUser?._id).filter(u => {
                         if (!adminUserSearchQuery) return true;
                         const search = adminUserSearchQuery.toLowerCase();
                         return u.name?.toLowerCase().includes(search) || u.email?.toLowerCase().includes(search);
@@ -2164,6 +2233,7 @@ const AdminManagement = ({ onRefresh }) => {
                         </Typography>
                       )}
                     </Box>
+
                     <Button
                       variant="contained"
                       onClick={handleSaveUserAssignments}

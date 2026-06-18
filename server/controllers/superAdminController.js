@@ -1735,7 +1735,7 @@ export const assignUsersToAdmin = async (req, res) => {
     // 2. Assign this admin to the specified users
     if (userIds.length > 0) {
       await EximclientUser.updateMany(
-        { _id: { $in: userIds }, role: "user" },
+        { _id: { $in: userIds, $ne: adminId } },
         { $set: { adminId: adminId } }
       );
     }

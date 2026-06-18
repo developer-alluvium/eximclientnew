@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import { fetchProjectPoints, updatePointStatus, createOpenPoint, fetchProjectDetails, addProjectMember, fetchAllUsers, deleteOpenPoint, removeProjectMember, deleteProject, changeProjectOwner } from '../../services/openPointsService';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { UserContext } from '../../context/UserContext';
@@ -22,6 +22,7 @@ const ProjectWorkspace = () => {
     const [accessDenied, setAccessDenied] = useState(false);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
     const [showMemberSuggestions, setShowMemberSuggestions] = useState(false);
+    const memberSearchContainerRef = useRef(null);
 
     // Summary Stats
     const [summary, setSummary] = useState([]);
@@ -64,6 +65,18 @@ const ProjectWorkspace = () => {
     useEffect(() => {
         loadData();
     }, [projectId]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (memberSearchContainerRef.current && !memberSearchContainerRef.current.contains(event.target)) {
+                setShowMemberSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     // Scroll to and highlight point if query param exists
     useEffect(() => {
@@ -479,10 +492,42 @@ const ProjectWorkspace = () => {
 
             {/* Unified Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', background: '#f8fafc', padding: '10px 15px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h3 style={{ margin: 0, fontWeight: '700', color: '#334155', fontSize: '1.25rem' }}>
-                    <span style={{ fontWeight: '400', color: '#64748b', fontSize: '1rem', marginRight: '8px' }}>Project Title:</span>
-                    {projectName || 'Project Workspace'}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button 
+                        onClick={() => navigate('/open-points')}
+                        className="btn btn-sm btn-secondary"
+                        style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            borderRadius: '6px',
+                            background: '#fff',
+                            border: '1px solid #cbd5e1',
+                            color: '#475569',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.borderColor = '#94a3b8';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#fff';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                        }}
+                    >
+                        ← Back
+                    </button>
+                    <h3 style={{ margin: 0, fontWeight: '700', color: '#334155', fontSize: '1.25rem', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: '400', color: '#64748b', fontSize: '1rem', marginRight: '8px' }}>Project Title:</span>
+                        {projectName || 'Project Workspace'}
+                    </h3>
+                </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     {/* Filters Group */}
@@ -639,7 +684,7 @@ const ProjectWorkspace = () => {
             {
                 showAddMember && (
                     <div style={{ marginBottom: '10px', padding: '10px', background: '#e0f2fe', borderRadius: '4px', display: 'flex', gap: '10px', alignItems: 'center', overflow: 'visible' }}>
-                        <div style={{ position: 'relative', width: '250px' }}>
+                        <div ref={memberSearchContainerRef} style={{ position: 'relative', width: '250px' }}>
                             <input
                                 type="text"
                                 className="form-control"
@@ -651,9 +696,24 @@ const ProjectWorkspace = () => {
                                     setNewMemberName('');
                                 }}
                                 onFocus={() => setShowMemberSuggestions(true)}
-                                style={{ width: '100%' }}
+                                style={{ width: '100%', paddingRight: '28px' }}
                             />
-                            {showMemberSuggestions && memberSearchQuery && (
+                            <div 
+                                onClick={() => setShowMemberSuggestions(prev => !prev)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    fontSize: '9px',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                {showMemberSuggestions ? '▲' : '▼'}
+                            </div>
+                            {showMemberSuggestions && (
                                 <div style={{
                                     position: 'absolute', top: '100%', left: 0, right: 0,
                                     background: 'white', border: '1px solid #ddd', borderRadius: '4px',

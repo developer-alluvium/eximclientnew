@@ -77,7 +77,24 @@ const verifyProjectAccess = async (req, res, next) => {
 // --- Custom Endpoint to Fetch All Users for Autocompletion ---
 router.get("/api/get-all-users", authenticateUser, async (req, res) => {
     try {
-        const users = await UserModel.find({ isActive: true }).select('name email role');
+        let query = { isActive: true };
+
+        // If the logged-in user is an admin, only return users assigned to them
+        if (req.user.role === 'admin') {
+            query.adminId = req.user._id;
+        } 
+        // If the logged-in user is a standard user, only return users assigned to their admin
+        else if (req.user.role === 'user') {
+            const adminId = req.user.adminId?._id || req.user.adminId;
+            if (adminId) {
+                query.adminId = adminId;
+            } else {
+                // If standard user has no admin, restrict them to seeing nobody (or just themselves?)
+                query.adminId = new mongoose.Types.ObjectId();
+            }
+        }
+
+        const users = await UserModel.find(query).select('name email role adminId');
         const mappedUsers = users.map(user => ({
             _id: user._id,
             username: user.email, // map email to username
