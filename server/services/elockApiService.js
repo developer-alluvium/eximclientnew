@@ -176,25 +176,116 @@ class ElockApiService {
 
             const serviceToken = await transportAuthService.getServiceToken();
 
-            const response = await axios.get(
-                `${this.thirdPartyBaseURL}/client-elock-assign`,
-                {
-                    params,
-                    timeout: 15000,
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                        ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
-                    },
-                }
-            );
+            // Fetch from both endpoints in parallel
+            const [response, othersResponse] = await Promise.all([
+                axios.get(
+                    `${this.thirdPartyBaseURL}/client-elock-assign`,
+                    {
+                        params,
+                        timeout: 15000,
+                        headers: {
+                            Accept: "application/json",
+                            "Content-Type": "application/json",
+                            ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                        },
+                    }
+                ),
+                axios.get(
+                    `${this.thirdPartyBaseURL}/elock/assign-others`,
+                    {
+                        params: { page: 1, limit: 10000 },
+                        timeout: 15000,
+                        headers: {
+                            Accept: "application/json",
+                            "Content-Type": "application/json",
+                            ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                        },
+                    }
+                ).catch(err => {
+                    console.warn("⚠️ Backend: Failed to fetch assign-others data:", err.message);
+                    return { data: { jobs: [] } };
+                })
+            ]);
 
             console.log("✅ Backend: Third-party API response received");
             console.log(
-                `📊 Backend: Total jobs from API: ${response.data?.jobs?.length || 0}`
+                `📊 Backend: Total jobs from client-elock-assign: ${response.data?.jobs?.length || 0}`
+            );
+
+            const othersJobs = othersResponse.data?.jobs || [];
+            console.log(
+                `📊 Backend: Total jobs from assign-others: ${othersJobs.length}`
             );
 
             let jobs = response.data?.jobs || [];
+
+            // Merge "others" e-lock assignments into main jobs
+            // 1) Overlay e-lock info onto main records that have matching containers but no e-lock
+            // 2) Add ALL "others" records as separate rows so they appear in the UI
+            if (othersJobs.length > 0) {
+                const othersByContainer = {};
+                for (const oj of othersJobs) {
+                    if (oj.container_number) {
+                        if (!othersByContainer[oj.container_number]) {
+                            othersByContainer[oj.container_number] = [];
+                        }
+                        othersByContainer[oj.container_number].push(oj);
+                    }
+                }
+
+                // For existing jobs, overlay e-lock info from "others" if the main record has no e-lock
+                for (let i = 0; i < jobs.length; i++) {
+                    const job = jobs[i];
+                    if (job.container_number && othersByContainer[job.container_number]) {
+                        const othersForContainer = othersByContainer[job.container_number];
+                        // Find an "others" record that has an assigned e-lock
+                        const assignedOther = othersForContainer.find(
+                            oj => oj.elock_assign_status === "ASSIGNED" && oj.elock_no
+                        );
+
+                        if (assignedOther && (!job.elock_no || job.elock_assign_status === "UNASSIGNED")) {
+                            const elockFAssetId = typeof assignedOther.elock_no === 'object'
+                                ? assignedOther.elock_no?.FAssetID
+                                : assignedOther.elock_no;
+
+                            console.log(
+                                `🔗 Backend: Merging e-lock ${elockFAssetId} from assign-others into container ${job.container_number}`
+                            );
+
+                            jobs[i] = {
+                                ...job,
+                                elock_no: elockFAssetId || null,
+                                elock_assign_status: assignedOther.elock_assign_status,
+                                uploadedImageUrls: (job.uploadedImageUrls && job.uploadedImageUrls.length > 0)
+                                    ? job.uploadedImageUrls
+                                    : assignedOther.uploadedImageUrls || [],
+                                _othersElockMerged: true,
+                                _othersTrNo: assignedOther.tr_no,
+                            };
+                        }
+                    }
+                }
+
+                // Add ALL "others" records as separate rows so they are visible in the UI
+                console.log(
+                    `➕ Backend: Adding all ${othersJobs.length} assign-others records as separate rows`
+                );
+                for (const oj of othersJobs) {
+                    const elockFAssetId = typeof oj.elock_no === 'object'
+                        ? oj.elock_no?.FAssetID
+                        : oj.elock_no;
+
+                    jobs.push({
+                        ...oj,
+                        elock_no: elockFAssetId || null,
+                        _fromAssignOthers: true,
+                    });
+                }
+
+                console.log(
+                    `✅ Backend: After adding assign-others: ${jobs.length} total jobs`
+                );
+            }
 
             // Apply IE code filtering if provided
             if (ieCodeNo) {
@@ -205,6 +296,10 @@ class ElockApiService {
                 
                 const beforeCount = jobs.length;
                 jobs = jobs.filter((item) => {
+                    // Don't filter out records from assign-others - they are already
+                    // relevant to this client (the transport API handles that filtering)
+                    if (item._fromAssignOthers) return true;
+
                     const consignorIeCode = item.consignor?.ieCodeNo;
                     const consigneeIeCode = item.consignee?.ieCodeNo;
 
