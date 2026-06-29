@@ -282,6 +282,7 @@ app.use((req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`db ${config.mongodb[config.nodeEnv]}`);
 });
 
 export default app;

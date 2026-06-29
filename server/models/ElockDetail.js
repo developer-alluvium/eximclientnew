@@ -55,7 +55,6 @@ const elockDetailSchema = new mongoose.Schema(
 );
 
 // Index for better query performance
-elockDetailSchema.index({ elock_number: 1 });
 elockDetailSchema.index({ status: 1 });
 elockDetailSchema.index({ ie_code: 1 });
 elockDetailSchema.index({ created_by: 1 });
