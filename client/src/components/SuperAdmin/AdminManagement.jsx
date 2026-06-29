@@ -56,6 +56,9 @@ import {
   AccountBox,
   AddCircle,
   RemoveCircle,
+  Lock,
+  Visibility,
+  VisibilityOff,
 } from "@mui/icons-material";
 import axios from "axios";
 import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
@@ -223,6 +226,10 @@ const AdminManagement = ({ onRefresh }) => {
   // Enterprise Actions Modal state
   const [actionsMenuUser, setActionsMenuUser] = useState(null);
   const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Branch Access
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Branch Assignments
   const [selectedBranches, setSelectedBranches] = useState([]);
@@ -543,6 +550,60 @@ const AdminManagement = ({ onRefresh }) => {
       setError(error.response?.data?.message || "Failed to update branch access");
     } finally {
       setBranchAssignmentLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      setError("Please fill out both fields.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      const superadminToken = getCookie("superadmin_token");
+      if (!superadminToken) {
+        setError("SuperAdmin authentication required. Please login again.");
+        return;
+      }
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${superadminToken}`,
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const endpoint = `${process.env.REACT_APP_API_STRING}/superadmin/users/${actionsMenuUser._id}/change-password`;
+      const response = await axios.put(endpoint, { newPassword, confirmPassword }, config);
+
+      if (response.data.success) {
+        setSuccess(response.data.message || "Password changed successfully.");
+        setNewPassword("");
+        setConfirmPassword("");
+        setActionsMenuUser(null);
+        setActionsTab(0);
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Change password error:", error);
+      setError(error.response?.data?.message || "Failed to change password.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1037,12 +1098,12 @@ const AdminManagement = ({ onRefresh }) => {
       </Box>
 
       {/* Alerts */}
-      {error && (
+      {error && !actionsMenuUser && !ieCodeDialog && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
-      {success && (
+      {success && !actionsMenuUser && !ieCodeDialog && (
         <Alert
           severity="success"
           sx={{ mb: 3 }}
@@ -1455,6 +1516,10 @@ const AdminManagement = ({ onRefresh }) => {
                           const assigned = users.filter(u => u.adminId?._id === user._id || u.adminId === user._id);
                           setTempAssignedUserIds(assigned.map(u => u._id));
                           setAdminUserSearchQuery("");
+                          setNewPassword("");
+                          setConfirmPassword("");
+                          setShowNewPassword(false);
+                          setShowConfirmPassword(false);
                         }}
                         sx={{
                           textTransform: "none",
@@ -1490,7 +1555,7 @@ const AdminManagement = ({ onRefresh }) => {
       {/* ── Enterprise Actions Modal ── */}
       <Dialog
         open={Boolean(actionsMenuUser)}
-        onClose={() => { setActionsMenuUser(null); setActionsTab(0); }}
+        onClose={() => { setActionsMenuUser(null); setActionsTab(0); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }}
         maxWidth="lg"
         fullWidth
         PaperProps={{
@@ -1559,7 +1624,7 @@ const AdminManagement = ({ onRefresh }) => {
           </Box>
           <IconButton
             size="small"
-            onClick={() => { setActionsMenuUser(null); setActionsTab(0); }}
+            onClick={() => { setActionsMenuUser(null); setActionsTab(0); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }}
             sx={{
               color: "rgba(255,255,255,0.6)",
               "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
@@ -1603,6 +1668,7 @@ const AdminManagement = ({ onRefresh }) => {
               { idx: 2, icon: <Assignment sx={{ fontSize: 18 }} />, label: "Modules", desc: `${(actionsMenuUser?.assignedModules || []).length} assigned` },
               { idx: 3, icon: <AdminPanelSettings sx={{ fontSize: 18 }} />, label: "Role", desc: actionsMenuUser?.role === "admin" ? "Admin" : "User" },
               { idx: 4, icon: <Business sx={{ fontSize: 18 }} />, label: "Branch Access", desc: `${(actionsMenuUser?.selected_branches || []).length} branches` },
+              { idx: 5, icon: <Lock sx={{ fontSize: 18 }} />, label: "Change Password", desc: "Reset password" },
             ].map(({ idx, icon, label, desc }) => (
               <Box
                 key={idx}
@@ -1648,6 +1714,16 @@ const AdminManagement = ({ onRefresh }) => {
 
           {/* Right Content Panel */}
           <Box sx={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+            {error && (
+              <Alert severity="error" sx={{ mx: 3.5, mt: 3.5 }} onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            )}
+            {success && (
+              <Alert severity="success" sx={{ mx: 3.5, mt: 3.5 }} onClose={() => setSuccess(null)}>
+                {success}
+              </Alert>
+            )}
 
             {/* Panel 0: IE Codes */}
             {actionsTab === 0 && (
@@ -2347,6 +2423,72 @@ const AdminManagement = ({ onRefresh }) => {
               </Box>
             )}
 
+            {/* Panel 5: Change Password */}
+            {actionsTab === 5 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Change Password</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>Update the password for this user account.</Typography>
+                </Box>
+
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, maxWidth: 400 }}>
+                  <TextField
+                    label="New Password"
+                    type={showNewPassword ? "text" : "password"}
+                    size="small"
+                    fullWidth
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowNewPassword((show) => !show)}
+                            edge="end"
+                            size="small"
+                          >
+                            {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <TextField
+                    label="Confirm New Password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    size="small"
+                    fullWidth
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowConfirmPassword((show) => !show)}
+                            edge="end"
+                            size="small"
+                          >
+                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+
+                <Box sx={{ mt: "auto", pt: 2 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleChangePassword}
+                    disabled={loading || !newPassword || !confirmPassword}
+                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, py: 1.2, px: 4, bgcolor: "#1e293b", color: "#fff !important" }}
+                  >
+                    {loading ? "Updating..." : "Update Password"}
+                  </Button>
+                </Box>
+              </Box>
+            )}
+
           </Box>
         </Box>
       </Dialog>
@@ -2358,6 +2500,8 @@ const AdminManagement = ({ onRefresh }) => {
           setSelectedIeCodes([]);
           setIeCodeReason("");
           setIeCodeMode("assign_import");
+          setError(null);
+          setSuccess(null);
         }}
         selectedEntity={selectedEntity}
         isRemovingIeCode={ieCodeMode === "remove"}
@@ -2369,6 +2513,10 @@ const AdminManagement = ({ onRefresh }) => {
         loading={loading}
         handleIeCodeOperation={handleIeCodeOperation}
         filteredIeCodes={filteredIeCodes}
+        error={error}
+        setError={setError}
+        success={success}
+        setSuccess={setSuccess}
       />
 
       {/* Admin Action Dialog */}
