@@ -1,0 +1,261 @@
+.lookup-container {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.lookup-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.lookup-header h2 {
+  color: #1a1a2e;
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+
+.lookup-subtitle {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+/* Tabs */
+.lookup-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0;
+}
+
+.lookup-tab {
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.3s ease;
+}
+
+.lookup-tab:hover {
+  color: #4f46e5;
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.lookup-tab.active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+  background: rgba(79, 70, 229, 0.08);
+}
+
+/* Form */
+.lookup-form {
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 20px;
+}
+
+.lookup-form .form-group label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 12px;
+}
+
+.search-input-group .form-control {
+  flex: 1;
+  padding: 14px 18px;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+.search-input-group .form-control:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.search-btn {
+  padding: 14px 28px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  min-width: 140px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border: none;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+}
+
+.form-hint {
+  display: block;
+  margin-top: 10px;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+/* Loading */
+.lookup-loading {
+  text-align: center;
+  padding: 40px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.lookup-loading p {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Result Card */
+.lookup-result-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.result-title {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 15px 20px;
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-icon {
+  font-size: 1.2rem;
+}
+
+.result-content {
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.result-table tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.result-table tr:last-child {
+  border-bottom: none;
+}
+
+.result-table td {
+  padding: 12px 8px;
+  vertical-align: top;
+}
+
+.result-key {
+  font-weight: 600;
+  color: #555;
+  width: 40%;
+  text-transform: capitalize;
+}
+
+.result-value {
+  color: #333;
+  word-break: break-word;
+}
+
+.result-raw {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .lookup-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .lookup-tab {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    font-size: 0.8rem;
+    padding: 10px 12px;
+  }
+  
+  .search-input-group {
+    flex-direction: column;
+  }
+  
+  .search-btn {
+    width: 100%;
+  }
+}

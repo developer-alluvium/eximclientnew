@@ -11,7 +11,7 @@ class ElockApiService {
 
         // Third-party API configuration
         this.thirdPartyBaseURL = process.env.NODE_ENV === "development"
-            ? "http://localhost:9005/api"
+            ? "http://localhost:9007/api"
             : "https://eximbot.alvision.in/transport/api";
     }
 

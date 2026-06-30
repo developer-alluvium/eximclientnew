@@ -246,17 +246,14 @@ const AdminManagement = ({ onRefresh }) => {
     setIsMouseDown(true);
     setStartX(e.pageX - tableContainerRef.current.offsetLeft);
     setScrollLeftState(tableContainerRef.current.scrollLeft);
-    document.body.style.userSelect = 'none';
   };
 
   const handleMouseLeave = () => {
     setIsMouseDown(false);
-    document.body.style.userSelect = 'auto';
   };
 
   const handleMouseUp = () => {
     setIsMouseDown(false);
-    document.body.style.userSelect = 'auto';
   };
 
   const handleMouseMove = (e) => {
@@ -269,6 +266,10 @@ const AdminManagement = ({ onRefresh }) => {
 
   useEffect(() => {
     fetchData();
+    return () => {
+      // Restore user selection on unmount in case it was modified
+      document.body.style.userSelect = 'auto';
+    };
   }, []);
 
   const fetchData = async () => {

@@ -247,7 +247,7 @@ router.get("/assign-limits", async (req, res) => {
     const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
-        ? "http://localhost:9005/api"
+        ? "http://localhost:9007/api"
         : "https://eximbot.alvision.in/transport/api";
 
     const response = await axios.get(
@@ -293,7 +293,7 @@ router.post("/maintenance/forecast/upload", upload.single("file"), async (req, r
         const serviceToken = await transportAuthService.getServiceToken();
 
         const targetBaseUrl = process.env.NODE_ENV === "development"
-            ? "http://localhost:9005/api"
+            ? "http://localhost:9007/api"
             : "https://eximbot.alvision.in/transport/api";
 
         const response = await axios.post(
@@ -351,7 +351,7 @@ router.get("/elock-status-history/:containerId", async (req, res) => {
         const serviceToken = await transportAuthService.getServiceToken();
 
         const targetBaseUrl = process.env.NODE_ENV === "development"
-            ? "http://localhost:9005/api"
+            ? "http://localhost:9007/api"
             : "https://eximbot.alvision.in/transport/api";
 
         console.log(`📨 Proxying status history request for container: ${containerId}`);
@@ -384,7 +384,7 @@ router.get("/elock-status-history-others/:containerId", async (req, res) => {
         const serviceToken = await transportAuthService.getServiceToken();
 
         const targetBaseUrl = process.env.NODE_ENV === "development"
-            ? "http://localhost:9005/api"
+            ? "http://localhost:9007/api"
             : "https://eximbot.alvision.in/transport/api";
 
         console.log(`📨 Proxying others status history request for container: ${containerId}`);

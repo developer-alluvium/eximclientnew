@@ -37,6 +37,9 @@ import exportProxyRoutes from "./routes/exportProxyRoutes.js"; // Export module 
 import importProxyRoutes from "./routes/importProxyRoutes.js"; // Import module proxy routes
 import openPointsRoutes from "./routes/openPointsRoutes.js";
 import transportAuthService from "./services/transportAuthService.js";
+import ewayBillProxyRoutes from "./routes/ewayBillProxyRoutes.js";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 // Load environment variables
 dotenv.config();
 
@@ -50,6 +53,24 @@ const PORT = config.port;
 if (config.nodeEnv === "production" || process.env.TRUST_PROXY === "1") {
   app.set("trust proxy", 1);
 }
+
+// Enable Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
+
+// Rate Limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 500 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many requests, please try again later."
+  }
+});
+app.use("/api", apiLimiter);
 
 // Middleware
 app.use(express.json());
@@ -65,7 +86,8 @@ const defaultOrigins = [
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",
   "https://eximbot.alvision.in",
-  /^https:\/\/.*\.ngrok-free\.app$/
+  "http://192.168.2.65:3001"
+
 ];
 
 const allowedOrigins = [
@@ -137,6 +159,7 @@ app.use(exportProxyRoutes); // Export module proxy routes
 app.use(importProxyRoutes); // Import module proxy routes
 app.use(analytics);
 app.use(openPointsRoutes); // Open Points routes
+app.use("/api/eway-bill", ewayBillProxyRoutes);
 
 app.use("/api/elock", elockRoutes);
 app.use("/api/elock-details", elockDetailsRoutes);
@@ -151,8 +174,8 @@ app.get("/api/notifications", async (req, res) => {
     const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
-        ? "http://localhost:9005/api"
-        : "https://eximbot.alvision.in/transport/api";
+      ? "http://localhost:9007/api"
+      : "https://eximbot.alvision.in/transport/api";
 
     const response = await axios.get(
       `${targetBaseUrl}/notifications`, {
@@ -180,7 +203,7 @@ app.get("/api/notifications/stream", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders && res.flushHeaders();
-  
+
   // Establish connection immediately
   res.write(': connected\n\n');
 
@@ -191,8 +214,8 @@ app.get("/api/notifications/stream", (req, res) => {
     try {
       const serviceToken = await transportAuthService.getServiceToken();
       const targetBaseUrl = process.env.NODE_ENV === "development"
-          ? "http://localhost:9005/api"
-          : "https://eximbot.alvision.in/transport/api";
+        ? "http://localhost:9007/api"
+        : "https://eximbot.alvision.in/transport/api";
 
       const response = await axios.get(`${targetBaseUrl}/notifications`, {
         params: { assetIds },
@@ -200,10 +223,10 @@ app.get("/api/notifications/stream", (req, res) => {
           ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
         }
       });
-      
+
       const responseData = response.data;
       const dataArray = Array.isArray(responseData) ? responseData : (responseData.data || responseData.notifications || []);
-      
+
       if (isFirstFetch) {
         dataArray.forEach(notif => {
           const title = notif.components?.title || notif.title || "";
@@ -218,7 +241,7 @@ app.get("/api/notifications/stream", (req, res) => {
           const title = notif.components?.title || notif.title || "";
           const timeStr = notif.components?.time || notif.createdAt;
           const key = `${title}_${timeStr}`;
-          
+
           if (!previousState.has(key)) {
             previousState.add(key);
             newNotifications.push(notif);

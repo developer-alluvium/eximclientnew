@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Tag, Pagination, Spin, Empty, Tooltip } from 'antd';
 import ColumnSettingsModal from './ColumnSettingsModal';
+import axios from 'axios';
+import Swal from 'sweetalert2';
+import LrEwayBillDialog from '../ewaybill/Modals/LrEwayBillDialog';
 import '../../styles/transport.scss';
 
 const formatDate = (dateVal) => {
@@ -27,6 +30,76 @@ const TransportTable = ({
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  // E-Way Bill Dialog States
+  const [isLrEwayBillDialogOpen, setIsLrEwayBillDialogOpen] = useState(false);
+  const [lrEwayBillMode, setLrEwayBillMode] = useState("generate"); // "generate" | "update"
+  const [currentContainer, setCurrentContainer] = useState(null);
+  const [prData, setPrData] = useState(null);
+  const [containers, setContainers] = useState([]);
+  const [selectedEWBData, setSelectedEWBData] = useState(null);
+
+  const handleEwayBillClick = async (row) => {
+    const docNo = row.original.be_no || row.original.document_no;
+    if (!docNo) {
+      Swal.fire("Error", "No Bill of Entry (BE No) or Document No found for this container.", "error");
+      return;
+    }
+    
+    Swal.fire({
+      title: "Fetching Details...",
+      text: "Please wait while we retrieve LR details.",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const response = await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data`, {
+        params: { document_no: docNo }
+      });
+
+      if (response.data.success && response.data.data) {
+        const prInfo = response.data.data;
+        setPrData(prInfo);
+        setContainers(prInfo.all_active_containers || []);
+        
+        // Find specific container
+        const container = prInfo.all_active_containers.find(
+          c => c.tr_no === row.original.tr_no || c.container_number === row.original.container_number
+        ) || prInfo.container_details;
+
+        setCurrentContainer(container);
+
+        if (row.original.eWay_bill && /^\d{12}$/.test(String(row.original.eWay_bill).trim())) {
+          // Fetch existing EWB details to manage it
+          const listRes = await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/list`, {
+            params: { search: row.original.eWay_bill }
+          });
+
+          const ewb = listRes.data.data?.find(e => e.ewbNo == row.original.eWay_bill);
+          if (ewb) {
+            setSelectedEWBData(ewb);
+          } else {
+            setSelectedEWBData({ ewbNo: row.original.eWay_bill, userGstin: prInfo.consignor?.gstin || prInfo.consignee?.gstin });
+          }
+          setLrEwayBillMode("update");
+        } else {
+          setLrEwayBillMode("generate");
+          setSelectedEWBData(null);
+        }
+
+        setIsLrEwayBillDialogOpen(true);
+        Swal.close();
+      } else {
+        throw new Error("Failed to retrieve LR data");
+      }
+    } catch (error) {
+      console.error("Error fetching LR details for EWB:", error);
+      Swal.fire("Error", "Could not fetch LR details for E-Way Bill. Ensure the LR exists for this container.", "error");
+    }
+  };
 
   // Define Columns
   const columns = useMemo(
@@ -90,7 +163,23 @@ const TransportTable = ({
         minWidth: 160,
         Cell: ({ row }) => (
           <div className="t-cell">
-            <span className="t-link">{row.original.eWay_bill || 'NA'}</span>
+            {row.original.eWay_bill ? (
+              <span 
+                className="t-link" 
+                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => handleEwayBillClick(row)}
+              >
+                {row.original.eWay_bill}
+              </span>
+            ) : (
+              <span 
+                className="t-link" 
+                style={{ cursor: 'pointer', color: '#1677ff', fontWeight: 500 }}
+                onClick={() => handleEwayBillClick(row)}
+              >
+                Generate EWB
+              </span>
+            )}
             <span className="t-sub">{row.original.vehicle_no || 'NA'}</span>
           </div>
         ),
@@ -448,6 +537,29 @@ const TransportTable = ({
         onSave={(newOrder) => {
           setColumnOrder(newOrder); // Update Parent State
           setIsColumnSettingsOpen(false);
+        }}
+      />
+
+      {/* E-Way Bill Dialog */}
+      <LrEwayBillDialog
+        open={isLrEwayBillDialogOpen}
+        mode={lrEwayBillMode}
+        container={currentContainer}
+        prData={prData}
+        containers={containers}
+        existingEwb={selectedEWBData}
+        onClose={() => {
+          setIsLrEwayBillDialogOpen(false);
+          setCurrentContainer(null);
+          setSelectedEWBData(null);
+        }}
+        onSuccess={() => {
+          setIsLrEwayBillDialogOpen(false);
+          setCurrentContainer(null);
+          setSelectedEWBData(null);
+          if (onRefresh) {
+            onRefresh();
+          }
         }}
       />
     </div>

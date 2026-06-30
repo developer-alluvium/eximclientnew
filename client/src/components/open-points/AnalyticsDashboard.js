@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import '../../styles/openPoints.scss';
 
-const API_URL = process.env.REACT_APP_API_STRING || 'http://localhost:9003/api';
+const API_URL = process.env.REACT_APP_API_STRING || 'http://localhost:9007/api';
 
 const getCookie = (name) => {
     const value = `; ${document.cookie}`;

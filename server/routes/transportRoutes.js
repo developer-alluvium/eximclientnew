@@ -1,5 +1,5 @@
 import express from 'express';
-import { getClientTransportData } from '../controllers/transportController.js';
+import { getClientTransportData, getBoeExtract } from '../controllers/transportController.js';
 import { authenticateUser } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
@@ -9,5 +9,6 @@ router.use(authenticateUser);
 
 // Proxy route for transport data
 router.get('/data', getClientTransportData);
+router.get('/boe-extract', getBoeExtract);
 
 export default router;
