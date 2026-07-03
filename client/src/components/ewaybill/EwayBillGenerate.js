@@ -1094,6 +1094,26 @@ function EwayBillGenerate({
     const itemDutyRates = boeDetail.ItemDutyRates || [];
     const items = invoiceDetails.ITEMS || [];
 
+    // ========== Multi‑Rate Guard: Stop if ItemDutyRates has multiple different IGST values ==========
+    if (itemDutyRates.length > 0) {
+      const uniqueIgstValues = new Set();
+      for (const rateItem of itemDutyRates) {
+        const igstVal = parseFloat(rateItem['IGST']) || 0;
+        uniqueIgstValues.add(igstVal);
+      }
+      if (uniqueIgstValues.size > 1) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Multi‑Rate BOE Not Supported',
+          text: 'This BOE has items with multiple different IGST rates, which requires manual review. Please enter values manually.',
+          confirmButtonText: 'OK',
+        });
+        // Still initialize basic form state so user can edit manually
+        return;
+      }
+    }
+    // =================================================================================================
+
     // Priority for party data:
     // 1. lrData (internal LR DB) — most accurate, already in our system
     // 2. _prData from backend merge
@@ -1134,23 +1154,19 @@ function EwayBillGenerate({
     setBoeContainers(containerDetails);
     setWeightPerContainer(weightPerCont);
     
-    // Calculate Total Value and Per KG Value for proportional distribution
-    const totalAssVal = parseFloat(dutySummaryData['TOT.ASS VAL']) || 0;
-    const bcdVal = parseFloat(dutySummaryData['BCD']) || 0;
-    const swsVal = parseFloat(dutySummaryData['SWS']) || parseFloat(dutySummaryData['SW Surcharge']) || 0;
+    // ========== New Calculation Logic ==========
+    // Formula (as validated against real BOE):
+    //  Y (Total Taxable) = IGST Amount ÷ (IGST Rate / 100)
+    //  Per KG Value       = Y ÷ Total Gross Weight (ManifestDetails.GW)
+    //  Container Taxable  = Per KG Value × Container Weight
+    //  Container IGST     = Container Taxable × IGST Rate
+    //  Total Inv. Amt      = Container Taxable + Container IGST
     const igstAbsolute = parseFloat(dutySummaryData['IGST']) || 0;
-    const calcTotalValue = totalAssVal + bcdVal + swsVal;
+    const igstRate = itemDutyRates.length > 0 ? (parseFloat(itemDutyRates[0]['IGST']) || 0) : 0;
+    const calcTotalValue = igstRate > 0 ? (igstAbsolute / (igstRate / 100)) : 0;
     const calcPerKgValue = totalGW > 0 ? (calcTotalValue / totalGW) : 0;
-
-    // ─── Effective IGST % ─────────────────────────────────────────────
-    // IGST% = (IGST_amount / (AssessableValue + BCD + SWS) × 100)
-    // This is the CORRECT rate to use for any proportional assessable value.
-    // Using direct item duty rates would be wrong for subset-container generation.
-    // We use parseFloat(toFixed(2)) to allow precision while avoiding Math.ceil rounding issues.
-    const effectiveIgstPercent = calcTotalValue > 0
-      ? parseFloat(((igstAbsolute / calcTotalValue) * 100).toFixed(2))
-      : parseFloat((itemDutyRates.length > 0 ? (parseFloat(itemDutyRates[0]['IGST']) || 0) : 0).toFixed(2));
-    // ─────────────────────────────────────────────────────────────────
+    const effectiveIgstPercent = igstRate;
+    // ===========================================
 
     setTotalValueFromBoe(calcTotalValue);
     setPerKgValue(calcPerKgValue);
