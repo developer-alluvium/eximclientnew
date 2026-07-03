@@ -39,10 +39,23 @@ import { parseNicErrorMessage } from "../EwayBillGenerate";
 import { 
   checkCancellationWindow, 
   checkRejectionWindow,
-  validateVehicleNumber 
+  validateVehicleNumber,
+  validateGstinFormat,
+  checkExtensionWindow,
+  parseEwbDate
 } from "../ewbValidationHelpers";
 
 const TRANSPORT_MODE_MAP = { 1: "Road", 2: "Rail", 3: "Air", 4: "Ship" };
+
+const formatReason = (reason) => {
+  if (!reason) return "—";
+  const clean = String(reason).trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (clean === "1" || clean.includes("breakdown") || clean.includes("break")) return "Breakdown";
+  if (clean === "2" || clean.includes("tranship") || clean.includes("transship")) return "Transshipment";
+  if (clean === "3" || clean.includes("other")) return "Others";
+  if (clean === "4" || clean.includes("first")) return "First Time";
+  return reason.charAt(0).toUpperCase() + reason.slice(1);
+};
 
 const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
@@ -74,6 +87,7 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [initializedEwayBillNo, setInitializedEwayBillNo] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Time-window state (computed on modal open)
   const [cancelWindowOpen, setCancelWindowOpen] = useState(true);
@@ -101,16 +115,17 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   };
 
   const normalizeVehicleUpdateReasonCode = (code) => {
-    if (!code) return "2";
+    if (!code) return "1";
     const normalized = String(code).trim().toLowerCase().replace(/\s+/g, '');
     switch (normalized) {
       case "duetobreakdown":
       case "breakdown":
-      case "2":
-        return "2";
-      case "transshipment":
       case "1":
         return "1";
+      case "transshipment":
+      case "transhipment":
+      case "2":
+        return "2";
       case "others":
       case "3":
         return "3";
@@ -143,7 +158,7 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
     vehicleNo: "",
     currentPlace: "",
     currentState: "",
-    reason: "Others",
+    reason: "99",
     remarks: "Traffic Delay",
     currentPincode: "",
     modeOfTransport: "1",
@@ -300,28 +315,44 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
     setError(null);
+    setFieldErrors({});
   };
 
   const handleUpdateVehicle = async () => {
     try {
       setLoading(true);
-      const fieldErrors = {};
+      setFieldErrors({});
 
-      if (!vehicleForm.vehicleNo) fieldErrors.vehicleNo = "Vehicle Number is required";
+      // TC-VEH-02 Expiry check
+      if (ewayBill.validUpto) {
+        const parsedValDate = parseEwbDate(ewayBill.validUpto);
+        if (parsedValDate && new Date() >= parsedValDate) {
+          const expiryMsg = "Vehicle details cannot be updated because the validity period of the E-Way Bill has expired.";
+          setError(expiryMsg);
+          Swal.fire("Validation Error", expiryMsg, "error");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const errors = {};
+
+      if (!vehicleForm.vehicleNo) errors.vehicleNo = "Vehicle Number is required";
       
       // NEW: Validate vehicle number format
       const vnErr = validateVehicleNumber(vehicleForm.vehicleNo);
-      if (vnErr) fieldErrors.vehicleNo = vnErr;
+      if (vnErr) errors.vehicleNo = vnErr;
 
-      if (!vehicleForm.fromPlace) fieldErrors.fromPlace = "From Place is required";
+      if (!vehicleForm.fromPlace) errors.fromPlace = "From Place is required";
 
       const effectiveFromState = getStateCode(vehicleForm.fromState);
-      if (!effectiveFromState) fieldErrors.fromState = "From State is required and must be a valid Indian state";
+      if (!effectiveFromState) errors.fromState = "From State is required and must be a valid Indian state";
 
       const effectiveReasonCode = normalizeVehicleUpdateReasonCode(vehicleForm.reasonCode);
-      if (!effectiveReasonCode) fieldErrors.reasonCode = "Reason for vehicle update is required";
+      if (!effectiveReasonCode) errors.reasonCode = "Reason for vehicle update is required";
 
-      if (Object.keys(fieldErrors).length > 0) {
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
         setError("Please complete all required fields before updating vehicle.");
         setLoading(false);
         return;
@@ -361,7 +392,19 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   const handleUpdateTransporter = async () => {
     try {
       setLoading(true);
-      if (!transporterForm.transporterId) throw new Error("Transporter ID is required");
+      setFieldErrors({});
+
+      if (!transporterForm.transporterId) {
+        setFieldErrors({ transporterId: "Transporter ID is required" });
+        throw new Error("Transporter ID is required");
+      }
+
+      const gstinErr = validateGstinFormat(transporterForm.transporterId);
+      if (gstinErr) {
+        setFieldErrors({ transporterId: gstinErr });
+        throw new Error(gstinErr);
+      }
+
       const payload = {
         ewayBillNo: ewayBill.ewbNo,
         transporterId: transporterForm.transporterId,
@@ -385,6 +428,35 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   const handleExtendValidity = async () => {
     try {
       setLoading(true);
+      setFieldErrors({});
+
+      // TC-EXT-05 Cancelled check
+      if (ewayBill.ewbStatus === "Cancelled" || ewayBill.status === "Cancelled") {
+        const cancelErr = "Cannot extend validity for a cancelled E-Way Bill.";
+        setError(cancelErr);
+        Swal.fire("Validation Error", cancelErr, "error");
+        setLoading(false);
+        return;
+      }
+
+      // TC-EXT-02 & TC-EXT-03 Extension window check
+      if (ewayBill.validUpto) {
+        const ew = checkExtensionWindow(ewayBill.validUpto);
+        if (!ew.withinWindow) {
+          const hours = ew.hoursUntilExpiry;
+          let msg = "";
+          if (hours > 8) {
+            msg = `Extension is too early. You can only extend validity within 8 hours of the expiry time (currently ${hours.toFixed(1)} hours remaining).`;
+          } else {
+            msg = `Extension is too late. The E-Way Bill expired ${Math.abs(hours).toFixed(1)} hours ago (maximum allowed window is 8 hours past expiry).`;
+          }
+          setError(msg);
+          Swal.fire("Validation Error", msg, "error");
+          setLoading(false);
+          return;
+        }
+      }
+
       const payload = {
         ewayBillNo: ewayBill.ewbNo,
         vehicleNo: extendForm.vehicleNo,
@@ -418,6 +490,30 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
   const handleCancel = async () => {
     try {
       setLoading(true);
+      setFieldErrors({});
+
+      // TC-CAN-04 Check if already cancelled
+      if (ewayBill.ewbStatus === "Cancelled" || ewayBill.status === "Cancelled") {
+        const alreadyCancelErr = "This E-Way Bill has already been cancelled.";
+        setError(alreadyCancelErr);
+        Swal.fire("Validation Error", alreadyCancelErr, "error");
+        setLoading(false);
+        return;
+      }
+
+      // TC-CAN-02 Cancellation window check (within 24 hours of generation)
+      const genTime = ewayBill.generatedAt || ewayBill.ewbDate || ewayBill.createdAt;
+      if (genTime) {
+        const cw = checkCancellationWindow(genTime);
+        if (!cw.withinWindow) {
+          const msg = `Cancellation is blocked because the 24-hour window has expired. (E-Way Bill was generated ${cw.hoursElapsed.toFixed(1)} hours ago).`;
+          setError(msg);
+          Swal.fire("Validation Error", msg, "error");
+          setLoading(false);
+          return;
+        }
+      }
+
       const payload = {
         ewayBillNo: ewayBill.ewbNo,
         cancelReason: cancelForm.cancelReason,
@@ -639,6 +735,8 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 value={vehicleForm.vehicleNo}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleNo: e.target.value.toUpperCase() })}
                 placeholder="e.g. TM1234"
+                error={!!fieldErrors.vehicleNo}
+                helperText={fieldErrors.vehicleNo}
               />
             </Grid>
             <Grid item xs={6}>
@@ -649,6 +747,8 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 value={vehicleForm.fromPlace}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, fromPlace: e.target.value })}
                 placeholder="e.g. HANGAL"
+                error={!!fieldErrors.fromPlace}
+                helperText={fieldErrors.fromPlace}
               />
             </Grid>
             <Grid item xs={6}>
@@ -659,6 +759,8 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 value={vehicleForm.fromState}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, fromState: e.target.value })}
                 placeholder="e.g. GUJARAT or OTHER COUNTRY"
+                error={!!fieldErrors.fromState}
+                helperText={fieldErrors.fromState}
               />
             </Grid>
 
@@ -671,8 +773,8 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 value={vehicleForm.reasonCode}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, reasonCode: e.target.value })}
               >
-                <MenuItem value="1">Transshipment</MenuItem>
-                <MenuItem value="2">Due to Break Down</MenuItem>
+                <MenuItem value="1">Due to Break Down</MenuItem>
+                <MenuItem value="2">Transshipment</MenuItem>
                 <MenuItem value="3">Others</MenuItem>
                 <MenuItem value="4">First Time Update</MenuItem>
               </TextField>
@@ -745,6 +847,8 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 value={transporterForm.transporterId}
                 onChange={(e) => setTransporterForm({ ...transporterForm, transporterId: e.target.value.toUpperCase() })}
                 placeholder="15-digit GSTIN"
+                error={!!fieldErrors.transporterId}
+                helperText={fieldErrors.transporterId}
               />
             </Grid>
           </Grid>
@@ -1136,10 +1240,10 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                 onChange={(e) => setCancelForm({ ...cancelForm, cancelReason: e.target.value })}
                 disabled={!cancelWindowOpen}
               >
-                <MenuItem value="Duplicate">Duplicate</MenuItem>
-                <MenuItem value="Order Cancelled">Order Cancelled</MenuItem>
-                <MenuItem value="Data Entry Error">Data Entry Error</MenuItem>
-                <MenuItem value="others">Others</MenuItem>
+                <MenuItem value="1">Duplicate</MenuItem>
+                <MenuItem value="2">Order Cancelled</MenuItem>
+                <MenuItem value="3">Data Entry Mistake</MenuItem>
+                <MenuItem value="4">Others</MenuItem>
               </TextField>
             </Grid>
             <Grid item xs={12}>
@@ -1197,6 +1301,7 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                   <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>Trans Mode</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>Vehicle No/Trans Doc No</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>From Place</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>Reason</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>Updated By/Date</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", py: 0.5 }}>Cons.EWB No.</TableCell>
                 </TableRow>
@@ -1208,6 +1313,7 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{TRANSPORT_MODE_MAP[h.modeOfTransport] || "Road"}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}><strong>{h.newVehicle}</strong><br/>{h.transporterDocNo}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{h.fromPlace}</TableCell>
+                    <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{formatReason(h.reasonCode)}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{h.updatedAt ? new Date(h.updatedAt).toLocaleString("en-IN") : "—"}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{h.apiResponse?.cewbNo || "NA"}</TableCell>
                   </TableRow>
@@ -1218,6 +1324,7 @@ const EwayBillActionModal = ({ open, onClose, ewayBill, onSuccess }) => {
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{TRANSPORT_MODE_MAP[h.modeOfTransport] || "Road"}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}><strong>{h.vehicleNumber}</strong><br/>{h.transporterDocNo}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{groupInfo?.placeOfConsignor}</TableCell>
+                    <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{formatReason(h.reasonCode || groupInfo?.reasonCode || mvData?.reasonCode)}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{h.addedAt ? new Date(h.addedAt).toLocaleString("en-IN") : "—"}</TableCell>
                     <TableCell sx={{ fontSize: "0.7rem", py: 0.5 }}>{h.apiResponse?.cewbNo || "NA"}</TableCell>
                   </TableRow>

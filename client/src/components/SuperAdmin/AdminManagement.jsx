@@ -167,6 +167,12 @@ const AVAILABLE_MODULES = [
     category: "core",
   },
   {
+    id: "/ewaybill",
+    name: "E-Way Bill",
+    description: "Generate and manage e-way bills with direct ICEGATE Integration",
+    category: "core",
+  },
+  {
     id: "/export",
     name: "Export DSR",
     description: "View and manage export shipment jobs, track IEC-wise export data from the Export module",

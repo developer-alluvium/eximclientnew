@@ -1006,3 +1006,55 @@ export const getSuppliers = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch suppliers from third-party API." });
   }
 };
+
+/**
+ * PATCH /api/jobs/container-ewaybill/:id
+ */
+export const updateContainerEwayBill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { updates } = req.body; // Array of { container_no, ewaybill_no }
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ success: false, message: "Updates array is required" });
+    }
+
+    const Job = mongoose.models.Job || mongoose.model("Job");
+    
+    // Fetch the job to resolve indices
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    const dbContainers = job.container_nos || [];
+    const setQuery = {};
+
+    updates.forEach(u => {
+      const cNo = (u.container_no || "").trim().toUpperCase();
+      const ewbNo = (u.ewaybill_no || "").trim();
+      
+      if (!cNo || !ewbNo) return;
+
+      const dbIndex = dbContainers.findIndex(dc => 
+        (dc.container_number || dc.container_no || "").trim().toUpperCase() === cNo
+      );
+
+      if (dbIndex !== -1) {
+        setQuery[`container_nos.${dbIndex}.ewaybill_no`] = ewbNo;
+      }
+    });
+
+    if (Object.keys(setQuery).length === 0) {
+      return res.status(400).json({ success: false, message: "No matching containers found to update" });
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(id, { $set: setQuery }, { new: true });
+
+    res.json({ success: true, message: "Container E-Way Bill(s) updated successfully", data: updatedJob });
+  } catch (error) {
+    console.error("Error updating container E-Way Bill in MongoDB:", error);
+    res.status(500).json({ success: false, message: "Failed to update container E-Way Bill.", error: error.message });
+  }
+};
+

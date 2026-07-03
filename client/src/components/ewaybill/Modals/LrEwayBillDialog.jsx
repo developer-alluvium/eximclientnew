@@ -38,6 +38,9 @@ import {
   checkCancellationWindow,
   checkRejectionWindow,
   validateVehicleNumber,
+  validateGstinFormat,
+  checkExtensionWindow,
+  parseEwbDate
 } from "../ewbValidationHelpers";
 
 import EwayBillGenerateLR from "../EwayBillGenerateLR";
@@ -96,30 +99,6 @@ const TabPanel = ({ children, value, index, ...other }) => (
 // ─── Constants ───────────────────────────────────────────────────────────────
 const EXTENSION_WINDOW_HOURS = 8;
 
-const checkExtensionWindow = (validUpto) => {
-  const now = new Date();
-  let validDate = null;
-  if (!validUpto) return { withinWindow: false, hoursUntilExpiry: 0, isExpired: false };
-  const s = String(validUpto).trim();
-  const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (match) {
-    const [_, day, month, year] = match;
-    const t = s.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-    if (t) {
-      let h = parseInt(t[1]);
-      if (t[4].toUpperCase() === "PM" && h !== 12) h += 12;
-      if (t[4].toUpperCase() === "AM" && h === 12) h = 0;
-      validDate = new Date(year, month - 1, day, h, parseInt(t[2]), parseInt(t[3]));
-    } else {
-      validDate = new Date(year, month - 1, day, 23, 59, 59);
-    }
-  } else {
-    validDate = new Date(validUpto);
-  }
-  if (isNaN(validDate.getTime())) return { withinWindow: false, error: "Invalid date" };
-  const diff = (validDate - now) / (1000 * 60 * 60);
-  return { withinWindow: Math.abs(diff) <= EXTENSION_WINDOW_HOURS, hoursUntilExpiry: diff, isExpired: diff < 0 };
-};
 
 const STATE_NAME_TO_CODE = {
   "JAMMU AND KASHMIR": "01", "HIMACHAL PRADESH": "02", "PUNJAB": "03", "CHANDIGARH": "04",
@@ -247,6 +226,7 @@ const LrEwayBillDialog = ({
   const [boeLrData, setBoeLrData] = useState(null);
   const [boeLoading, setBoeLoading] = useState(false);
   const [boeError, setBoeError] = useState("");
+  const [boeDocDate, setBoeDocDate] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", type: "error" });
 
   const showToast = (message, type = "error") => setSnackbar({ open: true, message, type });
@@ -321,7 +301,7 @@ const LrEwayBillDialog = ({
   const getFieldError = (keywords) => {
     if (!ewbUpdateError) return null;
     const lower = ewbUpdateError.toLowerCase();
-    const generalKw = ["validity", "expired", "lapsed", "cancelled", "rejected", "311", "312", "invalid gstin"];
+    const generalKw = ["validity", "expired", "lapsed", "cancelled", "rejected", "311", "312"];
     if (generalKw.some((k) => lower.includes(k))) return null;
     return keywords.some((k) => lower.includes(k.toLowerCase())) ? ewbUpdateError : null;
   };
@@ -421,6 +401,8 @@ const LrEwayBillDialog = ({
 
       const rawDate = prData?.be_date || prData?.document_date || prData?.boe_date || "";
       const docDate = parseDateToYyyyMmDd(rawDate) || new Date().toISOString().split("T")[0];
+      // Store the parsed BOE date so the form pre-fills Document Date correctly
+      setBoeDocDate(parseDateToYyyyMmDd(rawDate) || null);
 
       const [calcRes, extractRes, lrRes] = await Promise.allSettled([
         axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-value-calc?document_no=${encodeURIComponent(targetDocNo)}&be_date=${docDate}`),
@@ -466,10 +448,9 @@ const LrEwayBillDialog = ({
 
   const handleContainerAction = useCallback((cont, action) => {
     if (action === "generate") {
-      if (!cont.container_number || !cont.tr_no) {
-        Swal.fire("Error", "LR is not generated for the selected container. Please add the container number and generate the LR first.", "error");
-        return;
-      }
+      // ✅ LR is only required for Part B (when vehicle number is provided).
+      // Part A can be generated without LR — do NOT block here.
+      // The LR check at submit time (in EwayBillGenerateLR.js) handles Part B validation.
       setSelectedContainers([cont]); setContainerSelectionMode("selected");
       const targetDocNo = prData?.be_no || prData?.boe_no || prData?.document_no || prData?.BOE_NO || "";
       if (targetDocNo) {
@@ -558,6 +539,7 @@ const LrEwayBillDialog = ({
       setBoeLrData(null);
       setBoeLoading(false);
       setBoeError("");
+      setBoeDocDate(null);
     }
   }, [open]);
 
@@ -666,7 +648,9 @@ const LrEwayBillDialog = ({
     if (action !== "generate" || !canGenerateEWB) return;
     const targets = selectedContainers.length > 0 ? selectedContainers : multiContainerData.filter((c) => !c.eWay_bill);
     if (!targets.length) return;
-    if (targets.some((c) => !c.container_number || !c.tr_no)) { Swal.fire("Error", "LR is not generated for the selected container.", "error"); return; }
+    // ✅ LR is only required for Part B (when vehicle number is provided).
+    // Part A can be generated without LR — do NOT block here.
+    // if (targets.some((c) => !c.container_number || !c.tr_no)) { ... }
     setSelectedContainers(targets);
     setContainerSelectionMode(targets.length === 1 ? "selected" : "all");
     const targetDocNo = prData?.be_no || prData?.boe_no || prData?.document_no || prData?.BOE_NO || "";
@@ -680,6 +664,14 @@ const LrEwayBillDialog = ({
     try {
       setIsLoading(true);
       if (!vehicleForm.vehicleNo) throw new Error("Vehicle number is required");
+      
+      if (selectedEWB?.validUpto) {
+        const parsedValDate = parseEwbDate(selectedEWB.validUpto);
+        if (parsedValDate && new Date() >= parsedValDate) {
+          throw new Error("Vehicle details cannot be updated because the validity period of the E-Way Bill has expired.");
+        }
+      }
+
       const vnErr = validateVehicleNumber(vehicleForm.vehicleNo);
       if (vnErr) { setEwbUpdateError(vnErr); throw new Error(vnErr); }
       const ewayBillNo = partAForm.ewayBillNo || selectedEWB?.ewbNo;
@@ -698,6 +690,23 @@ const LrEwayBillDialog = ({
     try {
       setIsLoading(true);
       if (!extendForm.remarks) throw new Error("Remarks are required");
+
+      if (selectedEWB?.ewbStatus === "Cancelled" || selectedEWB?.status === "Cancelled") {
+        throw new Error("Cannot extend validity for a cancelled E-Way Bill.");
+      }
+
+      if (selectedEWB?.validUpto) {
+        const ew = checkExtensionWindow(selectedEWB.validUpto);
+        if (!ew.withinWindow) {
+          const hours = ew.hoursUntilExpiry;
+          if (hours > 8) {
+            throw new Error(`Extension is too early. You can only extend validity within 8 hours of the expiry time (currently ${hours.toFixed(1)} hours remaining).`);
+          } else {
+            throw new Error(`Extension is too late. The E-Way Bill expired ${Math.abs(hours).toFixed(1)} hours ago.`);
+          }
+        }
+      }
+
       const ewayBillNo = partAForm.ewayBillNo || selectedEWB?.ewbNo;
       const userGstin = partAForm.gstin || selectedEWB?.userGstin || process.env.REACT_APP_DEFAULT_GSTIN || "24ANGPR7652E1ZV";
       if (!ewayBillNo || !userGstin) throw new Error("E-Way Bill number and GSTIN are required");
@@ -714,6 +723,10 @@ const LrEwayBillDialog = ({
       setIsLoading(true);
       const newId = transporterForm.selectedOrg?.gstin || transporterForm.transporterId;
       if (!newId) throw new Error("Transporter GSTIN is required");
+
+      const gstinErr = validateGstinFormat(newId);
+      if (gstinErr) throw new Error(gstinErr);
+
       const ewayBillNo = partAForm.ewayBillNo || selectedEWB?.ewbNo;
       const userGstin = partAForm.gstin || selectedEWB?.userGstin || process.env.REACT_APP_DEFAULT_GSTIN || "24ANGPR7652E1ZV";
       if (!ewayBillNo || !userGstin) throw new Error("E-Way Bill number and GSTIN are required");
@@ -803,6 +816,9 @@ const LrEwayBillDialog = ({
   const handleCancelEWB = async () => {
     try {
       setIsLoading(true);
+      if (selectedEWB?.ewbStatus === "Cancelled" || selectedEWB?.status === "Cancelled") {
+        throw new Error("This E-Way Bill has already been cancelled.");
+      }
       if (!cancelForm.cancelReason) throw new Error("Cancellation reason is required");
       if (!cancelForm.cancelRemark?.trim()) { setEwbUpdateError("Cancellation remarks are required"); return; }
       const ewayBillNo = partAForm.ewayBillNo || selectedEWB?.ewbNo;
@@ -816,14 +832,30 @@ const LrEwayBillDialog = ({
     } finally { setIsLoading(false); }
   };
 
-  const handleGenerationSuccess = (data) => {
+  const handleGenerationSuccess = async (data) => {
     setWasModified(true);
     let ewbData = data;
+
     if (Array.isArray(data)) {
-      const successResult = data.find(r => r.status === "success" && r.ewbNo);
-      if (successResult) {
-        ewbData = successResult;
+      // ── "Already exists" path: all results have status "exists"
+      const existsResult = data.find(r => r.status === "exists" && r.ewbNo);
+      if (existsResult && !data.find(r => r.status === "success")) {
+        // Fetch Part A details for the existing EWB and navigate to manage view
+        const ewbNo = existsResult.ewbNo;
+        setPartAForm(prev => ({ ...prev, ewayBillNo: ewbNo, gstin: process.env.REACT_APP_DEFAULT_GSTIN || prev.gstin }));
+        const fetched = await fetchPartAData(process.env.REACT_APP_DEFAULT_GSTIN, ewbNo);
+        if (!fetched) {
+          // Fallback: set minimal EWB data from the error info
+          setSelectedEWB({ ewbNo, ewayBillNo: ewbNo });
+        }
+        setInternalStep("ewb-manage");
+        setTimeout(() => setEwbManagementMode(0), 100); // Tab 0 = Part A preview
+        return;
       }
+
+      // ── Normal success path
+      const successResult = data.find(r => r.status === "success" && r.ewbNo);
+      if (successResult) ewbData = successResult;
     }
 
     const ewbNo = ewbData?.ewbNo;
@@ -855,23 +887,29 @@ const LrEwayBillDialog = ({
   const handleDownloadPDF = async () => {
     const pdfUrl = partAData?.meta?.pdfUrl || partAData?.pdfUrl || selectedEWB?.meta?.pdfUrl || selectedEWB?.pdfUrl;
     if (!pdfUrl) { showToast("PDF URL not available", "error"); return; }
-    let url = pdfUrl;
-    if (!url.startsWith("http")) url = `https://${url}`;
+
     try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Network error");
+      // Fetch via server-side proxy to avoid CORS / binary encoding issues
+      const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
+      const res = await fetch(proxyUrl, { credentials: "include" });
+      if (!res.ok) {
+        let errMsg = "Failed to download PDF";
+        try { const j = await res.json(); errMsg = j.message || errMsg; } catch (_) {}
+        throw new Error(errMsg);
+      }
       const blob = await res.blob();
+      if (!blob.size) throw new Error("Empty PDF received");
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.setAttribute("download", `EWayBill_${selectedEWB?.ewbNo || partAData?.eway_bill_number || partAForm.ewayBillNo || "download"}.pdf`);
+      a.setAttribute("download", `EWB_${selectedEWB?.ewbNo || partAData?.eway_bill_number || partAForm.ewayBillNo || "download"}.pdf`);
       document.body.appendChild(a);
       a.click();
       a.parentNode.removeChild(a);
       window.URL.revokeObjectURL(blobUrl);
       showToast("PDF download started", "success");
-    } catch (_) {
-      showToast("Failed to download PDF", "error");
+    } catch (err) {
+      showToast(err.message || "Failed to download PDF", "error");
     }
   };
 
@@ -886,6 +924,16 @@ const LrEwayBillDialog = ({
   const MODES = ["Road", "Rail", "Air", "Ship"];
   const modeLabel = (v) => MODES[parseInt(v) - 1] || v || "Road";
 
+  const formatReason = (reason) => {
+    if (!reason) return "—";
+    const clean = String(reason).trim().toLowerCase().replace(/[\s_-]+/g, "");
+    if (clean === "1" || clean.includes("breakdown") || clean.includes("break")) return "Breakdown";
+    if (clean === "2" || clean.includes("tranship") || clean.includes("transship")) return "Transshipment";
+    if (clean === "3" || clean.includes("other")) return "Others";
+    if (clean === "4" || clean.includes("first")) return "First Time";
+    return reason.charAt(0).toUpperCase() + reason.slice(1);
+  };
+
   // ─── History Table ──────────────────────────────────────────────────────────
   const HistoryTable = ({ history = [], mvList = [], unitCode = "NOS", sourceList }) => {
     const rows = [...history];
@@ -899,6 +947,7 @@ const LrEwayBillDialog = ({
           groupNo: v.groupNo,
           qty: v.quantity,
           modeOfTransport: v.modeOfTransport,
+          reasonCode: v.reasonCode || selectedEWB?.multiVehicleGroup?.reasonCode,
         }));
     }
     if (!rows.length) return <Typography sx={{ fontSize: "0.85rem", color: "#94a3b8", py: 1.5 }}>No vehicle update history yet.</Typography>;
@@ -907,8 +956,11 @@ const LrEwayBillDialog = ({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ "& th": { fontSize: "0.72rem", fontWeight: 700, color: "#64748b", borderBottom: "2px solid #e2e8f0", py: 1 } }}>
-              <TableCell>Mode</TableCell><TableCell>Vehicle / Doc No</TableCell>
-              <TableCell>Updated At</TableCell><TableCell>Group / Qty</TableCell>
+              <TableCell>Mode</TableCell>
+              <TableCell>Vehicle / Doc No</TableCell>
+              <TableCell>Reason</TableCell>
+              <TableCell>Updated At</TableCell>
+              <TableCell>Group / Qty</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -916,6 +968,7 @@ const LrEwayBillDialog = ({
               <TableRow key={i} sx={{ "&:last-child td": { border: 0 }, "& td": { fontSize: "0.8rem", py: 0.75 } }}>
                 <TableCell>{modeLabel(r.modeOfTransport)}</TableCell>
                 <TableCell><strong>{r.newVehicle || r.oldVehicle || "—"}</strong><br /><span style={{ color: "#94a3b8", fontSize: "0.72rem" }}>{r.transporterDocNo || "—"}</span></TableCell>
+                <TableCell>{formatReason(r.reasonCode)}</TableCell>
                 <TableCell>{r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—"}</TableCell>
                 <TableCell>{r.groupNo ? `Group: ${r.groupNo}` : "—"}<br /><span style={{ color: "#94a3b8", fontSize: "0.72rem" }}>{r.qty || (sourceList?.find((v) => v.vehicleNumber === (r.newVehicle || r.oldVehicle))?.quantity) || "—"} {unitCode}</span></TableCell>
               </TableRow>
@@ -1096,10 +1149,10 @@ const LrEwayBillDialog = ({
         </Box>
 
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Vehicle Number *" inputRef={vehicleNoInputRef} value={vehicleForm.vehicleNo} onFocus={() => setActiveVehicleInput("vehicleNo")} onChange={handleVehicleNoChange} placeholder="e.g. TM1234" /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Vehicle Number *" inputRef={vehicleNoInputRef} value={vehicleForm.vehicleNo} onFocus={() => setActiveVehicleInput("vehicleNo")} onChange={handleVehicleNoChange} placeholder="e.g. TM1234" error={!!getFieldError(["vehicle", "format"])} helperText={getFieldError(["vehicle", "format"])} /></Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Place of Change *" inputRef={placeOfChangeInputRef} value={vehicleForm.fromPlace} onFocus={() => setActiveVehicleInput("fromPlace")} onChange={handlePlaceChange} placeholder="e.g. Surat" /></Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="From State *" value={vehicleForm.fromState} onChange={handleFromStateChange} placeholder="e.g. Gujarat" helperText="Indian state where vehicle currently is" /></Grid>
-          <Grid item xs={12} sm={6}><TextField select fullWidth size="small" label="Reason *" value={vehicleForm.reasonCode} onChange={handleReasonCodeChange}><MenuItem value="1">Transshipment</MenuItem><MenuItem value="2">Due to Break Down</MenuItem><MenuItem value="3">Others</MenuItem><MenuItem value="4">First Time Update</MenuItem></TextField></Grid>
+          <Grid item xs={12} sm={6}><TextField select fullWidth size="small" label="Reason *" value={vehicleForm.reasonCode} onChange={handleReasonCodeChange}><MenuItem value="1">Due to Break Down</MenuItem><MenuItem value="2">Transshipment</MenuItem><MenuItem value="3">Others</MenuItem><MenuItem value="4">First Time Update</MenuItem></TextField></Grid>
           <Grid item xs={12} sm={6}><TextField select fullWidth size="small" label="Vehicle Type *" value={vehicleForm.vehicleType} onChange={handleVehicleTypeChange}><MenuItem value="r">Regular</MenuItem><MenuItem value="o">ODC (Over Dimension Cargo)</MenuItem></TextField></Grid>
           {selectedEWB?.isMultiVehicle && <Grid item xs={12} sm={6}><TextField fullWidth size="small" type="number" label="Quantity in Vehicle *" value={vehicleForm.quantity} onChange={(e) => setVehicleForm({ ...vehicleForm, quantity: e.target.value })} helperText={`Unit: ${multiVehicleForm.unitCode || "NOS"}`} /></Grid>}
           <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Transporter Doc No." value={vehicleForm.transporterDocNo} onChange={handleTransporterDocNoChange} error={!!getFieldError(["transporter_document_number", "transporter doc", "document number"])} helperText={getFieldError(["transporter_document_number", "transporter doc", "document number"])} /></Grid>
@@ -1147,7 +1200,7 @@ const LrEwayBillDialog = ({
             <Autocomplete options={organizationList} getOptionLabel={(o) => `${o.name} (${o.gstin || "N/A"})`} value={transporterForm.selectedOrg} onChange={handleTransporterOrgChange} renderInput={(p) => <TextField {...p} label="New Transporter" placeholder="Search by name or GSTIN" size="small" />} size="small" />
           </Grid>
           <Grid item xs={12}>
-            <TextField fullWidth size="small" label="Transporter GSTIN" value={transporterForm.transporterId} onChange={handleTransporterIdChange} placeholder="Auto-filled from selection above" disabled={!!transporterForm.selectedOrg} />
+            <TextField fullWidth size="small" label="Transporter GSTIN" value={transporterForm.transporterId} onChange={handleTransporterIdChange} placeholder="Auto-filled from selection above" disabled={!!transporterForm.selectedOrg} error={!!getFieldError(["transporter", "gstin", "invalid format"])} helperText={getFieldError(["transporter", "gstin", "invalid format"])} />
           </Grid>
           <Grid item xs={12}><Box sx={S.actionRow}><Button variant="contained" onClick={handleUpdateTransporter} disabled={isLoading || !transporterForm.transporterId} sx={{ ...S.submitBtn, bgcolor: "#1e40af" }}>{isLoading ? <CircularProgress size={16} /> : "Submit"}</Button><Button variant="contained" onClick={() => setInternalStep("container-select")} sx={S.exitBtn}>Exit</Button></Box></Grid>
         </Grid>
@@ -1222,7 +1275,7 @@ const LrEwayBillDialog = ({
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="State of Consignor *" value={multiVehicleForm.stateOfConsignor} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, stateOfConsignor: e.target.value })} /></Grid>
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Place of Consignee *" value={multiVehicleForm.placeOfConsignee} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, placeOfConsignee: e.target.value })} /></Grid>
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="State of Consignee *" value={multiVehicleForm.stateOfConsignee} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, stateOfConsignee: e.target.value })} /></Grid>
-              <Grid item xs={12} sm={6}><TextField select fullWidth size="small" label="Reason *" value={multiVehicleForm.reasonCode} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, reasonCode: e.target.value })}><MenuItem value="1">Transshipment</MenuItem><MenuItem value="2">Due to Break Down</MenuItem><MenuItem value="3">Others</MenuItem><MenuItem value="4">First Time Update</MenuItem></TextField></Grid>
+              <Grid item xs={12} sm={6}><TextField select fullWidth size="small" label="Reason *" value={multiVehicleForm.reasonCode} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, reasonCode: e.target.value })}><MenuItem value="1">Due to Break Down</MenuItem><MenuItem value="2">Transshipment</MenuItem><MenuItem value="3">Others</MenuItem><MenuItem value="4">First Time Update</MenuItem></TextField></Grid>
               <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Remarks *" value={multiVehicleForm.reasonText} onChange={(e) => setMultiVehicleForm({ ...multiVehicleForm, reasonText: e.target.value })} inputProps={{ maxLength: 50 }} helperText={`${multiVehicleForm.reasonText?.length || 0}/50`} /></Grid>
               <Grid item xs={12}><Box sx={S.actionRow}><Button variant="contained" onClick={handleInitiateMultiVehicle} disabled={isLoading || !multiVehicleForm.totalQuantity} sx={{ ...S.submitBtn, bgcolor: "#7c3aed" }}>{isLoading ? <CircularProgress size={16} /> : "Initiate"}</Button></Box></Grid>
             </Grid>
@@ -1387,15 +1440,96 @@ const LrEwayBillDialog = ({
       return str;
     };
 
+    // ── Full-page BOE loading overlay ────────────────────────────────────────
+    if (boeLoading) {
+      return (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 340,
+            gap: 3,
+            px: 4,
+          }}
+        >
+          {/* Animated spinner ring */}
+          <Box sx={{ position: "relative", display: "inline-flex" }}>
+            <CircularProgress
+              size={64}
+              thickness={3}
+              sx={{ color: "#1e40af" }}
+            />
+            <Box
+              sx={{
+                top: 0, left: 0, bottom: 0, right: 0,
+                position: "absolute",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography sx={{ fontSize: "1.2rem" }}>📄</Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ textAlign: "center" }}>
+            <Typography
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#1e293b",
+                mb: 0.75,
+              }}
+            >
+              Extracting BOE Details…
+            </Typography>
+            <Typography
+              sx={{ fontSize: "0.82rem", color: "#64748b", maxWidth: 340 }}
+            >
+              Fetching Bill of Entry data, shipment info and value calculations.
+              This may take a few seconds — please wait.
+            </Typography>
+          </Box>
+
+          {/* Animated progress dots */}
+          <Box sx={{ display: "flex", gap: 0.75 }}>
+            {[0, 1, 2].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: "#1e40af",
+                  opacity: 0.3,
+                  animation: "boeLoadingPulse 1.2s ease-in-out infinite",
+                  animationDelay: `${i * 0.2}s`,
+                  "@keyframes boeLoadingPulse": {
+                    "0%, 80%, 100%": { opacity: 0.3, transform: "scale(1)" },
+                    "40%": { opacity: 1, transform: "scale(1.3)" },
+                  },
+                }}
+              />
+            ))}
+          </Box>
+
+          <Typography
+            sx={{
+              fontSize: "0.72rem",
+              color: "#94a3b8",
+              fontStyle: "italic",
+            }}
+          >
+            Connecting to BOE extract API…
+          </Typography>
+        </Box>
+      );
+    }
+
     return (
       <Box>
-        {/* BOE Calc Status */}
-        {boeLoading && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <CircularProgress size={18} />
-            <Typography variant="body2" color="text.secondary">Fetching BOE details...</Typography>
-          </Box>
-        )}
         {boeError && (
           <Alert severity="warning" sx={{ mb: 2, fontSize: "0.8rem" }}>{boeError}</Alert>
         )}
@@ -1508,7 +1642,7 @@ const LrEwayBillDialog = ({
           boeData={boeExtractData}
           prefetchedBoeLrData={boeLrData}
           document_no={boeLrData?.document_no || prData?.document_no || prData?.be_no}
-          documentDate={boeLrData?.document_date || prData?.document_date || prData?.be_date}
+          documentDate={boeDocDate || parseDateToYyyyMmDd(boeLrData?.document_date || prData?.be_date || prData?.document_date || prData?.boe_date || "") || undefined}
           boeCalcData={boeCalcData}
           onClose={handleClose}
           onSuccess={handleGenerationSuccess}

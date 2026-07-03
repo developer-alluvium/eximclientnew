@@ -129,6 +129,7 @@ const jobSchema = new mongoose.Schema({
   container_nos: [
     {
       container_number: { type: String, trim: true },
+      ewaybill_no: { type: String, trim: true },
       arrival_date: { type: String, trim: true },
       detention_from: { type: String, trim: true },
       size: { type: String, trim: true },

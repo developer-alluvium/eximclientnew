@@ -5,6 +5,7 @@ import {
   proxyImportListing,
   updateJob,
   updateContainerTransporter,
+  updateContainerEwayBill,
   getContainerSummary,
   getContainerDetails,
   getExporters,
@@ -48,6 +49,7 @@ router.get("/api/gandhidham/:year/jobs/:status/:detailedStatus/:customHouse/mult
 // Job / Container Updates
 router.patch("/api/jobs/:id", authenticateUser, updateJob);
 router.patch("/api/jobs/container/:id", authenticateUser, updateContainerTransporter);
+router.patch("/api/jobs/container-ewaybill/:id", authenticateUser, updateContainerEwayBill);
 
 // Container Analytics & Summaries
 router.get("/api/container-summary", authenticateUser, getContainerSummary);

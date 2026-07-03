@@ -64,6 +64,12 @@ const AVAILABLE_MODULES = [
     category: "core",
   },
   {
+    id: "/ewaybill",
+    name: "E-Way Bill",
+    description: "Generate and manage e-way bills with direct ICEGATE Integration",
+    category: "core",
+  },
+  {
     id: "/open-points",
     name: "Open Points",
     description: "Manage project discussion points, task assignments, and review timelines",

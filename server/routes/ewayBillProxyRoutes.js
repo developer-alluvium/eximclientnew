@@ -135,6 +135,52 @@ const multipartHandler = (req, res, next) => {
   next();
 };
 
+// ── PDF Proxy: fetch external PDF URL server-side and stream back ────────────
+// Prevents CORS/encoding issues when the browser tries to fetch cross-origin PDFs.
+router.get("/pdf-proxy", async (req, res) => {
+  const { url } = req.query;
+  if (!url) {
+    return res.status(400).json({ success: false, message: "Missing url parameter" });
+  }
+
+  let targetUrl = url;
+  if (!targetUrl.startsWith("http")) targetUrl = `https://${targetUrl}`;
+
+  try {
+    const serviceToken = await transportAuthService.getServiceToken();
+    const headers = {};
+    if (serviceToken) headers.Authorization = `Bearer ${serviceToken}`;
+
+    const response = await axios.get(targetUrl, {
+      responseType: "arraybuffer",
+      headers,
+      timeout: 30000,
+      validateStatus: () => true,
+    });
+
+    const contentType = response.headers["content-type"] || "";
+
+    // If the upstream sent an error (JSON), forward it cleanly
+    if (response.status !== 200 || (!contentType.includes("pdf") && !contentType.includes("octet"))) {
+      let errMsg = "Failed to fetch PDF";
+      try {
+        const decoded = Buffer.from(response.data).toString("utf8");
+        const parsed = JSON.parse(decoded);
+        errMsg = parsed.message || parsed.error || errMsg;
+      } catch (_) {}
+      return res.status(response.status || 502).json({ success: false, message: errMsg });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment");
+    res.setHeader("Content-Length", response.data.byteLength);
+    res.status(200).end(Buffer.from(response.data));
+  } catch (err) {
+    console.error("[pdf-proxy] error:", err.message);
+    res.status(502).json({ success: false, message: err.message || "PDF proxy failed" });
+  }
+});
+
 // Define routes
 router.use(multipartHandler, proxyRequest);
 

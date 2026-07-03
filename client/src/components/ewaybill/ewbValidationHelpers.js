@@ -233,26 +233,145 @@ export function runClientSideValidations(formData, autoCalculatedKm = 0) {
   );
   hsnErrors.forEach((msg) => errors.push({ field: "items", message: msg }));
 
-  // Transport mode (Ship)
-  const modeErrors = validateTransportModeClient(
-    formData.transportationMode,
-    formData.vehicleNo,
-    formData.vehicleType,
-    formData.transporterDocNo,
-    formData.transporterDocDate
-  );
-  modeErrors.forEach((msg) => errors.push({ field: "vehicleType", message: msg }));
+  // Transport mode, vehicle, and rail validations (skipped for Part A Only)
+  if (!formData.partAOnly) {
+    const modeErrors = validateTransportModeClient(
+      formData.transportationMode,
+      formData.vehicleNo,
+      formData.vehicleType,
+      formData.transporterDocNo,
+      formData.transporterDocDate
+    );
+    modeErrors.forEach((msg) => errors.push({ field: "vehicleType", message: msg }));
 
-  // Vehicle Number Format
-  const vnErr = validateVehicleNumber(formData.vehicleNo);
-  if (vnErr) errors.push({ field: "vehicleNo", message: vnErr });
+    // Vehicle Number Format
+    const vnErr = validateVehicleNumber(formData.vehicleNo);
+    if (vnErr) errors.push({ field: "vehicleNo", message: vnErr });
 
-  // Rail document
-  const railErr = validateRailDocumentClient(
-    formData.transportationMode,
-    formData.transporterDocNo
-  );
-  if (railErr) errors.push({ field: "transporterDocNo", message: railErr });
+    // Rail document
+    const railErr = validateRailDocumentClient(
+      formData.transportationMode,
+      formData.transporterDocNo
+    );
+    if (railErr) errors.push({ field: "transporterDocNo", message: railErr });
+  }
+
+  // State-PIN combinations (TC-EWB-VAL-04 / NEG-03)
+  const consignorStatePinErr = validateStatePin(formData.consignorState, formData.consignorPincode);
+  if (consignorStatePinErr) errors.push({ field: "consignorPincode", message: consignorStatePinErr });
+
+  const dispatchStatePinErr = validateStatePin(formData.dispatchFromState, formData.dispatchFromPincode);
+  if (dispatchStatePinErr) errors.push({ field: "dispatchFromPincode", message: dispatchStatePinErr });
+
+  const consigneeStatePinErr = validateStatePin(formData.consigneeState, formData.consigneePincode);
+  if (consigneeStatePinErr) errors.push({ field: "consigneePincode", message: consigneeStatePinErr });
+
+  const shipToStatePinErr = validateStatePin(formData.shipToState, formData.shipToPincode);
+  if (shipToStatePinErr) errors.push({ field: "shipToPincode", message: shipToStatePinErr });
 
   return { valid: errors.length === 0, errors };
 }
+
+// ─── 9. State-PIN Mapping & Validation (TC-EWB-VAL-04 / NEG-03) ────────────────
+const STATE_PIN_PREFIX_MAP = {
+  "andhra pradesh": ["51", "52", "53"],
+  "arunachal pradesh": ["79"],
+  "assam": ["78"],
+  "bihar": ["80", "81", "82", "83", "84", "85"],
+  "chhattisgarh": ["49"],
+  "goa": ["40"],
+  "gujarat": ["36", "37", "38", "39"],
+  "haryana": ["12", "13"],
+  "himachal pradesh": ["17"],
+  "jammu and kashmir": ["18", "19"],
+  "jharkhand": ["81", "82", "83"],
+  "karnataka": ["56", "57", "58", "59"],
+  "kerala": ["67", "68", "69"],
+  "madhya pradesh": ["45", "46", "47", "48"],
+  "maharashtra": ["40", "41", "42", "43", "44"],
+  "manipur": ["79"],
+  "meghalaya": ["79"],
+  "mizoram": ["79"],
+  "nagaland": ["79"],
+  "odisha": ["75", "76", "77"],
+  "punjab": ["14", "15"],
+  "rajasthan": ["30", "31", "32", "33", "34"],
+  "sikkim": ["73"],
+  "tamil nadu": ["60", "61", "62", "63", "64"],
+  "telangana": ["50"],
+  "tripura": ["79"],
+  "uttar pradesh": ["20", "21", "22", "23", "24", "25", "26", "27", "28"],
+  "uttarakhand": ["24", "26"],
+  "west bengal": ["70", "71", "72", "73", "74"],
+  "andaman and nicobar islands": ["74"],
+  "chandigarh": ["16"],
+  "dadra and nagar haveli and daman and diu": ["39"],
+  "delhi": ["11"],
+  "ladakh": ["18", "19"],
+  "lakshadweep": ["68"],
+  "puducherry": ["60", "67", "69"]
+};
+
+export function validateStatePin(state, pincode) {
+  if (!state || !pincode) return null;
+  const pinStr = String(pincode).trim();
+  const stateStr = String(state).trim().toLowerCase();
+
+  // If pincode is "999999" (imports/exports standard), bypass this check
+  if (pinStr === "999999") return null;
+
+  if (!/^\d{6}$/.test(pinStr)) {
+    return "Pincode must be a 6-digit number.";
+  }
+
+  const prefixes = STATE_PIN_PREFIX_MAP[stateStr];
+  if (!prefixes) return null; // If state is not in mapping, don't block
+
+  const matched = prefixes.some(pref => pinStr.startsWith(pref));
+  if (!matched) {
+    return `Pincode mismatch for the selected State. Pincode should start with one of: ${prefixes.join(', ')}.`;
+  }
+
+  return null;
+}
+
+// ─── 10. GSTIN / Transporter ID Format Validation (TC-TRA-02) ──────────────────
+export function validateGstinFormat(gstin) {
+  if (!gstin) return null;
+  const clean = gstin.trim().toUpperCase();
+  const regex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z0-9]{1}[Zz][A-Z0-9]{1}$/;
+  if (!regex.test(clean)) {
+    return "Invalid GSTIN / Transporter ID format (15 characters alphanumeric, e.g., 24ANGPR7652E1ZV).";
+  }
+  return null;
+}
+
+// ─── 11. Parse DD/MM/YYYY HH:MM:SS AM/PM E-Way Bill Date ────────────────────────
+export function parseEwbDate(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (match) {
+    const [_, day, month, year] = match;
+    const t = s.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+    if (t) {
+      let h = parseInt(t[1]);
+      if (t[4].toUpperCase() === "PM" && h !== 12) h += 12;
+      if (t[4].toUpperCase() === "AM" && h === 12) h = 0;
+      return new Date(year, month - 1, day, h, parseInt(t[2] || 0), parseInt(t[3] || 0));
+    }
+    return new Date(year, month - 1, day, 23, 59, 59); // End of day fallback
+  }
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+// ─── 12. Validity Extension Window (TC-EXT-02 / TC-EXT-03) ─────────────────────
+export function checkExtensionWindow(validUpto) {
+  const now = new Date();
+  const validDate = parseEwbDate(validUpto);
+  if (!validDate) return { withinWindow: false, error: "Invalid date" };
+  const diff = (validDate - now) / (1000 * 60 * 60);
+  return { withinWindow: Math.abs(diff) <= 8, hoursUntilExpiry: diff, isExpired: diff < 0 };
+}
+

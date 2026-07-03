@@ -1389,3 +1389,51 @@ $gap-lg: 24px;
 .swal2-container {
   z-index: 99999 !important;
 }
+
+/* ─────────────────────────────────────────────
+   MOBILE RESPONSIVENESS OVERRIDES (TC-LAY-01)
+───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ewb-action-btns {
+    gap: 10px; // Larger gap for easier touch targets
+    .btn {
+      padding: 8px 14px; // Increased padding
+      height: 36px; // Taller buttons
+      font-size: $font-sm;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .ewb-search-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    
+    .form-input {
+      width: 100%;
+    }
+    
+    button, .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .ewb-bulk-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    
+    &__actions {
+      flex-direction: column;
+      width: 100%;
+      
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+}
+

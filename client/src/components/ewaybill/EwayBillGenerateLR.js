@@ -594,7 +594,9 @@ function EwayBillGenerateLR({
     }
     lastPromptedPins.current[type] = pin;
 
-    setActivePincodeDropdown(type);
+    if (isManual) {
+      setActivePincodeDropdown(type);
+    }
     setPincodeLoading(prev => ({ ...prev, [type]: true }));
 
     const data = await getCityAndStateByPinCode(pin);
@@ -610,7 +612,9 @@ function EwayBillGenerateLR({
       setPincodeChoices(prev => ({ ...prev, [type]: options }));
 
       if (options.length > 1) {
-        setActivePincodeDropdown(type);
+        if (isManual) {
+          setActivePincodeDropdown(type);
+        }
       } else if (options.length === 1) {
         applyPincodeData(options[0].city, options[0].state, type);
         setActivePincodeDropdown(null);
@@ -620,7 +624,9 @@ function EwayBillGenerateLR({
       }
     } else {
       setPincodeChoices(prev => ({ ...prev, [type]: [] }));
-      setActivePincodeDropdown(type);
+      if (isManual) {
+        setActivePincodeDropdown(type);
+      }
     }
   };
 
@@ -694,7 +700,7 @@ function EwayBillGenerateLR({
       if (generationMode === "batch-all") {
         if (boeNumber && !autoFetchedBoe) { setAutoFetchedBoe(true); handleBoeFetch(); }
         
-        const targetVal = parseFloat(boeData?.assessableValue || prefilledAssessableValue || 0);
+        const targetVal = parseFloat(boeCalcData?.assessableValue || boeData?.assessableValue || prefilledAssessableValue || 0);
         const targetQty = selectedContainers.reduce((s, c) => s + parseFloat(c.gross_weight || 0), 0);
         
         const currentVal = parseFloat(formData.totalInvoiceValue) || 0;
@@ -717,7 +723,9 @@ function EwayBillGenerateLR({
         }
       } else if (generationMode === "batch-selected") {
         if (selectedContainers.length === 1 && (containerAssessableValues[firstContainer._id] || firstContainer.gross_weight)) {
-          const calcData = containerAssessableValues[firstContainer._id] || { weight: parseFloat(firstContainer.gross_weight || 0), assessableValue: parseFloat(firstContainer.assessable_value || 0) };
+          const weightVal = parseFloat(firstContainer.gross_weight || 0);
+          const assessableVal = parseFloat(firstContainer.assessable_value || 0) || (weightVal * (perKgValue || 0));
+          const calcData = containerAssessableValues[firstContainer._id] || { weight: weightVal, assessableValue: assessableVal };
           
           const targetVal = parseFloat(calcData.assessableValue) || 0;
           const targetQty = parseFloat(calcData.weight) || 0;
@@ -744,7 +752,7 @@ function EwayBillGenerateLR({
         }
       }
     }
-  }, [isMultiContainerMode, selectedContainers, generationMode, boeData, prefilledAssessableValue, containerAssessableValues, formData]);
+  }, [isMultiContainerMode, selectedContainers, generationMode, boeData, prefilledAssessableValue, containerAssessableValues, formData, perKgValue, boeCalcData]);
 
   useEffect(() => {
     if (asDialog) {
@@ -1351,22 +1359,37 @@ function EwayBillGenerateLR({
   };
 
   const normalizeVehicleUpdateReasonCode = (code) => {
-    if (!code) return "2";
+    if (!code) return "1";
     const n = String(code).trim().toLowerCase().replace(/\s+/g, '');
-    switch (n) { case "duetobreakdown": case "breakdown": case "2": return "2"; case "transshipment": case "1": return "1"; case "others": case "3": return "3"; case "firsttimeupdate": case "firsttimepartb": case "4": return "4"; default: return code; }
+    switch (n) {
+      case "duetobreakdown":
+      case "breakdown":
+      case "1":
+        return "1";
+      case "transshipment":
+      case "transhipment":
+      case "2":
+        return "2";
+      case "others":
+      case "3":
+        return "3";
+      case "firsttimeupdate":
+      case "firsttimepartb":
+      case "4":
+        return "4";
+      default:
+        return code;
+    }
   };
 
   // ── Multi-container submit ─────────────────────────────────────────────────
   const submitMultipleEwayBills = async () => {
-    const containersWithoutLr = selectedContainers.filter(c => !c.tr_no);
-    if (containersWithoutLr.length > 0) {
-      Swal.fire({ icon: 'warning', title: 'LR Not Generated', text: 'Please generate LR first for all selected containers before generating E-Way Bills.', confirmButtonColor: '#f39c12' });
-      return;
-    }
+    // ✅ No LR (tr_no) check needed here.
+    // Transporter Doc No is manually entered in the form and sent to the API.
+    // Internal tr_no (system LR record) is NOT required for EWB generation.
     try {
       setGenerating(true);
-      const results = [];
-      for (const container of selectedContainers) {
+      const promises = selectedContainers.map(async (container) => {
         const scNo = (container.container_number || container.container_no || "").trim().toUpperCase();
         const oIdx = boeContainers.findIndex(bc => {
           const bcNo = (bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "").trim().toUpperCase();
@@ -1374,13 +1397,13 @@ function EwayBillGenerateLR({
         });
         const weight = parseFloat(oIdx !== -1 ? containerWeights[oIdx] : containerWeights[`manual_${scNo}`]) || 0;
         const containerValue = { weight, assessableValue: weight * perKgValue };
-        if (weight <= 0) { results.push({ container: container.container_number, ewbNo: null, status: "failed", error: "Weight is zero or invalid." }); continue; }
-        if (!perKgValue || perKgValue <= 0) { results.push({ container: container.container_number, ewbNo: null, status: "failed", error: "Per KG value is not set." }); continue; }
+        if (weight <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Weight is zero or invalid." };
+        if (!perKgValue || perKgValue <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Per KG value is not set." };
         const containerPayload = buildPayloadForContainer(container, containerValue);
         try {
           const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, containerPayload);
           if (r.data.success) {
-            results.push({
+            return {
               container: container.container_number,
               ewbNo: r.data.data.ewbNo,
               ewbDate: r.data.data.ewbDate,
@@ -1388,23 +1411,23 @@ function EwayBillGenerateLR({
               pdfUrl: r.data.data.pdfUrl,
               ewayBillId: r.data.data.ewayBillId,
               status: "success"
-            });
+            };
           }
           else {
             let errorMsg = r.data.message || "Unknown error";
             if (r.data.errors?.length) errorMsg = r.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
             else if (r.data.validationErrors?.length) errorMsg = r.data.validationErrors.map(e => e.message).join(", ");
-            results.push({ container: container.container_number, ewbNo: null, status: "failed", error: errorMsg });
+            return { container: container.container_number, ewbNo: null, status: "failed", error: errorMsg };
           }
         } catch (err) {
           const ed = err.response?.data;
           let et = parseNicErrorMessage(ed?.message || err.message);
           if (ed?.errors?.length) et = ed.errors.map(e => e.message).join(", ");
           else if (ed?.validationErrors?.length) et = ed.validationErrors.map(e => e.message).join(", ");
-          results.push({ container: container.container_number, ewbNo: null, status: "failed", error: et });
+          return { container: container.container_number, ewbNo: null, status: "failed", error: et };
         }
-        await new Promise(r => setTimeout(r, 200));
-      }
+      });
+      const results = await Promise.all(promises);
       const successCount = results.filter(r => r.status === "success").length;
       const failedCount = results.filter(r => r.status === "failed").length;
       if (successCount > 0) {
@@ -1413,8 +1436,28 @@ function EwayBillGenerateLR({
         Swal.fire({ icon: successCount === selectedContainers.length ? "success" : "warning", title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`, html: `<div>${sh}${fh}</div>`, confirmButtonText: "OK" })
           .then(() => { if (onSuccess) onSuccess(results); if (onClose) onClose(); });
       } else {
-        const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
-        Swal.fire({ icon: "error", title: "All E-Way Bills Failed", html: fh || "<div>No failure details available.</div>", confirmButtonText: "OK" });
+        // ── Check if all failures are "already exists" → open the existing EWB for viewing/printing
+        const alreadyExistsPattern = /e-?way\s*bill\s*(\d{12})\s*already\s*exists/i;
+        const existingEwbs = results
+          .map(r => {
+            const m = (r.error || "").match(alreadyExistsPattern);
+            return m ? { container: r.container, ewbNo: m[1], status: "exists" } : null;
+          })
+          .filter(Boolean);
+
+        if (existingEwbs.length > 0 && existingEwbs.length === results.length) {
+          // All failures are "already exists" — show info then open preview
+          await Swal.fire({
+            icon: "info",
+            title: "E-Way Bill Already Exists",
+            html: existingEwbs.map(e => `<div><strong>${e.container}:</strong> EWB ${e.ewbNo}</div>`).join(""),
+            confirmButtonText: "View & Print",
+          });
+          if (onSuccess) onSuccess(existingEwbs);
+        } else {
+          const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
+          Swal.fire({ icon: "error", title: "All E-Way Bills Failed", html: fh || "<div>No failure details available.</div>", confirmButtonText: "OK" });
+        }
       }
     } catch (err) { console.error("submitMultipleEwayBills:", err); Swal.fire("Error", "Failed to generate E-Way Bills", "error"); }
     finally { setGenerating(false); }
@@ -1520,11 +1563,9 @@ function EwayBillGenerateLR({
     }
 
     // Full generation
-    const containerForLrCheck = selectedLr ? selectedLr.container_details : null;
-    if (containerForLrCheck && !containerForLrCheck.tr_no) {
-      Swal.fire({ icon: 'warning', title: 'LR Not Generated', text: 'Please generate LR first for this selected container before generating the E-Way Bill.', confirmButtonColor: '#f39c12' });
-      return;
-    }
+    // ✅ No LR (tr_no) check needed here.
+    // Part A or Part B can both be generated without a system LR record.
+    // Transporter Doc No is manually entered in the form and is optional per the API.
 
     let hasError = false;
     const nfe = {};
@@ -2021,13 +2062,18 @@ function EwayBillGenerateLR({
 
   // ── Calculated value banner ────────────────────────────────────────────────
   const renderCalcBanner = () => {
-    if (!(isMultiContainerMode && generationMode === 'batch-selected' && selectedContainers?.length === 1 && containerAssessableValues[selectedContainers[0]._id])) return null;
-    const cv = containerAssessableValues[selectedContainers[0]._id];
-    const pkv = cv.perKgValue || (cv.assessableValue / cv.weight);
+    if (!(isMultiContainerMode && generationMode === 'batch-selected' && selectedContainers?.length === 1)) return null;
+    const firstContainer = selectedContainers[0];
+    const cv = containerAssessableValues[firstContainer._id] || {
+      weight: parseFloat(firstContainer.gross_weight || 0),
+      assessableValue: parseFloat(firstContainer.gross_weight || 0) * (perKgValue || 0)
+    };
+    if (cv.assessableValue <= 0) return null;
+    const pkv = perKgValue || (cv.assessableValue / cv.weight);
     return (
       <div className="ewb-calc-banner">
-        <div className="cb-title">✓ Calculated Assessable Value: ₹{cv.assessableValue.toLocaleString()}</div>
-        <div className="cb-formula">₹{pkv.toFixed(2)}/kg × {cv.weight} kg = ₹{cv.assessableValue}</div>
+        <div className="cb-title">✓ Calculated Assessable Value: ₹{cv.assessableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div className="cb-formula">₹{pkv.toFixed(2)}/kg × {cv.weight} kg = ₹{cv.assessableValue.toFixed(2)}</div>
         <div className="cb-note">Pre-filled in Taxable Amount and Total Invoice Value below.</div>
       </div>
     );

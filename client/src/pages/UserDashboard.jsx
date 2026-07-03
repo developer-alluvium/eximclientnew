@@ -594,6 +594,13 @@ function UserDashboard() {
       isExternal: false,
     },
     {
+      name: "E-Way Bill",
+      description: "Generate and manage e-way bills with direct ICEGATE Integration",
+      path: "/ewaybill",
+      categoryLabel: "TRANSPORT MANAGEMENT",
+      category: "core",
+    },
+    {
       name: "SnapCheck",
       description:
         "AI-powered quality inspection system with automated defect detection",

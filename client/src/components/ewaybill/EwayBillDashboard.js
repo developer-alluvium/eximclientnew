@@ -134,8 +134,41 @@ function EwayBillDashboard() {
       );
 
       if (response.data.success) {
-        setEwayBills(response.data.data);
+        const list = response.data.data || [];
+        setEwayBills(list);
         setTotalPages(response.data.totalPages);
+
+        // Auto background sync active ones (Generated or Pending) to catch external cancellations/expiry (TC-INT-02)
+        const activeEwbs = list.filter(
+          (ewb) => ewb.ewbStatus === "Generated" || ewb.ewbStatus === "Pending"
+        );
+        if (activeEwbs.length > 0) {
+          console.log(`🔄 Silent background sync initiated for ${activeEwbs.length} active E-Way Bills...`);
+          Promise.all(
+            activeEwbs.map(async (ewb) => {
+              try {
+                const userGstin = ewb.userGstin || ewb.consignorGstin || process.env.REACT_APP_DEFAULT_GSTIN || "24ANGPR7652E1ZV";
+                const syncRes = await axios.post(
+                  `${process.env.REACT_APP_API_STRING}/eway-bill/sync-status`,
+                  { ewayBillNo: ewb.ewbNo, userGstin }
+                );
+                if (syncRes.data?.success && syncRes.data?.data) {
+                  const updated = syncRes.data.data;
+                  if (updated.ewbStatus && updated.ewbStatus !== ewb.ewbStatus) {
+                    console.log(`🎯 EWB ${ewb.ewbNo} status auto-updated from API: ${ewb.ewbStatus} -> ${updated.ewbStatus}`);
+                    setEwayBills((prev) =>
+                      prev.map((item) =>
+                        item.ewbNo === ewb.ewbNo ? { ...item, ewbStatus: updated.ewbStatus } : item
+                      )
+                    );
+                  }
+                }
+              } catch (err) {
+                console.warn(`Failed to auto background sync EWB ${ewb.ewbNo}:`, err.message);
+              }
+            })
+          ).catch((err) => console.error("Error in background auto-sync promise group:", err));
+        }
       }
     } catch (error) {
       console.error("Error fetching E-Way Bills:", error);

@@ -59,6 +59,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ContactSupportOutlinedIcon from "@mui/icons-material/ContactSupportOutlined";
 import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import "../styles/home.scss";
 import { alpha } from "@mui/material/styles";
 
@@ -289,6 +290,13 @@ function HomePage() {
       icon: <LockOutlinedIcon />,
       category: "core",
       isExternal: false,
+    },
+    {
+      name: "E-Way Bill",
+      description: "Generate and manage e-way bills with direct ICEGATE Integration",
+      path: "/ewaybill",
+      icon: <LocalShippingOutlinedIcon />,
+      category: "core",
     },
     {
       name: "Intendor Management System",

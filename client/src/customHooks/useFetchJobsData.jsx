@@ -173,7 +173,16 @@ function useFetchJobsData(
         const response = await axios.get(apiUrl);
         const { data, total, totalPages, currentPage } = response.data;
 
-        setRows(data || []);
+        let fetchedRows = data || [];
+        if (window.location.pathname.includes("ewaybill")) {
+          fetchedRows = fetchedRows.filter((row) => {
+            const beNo = row.be_no || row.document_no || row.documentNumber;
+            const beDate = row.be_date || row.document_date;
+            return beNo && beNo !== "-" && beDate && beDate !== "-";
+          });
+        }
+
+        setRows(fetchedRows);
         setTotal(total || 0);
         setTotalPages(totalPages || 1);
         setCurrentPage(currentPage || 1);
@@ -237,7 +246,17 @@ function useFetchJobsData(
 
       const response = await axios.get(apiUrl);
       const { data, total, totalPages, currentPage } = response.data;
-      setRows(data || []);
+
+      let fetchedRows = data || [];
+      if (window.location.pathname.includes("ewaybill")) {
+        fetchedRows = fetchedRows.filter((row) => {
+          const beNo = row.be_no || row.document_no || row.documentNumber;
+          const beDate = row.be_date || row.document_date;
+          return beNo && beNo !== "-" && beDate && beDate !== "-";
+        });
+      }
+
+      setRows(fetchedRows);
       setTotal(total || 0);
       setTotalPages(totalPages || 1);
       setCurrentPage(currentPage || 1);

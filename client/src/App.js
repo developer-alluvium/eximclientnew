@@ -43,6 +43,7 @@ import TransportModule from "./components/Transport/TransportModule.jsx";
 import OpenPointsHome from "./components/open-points/OpenPointsHome";
 import MyOpenPoints from "./components/open-points/MyOpenPoints";
 import ProjectWorkspace from "./components/open-points/ProjectWorkspace";
+import EwayBillForm from "./components/ewaybill/EwayBillForm";
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
@@ -250,6 +251,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <TransportModule />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/ewaybill"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <EwayBillForm />
                         </ProtectedRoute>
                       }
                     />

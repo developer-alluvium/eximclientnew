@@ -29,7 +29,9 @@ export const mapEwbApiErrorToFields = (nicMessage) => {
     { code: '237', field: 'dispatchFromPincode', msg: 'Dispatch from pincode must match the State.' },
     { code: '238', field: 'shipToPincode', msg: 'Ship to pincode must match the State.' },
     { code: '436', field: 'dispatchFromPincode', msg: 'Consignor pincode must be 999999 for imports.' },
+    { code: '436', field: 'consignorPincode', msg: 'Consignor pincode must be 999999 for imports.' },
     { code: '437', field: 'shipToPincode', msg: 'Consignee pincode must be 999999 for exports.' },
+    { code: '437', field: 'consigneePincode', msg: 'Consignee pincode must be 999999 for exports.' },
     { code: '223', field: 'documentNumber', msg: '223: Invalid Transaction Document Number' },
     { code: '604', field: 'documentNumber', msg: 'Duplicate! E-way bill(s) are already generated for the same document number.' },
     { code: '311', field: 'ewayBillNo', msg: 'Vehicle details cannot be updated because the validity period has expired.' },
@@ -217,7 +219,9 @@ function EwayBillGenerate({
   containerAssessableValues = {},         // { containerId: { weight, perKgValue, assessableValue } }
   boeData = null,                         // Full BOE extract with perKgValue, duties, etc.
   onClose, 
-  onSuccess 
+  onSuccess,
+  partAOnlyDefault = false,
+  jobId = null
 }) {
   // ---- Tab & Mode State ----
   // For BOE-only mode we always start in BOE tab and don't display the LR path.
@@ -325,8 +329,10 @@ function EwayBillGenerate({
     const codeMapping = [
       { code: '371', field: 'consignorState', msg: 'Import error: Consignor State must be "Other Country"' },
       { code: '721', field: 'transportDistance', msg: 'Distance not available. Please enter manually.' },
-      { code: '437', field: 'consignorPincode', msg: 'Pincode mismatch for the selected Consignor State.' },
-      { code: '436', field: 'shipToPincode', msg: 'Pincode mismatch for the selected Destination State.' },
+      { code: '436', field: 'consignorPincode', msg: 'Consignor pincode must be 999999 for imports.' },
+      { code: '436', field: 'dispatchFromPincode', msg: 'Consignor pincode must be 999999 for imports.' },
+      { code: '437', field: 'consigneePincode', msg: 'Consignee pincode must be 999999 for exports.' },
+      { code: '437', field: 'shipToPincode', msg: 'Consignee pincode must be 999999 for exports.' },
       { code: '254', field: 'items[0].igstRate', msg: 'Invalid Tax Rate. Check if SGST/CGST should be used.' },
       { code: '223', field: 'documentNumber', msg: '223: Invalid Transaction Document Number' },
       { code: '604', field: 'documentNumber', msg: 'Duplicate! E-way bill(s) are already generated for the same document number.' },
@@ -356,7 +362,7 @@ function EwayBillGenerate({
 
 
   // ---- Form State ----
-  const [formData, setFormData] = useState({ ...DEFAULT_FORM });
+  const [formData, setFormData] = useState({ ...DEFAULT_FORM, partAOnly: partAOnlyDefault || false });
 
   // ==========================================
   // Data Fetching
@@ -393,9 +399,9 @@ function EwayBillGenerate({
       const firstContainer = selectedContainers[0];
 
       if (generationMode === "batch-all") {
-        // Scenario 2: Calculate combined totals
+        // Scenario 2: Calculate combined totals for selected containers only
         const totalWeight = selectedContainers.reduce(
-          (sum, c) => sum + parseFloat(c.gross_weight || 0),
+          (sum, c) => sum + parseFloat(c.container_gross_weight || c.gross_weight || 0),
           0
         );
 
@@ -405,16 +411,22 @@ function EwayBillGenerate({
           handleBoeFetch();
         }
 
-        // Use total BOE assessable value (NOT proportional) if already available
-        if (boeData?.assessableValue || prefilledAssessableValue) {
+        // Proportional assessable value when only a subset of containers is selected
+        const proportionalValue =
+          perKgValue > 0 && totalWeight > 0
+            ? parseFloat((totalWeight * perKgValue).toFixed(2))
+            : parseFloat(boeData?.assessableValue || prefilledAssessableValue || 0) || 0;
+
+        if (proportionalValue > 0) {
           setFormData((prev) => ({
             ...prev,
-            totalInvoiceValue: boeData?.assessableValue || prefilledAssessableValue || prev.totalInvoiceValue,
+            totalInvoiceValue: proportionalValue,
+            calculatedAssessableValue: proportionalValue,
             items: [
               {
                 ...(prev.items[0] || {}),
                 quantity: totalWeight,
-                taxableAmount: boeData?.assessableValue || prefilledAssessableValue || prev.items[0]?.taxableAmount,
+                taxableAmount: proportionalValue,
               },
             ],
           }));
@@ -422,10 +434,12 @@ function EwayBillGenerate({
       } else if (generationMode === "batch-selected") {
         // Scenario 3: Individual Generation Flow
         // If there's 1 container, pre-fill its assessable value 
-        if (selectedContainers.length === 1 && (containerAssessableValues[firstContainer._id] || firstContainer.gross_weight)) {
+        if (selectedContainers.length === 1 && (containerAssessableValues[firstContainer._id] || firstContainer.container_gross_weight || firstContainer.gross_weight)) {
+          const weightVal = parseFloat(firstContainer.container_gross_weight || firstContainer.gross_weight || 0);
+          const assessableVal = parseFloat(firstContainer.assessable_value || 0) || (weightVal * (perKgValue || 0));
           const calcData = containerAssessableValues[firstContainer._id] || { 
-            weight: parseFloat(firstContainer.gross_weight || 0),
-            assessableValue: parseFloat(firstContainer.assessable_value || 0) 
+            weight: weightVal,
+            assessableValue: assessableVal
           };
           setFormData((prev) => ({
             ...prev,
@@ -444,7 +458,7 @@ function EwayBillGenerate({
         }
       }
     }
-  }, [isMultiContainerMode, selectedContainers, generationMode, boeData, prefilledAssessableValue, containerAssessableValues]);
+  }, [isMultiContainerMode, selectedContainers, generationMode, boeData, prefilledAssessableValue, containerAssessableValues, perKgValue]);
 
   const fetchBoeList = async () => {
     try {
@@ -1083,27 +1097,41 @@ function EwayBillGenerate({
     const initialWeights = {};
     let totalSelectedWeight = 0;
     
-    containerDetails.forEach((bc, idx) => {
-      const bcNo = (bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "").trim().toUpperCase();
-      
-      // Try to find matching container in selectedContainers (from shipment records)
-      const matchedSelected = selectedContainers?.find(sc => {
+    // First, initialize from selectedContainers (since these are the ones the user is actually managing/generating for!)
+    if (selectedContainers && selectedContainers.length > 0) {
+      selectedContainers.forEach((sc, idx) => {
         const scNo = (sc.container_number || sc.container_no || "").trim().toUpperCase();
-        return scNo === bcNo || (bcNo && scNo && bcNo.includes(scNo));
-      });
+        
+        // Find matching container in BOE
+        const originalIdx = containerDetails.findIndex(bc => {
+          const bcNo = (bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "").trim().toUpperCase();
+          return bcNo === scNo || (bcNo && scNo && bcNo.includes(scNo));
+        });
 
-      if (matchedSelected) {
-        const weight = parseFloat(matchedSelected.gross_weight || 0);
-        initialWeights[idx] = weight;
+        // Use the container's weight from shipment database if available, else average weight
+        const weight = parseFloat(sc.container_gross_weight || sc.gross_weight || sc.grossWeight || sc.weight || weightPerCont || (totalGW / selectedContainers.length) || 0);
+        
+        if (originalIdx !== -1) {
+          initialWeights[originalIdx] = weight;
+        }
+        // Always store under the manual key as well to ensure fallback lookup succeeds
+        initialWeights[`manual_${scNo}`] = weight;
         totalSelectedWeight += weight;
-      } else {
+      });
+    }
+
+    // Also populate any remaining BOE containers
+    containerDetails.forEach((bc, idx) => {
+      if (initialWeights[idx] === undefined) {
         initialWeights[idx] = weightPerCont;
       }
     });
 
     // If only one container is selected but it wasn't matched in BOE list, we still want its weight
     if (totalSelectedWeight === 0 && selectedContainers?.length === 1) {
-      totalSelectedWeight = parseFloat(selectedContainers[0].gross_weight || 0);
+      totalSelectedWeight = parseFloat(selectedContainers[0].container_gross_weight || selectedContainers[0].gross_weight || 0);
+      const scNo = (selectedContainers[0].container_number || selectedContainers[0].container_no || "").trim().toUpperCase();
+      initialWeights[`manual_${scNo}`] = totalSelectedWeight;
     }
 
     setContainerWeights(initialWeights);
@@ -1142,7 +1170,7 @@ function EwayBillGenerate({
     }) : [{ ...EMPTY_ITEM, igstRate: effectiveIgstPercent }];
 
     // ── Smart EWB Mode Defaults from import_export field ──────────────
-    const importExport = (lrData?.import_export || '').toLowerCase().trim();
+    const importExport = (lrData?.import_export || prData?.import_export || 'import').toLowerCase().trim();
     let modeDefaults = {};
     let detectedMode = 'general';
     if (importExport === 'import' || importExport === 'inward') {
@@ -1605,23 +1633,14 @@ function EwayBillGenerate({
    * Iterates through selectedContainers and generates proportional EWBs
    */
   const submitMultipleEwayBills = async () => {
-    // LR Generation Check for Multi-Container
-    const containersWithoutLr = selectedContainers.filter(c => !c.tr_no);
-    if (containersWithoutLr.length > 0) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'LR Not Generated',
-        text: 'Please generate LR first for all selected containers before generating E-Way Bills.',
-        confirmButtonColor: '#f39c12'
-      });
-      return;
-    }
+    // ✅ No LR (tr_no) check needed here.
+    // Transporter Doc No is manually entered in the form and sent to the API.
+    // Internal tr_no (system LR record) is NOT required for EWB generation.
 
     try {
       setGenerating(true);
-      const results = [];
 
-      for (const container of selectedContainers) {
+      const promises = selectedContainers.map(async (container) => {
         const scNo = (container.container_number || container.container_no || "").trim().toUpperCase();
         const oIdx = boeContainers.findIndex(bc => {
           const bcNo = (bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "").trim().toUpperCase();
@@ -1635,24 +1654,21 @@ function EwayBillGenerate({
         };
 
         if (weight <= 0) {
-          console.warn(`Skipping container ${container.container_number} - weight is zero or invalid`);
-          results.push({
+          return {
             container: container.container_number,
             ewbNo: null,
             status: "failed",
             error: "Weight is zero or invalid. Please check container weights.",
-          });
-          continue;
+          };
         }
 
         if (!perKgValue || perKgValue <= 0) {
-           results.push({
+          return {
             container: container.container_number,
             ewbNo: null,
             status: "failed",
             error: "Assessable value (Per KG) is not set. Please fetch BOE details first.",
-          });
-          continue;
+          };
         }
 
         // Build container-specific payload
@@ -1665,7 +1681,7 @@ function EwayBillGenerate({
           );
 
           if (response.data.success) {
-            results.push({
+            return {
               container: container.container_number,
               ewbNo: response.data.data.ewbNo,
               ewbDate: response.data.data.ewbDate,
@@ -1673,52 +1689,55 @@ function EwayBillGenerate({
               pdfUrl: response.data.data.pdfUrl,
               ewayBillId: response.data.data.ewayBillId,
               status: "success",
-            });
+            };
           } else {
-            // Extract detailed validation errors if available
             let errorMsg = response.data.message || "Unknown error";
             if (response.data.errors && Array.isArray(response.data.errors) && response.data.errors.length > 0) {
               errorMsg = response.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
             } else if (response.data.validationErrors && Array.isArray(response.data.validationErrors) && response.data.validationErrors.length > 0) {
-               errorMsg = response.data.validationErrors.map(e => e.message).join(", ");
+              errorMsg = response.data.validationErrors.map(e => e.message).join(", ");
             }
 
-            results.push({
+            return {
               container: container.container_number,
               ewbNo: null,
               status: "failed",
               error: errorMsg,
-            });
+            };
           }
         } catch (err) {
           console.error(`Error generating EWB for container ${container.container_number}:`, err);
           const errorData = err.response?.data;
           let errorText = parseNicErrorMessage(errorData?.message || err.message);
           
-          // If there are detailed validation errors in the 400 response
           if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
             errorText = errorData.errors.map(e => e.message).join(", ");
           } else if (errorData?.validationErrors && Array.isArray(errorData.validationErrors) && errorData.validationErrors.length > 0) {
             errorText = errorData.validationErrors.map(e => e.message).join(", ");
           }
 
-          results.push({
+          return {
             container: container.container_number,
             ewbNo: null,
             status: "failed",
             error: errorText,
-          });
+          };
         }
+      });
 
-        // Small delay between requests to avoid rate limiting
-        await new Promise((r) => setTimeout(r, 200));
-      }
+      const results = await Promise.all(promises);
 
       // Show summary
       const successCount = results.filter((r) => r.status === "success").length;
       const failedCount = results.filter((r) => r.status === "failed").length;
 
       if (successCount > 0) {
+        // Save generated E-Way Bills to DB at container level
+        const successList = results.filter((r) => r.status === "success" && r.container && r.ewbNo);
+        if (successList.length > 0) {
+          await saveGeneratedEwayBillsToDb(successList);
+        }
+
         const successHtml = results
           .filter((r) => r.status === "success")
           .map((r) => `<div><strong>${r.container}:</strong> ${r.ewbNo}</div>`)
@@ -1818,6 +1837,10 @@ function EwayBillGenerate({
       containerId: container?._id || containerObj?._id,
       formData: {
         ...formData,
+        documentType: generationMode === "batch-selected" ? "Delivery Challan" : (formData.documentType || "Bill of Entry"),
+        documentNumber: generationMode === "batch-selected" 
+          ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${(container.container_number || container.container_no || "").trim().toUpperCase().slice(-4)}` 
+          : (formData.documentNumber || boeNumber),
         totalInvoiceValue: totalInvoiceValue,
         taxableAmount: taxable,
         calculatedAssessableValue: containerValue.assessableValue,
@@ -1866,16 +1889,17 @@ function EwayBillGenerate({
   };
 
   const normalizeVehicleUpdateReasonCode = (code) => {
-    if (!code) return "2"; // default to breakdown fallback
+    if (!code) return "1"; // default to breakdown fallback
     const normalized = String(code).trim().toLowerCase().replace(/\s+/g, '');
     switch (normalized) {
       case "duetobreakdown":
       case "breakdown":
-      case "2":
-        return "2";
-      case "transshipment":
       case "1":
         return "1";
+      case "transshipment":
+      case "transhipment":
+      case "2":
+        return "2";
       case "others":
       case "3":
         return "3";
@@ -1885,6 +1909,44 @@ function EwayBillGenerate({
         return "4";
       default:
         return code;
+    }
+  };
+
+  const saveGeneratedEwayBillsToDb = async (successResults) => {
+    if (!jobId || !successResults || successResults.length === 0) {
+      return;
+    }
+
+    try {
+      const updates = successResults.map(item => ({
+        container_no: item.container,
+        ewaybill_no: String(item.ewbNo)
+      }));
+
+      console.log("Saving E-Way Bill numbers to containers in DB...", updates);
+      
+      let headers = {};
+      try {
+        const userStr = localStorage.getItem("exim_user") || "{}";
+        const user = JSON.parse(userStr);
+        headers = {
+          "Content-Type": "application/json",
+          "user-id": user.username || "unknown",
+          username: user.username || "unknown",
+          "user-role": user.role || "unknown",
+        };
+      } catch (e) {
+        // ignore
+      }
+
+      await axios.patch(
+        `${process.env.REACT_APP_API_STRING}/jobs/container-ewaybill/${jobId}`,
+        { updates },
+        { headers }
+      );
+      console.log("Successfully saved generated E-Way Bill numbers to containers in MongoDB.");
+    } catch (err) {
+      console.error("Error saving generated E-Way Bill numbers to MongoDB:", err);
     }
   };
 
@@ -1985,17 +2047,9 @@ function EwayBillGenerate({
     }
 
     // ---- Full Generate Flow ----
-    // LR Generation Check
-    const containerForLrCheck = selectedLr ? selectedLr.container_details : null;
-    if (containerForLrCheck && !containerForLrCheck.tr_no) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'LR Not Generated',
-        text: 'Please generate LR first for this selected container before generating the E-Way Bill.',
-        confirmButtonColor: '#f39c12'
-      });
-      return;
-    }
+    // ✅ No LR (tr_no) check needed here.
+    // Part A or Part B can both be generated without a system LR record.
+    // Transporter Doc No is manually entered in the form and is optional per the API.
 
     let hasError = false;
     const newFieldErrors = {};
@@ -2201,6 +2255,20 @@ function EwayBillGenerate({
 
       if (response.data.success) {
         setSuccess(response.data.data);
+
+        // Save E-Way Bill to database at container level
+        const ewbNo = response.data.data.ewbNo;
+        if (ewbNo && selectedContainers && selectedContainers.length > 0) {
+          const successList = selectedContainers.map(c => ({
+            container: c.container_number || c.container_no,
+            ewbNo: ewbNo
+          })).filter(item => item.container && item.ewbNo);
+
+          if (successList.length > 0) {
+            await saveGeneratedEwayBillsToDb(successList);
+          }
+        }
+
         if (onSuccess) {
           onSuccess(response.data.data);
         }
@@ -3777,6 +3845,30 @@ function EwayBillGenerate({
               <div className="form-section">
                 <h3 className="blue-dot">Transportation Details (Part B)</h3>
                 <div className="section-body">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                    <input 
+                      type="checkbox" 
+                      id="partAOnlyCheckbox" 
+                      checked={formData.partAOnly} 
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        setFormData(prev => ({
+                          ...prev,
+                          partAOnly: isChecked,
+                          ...(isChecked && {
+                            vehicleNo: "",
+                            transporterDocNo: "",
+                            transportationMode: ""
+                          })
+                        }));
+                      }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="partAOnlyCheckbox" style={{ fontWeight: 600, color: '#ef4444', fontSize: '0.85rem', cursor: 'pointer', margin: 0 }}>
+                      Generate Part A Only (No Vehicle Details / Part A Slip)
+                    </label>
+                  </div>
+
                   <div className="form-row">
                     <datalist id="transporters">
                       {transporters.map(t => <option key={t._id} value={t.gstin}>{t.name}</option>)}
@@ -3811,14 +3903,14 @@ function EwayBillGenerate({
                     </div>
                     <div className="form-group">
                       <label className="form-label">Vehicle Type</label>
-                      <select className="form-select" name="vehicleType" value={formData.vehicleType} onChange={handleInputChange}>
+                      <select className="form-select" name="vehicleType" value={formData.vehicleType} onChange={handleInputChange} disabled={formData.partAOnly}>
                         <option value="Regular">Regular</option>
                         <option value="ODC">Over Dimensional Cargo</option>
                       </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Mode</label>
-                      <select className="form-select" name="transportationMode" value={formData.transportationMode} onChange={handleInputChange}>
+                      <select className="form-select" name="transportationMode" value={formData.transportationMode} onChange={handleInputChange} disabled={formData.partAOnly}>
                         <option value="Road">Road</option>
                         <option value="Rail">Rail</option>
                         <option value="Air">Air</option>
@@ -3829,17 +3921,25 @@ function EwayBillGenerate({
 
                   <div className="form-row three-cols">
                     <div className="form-group">
-                      <label className="form-label required">Vehicle No</label>
-                      <input type="text" className={getInputClass("vehicleNo")} name="vehicleNo" value={formData.vehicleNo} onChange={handleInputChange} placeholder="XX00XX0000" />
-                      {renderFieldError("vehicleNo")}
+                      <label className={`form-label ${formData.partAOnly ? '' : 'required'}`}>Vehicle No</label>
+                      <input 
+                        type="text" 
+                        className={getInputClass("vehicleNo")} 
+                        name="vehicleNo" 
+                        value={formData.vehicleNo} 
+                        onChange={handleInputChange} 
+                        placeholder={formData.partAOnly ? "Not required for Part A" : "XX00XX0000"} 
+                        disabled={formData.partAOnly} 
+                      />
+                      {!formData.partAOnly && renderFieldError("vehicleNo")}
                     </div>
                     <div className="form-group">
                       <label className="form-label">Transporter Doc No</label>
-                      <input type="text" className="form-input" name="transporterDocNo" value={formData.transporterDocNo} onChange={handleInputChange} />
+                      <input type="text" className="form-input" name="transporterDocNo" value={formData.transporterDocNo} onChange={handleInputChange} disabled={formData.partAOnly} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Transporter Doc Date</label>
-                      <input type="date" className="form-input" name="transporterDocDate" value={formData.transporterDocDate} onChange={handleInputChange} />
+                      <input type="date" className="form-input" name="transporterDocDate" value={formData.transporterDocDate} onChange={handleInputChange} disabled={formData.partAOnly} />
                     </div>
                   </div>
                 </div>

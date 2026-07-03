@@ -87,6 +87,7 @@ class ModuleAssignmentFrontendTester {
           "/importdsr",
           "/netpage",
           "/elock",
+          "/ewaybill",
         ];
         testModules.forEach((module) => {
           const hasAccess = hasModuleAccess(module);
@@ -179,9 +180,9 @@ class ModuleAssignmentFrontendTester {
       "http://task-flow-ai.s3-website.ap-south-1.amazonaws.com/":
         "Task Flow AI",
       "/elock": "E-Lock",
-      // 'http://localhost:3005': 'E-Lock (Local)',
       "/trademasterguide": "Import Video",
       "/transport": "Transport",
+      "/ewaybill": "E-Way Bill",
     };
 
     let accessibleModules = 0;
