@@ -3,9 +3,13 @@ import FileUpload from "../utils/FileUpload";
 import { FaUpload } from "react-icons/fa";
 import axios from "axios";
 import { getJsonCookie } from "../utils/cookies";
-import { IconButton } from "@mui/material";
+import { IconButton, Button } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import BEStatusModal from "../customHooks/BeStatus"; // Import the modal component
+import { message, Tooltip } from "antd";
+import { checkEwayBillExists } from "../utils/axiosConfig";
+import PartAGenerateModal from "./PartAGenerateModal";
+import PartAEwayBillModal from "./PartAEwayBillModal";
 
 const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -18,6 +22,17 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
   const [gatePassFiles, setGatePassFiles] = useState(
     cell.row.original.gate_pass_copies || []
   );
+  const [ewayBillLoading, setEwayBillLoading] = useState(false);
+  const [ewayBillExists, setEwayBillExists] = useState(false);
+  const [existingEwbNumber, setExistingEwbNumber] = useState(null);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [checkingEwayBill, setCheckingEwayBill] = useState(false);
+
+  // Extract and format BE-related data early (before useEffects that depend on them)
+  const beNumber = cell?.getValue()?.toString();
+  const rawBeDate = cell.row.original.be_date;
+  const customHouse = cell.row.original.custom_house;
 
   const formatDate = useCallback((dateStr) => {
     const date = new Date(dateStr);
@@ -35,6 +50,9 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
     return `${year}/${month}/${day}`; // Format as YYYY/MM/DD for display
   }, []);
 
+  const beDate = formatDateDisplay(rawBeDate); // For display
+  const beDateForAPI = formatDate(rawBeDate); // For API (YYYYMMDD)
+
   const getCustomHouseLocation = useMemo(
     () => (customHouse) => {
       const houseMap = {
@@ -46,6 +64,34 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
     },
     []
   );
+
+  const location = getCustomHouseLocation(customHouse);
+  const rowId = cell.row.original._id || cell.row.id;
+
+  // Define EWB check function with useCallback to prevent infinite loops
+  const checkEWayBillStatus = useCallback(async () => {
+    setCheckingEwayBill(true);
+    try {
+      const response = await checkEwayBillExists(beNumber);
+      if (response.data && response.data.length > 0) {
+        const existingEWB = response.data[0];
+        setEwayBillExists(true);
+        setExistingEwbNumber(existingEWB.ewb_number || existingEWB.ewbNo);
+        return true;
+      } else {
+        setEwayBillExists(false);
+        setExistingEwbNumber(null);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error checking E-Way Bill status:", error);
+      // If check fails, show Generate button (fallback to normal flow)
+      setEwayBillExists(false);
+      return false;
+    } finally {
+      setCheckingEwayBill(false);
+    }
+  }, [beNumber]);
 
   // Sync BE Attachments
   useEffect(() => {
@@ -61,14 +107,6 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
   useEffect(() => {
     setGatePassFiles(cell.row.original.gate_pass_copies || []);
   }, [cell.row.original.gate_pass_copies]);
-
-  const beNumber = cell?.getValue()?.toString();
-  const rawBeDate = cell.row.original.be_date;
-  const customHouse = cell.row.original.custom_house;
-  const beDate = formatDateDisplay(rawBeDate); // For display
-  const beDateForAPI = formatDate(rawBeDate); // For API (YYYYMMDD)
-  const location = getCustomHouseLocation(customHouse);
-  const rowId = cell.row.original._id || cell.row.id;
 
   // Handle BE number click to open modal
   const handleBEClick = (event) => {
@@ -87,6 +125,43 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
     navigator.clipboard.writeText(text);
     // You can add a toast notification here if needed
     console.log(`Copied: ${text}`);
+  };
+
+  // Handle E-Way Bill Generation - Open Generate Modal
+  const handleGenerateEwayBill = async (event) => {
+    event.stopPropagation();
+    
+    if (!beNumber) {
+      message.warning("No BE number available");
+      return;
+    }
+
+    const exists = await checkEWayBillStatus();
+    if (exists) {
+      setViewModalOpen(true);
+      return;
+    }
+
+    setGenerateModalOpen(true);
+  };
+
+  // Handle View E-Way Bill - Open View Modal
+  const handleViewEwayBill = (event) => {
+    event.stopPropagation();
+    
+    if (!existingEwbNumber) {
+      message.warning("E-Way Bill number not found");
+      return;
+    }
+
+    setViewModalOpen(true);
+  };
+
+  // Handle successful E-Way Bill generation
+  const handleEwayBillSuccess = (response) => {
+    message.success("E-Way Bill generated successfully!");
+    // Refresh E-Way Bill status
+    checkEWayBillStatus();
   };
 
   // Handle file uploads for different document types
@@ -254,7 +329,7 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
       >
         {beNumber && (
           <div>
-            <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <a
                 href="#"
                 onClick={handleBEClick}
@@ -273,11 +348,32 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
               <IconButton
                 size="small"
                 onClick={(event) => copyFn(event, beNumber)}
+                title="Copy BE Number"
               >
-                <abbr title="Copy BE Number">
-                  <ContentCopyIcon fontSize="inherit" />
-                </abbr>
+                <ContentCopyIcon fontSize="inherit" />
               </IconButton>
+              
+              {/* E-Way Bill Button - Generate or View based on existence */}
+              <Tooltip title={ewayBillExists ? "View existing E-Way Bill" : "Generate new E-Way Bill"}>
+                <Button
+                  size="small"
+                  type={ewayBillExists ? "primary" : "default"}
+                  loading={checkingEwayBill}
+                  onClick={ewayBillExists ? handleViewEwayBill : handleGenerateEwayBill}
+                  disabled={!beNumber || checkingEwayBill}
+                  style={{
+                    marginBottom: "5px",
+                    fontSize: "12px",
+                    height: "32px",
+                    padding: "0 8px",
+                    minWidth: "fit-content",
+                    backgroundColor: ewayBillExists ? "#52c41a" : undefined,
+                    borderColor: ewayBillExists ? "#52c41a" : undefined,
+                  }}
+                >
+                  {ewayBillExists ? "View E-Way" : "Generate E-Way"}
+                </Button>
+              </Tooltip>
             </div>
 
             <span>{beDate}</span>
@@ -334,6 +430,23 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
         beNo={selectedBE?.beNo}
         beDt={selectedBE?.beDt}
         location={selectedBE?.location}
+      />
+
+      {/* Part-A Generate Modal */}
+      <PartAGenerateModal
+        open={generateModalOpen}
+        onClose={() => setGenerateModalOpen(false)}
+        beNumber={beNumber}
+        beDate={beDate}
+        onSuccess={handleEwayBillSuccess}
+      />
+
+      {/* Part-A View Modal */}
+      <PartAEwayBillModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        ewbNumber={existingEwbNumber}
+        beNumber={beNumber}
       />
     </>
   );
