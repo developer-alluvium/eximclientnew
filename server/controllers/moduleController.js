@@ -9,6 +9,12 @@ const AVAILABLE_MODULES = [
     category: "core"
   },
   {
+    id: "/ewaybill",
+    name: "E-Way Bill",
+    description: "View and manage E-Way Bills linked to import shipments",
+    category: "core"
+  },
+  {
     id: "/netpage",
     name: "CostIQ",
     description: "Calculate shipping costs per kilogram for better pricing decisions",

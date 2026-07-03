@@ -569,6 +569,14 @@ function UserDashboard() {
       category: "core",
     },
     {
+      name: "E-Way Bill",
+      description:
+        "Generate and manage E-Way Bills linked to import shipments and BE numbers",
+      path: "/ewaybill",
+      categoryLabel: "IMPORT MANAGEMENT",
+      category: "core",
+    },
+    {
       name: "Export DSR",
       description:
         "Comprehensive export shipment tracking and IEC-wise data management",

@@ -85,6 +85,7 @@ class ModuleAssignmentFrontendTester {
         // Test access to specific modules
         const testModules = [
           "/importdsr",
+          "/ewaybill",
           "/netpage",
           "/elock",
         ];
@@ -173,6 +174,7 @@ class ModuleAssignmentFrontendTester {
     // Define module navigation mappings
     const moduleNavigationMap = {
       "/importdsr": "Import DSR",
+      "/ewaybill": "E-Way Bill",
       "/netpage": "CostIQ",
       "http://snapcheckv1.s3-website.ap-south-1.amazonaws.com/": "SnapCheck",
       "http://qrlocker.s3-website.ap-south-1.amazonaws.com/": "QR Locker",

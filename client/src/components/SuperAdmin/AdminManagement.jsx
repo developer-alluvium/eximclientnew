@@ -115,6 +115,13 @@ const AVAILABLE_MODULES = [
     category: "core",
   },
   {
+    id: "/ewaybill",
+    name: "E-Way Bill",
+    description:
+      "View and manage E-Way Bills linked to import shipments",
+    category: "core",
+  },
+  {
     id: "/netpage",
     name: "CostIQ",
     description:
@@ -907,6 +914,7 @@ const AdminManagement = ({ onRefresh }) => {
 
   // Utility functions
   const getModuleIcon = (moduleId) => {
+    if (moduleId.includes("ewaybill") || moduleId.includes("eway")) return "🧾";
     if (moduleId.includes("dsr")) return "📊";
     if (moduleId.includes("net") || moduleId.includes("cost")) return "⚖️";
     if (moduleId.includes("snap")) return "📷";
