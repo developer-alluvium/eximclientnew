@@ -464,6 +464,7 @@ function EwayBillGenerateLR({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [success, setSuccess] = useState(null);
+  const generatedBoeDocumentsRef = useRef(new Set());
   const [dutySummary, setDutySummary] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [mvData, setMvData] = useState(null);
@@ -648,6 +649,32 @@ function EwayBillGenerateLR({
   const renderErr = (name) => fieldErrors[name]
     ? <div className="ewb-err">{fieldErrors[name]}</div>
     : null;
+
+  const normalizeBoeDocumentNo = (documentNo) => String(documentNo || "").trim();
+
+  const markBoeDocumentGenerated = (documentNo) => {
+    const normalized = normalizeBoeDocumentNo(documentNo);
+    if (!normalized) return;
+
+    generatedBoeDocumentsRef.current.add(normalized);
+    try {
+      window.sessionStorage?.setItem(`ewaybill.generatedBoeDocument.${normalized}`, "1");
+    } catch (error) {
+      // Non-critical: the in-memory guard still covers the current mounted component.
+    }
+  };
+
+  const shouldSkipBoeLrDataFetch = (documentNo) => {
+    const normalized = normalizeBoeDocumentNo(documentNo);
+    if (!normalized) return false;
+
+    if (generatedBoeDocumentsRef.current.has(normalized)) return true;
+    try {
+      return window.sessionStorage?.getItem(`ewaybill.generatedBoeDocument.${normalized}`) === "1";
+    } catch (error) {
+      return false;
+    }
+  };
 
   // Local mapEwbApiErrorToFields (component-level, same as before)
   const mapLocalEwbErrors = (errorMessage, existing = {}) => {
@@ -835,6 +862,7 @@ function EwayBillGenerateLR({
 
   const fetchBoeLrData = async (documentNo, documentDate) => {
     if (!documentNo) return;
+    if (shouldSkipBoeLrDataFetch(documentNo)) return;
     try {
       setBoeLrLoading(true); setBoeError('');
       const r = await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data?document_no=${encodeURIComponent(documentNo)}`);
@@ -1010,7 +1038,9 @@ function EwayBillGenerateLR({
     try {
       setBoeLoading(true); setBoeError('');
       const [lrResponse, boeResponse] = await Promise.allSettled([
-        axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data?document_no=${encodeURIComponent(docToFetch)}`),
+        shouldSkipBoeLrDataFetch(docToFetch)
+          ? Promise.resolve({ data: { success: false, data: null } })
+          : axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data?document_no=${encodeURIComponent(docToFetch)}`),
         axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-extract?be_no=${encodeURIComponent(docToFetch)}&be_date=${dateToFetch}`),
       ]);
       if (boeResponse.status === 'fulfilled') {
@@ -1403,6 +1433,7 @@ function EwayBillGenerateLR({
         try {
           const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, containerPayload);
           if (r.data.success) {
+            markBoeDocumentGenerated(formData.documentNumber || boeNumber);
             return {
               container: container.container_number,
               ewbNo: r.data.data.ewbNo,
@@ -1629,6 +1660,7 @@ function EwayBillGenerateLR({
       };
       const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, payload);
       if (r.data.success) {
+        markBoeDocumentGenerated(formData.documentNumber || boeNumber);
         setSuccess(r.data.data);
         if (onSuccess) onSuccess(r.data.data);
         Swal.fire({ icon: "success", title: "E-Way Bill Generated", html: `<p><strong>EWB No:</strong> ${r.data.data.ewbNo}</p><p><strong>Valid Until:</strong> ${r.data.data.validUpto}</p>` });

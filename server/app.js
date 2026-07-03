@@ -38,6 +38,8 @@ import importProxyRoutes from "./routes/importProxyRoutes.js"; // Import module 
 import openPointsRoutes from "./routes/openPointsRoutes.js";
 import transportAuthService from "./services/transportAuthService.js";
 import ewayBillProxyRoutes from "./routes/ewayBillProxyRoutes.js";
+import { updateContainerEwayBill } from "./controllers/importProxyController.js";
+import { authenticateUser } from "./middlewares/authMiddleware.js";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 // Load environment variables
@@ -163,6 +165,9 @@ app.use("/api/eway-bill", ewayBillProxyRoutes);
 
 app.use("/api/elock", elockRoutes);
 app.use("/api/elock-details", elockDetailsRoutes);
+
+// Update container ewaybill route
+app.patch("/api/jobs/container-ewaybill/:id", authenticateUser, updateContainerEwayBill);
 
 // Proxy route for third-party notifications
 app.get("/api/notifications", async (req, res) => {

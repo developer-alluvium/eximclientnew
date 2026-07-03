@@ -1,6 +1,7 @@
 import axios from "axios";
 import mongoose from "mongoose";
 import EximclientUser from "../models/eximclientUserModel.js";
+import JobModel from "../models/jobModel.js";
 
 const IMPORT_API_BASE_URL = process.env.IMPORT_API_BASE_URL || "http://localhost:9006/api";
 
@@ -1019,10 +1020,45 @@ export const updateContainerEwayBill = async (req, res) => {
       return res.status(400).json({ success: false, message: "Updates array is required" });
     }
 
-    const Job = mongoose.models.Job || mongoose.model("Job");
-    
-    // Fetch the job to resolve indices
-    const job = await Job.findById(id);
+    let job = null;
+
+    // First: Try to find by _id
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      job = await JobModel.findById(id);
+    }
+
+    // Second: If not found, try to find by year and job_no or other unique fields
+    if (!job) {
+      // Let's first try to fetch the job from the third-party API using this id to get more info to find it in local DB!
+      const apiJobResponse = await axios.get(`${IMPORT_API_BASE_URL}/jobs/${id}`, {
+        headers: {
+          username: "Admin",
+          "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET
+        },
+        timeout: 15000,
+      });
+
+      const apiJob = apiJobResponse.data?.data || apiJobResponse.data;
+      if (apiJob) {
+        // Try to find in local DB using year and job_no (the unique index)
+        if (apiJob.year && apiJob.job_no) {
+          job = await JobModel.findOne({ year: apiJob.year, job_no: apiJob.job_no });
+        }
+
+        // If still not found, upsert the job into local DB
+        if (!job) {
+          const jobData = { ...apiJob, updatedAt: new Date() };
+          // Remove _id if present to avoid issues
+          delete jobData._id;
+          job = await JobModel.findOneAndUpdate(
+            { year: apiJob.year, job_no: apiJob.job_no },
+            { $set: jobData },
+            { new: true, upsert: true }
+          );
+        }
+      }
+    }
+
     if (!job) {
       return res.status(404).json({ success: false, message: "Job not found" });
     }
@@ -1049,7 +1085,7 @@ export const updateContainerEwayBill = async (req, res) => {
       return res.status(400).json({ success: false, message: "No matching containers found to update" });
     }
 
-    const updatedJob = await Job.findByIdAndUpdate(id, { $set: setQuery }, { new: true });
+    const updatedJob = await JobModel.findByIdAndUpdate(job._id, { $set: setQuery }, { new: true });
 
     res.json({ success: true, message: "Container E-Way Bill(s) updated successfully", data: updatedJob });
   } catch (error) {

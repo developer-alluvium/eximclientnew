@@ -55,7 +55,7 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
 
     try {
       let pdfUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-      const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/proxy-pdf?url=${encodeURIComponent(pdfUrl)}`;
+      const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
 
       // Fetch as binary blob — guarantees a real file download, not browser navigation
       const response = await axios.get(proxyUrl, { responseType: "blob" });
@@ -78,8 +78,35 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
 
   if (!open || !ewbList || ewbList.length === 0) return null;
 
-  const data = partAData?.data || {};
+  const rawData = partAData?.data || {};
   const meta = partAData?.meta || {};
+  // Map both camelCase and underscore case fields
+  const data = {
+    ewayBillNo: rawData.ewayBillNo || rawData.eway_bill_number,
+    ewayBillDate: rawData.ewayBillDate || rawData.eway_bill_date,
+    validUpto: rawData.validUpto || rawData.eway_bill_valid_date || meta.validUpto,
+    status: rawData.status || rawData.eway_bill_status || meta.ewbStatus,
+    fromGstIn: rawData.fromGstIn || rawData.gstin_of_consignor,
+    fromTrdName: rawData.fromTrdName || rawData.legal_name_of_consignor,
+    fromAddr1: rawData.fromAddr1 || rawData.address1_of_consignor,
+    fromAddr2: rawData.fromAddr2 || rawData.address2_of_consignor,
+    actFromStateCode: rawData.actFromStateCode || rawData.actual_from_state_name || rawData.state_of_consignor,
+    toTrdName: rawData.toTrdName || rawData.legal_name_of_consignee,
+    toGstIn: rawData.toGstIn || rawData.gstin_of_consignee,
+    toAddr1: rawData.toAddr1 || rawData.address1_of_consignee,
+    toAddr2: rawData.toAddr2 || rawData.address2_of_consignee,
+    actToStateCode: rawData.actToStateCode || rawData.actual_to_state_name || rawData.state_of_supply,
+    transMode: rawData.transMode || rawData.transport_mode || "N/A",
+    vehicleNo: rawData.vehicleNo || rawData.vehicle_number || (rawData.VehiclListDetails?.[0]?.vehicleNo || rawData.VehiclListDetails?.[0]?.vehicle_number) || "N/A",
+    transDistance: rawData.transDistance || rawData.transportation_distance,
+    vehType: rawData.vehType || rawData.vehicle_type,
+    totAmt: rawData.totAmt || rawData.taxable_amount,
+    cgstValue: rawData.cgstValue || rawData.cgst_amount,
+    sgstValue: rawData.sgstValue || rawData.sgst_amount,
+    igstValue: rawData.igstValue || rawData.igst_amount,
+    totInvValue: rawData.totInvValue || rawData.total_invoice_value,
+    cessValue: rawData.cessValue || rawData.cess_amount,
+  };
 
   const matchContainer = containers?.find(c => String(c._id) === String(ewb.containerId) || String(c.container_no) === String(ewb.containerId));
   const containerNo = matchContainer?.container_no || ewb.containerId || (ewb.requestPayload?.document_number?.split("-CH-")?.[1]) || "-";
@@ -166,7 +193,7 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
                 E-Way Bill Details (Part A - Read Only)
               </Typography>
               <Chip
-                label={meta.ewbStatus ? `EWB: ${meta.ewbStatus}` : `EWB: ${ewb.ewbNo || "N/A"}`}
+                label={meta.ewbStatus ? `EWB: ${meta.ewbStatus}` : `EWB: ${data.ewayBillNo || ewb.ewbNo || "N/A"}`}
                 variant="outlined"
                 size="small"
                 color="primary"
@@ -180,8 +207,8 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
                 {[
                   ["EWB Number", data.ewayBillNo || meta.ewbNo || ewb.ewbNo || "N/A"],
                   ["Generated Date", data.ewayBillDate || meta.ewbDate || ewb.ewbDate || "-"],
-                  ["Valid Upto", data.validUpto || meta.validUpto || "N/A"],
-                  ["Status", data.status || meta.ewbStatus || ewb.ewbStatus || "UNKNOWN"],
+                  ["Valid Upto", data.validUpto || "N/A"],
+                  ["Status", data.status || "UNKNOWN"],
                 ].map(([label, val], i) => (
                   <Box key={i} sx={{ flex: 1, p: 1.5, borderRight: i < 3 ? "1px solid #e2e8f0" : "none", bgcolor: i % 2 === 0 ? "#fafafa" : "#ffffff" }}>
                     <Typography sx={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, mb: 0.5 }}>{label}</Typography>
@@ -195,7 +222,7 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
                 {renderRow("Name", data.fromGstIn === "URP" ? (data.fromTrdName || ewb.consignorName || "-") : (data.fromTrdName || ewb.consignorName))}
                 {renderRow("GSTIN", data.fromGstIn || ewb.consignorGstin || "-")}
                 {renderRow("Address", [data.fromAddr1, data.fromAddr2].filter(Boolean).join(", ") || ewb.consignorAddress1 || "-")}
-                {renderRow("State", data.actFromStateCode ? `${data.actFromStateCode}` : (ewb.consignorState || "-"))}
+                {renderRow("State", data.actFromStateCode || "-")}
               </>)}
 
               {/* Consignee Details */}
@@ -203,19 +230,19 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
                 {renderRow("Name", data.toTrdName || ewb.consigneeName || "-")}
                 {renderRow("GSTIN", data.toGstIn || ewb.consigneeGstin || "-")}
                 {renderRow("Address", [data.toAddr1, data.toAddr2].filter(Boolean).join(", ") || ewb.consigneeAddress1 || "-")}
-                {renderRow("State", data.actToStateCode ? `${data.actToStateCode}` : (ewb.consigneeState || "-"))}
+                {renderRow("State", data.actToStateCode || "-")}
               </>)}
 
               {/* Transport Details */}
               {renderSection("Transport Details", (
                 <Box sx={{ display: "flex" }}>
                   <Box sx={{ flex: 1, borderRight: "1px solid #f1f5f9" }}>
-                    {renderRow("Mode of Transport", data.transMode || ewb.transportationMode || "-")}
-                    {renderRow("Vehicle Number", data.vehicleNo || ewb.vehicleNo || "-")}
+                    {renderRow("Mode of Transport", data.transMode || "-")}
+                    {renderRow("Vehicle Number", data.vehicleNo || "-")}
                     {renderRow("Container Number", containerNo)}
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    {renderRow("Distance (km)", data.transDistance || ewb.transportDistance || "-")}
+                    {renderRow("Distance (km)", data.transDistance || "-")}
                     {renderRow("Vehicle Type", data.vehType || "-")}
                   </Box>
                 </Box>
@@ -225,12 +252,12 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
               {renderSection("Value Summary", (
                 <Box sx={{ display: "flex", flexWrap: "wrap" }}>
                   {[
-                    ["Taxable Amount", `₹ ${(data.totAmt || ewb.taxableAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
-                    ["CGST", `₹ ${(data.cgstValue || ewb.cgstAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
-                    ["SGST", `₹ ${(data.sgstValue || ewb.sgstAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
-                    ["IGST", `₹ ${(data.igstValue || ewb.igstAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
-                    ["Total Invoice Value", `₹ ${(data.totInvValue || ewb.totalInvoiceValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
-                    ["Cess", `₹ ${(data.cessValue || ewb.cessAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["Taxable Amount", `₹ ${(data.totAmt || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["CGST", `₹ ${(data.cgstValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["SGST", `₹ ${(data.sgstValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["IGST", `₹ ${(data.igstValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["Total Invoice Value", `₹ ${(data.totInvValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+                    ["Cess", `₹ ${(data.cessValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
                   ].map(([label, val], i) => (
                     <Box key={i} sx={{ width: "50%", display: "flex", borderBottom: "1px solid #f1f5f9" }}>
                       <Typography sx={{ width: "55%", p: 1, fontSize: "0.83rem", color: "#64748b", fontWeight: 600, bgcolor: i === 4 ? "#eff6ff" : "#f8fafc", borderRight: "1px solid #f1f5f9" }}>
@@ -270,6 +297,88 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
 };
 
 
+const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, onViewExisting }) => {
+  const hasExistingEwbs = containers?.some(container => container.ewaybill_no);
+  
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ py: 1.5, px: 3, borderBottom: "1px solid #e2e8f0", bgcolor: "#ffffff" }}>
+        <Typography variant="h6" fontWeight="800" sx={{ color: "#1e293b" }}>
+          Container E-Way Bill Status
+        </Typography>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3, bgcolor: "#f8fafc" }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {containers?.map((container, index) => {
+            const containerNo = container.container_no || container.container_number || `Container ${index + 1}`;
+            const ewaybillNo = container.ewaybill_no;
+            return (
+              <Box
+                key={index}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  p: 2,
+                  borderRadius: 1.5,
+                  border: `1px solid ${ewaybillNo ? "#bbf7d0" : "#fde68a"}`,
+                  bgcolor: ewaybillNo ? "#f0fdf4" : "#fffbeb"
+                }}
+              >
+                <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: "#1e293b" }}>
+                  {containerNo}
+                </Typography>
+                <Chip
+                  label={ewaybillNo ? ewaybillNo : "No E-Way Bill"}
+                  size="small"
+                  color={ewaybillNo ? "success" : "warning"}
+                  variant="outlined"
+                  sx={{ fontWeight: 600, fontSize: "0.72rem" }}
+                />
+              </Box>
+            );
+          })}
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "#ffffff", justifyContent: "space-between" }}>
+        <Button onClick={onClose} variant="outlined" color="inherit" sx={{ textTransform: "none", fontWeight: 600 }}>
+          Cancel
+        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          {hasExistingEwbs && onViewExisting && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                const existingEwbs = containers
+                  ?.filter(container => container.ewaybill_no)
+                  ?.map(container => ({
+                    ewbNo: container.ewaybill_no,
+                    containerId: container.container_no || container.container_number
+                  })) || [];
+                onViewExisting(existingEwbs);
+              }}
+              sx={{ textTransform: "none", fontSize: "0.78rem", borderRadius: 1 }}
+            >
+              View Existing E-Way Bills
+            </Button>
+          )}
+          <Button
+            onClick={onContinue}
+            variant="contained"
+            sx={{ bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" }, textTransform: "none", fontWeight: 700 }}
+          >
+            Continue to Generate
+          </Button>
+        </Box>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+
 const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBE, setSelectedBE] = useState(null);
@@ -287,6 +396,7 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [selectedEwb, setSelectedEwb] = useState(null);
   const [prefetchedEwbList, setPrefetchedEwbList] = useState([]);
+  const [isContainerEwaybillStatusModalOpen, setIsContainerEwaybillStatusModalOpen] = useState(false);
 
   const formatDate = useCallback((dateStr) => {
     const date = new Date(dateStr);
@@ -356,6 +466,11 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
       Swal.fire("Error", "No Bill of Entry (BE No) or Document No found.", "error");
       return;
     }
+    setIsContainerEwaybillStatusModalOpen(true);
+  };
+
+  const handleContinueToGenerate = () => {
+    setIsContainerEwaybillStatusModalOpen(false);
     setIsPartAEwayBillDialogOpen(true);
   };
 
@@ -637,6 +752,19 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
         beNo={selectedBE?.beNo}
         beDt={selectedBE?.beDt}
         location={selectedBE?.location}
+      />
+
+      {/* Container E-Way Bill Status Modal */}
+      <ContainerEwaybillStatusModal
+        open={isContainerEwaybillStatusModalOpen}
+        onClose={() => setIsContainerEwaybillStatusModalOpen(false)}
+        onContinue={handleContinueToGenerate}
+        containers={cell.row.original.container_nos}
+        onViewExisting={(list) => {
+          setIsContainerEwaybillStatusModalOpen(false);
+          setSelectedEwb(list);
+          setIsActionModalOpen(true);
+        }}
       />
 
       {/* E-Way Bill Part A Dialog */}

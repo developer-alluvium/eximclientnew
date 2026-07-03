@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import axios from "../../utils/axiosConfig";
 import Swal from "sweetalert2";
 import { Autocomplete, TextField } from "@mui/material";
 import "../../styles/ewaybill.scss";
@@ -282,6 +282,7 @@ function EwayBillGenerate({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [success, setSuccess] = useState(null);
+  const generatedBoeDocumentsRef = useRef(new Set());
 
   // ---- Duty Summary (from BOE upload/extract) ----
   const [dutySummary, setDutySummary] = useState(null);
@@ -317,6 +318,32 @@ function EwayBillGenerate({
   const renderFieldError = (fieldName) => {
     if (!fieldErrors[fieldName]) return null;
     return <div className="field-error" style={{ color: '#dc3545', fontSize: '0.875em', marginTop: '0.25rem' }}>{fieldErrors[fieldName]}</div>;
+  };
+
+  const normalizeBoeDocumentNo = (documentNo) => String(documentNo || "").trim();
+
+  const markBoeDocumentGenerated = (documentNo) => {
+    const normalized = normalizeBoeDocumentNo(documentNo);
+    if (!normalized) return;
+
+    generatedBoeDocumentsRef.current.add(normalized);
+    try {
+      window.sessionStorage?.setItem(`ewaybill.generatedBoeDocument.${normalized}`, "1");
+    } catch (error) {
+      // Non-critical: the in-memory guard still covers the current mounted component.
+    }
+  };
+
+  const shouldSkipBoeLrDataFetch = (documentNo) => {
+    const normalized = normalizeBoeDocumentNo(documentNo);
+    if (!normalized) return false;
+
+    if (generatedBoeDocumentsRef.current.has(normalized)) return true;
+    try {
+      return window.sessionStorage?.getItem(`ewaybill.generatedBoeDocument.${normalized}`) === "1";
+    } catch (error) {
+      return false;
+    }
   };
 
   const mapEwbApiErrorToFields = (errorMessage, existingFieldErrors = {}) => {
@@ -418,18 +445,33 @@ function EwayBillGenerate({
             : parseFloat(boeData?.assessableValue || prefilledAssessableValue || 0) || 0;
 
         if (proportionalValue > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            totalInvoiceValue: proportionalValue,
-            calculatedAssessableValue: proportionalValue,
-            items: [
-              {
-                ...(prev.items[0] || {}),
-                quantity: totalWeight,
-                taxableAmount: proportionalValue,
-              },
-            ],
-          }));
+          setFormData((prev) => {
+            const currentVal = parseFloat(prev.totalInvoiceValue) || 0;
+            const currentQty = parseFloat(prev.items[0]?.quantity) || 0;
+            const currentTaxable = parseFloat(prev.items[0]?.taxableAmount) || 0;
+            const currentCalcVal = parseFloat(prev.calculatedAssessableValue) || 0;
+
+            const hasChanged =
+              Math.abs(currentVal - proportionalValue) > 0.01 ||
+              Math.abs(currentQty - totalWeight) > 0.01 ||
+              Math.abs(currentTaxable - proportionalValue) > 0.01 ||
+              Math.abs(currentCalcVal - proportionalValue) > 0.01;
+
+            if (!hasChanged) return prev;
+
+            return {
+              ...prev,
+              totalInvoiceValue: proportionalValue,
+              calculatedAssessableValue: proportionalValue,
+              items: [
+                {
+                  ...(prev.items[0] || {}),
+                  quantity: totalWeight,
+                  taxableAmount: proportionalValue,
+                },
+              ],
+            };
+          });
         }
       } else if (generationMode === "batch-selected") {
         // Scenario 3: Individual Generation Flow
@@ -441,18 +483,35 @@ function EwayBillGenerate({
             weight: weightVal,
             assessableValue: assessableVal
           };
-          setFormData((prev) => ({
-            ...prev,
-            totalInvoiceValue: calcData.assessableValue || prev.totalInvoiceValue || 0,
-            calculatedAssessableValue: calcData.assessableValue || 0,
-            items: [
-              {
-                ...(prev.items[0] || {}),
-                quantity: calcData.weight || 0,
-                taxableAmount: calcData.assessableValue || prev.items[0]?.taxableAmount || 0,
-              },
-            ],
-          }));
+          setFormData((prev) => {
+            const targetVal = parseFloat(calcData.assessableValue) || 0;
+            const targetQty = parseFloat(calcData.weight) || 0;
+            const currentVal = parseFloat(prev.totalInvoiceValue) || 0;
+            const currentQty = parseFloat(prev.items[0]?.quantity) || 0;
+            const currentTaxable = parseFloat(prev.items[0]?.taxableAmount) || 0;
+            const currentCalcVal = parseFloat(prev.calculatedAssessableValue) || 0;
+
+            const hasChanged =
+              Math.abs(currentVal - targetVal) > 0.01 ||
+              Math.abs(currentQty - targetQty) > 0.01 ||
+              Math.abs(currentTaxable - targetVal) > 0.01 ||
+              Math.abs(currentCalcVal - targetVal) > 0.01;
+
+            if (!hasChanged) return prev;
+
+            return {
+              ...prev,
+              totalInvoiceValue: targetVal || prev.totalInvoiceValue || 0,
+              calculatedAssessableValue: targetVal,
+              items: [
+                {
+                  ...(prev.items[0] || {}),
+                  quantity: targetQty,
+                  taxableAmount: targetVal || prev.items[0]?.taxableAmount || 0,
+                },
+              ],
+            };
+          });
         } else {
           // Keep as is for multiple rendering
         }
@@ -546,6 +605,7 @@ function EwayBillGenerate({
   // Step 3A: Fetch internal LR data immediately when BOE is selected
   const fetchBoeLrData = async (documentNo, documentDate) => {
     if (!documentNo) return;
+    if (shouldSkipBoeLrDataFetch(documentNo)) return;
     try {
       setBoeLrLoading(true);
       setBoeError('');
@@ -938,7 +998,9 @@ function EwayBillGenerate({
 
       // ✅ Step 3B: Parallel fetch — internal LR data + external API
       const [lrResponse, boeResponse] = await Promise.allSettled([
-        axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data?document_no=${encodeURIComponent(docToFetch)}`),
+        shouldSkipBoeLrDataFetch(docToFetch)
+          ? Promise.resolve({ data: { success: false, data: null } })
+          : axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-lr-data?document_no=${encodeURIComponent(docToFetch)}`),
         axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-extract?be_no=${encodeURIComponent(docToFetch)}&be_date=${dateToFetch}`),
       ]);
 
@@ -1681,6 +1743,7 @@ function EwayBillGenerate({
           );
 
           if (response.data.success) {
+            markBoeDocumentGenerated(formData.documentNumber || boeNumber);
             return {
               container: container.container_number,
               ewbNo: response.data.data.ewbNo,
@@ -1925,12 +1988,11 @@ function EwayBillGenerate({
 
       console.log("Saving E-Way Bill numbers to containers in DB...", updates);
       
-      let headers = {};
+      let extraHeaders = {};
       try {
         const userStr = localStorage.getItem("exim_user") || "{}";
         const user = JSON.parse(userStr);
-        headers = {
-          "Content-Type": "application/json",
+        extraHeaders = {
           "user-id": user.username || "unknown",
           username: user.username || "unknown",
           "user-role": user.role || "unknown",
@@ -1942,7 +2004,7 @@ function EwayBillGenerate({
       await axios.patch(
         `${process.env.REACT_APP_API_STRING}/jobs/container-ewaybill/${jobId}`,
         { updates },
-        { headers }
+        { headers: extraHeaders }
       );
       console.log("Successfully saved generated E-Way Bill numbers to containers in MongoDB.");
     } catch (err) {
@@ -2254,6 +2316,7 @@ function EwayBillGenerate({
       );
 
       if (response.data.success) {
+        markBoeDocumentGenerated(formData.documentNumber || boeNumber);
         setSuccess(response.data.data);
 
         // Save E-Way Bill to database at container level

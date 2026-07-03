@@ -137,7 +137,7 @@ const multipartHandler = (req, res, next) => {
 
 // ── PDF Proxy: fetch external PDF URL server-side and stream back ────────────
 // Prevents CORS/encoding issues when the browser tries to fetch cross-origin PDFs.
-router.get("/pdf-proxy", async (req, res) => {
+const pdfProxyHandler = async (req, res) => {
   const { url } = req.query;
   if (!url) {
     return res.status(400).json({ success: false, message: "Missing url parameter" });
@@ -179,7 +179,10 @@ router.get("/pdf-proxy", async (req, res) => {
     console.error("[pdf-proxy] error:", err.message);
     res.status(502).json({ success: false, message: err.message || "PDF proxy failed" });
   }
-});
+};
+
+router.get("/pdf-proxy", pdfProxyHandler);
+router.get("/proxy-pdf", pdfProxyHandler); // backward compatibility
 
 // Define routes
 router.use(multipartHandler, proxyRequest);
