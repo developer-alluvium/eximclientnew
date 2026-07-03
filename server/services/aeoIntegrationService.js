@@ -215,6 +215,40 @@ export class AEOIntegrationService {
   }
 
   /**
+   * Search local database (CustomerKyc) for an existing certificate number
+   * matching the importer name.
+   */
+  static async searchAeodirectory(importerName) {
+    if (!importerName) return null;
+    
+    try {
+      const matchName = importerName.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      console.log(`🔍 Searching local database for importer: ${importerName}`);
+      
+      const record = await CustomerKycModel.findOne({
+        name_of_individual: { $regex: new RegExp(matchName, "i") },
+        aeo_certificates: { $exists: true, $not: { $size: 0 } }
+      });
+      
+      if (record && record.aeo_certificates && record.aeo_certificates.length > 0) {
+        const latestCert = record.aeo_certificates[record.aeo_certificates.length - 1];
+        console.log(`✅ Found certificate ${latestCert.certificate_no} for importer ${importerName} in database`);
+        return {
+          company_name: record.name_of_individual,
+          company_address: record.principle_business_address_line_1 || "",
+          certificate_number: latestCert.certificate_no,
+          certificate_no: latestCert.certificate_no,
+          aeo_tier: latestCert.aeo_tier,
+          certificate_present_validity_status: latestCert.certificate_present_validity_status || "Unknown",
+        };
+      }
+    } catch (err) {
+      console.error("❌ Error searching local AEO directory:", err);
+    }
+    return null;
+  }
+
+  /**
    * Complete AEO lookup flow for profile click
    */
   static async lookupAEOFromProfile(importerName, ieCode) {

@@ -37,6 +37,7 @@ import exportProxyRoutes from "./routes/exportProxyRoutes.js"; // Export module 
 import importProxyRoutes from "./routes/importProxyRoutes.js"; // Import module proxy routes
 import openPointsRoutes from "./routes/openPointsRoutes.js";
 import transportAuthService from "./services/transportAuthService.js";
+import "./services/reminderService.js";
 // Load environment variables
 dotenv.config();
 
