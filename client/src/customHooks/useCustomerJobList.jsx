@@ -14,7 +14,7 @@ import DoPlanningToggle from "../components/DoPlanningToggle"; // Adjust the pat
 import EditableTransporterCell from "../components/EditableTransporterCell";
 import BENumberCell from "../components/BEnumberCell.jsx";
 // Custom hook to manage job columns configuration with centered content
-function useCustomerJobList() {
+function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
   const badge = (bg, color, bold = false) => ({
     backgroundColor: bg,
     color,
@@ -317,7 +317,7 @@ function useCustomerJobList() {
         // ),
          header: <>BE Number and Date</>,
         size: 230,
-        Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} />,
+        Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} onEwayBillSuccess={onEwayBillSuccess} />,
       },
       {
         accessorKey: "checklist",
@@ -1128,6 +1128,7 @@ function useCustomerJobList() {
       containerModalOpen,
       handleModalClose,
       selectedContainer,
+      onEwayBillSuccess,
     ],
   );
 

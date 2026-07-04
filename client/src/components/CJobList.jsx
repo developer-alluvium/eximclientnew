@@ -33,20 +33,6 @@ function CJobList(props) {
   const [selectedExporter, setSelectedExporter] = useState("all");
   const [exporters, setExporters] = useState([]);
   
-  // Custom hook for columns
-  const {
-    columns,
-    // Modals are handled within the columns/hook logic or passed down?
-    // useCustomerJobList returns columns which contain the Modal logic/state internally or 
-    // it returns modal states. Let's check.
-    // It returns: columns, containerModalOpen, handleModalClose, selectedContainer, transporterModal
-    containerModalOpen, 
-    handleModalClose,
-    selectedContainer,
-    selectedJob,
-    modalInitialTab,
-  } = useCustomerJobList(detailedStatus);
-
   const { importers, selectedImporter, setSelectedImporter } = useImportersContext();
   const [username, setUsername] = useState(null);
   const [userImporterName, setUserImporterName] = useState(null);
@@ -64,6 +50,36 @@ function CJobList(props) {
   
   const icdCodeOptions = ["ICD SACHANA", "ICD SANAND", "ICD KHODIYAR"];
   const navigate = useNavigate();
+
+  // Use hook to fetch data
+  const {
+      rows,
+      total,
+      loading,
+      handlePageChange,
+      currentPage,
+      fetchJobsData
+  } = useFetchJobsData(
+      detailedStatus,
+      selectedYear,
+      props.status,
+      debouncedSearchQuery,
+      selectedImporter,
+      selectedExporter,
+      custom_house,
+      props.gandhidham,
+      props.branch
+  );
+
+  // Custom hook for columns
+  const {
+    columns,
+    containerModalOpen, 
+    handleModalClose,
+    selectedContainer,
+    selectedJob,
+    modalInitialTab,
+  } = useCustomerJobList(detailedStatus, () => fetchJobsData(currentPage));
 
   // Function to get background color based on status
   const getStatusColor = (statusValue) => {
@@ -218,25 +234,7 @@ function CJobList(props) {
       return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Use hook to fetch data
-  const {
-      rows,
-      total,
-      loading,
-      handlePageChange,
-      currentPage,
-      // fetchJobsData // Exposed if manual fetch needed
-  } = useFetchJobsData(
-      detailedStatus,
-      selectedYear,
-      props.status,
-      debouncedSearchQuery,
-      selectedImporter,
-      selectedExporter,
-      custom_house,
-      props.gandhidham,
-      props.branch
-  );
+  // Hook calls moved to the top of the component to avoid temporal dead zone (TDZ) for columns.
 
   // Fetch Years
   useEffect(() => {

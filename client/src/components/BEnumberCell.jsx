@@ -379,7 +379,7 @@ const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, o
 };
 
 
-const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
+const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSuccess }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBE, setSelectedBE] = useState(null);
   const [activeUpload, setActiveUpload] = useState(null);
@@ -787,6 +787,9 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn }) => {
         onSuccess={() => {
           setIsPartAEwayBillDialogOpen(false);
           setPrefetchedEwbList([]);
+          if (onEwayBillSuccess) {
+            onEwayBillSuccess();
+          }
         }}
       />
 
