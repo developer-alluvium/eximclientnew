@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +57,8 @@ const PartAEwayBillModal = ({
   onViewExisting,
   onSuccess,
   jobId,
+  boeData = null,
+  skipFetchExisting = false,
 }) => {
   const [step, setStep] = useState("select");
   const [checkedKeys, setCheckedKeys] = useState([]);
@@ -64,6 +66,7 @@ const PartAEwayBillModal = ({
   const [activeContainers, setActiveContainers] = useState([]);
   const [existingEwbs, setExistingEwbs] = useState([]);
   const [ewbLoading, setEwbLoading] = useState(false);
+  const initializedRef = useRef(false);
 
   const allContainers = useMemo(() => selectedContainers || [], [selectedContainers]);
   const hasMultiple = allContainers.length > 1;
@@ -89,6 +92,12 @@ const PartAEwayBillModal = ({
   useEffect(() => {
     if (!open || !beNo) return;
 
+    if (skipFetchExisting) {
+      setExistingEwbs([]);
+      setEwbLoading(false);
+      return;
+    }
+
     if (initialExistingEwbs?.length > 0) {
       setExistingEwbs(initialExistingEwbs);
       setEwbLoading(false);
@@ -112,7 +121,7 @@ const PartAEwayBillModal = ({
     };
 
     fetchExistingEwbs();
-  }, [open, beNo, initialExistingEwbs]);
+  }, [open, beNo, initialExistingEwbs, skipFetchExisting]);
 
   useEffect(() => {
     if (!open) {
@@ -121,6 +130,7 @@ const PartAEwayBillModal = ({
       setActiveContainers([]);
       setExistingEwbs([]);
       setSelectionMode("all");
+      initializedRef.current = false;
       return;
     }
     if (!hasMultiple) {
@@ -139,12 +149,15 @@ const PartAEwayBillModal = ({
 
   useEffect(() => {
     if (!open || !hasMultiple || ewbLoading) return;
+    if (initializedRef.current) return;
+    
     setCheckedKeys(
       pendingContainers.map((c) => {
         const idx = allContainers.indexOf(c);
         return getContainerKey(c, idx >= 0 ? idx : 0);
       })
     );
+    initializedRef.current = true;
   }, [open, hasMultiple, ewbLoading, pendingContainers, allContainers]);
 
   const resolveContainerByKey = useCallback(
@@ -217,8 +230,8 @@ const PartAEwayBillModal = ({
     onClose();
   };
 
-  const handleFormSuccess = () => {
-    if (onSuccess) onSuccess();
+  const handleFormSuccess = (results) => {
+    if (onSuccess) onSuccess(results);
     handleClose();
   };
 
@@ -510,6 +523,7 @@ const PartAEwayBillModal = ({
               containerSelectionMode={containerSelectionMode}
               prData={mockPrData}
               jobId={jobId}
+              boeData={boeData}
             />
           )
         )}

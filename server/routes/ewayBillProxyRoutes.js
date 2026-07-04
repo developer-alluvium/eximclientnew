@@ -4,6 +4,10 @@ import multer from "multer";
 import FormData from "form-data";
 import mongoose from "mongoose";
 import transportAuthService from "../services/transportAuthService.js";
+import OtherEwayBill from "../models/otherEwayBillModel.js";
+import Job from "../models/jobModel.js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { authenticateUser } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -127,7 +131,7 @@ const proxyRequest = async (req, res) => {
 const multipartHandler = (req, res, next) => {
   const contentType = req.headers["content-type"] || "";
   if (contentType.includes("multipart/form-data")) {
-    if (req.path === "/boe-upload") {
+    if (req.path === "/boe-upload" || req.path === "/others/upload-boe") {
       return upload.single("file")(req, res, next);
     }
     return upload.none()(req, res, next);
@@ -183,6 +187,412 @@ const pdfProxyHandler = async (req, res) => {
 
 router.get("/pdf-proxy", pdfProxyHandler);
 router.get("/proxy-pdf", pdfProxyHandler); // backward compatibility
+
+// Initialize S3 Client
+const s3 = new S3Client({
+  region: process.env.REACT_APP_AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.REACT_APP_ACCESS_KEY,
+    secretAccessKey: process.env.REACT_APP_SECRET_ACCESS_KEY,
+  },
+});
+
+// Local Others E-Way Bill Routes
+router.post("/others/upload-boe", authenticateUser, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+
+    const file = req.file;
+    const timestamp = Date.now();
+    const originalName = file.originalname;
+    const extension = originalName.substring(originalName.lastIndexOf("."));
+    const baseName = originalName.substring(0, originalName.lastIndexOf("."));
+    const uniqueFileName = `${baseName}-${timestamp}${extension}`;
+    const key = `others-boe/${uniqueFileName}`;
+
+    // Upload to S3
+    const params = {
+      Bucket: process.env.REACT_APP_S3_BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    };
+    const command = new PutObjectCommand(params);
+    await s3.send(command);
+
+    const s3Url = `https://${process.env.REACT_APP_S3_BUCKET}.s3.${process.env.REACT_APP_AWS_REGION}.amazonaws.com/${key}`;
+
+    // Call external parser API
+    const BOE_API_BASE = process.env.BOE_API_BASE_URL || "http://3.108.244.38:8002/api/v1";
+    const form = new FormData();
+    form.append("files", file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype,
+    });
+
+    console.log(`📡 [Others Upload] Sending file buffer to parser: ${BOE_API_BASE}/upload`);
+    const parserResponse = await axios.post(`${BOE_API_BASE}/upload`, form, {
+      headers: { ...form.getHeaders() },
+      timeout: 60000,
+    });
+
+    const parsedData = parserResponse.data;
+
+    let records = [];
+    if (parsedData.status === "success" && parsedData.data && typeof parsedData.data === "object" && !Array.isArray(parsedData.data)) {
+      records = Object.values(parsedData.data);
+    } else {
+      records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.data || [parsedData]);
+    }
+
+    const boeRecord = records[0] || {};
+    const boeDetail = boeRecord.data || boeRecord;
+    const importerDetails = boeDetail.ImporterDetails || {};
+    const invoiceDetails = boeDetail.InvoiceAndItemDetails || {};
+
+    const boeNumber = importerDetails["BE No"] || importerDetails["BE_NO"] || invoiceDetails.BE_NO || invoiceDetails.document_no || boeRecord.documentNumber || "";
+    const rawBoeDate = importerDetails["BE Date"] || importerDetails["BE_DATE"] || invoiceDetails.BE_DATE || invoiceDetails.document_date || "";
+
+    let boeDate = null;
+    if (rawBoeDate) {
+      if (rawBoeDate.includes("/")) {
+        const parts = rawBoeDate.split("/");
+        if (parts.length === 3) {
+          const formatted = `${parts[2].length === 2 ? "20" + parts[2] : parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+          const d = new Date(formatted);
+          if (!isNaN(d.getTime())) {
+            boeDate = d;
+          }
+        }
+      } else {
+        const d = new Date(rawBoeDate);
+        if (!isNaN(d.getTime())) {
+          boeDate = d;
+        }
+      }
+    }
+
+    // Try to find matching job in local database
+    let job = null;
+    if (boeNumber) {
+      try {
+        job = await Job.findOne({ be_no: { $regex: new RegExp(`^${boeNumber.trim()}$`, "i") } });
+      } catch (jobErr) {
+        console.warn("⚠️ Failed to check matching Job:", jobErr.message);
+      }
+    }
+
+    // Fetch enriched details from boe-extract
+    let enrichedData = boeRecord;
+    if (boeNumber) {
+      try {
+        const dateStr = boeDate ? boeDate.toISOString().split("T")[0] : "";
+        const serviceToken = await transportAuthService.getServiceToken();
+        const targetBase = getTargetUrl();
+        console.log(`📡 [Others Upload] Querying boe-extract from: ${targetBase}/boe-extract for doc: ${boeNumber} date: ${dateStr}`);
+        const enrichRes = await axios.get(`${targetBase}/boe-extract`, {
+          params: { be_no: boeNumber, be_date: dateStr },
+          headers: serviceToken ? { Authorization: `Bearer ${serviceToken}` } : {},
+          timeout: 20000,
+        });
+        if (enrichRes.data && enrichRes.data.success !== false) {
+          enrichedData = enrichRes.data;
+        }
+      } catch (enrichErr) {
+        console.warn("⚠️ Failed to enrich BOE details with Job/PrData:", enrichErr.message);
+      }
+    }
+
+    const boeDetailForConts = enrichedData?.data || enrichedData || {};
+    const containerDetails = boeDetailForConts.ContainerDetails || [];
+    const containers = containerDetails.map(bc => {
+      const cNo = bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "";
+      return {
+        containerNumber: cNo.trim(),
+        ewayBillStatus: "Pending"
+      };
+    }).filter(c => c.containerNumber);
+
+    const otherEwb = new OtherEwayBill({
+      clientId: req.user.adminId || req.user._id,
+      uploadedBy: req.user._id,
+      jobId: job ? job._id : undefined,
+      jobNo: job ? job.job_no : undefined,
+      boeNumber,
+      boeDate,
+      pdfUrl: s3Url,
+      pdfKey: key,
+      parsedData: enrichedData,
+      containers,
+      ewayBillStatus: "Pending",
+    });
+
+    await otherEwb.save();
+    res.status(200).json({ success: true, data: otherEwb });
+  } catch (error) {
+    console.error("Error in others/upload-boe:", error.response?.data || error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to process BOE upload" });
+  }
+});
+
+router.get("/others/list", authenticateUser, async (req, res) => {
+  try {
+    const query = req.user.role === "superadmin" ? {} : { clientId: req.user.adminId || req.user._id };
+    const list = await OtherEwayBill.find(query).sort({ createdAt: -1 });
+
+    // Auto-heal / migrate any legacy records with empty containers array
+    let updatedAny = false;
+    for (const record of list) {
+      if (!record.containers || record.containers.length === 0) {
+        const boeDetailForConts = record.parsedData?.data || record.parsedData || {};
+        const containerDetails = boeDetailForConts.ContainerDetails || [];
+        record.containers = containerDetails.map(bc => {
+          const cNo = bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "";
+          return {
+            containerNumber: cNo.trim(),
+            ewayBillStatus: "Pending"
+          };
+        }).filter(c => c.containerNumber);
+
+        // If E-Way Bills were already generated, map them to the initialized containers
+        if (record.ewayBillStatus === "Generated" || record.ewayBillStatus === "Partially Generated") {
+          const ewbData = record.ewayBillData;
+          if (Array.isArray(ewbData)) {
+            record.containers = record.containers.map(cont => {
+              const result = ewbData.find(r => {
+                const rCont = r.container || r.container_number;
+                return r.status === "success" && rCont && String(rCont).trim().toUpperCase() === String(cont.containerNumber).trim().toUpperCase();
+              });
+              if (result) {
+                return {
+                  ...cont.toObject(),
+                  ewayBillNo: String(result.ewbNo),
+                  ewayBillDate: result.ewbDate ? new Date(result.ewbDate) : new Date(),
+                  ewayBillUrl: result.url || result.pdfUrl,
+                  ewayBillStatus: "Generated",
+                  ewayBillData: result
+                };
+              }
+              return cont;
+            });
+          } else if (record.ewayBillNo) {
+            record.containers = record.containers.map(cont => ({
+              ...cont.toObject(),
+              ewayBillNo: record.ewayBillNo,
+              ewayBillDate: record.ewayBillDate,
+              ewayBillUrl: record.ewayBillUrl,
+              ewayBillStatus: "Generated",
+              ewayBillData: record.ewayBillData
+            }));
+          }
+
+          // Update parent ewayBill details for consistency
+          const firstActive = record.containers.find(c => c.ewayBillStatus === "Generated");
+          if (firstActive) {
+            record.ewayBillNo = firstActive.ewayBillNo;
+            record.ewayBillUrl = firstActive.ewayBillUrl;
+            record.ewayBillDate = firstActive.ewayBillDate;
+          }
+        }
+
+        record.markModified("containers");
+        await record.save();
+        updatedAny = true;
+      }
+    }
+
+    const finalList = updatedAny ? await OtherEwayBill.find(query).sort({ createdAt: -1 }) : list;
+    res.status(200).json({ success: true, data: finalList });
+  } catch (error) {
+    console.error("Error listing others eway bills:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to fetch list" });
+  }
+});
+
+router.post("/others/update-status", authenticateUser, async (req, res) => {
+  try {
+    const { otherEwayBillId, ewayBillNo, ewayBillDate, validUpto, ewayBillUrl, ewayBillData } = req.body;
+    if (!otherEwayBillId) {
+      return res.status(400).json({ success: false, message: "otherEwayBillId is required" });
+    }
+
+    const record = await OtherEwayBill.findById(otherEwayBillId);
+    if (!record) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+
+    // Legacy fallback: if containers array is empty, initialize it on the fly
+    if (!record.containers || record.containers.length === 0) {
+      const boeDetailForConts = record.parsedData?.data || record.parsedData || {};
+      const containerDetails = boeDetailForConts.ContainerDetails || [];
+      record.containers = containerDetails.map(bc => {
+        const cNo = bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "";
+        return {
+          containerNumber: cNo.trim(),
+          ewayBillStatus: "Pending"
+        };
+      }).filter(c => c.containerNumber);
+    }
+
+    if (Array.isArray(ewayBillData)) {
+      // Individual Mode (multiple results in array)
+      record.containers = record.containers.map(cont => {
+        const result = ewayBillData.find(r => {
+          const rCont = r.container || r.container_number;
+          return r.status === "success" && rCont && String(rCont).trim().toUpperCase() === String(cont.containerNumber).trim().toUpperCase();
+        });
+        if (result) {
+          return {
+            ...cont.toObject(),
+            ewayBillNo: String(result.ewbNo),
+            ewayBillDate: result.ewbDate ? new Date(result.ewbDate) : new Date(),
+            ewayBillUrl: result.url || result.pdfUrl,
+            ewayBillStatus: "Generated",
+            ewayBillData: result
+          };
+        }
+        return cont;
+      });
+    } else {
+      // Combined Mode (single result, applies to selected containers)
+      // If ewayBillData contains containerIds (e.g. from PartAEwayBillModal / EwayBillGenerate), we update those
+      const targetContainerNos = ewayBillData?.containerIds || [];
+      record.containers = record.containers.map(cont => {
+        const isSelected = targetContainerNos.length === 0 || targetContainerNos.some(cNo => String(cNo).trim().toUpperCase() === String(cont.containerNumber).trim().toUpperCase());
+        if (isSelected && cont.ewayBillStatus === "Pending") {
+          return {
+            ...cont.toObject(),
+            ewayBillNo,
+            ewayBillDate: ewayBillDate ? new Date(ewayBillDate) : new Date(),
+            ewayBillUrl,
+            ewayBillStatus: "Generated",
+            ewayBillData
+          };
+        }
+        return cont;
+      });
+    }
+
+    // Set parent status
+    const pending = record.containers.filter(c => c.ewayBillStatus === "Pending");
+    const generated = record.containers.filter(c => c.ewayBillStatus === "Generated");
+    if (pending.length === 0) {
+      record.ewayBillStatus = "Generated";
+    } else if (generated.length > 0) {
+      record.ewayBillStatus = "Partially Generated";
+    } else {
+      record.ewayBillStatus = "Pending";
+    }
+
+    // Backup parent single ewayBill details for backward compatibility in listings/cancellations
+    const firstActive = record.containers.find(c => c.ewayBillStatus === "Generated");
+    if (firstActive) {
+      record.ewayBillNo = firstActive.ewayBillNo;
+      record.ewayBillDate = firstActive.ewayBillDate;
+      record.ewayBillUrl = firstActive.ewayBillUrl;
+      record.ewayBillData = firstActive.ewayBillData;
+    }
+
+    record.markModified("containers");
+    record.markModified("ewayBillData");
+    await record.save();
+    res.status(200).json({ success: true, data: record });
+  } catch (error) {
+    console.error("Error updating others eway bill status:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to update status" });
+  }
+});
+
+router.post("/others/update-cancellation", authenticateUser, async (req, res) => {
+  try {
+    const { otherEwayBillId, ewayBillNo } = req.body;
+    if (!otherEwayBillId) {
+      return res.status(400).json({ success: false, message: "otherEwayBillId is required" });
+    }
+
+    const record = await OtherEwayBill.findById(otherEwayBillId);
+    if (!record) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+
+    if (ewayBillNo) {
+      // Mark specific container's E-Way Bill as Cancelled
+      record.containers = record.containers.map(cont => {
+        if (cont.ewayBillNo === String(ewayBillNo)) {
+          return {
+            ...cont.toObject(),
+            ewayBillStatus: "Cancelled"
+          };
+        }
+        return cont;
+      });
+
+      // Recalculate parent status
+      const active = record.containers.filter(c => c.ewayBillStatus === "Generated");
+      const pending = record.containers.filter(c => c.ewayBillStatus === "Pending");
+      if (active.length === 0 && pending.length === 0) {
+        record.ewayBillStatus = "Cancelled";
+      } else if (active.length > 0) {
+        record.ewayBillStatus = pending.length > 0 ? "Partially Generated" : "Generated";
+      } else {
+        record.ewayBillStatus = "Pending";
+      }
+
+      // If the parent ewayBillNo matches the cancelled one, update it to another active one (or clear it)
+      if (record.ewayBillNo === String(ewayBillNo)) {
+        const firstActive = record.containers.find(c => c.ewayBillStatus === "Generated");
+        if (firstActive) {
+          record.ewayBillNo = firstActive.ewayBillNo;
+          record.ewayBillUrl = firstActive.ewayBillUrl;
+          record.ewayBillDate = firstActive.ewayBillDate;
+          record.ewayBillData = firstActive.ewayBillData;
+        } else {
+          record.ewayBillNo = undefined;
+          record.ewayBillUrl = undefined;
+          record.ewayBillDate = undefined;
+          record.ewayBillData = undefined;
+        }
+      }
+
+      record.markModified("containers");
+      await record.save();
+      return res.status(200).json({ success: true, data: record });
+    }
+
+    // Default: update entire record and all containers to Cancelled
+    record.containers = record.containers.map(cont => ({
+      ...cont.toObject(),
+      ewayBillStatus: "Cancelled"
+    }));
+    record.ewayBillStatus = "Cancelled";
+    record.ewayBillNo = undefined;
+    record.ewayBillUrl = undefined;
+    record.ewayBillDate = undefined;
+    record.ewayBillData = undefined;
+
+    record.markModified("containers");
+    await record.save();
+    res.status(200).json({ success: true, data: record });
+  } catch (error) {
+    console.error("Error cancelling others eway bill:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to cancel record" });
+  }
+});
+
+router.delete("/others/:id", authenticateUser, async (req, res) => {
+  try {
+    const deleted = await OtherEwayBill.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+    res.status(200).json({ success: true, message: "Record deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting others eway bill:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to delete record" });
+  }
+});
 
 // Define routes
 router.use(multipartHandler, proxyRequest);

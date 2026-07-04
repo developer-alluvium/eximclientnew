@@ -1125,7 +1125,7 @@ function EwayBillGenerateLR({
     const buyerState = parsedBuyer.state || '';
     const manifestDetails = boeDetail.ManifestDetails || {};
     const containerDetails = boeDetail.ContainerDetails || [];
-    const totalGW = parseFloat(manifestDetails.GW) || 0;
+    const totalGW = parseFloat(manifestDetails.GW) || parseFloat(record._job?.gross_weight) || parseFloat(record.job?.gross_weight) || parseFloat(lrData?.gross_weight) || parseFloat(prData?.gross_weight) || 0;
     const numContainers = containerDetails.length;
     const weightPerCont = numContainers > 0 ? (totalGW / numContainers).toFixed(2) : 0;
     setBoeContainers(containerDetails);

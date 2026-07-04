@@ -1147,7 +1147,7 @@ function EwayBillGenerate({
     // Weight distribution logic
     const manifestDetails = boeDetail.ManifestDetails || {};
     const containerDetails = boeDetail.ContainerDetails || [];
-    const totalGW = parseFloat(manifestDetails.GW) || 0;
+    const totalGW = parseFloat(manifestDetails.GW) || parseFloat(record._job?.gross_weight) || parseFloat(record.job?.gross_weight) || parseFloat(lrData?.gross_weight) || parseFloat(prData?.gross_weight) || 0;
     const numContainers = containerDetails.length;
     const weightPerCont = numContainers > 0 ? (totalGW / numContainers).toFixed(2) : 0;
 
@@ -1359,6 +1359,35 @@ function EwayBillGenerate({
       return res;
     });
   };
+
+  // Auto-populate when boeData prop is provided (e.g. for Others E-Way Bill)
+  useEffect(() => {
+    if (boeData) {
+      console.log("ℹ️ [Others EWB] Prefilling form from boeData prop:", boeData);
+      populateFromBoe(boeData);
+      
+      // Prefill BOE number and date fields in UI
+      const boeDetail = boeData.data || boeData;
+      const invoiceDetails = boeDetail.InvoiceAndItemDetails || {};
+      const docNo = invoiceDetails.BE_NO || invoiceDetails.document_no || boeData.documentNumber || "";
+      if (docNo) {
+        setBoeNumber(docNo);
+      }
+      
+      const rawBoeDate = invoiceDetails.BE_DATE || invoiceDetails.document_date || "";
+      if (rawBoeDate) {
+        if (rawBoeDate.includes("/")) {
+          const parts = rawBoeDate.split("/");
+          if (parts.length === 3) {
+            const formatted = `${parts[2].length === 2 ? "20" + parts[2] : parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+            setBoeDate(formatted);
+          }
+        } else {
+          setBoeDate(rawBoeDate);
+        }
+      }
+    }
+  }, [boeData]);
 
   // ==========================================
   // Excel Tab: Upload & Extract

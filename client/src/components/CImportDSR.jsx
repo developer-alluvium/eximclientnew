@@ -11,6 +11,7 @@ import useTabs from "../customHooks/useTabs";
 import { UserContext } from "../context/UserContext";
 import { TabValueContext } from "../context/TabValueContext";
 import CJobTabs from "./CJobTabs";
+import OthersEwayBillTab from "./ewaybill/OthersEwayBillTab";
 import { useNavigate } from "react-router-dom";
 import BackButton from "./BackButton";
 import { useImportersContext } from "../context/importersContext";
@@ -41,11 +42,20 @@ function CImportDSR() {
     });
   };
 
+  React.useEffect(() => {
+    setTabValue(0);
+  }, [setTabValue]);
+
   // Both tabs always visible — Tab Visibility replaced by Branch Management
-  const visibleTabs = [
-    { label: "Jobs", key: "jobs" },
-    // { label: "Gandhidham", key: "gandhidham" },
-  ];
+  const isEwayBillPage = window.location.pathname.includes("ewaybill");
+  const visibleTabs = isEwayBillPage
+    ? [
+        { label: "Jobs", key: "jobs" },
+        { label: "Others", key: "others" },
+      ]
+    : [
+        { label: "Jobs", key: "jobs" },
+      ];
 
   return (
     <Box
@@ -144,11 +154,11 @@ function CImportDSR() {
 
           {visibleTabs.map((tab, idx) => (
             <CustomTabPanel value={tabValue} index={idx} key={tab.key}>
-              {/* {tab.key === "analytics" ? (
-                <AnalyticsTab />
-              ) : ( */}
+              {tab.key === "others" ? (
+                <OthersEwayBillTab />
+              ) : (
                 <CJobTabs gandhidham={tab.key === "gandhidham"} />
-              {/* )} */}
+              )}
             </CustomTabPanel>
           ))}
         </Box>

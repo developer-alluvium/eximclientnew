@@ -339,13 +339,13 @@ $gap-lg: 24px;
 
 .form-input {
   width: 100%;
-  padding: 5px 9px;
+  padding: 7px 10px;
   border: 1px solid $border;
   border-radius: 4px;
   font-size: $font-base;
   color: $text-primary;
   background: $white;
-  height: 32px;
+  height: 38px;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
@@ -374,13 +374,13 @@ $gap-lg: 24px;
 
 .form-select {
   width: 100%;
-  padding: 5px 9px;
+  padding: 6px 10px;
   border: 1px solid $border;
   border-radius: 4px;
   font-size: $font-base;
   color: $text-primary;
   background: $white;
-  height: 32px;
+  height: 36px;
   cursor: pointer;
   transition: border-color 0.15s;
   box-sizing: border-box;
