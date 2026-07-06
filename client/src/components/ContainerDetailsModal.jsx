@@ -46,6 +46,15 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   textAlign: "center",
   fontSize: "0.9rem",
   padding: "8px 12px",
+  color: "#333333 !important",
+  "&.MuiTableCell-head": {
+    color: "#333333 !important",
+    backgroundColor: `${theme.palette.grey[100]} !important`,
+  },
+  ".MuiTableHead-root .MuiTableRow-root &.MuiTableCell-head": {
+    color: "#333333 !important",
+    backgroundColor: `${theme.palette.grey[100]} !important`,
+  },
 }));
 
 const StyledDataCell = styled(TableCell)(({ theme }) => ({

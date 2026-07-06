@@ -805,7 +805,8 @@ function useCustomerJobList() {
             const uniqueFormatted = [...new Set(dates.map(d => formatDate(d)))];
             return uniqueFormatted.join(", ");
           };
-
+          const railoutDateDisplay = getContainerDates("container_rail_out_date", "Pending");
+          const arrivalDateDisplay = getContainerDates("arrival_date", "Pending");
           const detentionFromDisplay = getContainerDates("detention_from", "N/A");
           const deliveryDateDisplay = getContainerDates("delivery_date", "Pending");
           const emptyOffloadDisplay = getContainerDates("emptyContainerOffLoadDate", "Pending");
@@ -824,6 +825,18 @@ function useCustomerJobList() {
                 <strong>ETA:</strong>
                 <span style={{ marginLeft: "8px" }}>
                   {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
+                </span>
+              </div>
+              <div>
+                <strong>Rail out Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {railoutDateDisplay}
+                </span>
+              </div>
+              <div>
+                <strong>Arrival Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {arrivalDateDisplay}
                 </span>
               </div>
               <div>

@@ -133,10 +133,10 @@ export const convertToExcel = async (
       "detention_from"
     );
 
-    const containerNumbersWithSizes = item.container_nos
+    const containerNumbersWithSizes = (item.container_nos || [])
       .map((container) => `${container.container_number} - ${container.size}`)
       .join(",\n");
-    const weightExcessShortage = item.container_nos
+    const weightExcessShortage = (item.container_nos || [])
       .map((container) =>
         container.weight_shortage !== undefined
           ? `${container.weight_shortage}`
@@ -144,11 +144,20 @@ export const convertToExcel = async (
       )
       .join(",\n");
 
-    const size = item.container_nos
+    const size = (item.container_nos || [])
       .map((container) => container.size)
       .join(",\n");
-    const cif_amount = new Big(item.cif_amount);
-    const exrate = new Big(item.exrate);
+    let cif_amount, exrate;
+    try {
+      cif_amount = new Big(item.cif_amount && !isNaN(item.cif_amount) ? item.cif_amount : 0);
+    } catch (e) {
+      cif_amount = new Big(0);
+    }
+    try {
+      exrate = new Big(item.exrate && !isNaN(item.exrate) ? item.exrate : 1);
+    } catch (e) {
+      exrate = new Big(1);
+    }
     // const inv_value = cif_amount.div(exrate).toFixed(2); // Currently unused
     const exact_inv_value = item.total_inv_value
       ? item.total_inv_value.split(" ")[0]
@@ -551,7 +560,7 @@ export const convertToExcel = async (
   let containersWithSize40AndNoArrival = 0;
 
   rowsWithoutBillNo.forEach((item) => {
-    item.container_nos.forEach((container) => {
+    (item.container_nos || []).forEach((container) => {
       if (container.size === "20" && container.arrival_date) {
         containersWithSize20AndArrival++;
       } else if (container.size === "40" && container.arrival_date) {

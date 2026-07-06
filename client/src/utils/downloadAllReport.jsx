@@ -107,15 +107,16 @@ export const downloadAllReport = async (rows, status, detailedStatus) => {
       "detention_from"
     );
 
-    const containerNumbersWithSizes = item.container_nos
+    const containerNumbersWithSizes = (item.container_nos || [])
       .map((container) => `${container.container_number} - ${container.size}`)
       .join(",\n");
 
-    const size = item.container_nos
+    const size = (item.container_nos || [])
       .map((container) => container.size)
       .join(",\n");
 
-    const inv_value = (item.cif_amount / parseInt(item.exrate)).toFixed(2);
+    const exrateVal = parseInt(item.exrate);
+    const inv_value = (item.cif_amount && exrateVal) ? (item.cif_amount / exrateVal).toFixed(2) : "0.00";
     const invoice_value_and_unit_price = `${item.inv_currency} ${inv_value} | ${item.unit_price}`;
     const net_weight = item.container_nos?.reduce((sum, container) => {
       const weight = parseFloat(container.net_weight);
@@ -513,7 +514,7 @@ export const downloadAllReport = async (rows, status, detailedStatus) => {
   let containersWithSize40AndNoArrival = 0;
 
   rowsWithoutBillNo.forEach((item) => {
-    item.container_nos.forEach((container) => {
+    (item.container_nos || []).forEach((container) => {
       if (container.size === "20" && container.arrival_date) {
         containersWithSize20AndArrival++;
       } else if (container.size === "40" && container.arrival_date) {

@@ -9,11 +9,13 @@ import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import JobList from "./CJobList";
 import ContainerSummaryModal from "./ContainerSummaryModal";
+import CSelectImporterModal from "./CSelectImporterModal";
 import { useImportersContext } from "../context/importersContext";
 import { getJsonCookie } from "../utils/cookies";
 import Typography from "@mui/material/Typography";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney"; // Added for new button
+import DownloadIcon from "@mui/icons-material/Download";
 import CurrencyRateDialog from "./CurrencyRateDialog"; // Added import for the dialog
 import axios from "axios";
 
@@ -49,6 +51,7 @@ function a11yProps(index) {
 function CJobTabs({ gandhidham = false }) {
   const [value, setValue] = React.useState(0);
   const [containerSummaryOpen, setContainerSummaryOpen] = React.useState(false);
+  const [selectImporterOpen, setSelectImporterOpen] = React.useState(false);
 
   // --- New State for Currency Dialog ---
   const [currencyDialogOpen, setCurrencyDialogOpen] = React.useState(false);
@@ -100,6 +103,14 @@ function CJobTabs({ gandhidham = false }) {
 
   const handleContainerSummaryClose = () => {
     setContainerSummaryOpen(false);
+  };
+
+  const handleSelectImporterOpen = () => {
+    setSelectImporterOpen(true);
+  };
+
+  const handleSelectImporterClose = () => {
+    setSelectImporterOpen(false);
   };
 
   // --- New Handlers for Currency Dialog ---
@@ -231,8 +242,37 @@ function CJobTabs({ gandhidham = false }) {
           >
             Container Summary
           </Button>
+
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<DownloadIcon sx={{ fontSize: 18 }} />}
+            onClick={handleSelectImporterOpen}
+            sx={{
+              textTransform: "none",
+              fontWeight: 500,
+              fontSize: "0.8rem",
+              borderRadius: 2,
+              backgroundColor: "#10b981",
+              px: 2,
+              py: 0.75,
+              boxShadow: "none",
+              "&:hover": {
+                backgroundColor: "#059669",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              },
+            }}
+          >
+            Download Excel
+          </Button>
         </Box>
       </Box>
+
+      {/* Determine current status based on active tab */}
+      {(() => {
+        const currentStatus = value === 0 ? "Pending" : value === 1 ? "Completed" : "Cancelled";
+        return null;
+      })()}
 
       <CustomTabPanel value={value} index={0}>
         <JobList status="Pending" gandhidham={gandhidham} branch={selectedBranch} />
@@ -250,6 +290,14 @@ function CJobTabs({ gandhidham = false }) {
         onClose={handleContainerSummaryClose}
         gandhidham={gandhidham}
         branch={selectedBranch}
+      />
+
+      {/* Select Importer Modal for Excel Download */}
+      <CSelectImporterModal
+        open={selectImporterOpen}
+        handleClose={handleSelectImporterClose}
+        status={value === 0 ? "Pending" : value === 1 ? "Completed" : "Cancelled"}
+        detailedStatus="all"
       />
 
       {/* --- New Currency Rate Dialog --- */}

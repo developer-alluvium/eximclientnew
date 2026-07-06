@@ -35,7 +35,7 @@ const ImportAnalytics = () => {
       if (userDataFromStorage) {
         const parsedUser = userDataFromStorage;
 
-        return parsedUser?.assignedImporterName;
+        return parsedUser?.assignedImporterName || parsedUser?.ie_code_assignments?.[0]?.importer_name || null;
       }
     } catch (error) {
       console.error("Error parsing user data:", error);

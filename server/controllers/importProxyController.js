@@ -1006,3 +1006,134 @@ export const getSuppliers = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch suppliers from third-party API." });
   }
 };
+
+/**
+ * GET /api/get-importer-list/:year
+ */
+export const getImporterList = async (req, res) => {
+  try {
+    const { year } = req.params;
+    const response = await axios.get(
+      `${IMPORT_API_BASE_URL}/get-importer-list/${encodeURIComponent(year)}`,
+      {
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 15000,
+      }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getImporterList error:", error.message);
+    res.status(500).json({ error: "Failed to fetch importer list from third-party API." });
+  }
+};
+
+/**
+ * GET /api/download-report/:yearString/:importer/:status
+ */
+export const downloadReport = async (req, res) => {
+  try {
+    const { yearString, importer, status } = req.params;
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const dbUser = await EximclientUser.findById(user.id || user._id)
+      .select("ie_code_assignments role")
+      .lean();
+
+    if (!dbUser) {
+      return res.status(401).json({ success: false, message: "User not found." });
+    }
+
+    const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
+    const ieCodeAssignments = dbUser.ie_code_assignments || [];
+
+    const response = await axios.get(
+      `${IMPORT_API_BASE_URL}/download-report/${encodeURIComponent(yearString)}/${encodeURIComponent(importer)}/${encodeURIComponent(status)}`,
+      {
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 30000,
+      }
+    );
+
+    let jobs = response.data || [];
+
+    if (!isAdmin) {
+      const allowedIECodes = new Set(ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()));
+      const allowedImporterNames = new Set(
+        ieCodeAssignments.map((a) => formatImporter(a.importer_name)).filter(Boolean)
+      );
+
+      jobs = jobs.filter((j) => {
+        const jIec = (j.ie_code_no || "").toUpperCase().trim();
+        if (jIec && allowedIECodes.has(jIec)) {
+          return true;
+        }
+        const jImporter = formatImporter(j.importer);
+        return allowedImporterNames.has(jImporter);
+      });
+    }
+
+    res.json(jobs);
+  } catch (error) {
+    console.error("Proxy downloadReport error:", error.message);
+    res.status(500).json({ error: "Failed to download report from third-party API." });
+  }
+};
+
+/**
+ * GET /api/download-report/:yearString/:status
+ */
+export const downloadAllReport = async (req, res) => {
+  try {
+    const { yearString, status } = req.params;
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const dbUser = await EximclientUser.findById(user.id || user._id)
+      .select("ie_code_assignments role")
+      .lean();
+
+    if (!dbUser) {
+      return res.status(401).json({ success: false, message: "User not found." });
+    }
+
+    const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
+    const ieCodeAssignments = dbUser.ie_code_assignments || [];
+
+    const response = await axios.get(
+      `${IMPORT_API_BASE_URL}/download-report/${encodeURIComponent(yearString)}/${encodeURIComponent(status)}`,
+      {
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 30000,
+      }
+    );
+
+    let jobs = response.data || [];
+
+    if (!isAdmin) {
+      const allowedIECodes = new Set(ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()));
+      const allowedImporterNames = new Set(
+        ieCodeAssignments.map((a) => formatImporter(a.importer_name)).filter(Boolean)
+      );
+
+      jobs = jobs.filter((j) => {
+        const jIec = (j.ie_code_no || "").toUpperCase().trim();
+        if (jIec && allowedIECodes.has(jIec)) {
+          return true;
+        }
+        const jImporter = formatImporter(j.importer);
+        return allowedImporterNames.has(jImporter);
+      });
+    }
+
+    res.json(jobs);
+  } catch (error) {
+    console.error("Proxy downloadAllReport error:", error.message);
+    res.status(500).json({ error: "Failed to download report from third-party API." });
+  }
+};
+

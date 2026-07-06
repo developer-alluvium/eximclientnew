@@ -32,12 +32,20 @@ import axios from "../utils/axiosConfig";
 // Styled components for better visual presentation
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   fontWeight: "bold",
-  backgroundColor: "#000000ff",
+  backgroundColor: "#1e293b",
   border: "1px solid #e0e0e0",
   textAlign: "center",
   fontSize: "1rem",
   padding: "12px 16px",
-  color: "#000000ff !important",
+  color: "#ffffff !important",
+  "&.MuiTableCell-head": {
+    backgroundColor: "#1e293b !important",
+    color: "#ffffff !important",
+  },
+  ".MuiTableHead-root .MuiTableRow-root &.MuiTableCell-head": {
+    backgroundColor: "#1e293b !important",
+    color: "#ffffff !important",
+  },
 }));
 
 const StyledDataCell = styled(TableCell)(({ theme }) => ({
@@ -87,7 +95,7 @@ const StatusChip = styled(Chip)(({ theme, status }) => ({
 const ContainerSummaryModal = ({ open, onClose, gandhidham = false, branch = "" }) => {
   // Add gandhidham prop
   const [summaryData, setSummaryData] = useState(null);
-  const [selectedYear, setSelectedYear] = useState("25-26");
+  const [selectedYear, setSelectedYear] = useState("26-27");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -284,6 +292,17 @@ const ContainerSummaryModal = ({ open, onClose, gandhidham = false, branch = "" 
               onChange={handleYearChange}
               sx={{ gap: 3 }}
             >
+              <FormControlLabel
+                value="26-27"
+                control={<Radio color="primary" />}
+                label="2026-27"
+                sx={{
+                  "& .MuiFormControlLabel-label": {
+                    fontSize: "1rem",
+                    fontWeight: "500",
+                  },
+                }}
+              />
               <FormControlLabel
                 value="25-26"
                 control={<Radio color="primary" />}

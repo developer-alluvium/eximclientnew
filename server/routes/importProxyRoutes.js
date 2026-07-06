@@ -1,4 +1,4 @@
-import express from "express";
+ import express from "express";
 import {
   getImporterJobCounts,
   getJobByNumber,
@@ -24,7 +24,10 @@ import {
   getUserDashboardStats,
   getJobsOverview,
   getHsCodes,
-  getSuppliers
+  getSuppliers,
+  getImporterList,
+  downloadReport,
+  downloadAllReport
 } from "../controllers/importProxyController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -63,6 +66,9 @@ router.get("/api/gandhidham/get-exporters", authenticateUser, getExporters);
 router.get("/api/get-years", authenticateUser, getYears);
 router.get("/api/get-importer-users", authenticateUser, getImporterUsers);
 router.get("/api/get-duties/:job_no", authenticateUser, getduty);
+router.get("/api/get-importer-list/:year", authenticateUser, getImporterList);
+router.get("/api/download-report/:yearString/:importer/:status", authenticateUser, downloadReport);
+router.get("/api/download-report/:yearString/:status", authenticateUser, downloadAllReport);
 
 // Job & BE Number lookups
 router.get("/api/get-job-numbers/multiple", authenticateUser, getJobNumbersByMultipleIECodes);

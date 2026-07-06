@@ -6,6 +6,7 @@ import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import axios from "axios";
 import { SelectedYearContext } from "../context/SelectedYearContext";
+import { UserContext } from "../context/UserContext";
 import { convertToExcel } from "../utils/convertToExcel";
 import { downloadAllReport } from "../utils/downloadAllReport.jsx";
 import Checkbox from "@mui/material/Checkbox";
@@ -26,11 +27,43 @@ const style = {
 
 export default function CSelectImporterModal(props) {
   const { selectedYear } = React.useContext(SelectedYearContext);
+  const { user } = React.useContext(UserContext) || {};
   const { importers, setImporters } = useImportersContext();
   const [importerData, setImporterData] = React.useState([]);
   const [selectedImporter, setSelectedImporter] = React.useState("");
-  const [checked, setChecked] = React.useState(false);
   const [selectedApiYears, setSelectedApiYears] = React.useState([]);
+
+  const assignedImporterNames = React.useMemo(() => {
+    if (!user) return [];
+    
+    let names = [];
+    if (user.ie_code_assignments && Array.isArray(user.ie_code_assignments)) {
+      names = user.ie_code_assignments.map(a => a.importer_name?.trim()).filter(Boolean);
+    }
+    
+    if (names.length === 0 && user.assigned_importer_name) {
+      names = (Array.isArray(user.assigned_importer_name) 
+        ? user.assigned_importer_name 
+        : [user.assigned_importer_name]
+      ).map(name => name?.trim()).filter(Boolean);
+    }
+    
+    return [...new Set(names)];
+  }, [user]);
+
+  const hasSingleImporter = React.useMemo(() => {
+    return user && user.role !== 'Admin' && assignedImporterNames.length === 1;
+  }, [user, assignedImporterNames]);
+
+  const singleImporterName = React.useMemo(() => {
+    return hasSingleImporter ? assignedImporterNames[0] : "";
+  }, [hasSingleImporter, assignedImporterNames]);
+
+  React.useEffect(() => {
+    if (hasSingleImporter) {
+      setSelectedImporter(singleImporterName);
+    }
+  }, [hasSingleImporter, singleImporterName]);
 
   const getUniqueImporterNames = (importerData) => {
     const uniqueImporters = new Set();
@@ -57,15 +90,27 @@ export default function CSelectImporterModal(props) {
         const res = await axios.get(
           `${process.env.REACT_APP_API_STRING}/get-importer-list/${selectedYear}`
         );
-        setImporterData(res.data);
-        setImporters(res.data);
-        if (res.data.length > 0) {
-          setSelectedImporter(res.data[0].importer);
+        let fetchedData = res.data || [];
+        if (user && user.role !== 'Admin') {
+          fetchedData = fetchedData.filter(item =>
+            assignedImporterNames.some(name => name.toLowerCase() === item.importer?.trim().toLowerCase())
+          );
+        }
+        setImporterData(fetchedData);
+        setImporters(fetchedData);
+        if (hasSingleImporter) {
+          setSelectedImporter(singleImporterName);
+        } else if (user && user.role !== 'Admin' && assignedImporterNames.length > 0) {
+          setSelectedImporter(assignedImporterNames[0]);
+        } else if (fetchedData.length > 0) {
+          setSelectedImporter(fetchedData[0].importer);
+        } else {
+          setSelectedImporter("");
         }
       }
     }
     getImporterList();
-  }, [selectedYear]);
+  }, [selectedYear, user, hasSingleImporter, singleImporterName, assignedImporterNames]);
 
   const handleImporterChange = (event, newValue) => {
     setSelectedImporter(newValue?.label || null);
@@ -80,15 +125,32 @@ export default function CSelectImporterModal(props) {
     );
   };
 
-  const importerNames = getUniqueImporterNames(importerData);
+  const handleSelectAllYearsChange = (event) => {
+    if (event.target.checked) {
+      setSelectedApiYears(["26-27", "25-26", "24-25"]);
+    } else {
+      setSelectedApiYears([]);
+    }
+  };
+
+  const importerNames = React.useMemo(() => {
+    if (user && user.role !== 'Admin') {
+      return assignedImporterNames.map((name, index) => ({
+        label: name,
+        key: `${name}-${index}`,
+      }));
+    }
+    return getUniqueImporterNames(importerData);
+  }, [user, assignedImporterNames, importerData]);
 
   const handleReportDownload = async () => {
-    if (selectedImporter !== "" && selectedApiYears.length > 0) {
+    const importerToDownload = hasSingleImporter ? singleImporterName : selectedImporter;
+    if (importerToDownload !== "" && selectedApiYears.length > 0) {
       const yearString = selectedApiYears.join(",");
       const res = await axios.get(
         `${
           process.env.REACT_APP_API_STRING
-        }/download-report/${yearString}/${selectedImporter
+        }/download-report/${yearString}/${importerToDownload
           .toLowerCase()
           .replace(/\s+/g, "_")
           .replace(/[^\w]+/g, "")
@@ -98,21 +160,10 @@ export default function CSelectImporterModal(props) {
 
       convertToExcel(
         res.data,
-        selectedImporter,
+        importerToDownload,
         props.status,
         props.detailedStatus
       );
-    }
-  };
-
-  const handleDownloadAll = async () => {
-    if (selectedApiYears.length > 0) {
-      const yearString = selectedApiYears.join(",");
-      const res = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/download-report/${yearString}/${props.status}`
-      );
-
-      downloadAllReport(res.data, props.status, props.detailedStatus);
     }
   };
 
@@ -125,35 +176,38 @@ export default function CSelectImporterModal(props) {
         aria-describedby="modal-modal-description"
       >
         <Box sx={style}>
-          <Typography id="modal-modal-title" variant="h6" component="h2">
-            Select an importer to download DSR
+          <Typography id="modal-modal-title" variant="h6" component="h2" sx={{ fontWeight: "bold" }}>
+            {hasSingleImporter 
+              ? `Download DSR Report for ${singleImporterName}`
+              : "Select an importer to download DSR"}
           </Typography>
           <br />
 
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={checked}
-                  onChange={(e) => setChecked(e.target.checked)}
-                />
-              }
-              label="Download all importers"
-            />
-          </FormGroup>
 
-          <br />
 
           <div>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "600" }}>
+              Select Years:
+            </Typography>
             <FormControlLabel
               control={
                 <Checkbox
-                  value="24-25"
-                  checked={selectedApiYears.includes("24-25")}
+                  checked={selectedApiYears.length === 3}
+                  indeterminate={selectedApiYears.length > 0 && selectedApiYears.length < 3}
+                  onChange={handleSelectAllYearsChange}
+                />
+              }
+              label="All Years"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  value="26-27"
+                  checked={selectedApiYears.includes("26-27")}
                   onChange={handleYearChange}
                 />
               }
-              label="24-25"
+              label="26-27"
             />
             <FormControlLabel
               control={
@@ -165,30 +219,43 @@ export default function CSelectImporterModal(props) {
               }
               label="25-26"
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  value="24-25"
+                  checked={selectedApiYears.includes("24-25")}
+                  onChange={handleYearChange}
+                />
+              }
+              label="24-25"
+            />
           </div>
 
           <br />
-          {!checked && (
-            <Autocomplete
-              disablePortal
-              fullWidth
-              options={importerNames}
-              getOptionLabel={(option) => option.label}
-              value={
-                importerNames.find(
-                  (option) => option.label === selectedImporter
-                ) || null
-              }
-              onChange={handleImporterChange}
-              renderInput={(params) => (
-                <TextField {...params} size="small" label="Select importer" />
-              )}
-            />
+          {!hasSingleImporter && (
+            <>
+              <Autocomplete
+                disablePortal
+                fullWidth
+                options={importerNames}
+                getOptionLabel={(option) => option.label}
+                value={
+                  importerNames.find(
+                    (option) => option.label === selectedImporter
+                  ) || null
+                }
+                onChange={handleImporterChange}
+                renderInput={(params) => (
+                  <TextField {...params} size="small" label="Select importer" />
+                )}
+              />
+              <br />
+            </>
           )}
 
           <button
             className="btn"
-            onClick={checked ? handleDownloadAll : handleReportDownload}
+            onClick={handleReportDownload}
           >
             Download
           </button>
