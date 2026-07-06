@@ -1083,6 +1083,11 @@ function EwayBillGenerate({
     setIsPartBOnly(false);
     setExistingEwbNo('');
 
+    const cleanTransacting = (str) => {
+      if (!str) return "";
+      return String(str).replace(/\bTRANSACTING\b/ig, "").replace(/\s+/g, " ").trim();
+    };
+
     // Extract nested data from actual API response
     const boeDetail = record.data || record;
     const importerDetails = boeDetail.ImporterDetails || {};
@@ -1133,13 +1138,13 @@ function EwayBillGenerate({
     const parsedBuyer = record._parsedData?.buyer || splitCompanyNameAndAddress(buyerAddr);
     
     const supplierName = parsedSupplier.name || '';
-    const supplierCleanAddr = parsedSupplier.address || '';
+    const supplierCleanAddr = cleanTransacting(parsedSupplier.address || '');
     const supplierCity = parsedSupplier.city || '';
     const supplierPincode = parsedSupplier.pincode || '';
     const supplierState = parsedSupplier.state || '';
 
     const buyerName = parsedBuyer.name || '';
-    const buyerCleanAddr = parsedBuyer.address || '';
+    const buyerCleanAddr = cleanTransacting(parsedBuyer.address || '');
     const buyerCity = parsedBuyer.city || '';
     const buyerPincode = parsedBuyer.pincode || '';
     const buyerState = parsedBuyer.state || '';
@@ -1262,12 +1267,12 @@ function EwayBillGenerate({
     setFormData(prev => {
       const isImport = (importExport === 'import' || importExport === 'inward');
       const consignorState = isImport ? "Other Country" : normalizeState(supplierState || consignorSrc?.branches?.[0]?.state || "");
-      const consignorAddress = supplierCleanAddr || consignorSrc?.branches?.[0]?.address || "";
+      const consignorAddress = cleanTransacting(supplierCleanAddr || consignorSrc?.branches?.[0]?.address || "");
       const consignorCity = supplierCity || consignorSrc?.branches?.[0]?.city || "";
       const consignorPincode = isImport ? "999999" : (supplierPincode || consignorSrc?.branches?.[0]?.postalCode || "");
 
       const consigneeState = normalizeState(buyerState || consigneeSrc?.branches?.[0]?.state || "");
-      const consigneeAddress = buyerCleanAddr || consigneeSrc?.branches?.[0]?.address || "";
+      const consigneeAddress = cleanTransacting(buyerCleanAddr || consigneeSrc?.branches?.[0]?.address || "");
       const consigneeCity = buyerCity || consigneeSrc?.branches?.[0]?.city || "";
       const consigneePincode = buyerPincode || consigneeSrc?.branches?.[0]?.postalCode || "";
 
@@ -1313,10 +1318,9 @@ function EwayBillGenerate({
         // Items from external API (import line item details)
         items: mappedItems,
 
-        otherAmount: 0,
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2)
-          : (dutySummary['TOT.ASS VAL'] || ""),
+          : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummary['TOT.ASS VAL'] || "")),
         transportDistance: isImport ? 0 : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
       };
 
@@ -1324,6 +1328,9 @@ function EwayBillGenerate({
       if (totalSelectedWeight > 0 && res.items && res.items.length > 0) {
         res.items[0].quantity = totalSelectedWeight;
         res.items[0].taxableAmount = (totalSelectedWeight * calcPerKgValue).toFixed(2);
+      } else if (res.items && res.items.length > 0 && calcTotalValue > 0) {
+        res.items[0].taxableAmount = calcTotalValue.toFixed(2);
+        res.items[0].quantity = totalGW || res.items[0].quantity || 1;
       }
 
       // Apply prefilled assessable value if provided via props
@@ -3884,14 +3891,8 @@ function EwayBillGenerate({
                   <div className="section-body">
                     <div className="duty-summary-grid">
                       {(() => {
-                        const isProportional = selectedContainers?.length > 0;
-                        const propTaxable = parseFloat(formData.items[0]?.taxableAmount) || 0;
-                        const propIgst = propTaxable * (parseFloat(formData.items[0]?.igstRate) || 0) / 100;
-
-                        // Values to display
-                        const displayAssVal = isProportional ? propTaxable : parseFloat(dutySummary['TOT.ASS VAL'] || 0);
-                        const displayIgst = isProportional ? propIgst : parseFloat(dutySummary['IGST'] || 0);
-                        // Total Duty strictly from BOE API as requested
+                        const displayAssVal = parseFloat(dutySummary['TOT.ASS VAL'] || 0);
+                        const displayIgst = parseFloat(dutySummary['IGST'] || 0);
                         const displayTotalDuty = parseFloat(dutySummary['TOTAL DUTY'] || 0);
 
                         return (

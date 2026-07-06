@@ -1076,6 +1076,10 @@ function EwayBillGenerateLR({
 
   const populateFromBoe = (record, lrData = null) => {
     setIsPartBOnly(false); setExistingEwbNo('');
+    const cleanTransacting = (str) => {
+      if (!str) return "";
+      return String(str).replace(/\bTRANSACTING\b/ig, "").replace(/\s+/g, " ").trim();
+    };
     if (!record) return;
     const boeDetail = record.data || record;
     const importerDetails = boeDetail.ImporterDetails || {};
@@ -1114,12 +1118,12 @@ function EwayBillGenerateLR({
     const parsedSupplier = record._parsedData?.supplier || splitCompanyNameAndAddress(supplierAddr);
     const parsedBuyer = record._parsedData?.buyer || splitCompanyNameAndAddress(buyerAddr);
     const supplierName = parsedSupplier.name || '';
-    const supplierCleanAddr = parsedSupplier.address || '';
+    const supplierCleanAddr = cleanTransacting(parsedSupplier.address || '');
     const supplierCity = parsedSupplier.city || '';
     const supplierPincode = parsedSupplier.pincode || '';
     const supplierState = parsedSupplier.state || '';
     const buyerName = parsedBuyer.name || '';
-    const buyerCleanAddr = parsedBuyer.address || '';
+    const buyerCleanAddr = cleanTransacting(parsedBuyer.address || '');
     const buyerCity = parsedBuyer.city || '';
     const buyerPincode = parsedBuyer.pincode || '';
     const buyerState = parsedBuyer.state || '';
@@ -1191,11 +1195,11 @@ function EwayBillGenerateLR({
     setFormData(prev => {
       const isImport = (ie === 'import' || ie === 'inward');
       const cSignorSt = isImport ? "Other Country" : normalizeState(supplierState || consignorSrc?.branches?.[0]?.state || "");
-      const cSignorAd = supplierCleanAddr || consignorSrc?.branches?.[0]?.address || "";
+      const cSignorAd = cleanTransacting(supplierCleanAddr || consignorSrc?.branches?.[0]?.address || "");
       const cSignorCi = supplierCity || consignorSrc?.branches?.[0]?.city || "";
       const cSignorPin = isImport ? "999999" : (supplierPincode || consignorSrc?.branches?.[0]?.postalCode || "");
       const cSigneeSt = normalizeState(buyerState || consigneeSrc?.branches?.[0]?.state || "");
-      const cSigneeAd = buyerCleanAddr || consigneeSrc?.branches?.[0]?.address || "";
+      const cSigneeAd = cleanTransacting(buyerCleanAddr || consigneeSrc?.branches?.[0]?.address || "");
       const cSigneeCi = buyerCity || consigneeSrc?.branches?.[0]?.city || "";
       const cSigneePin = buyerPincode || consigneeSrc?.branches?.[0]?.postalCode || "";
       const res = {
@@ -1211,10 +1215,18 @@ function EwayBillGenerateLR({
         vehicleNo: lrData?.container_details?.vehicle_no || prev.vehicleNo || "",
         transporterDocNo: formatLrDocumentNumber(lrData?.container_details?.tr_no || prev.transporterDocNo || ""),
         items: mappedItems, otherAmount: 0,
-        totalInvoiceValue: totalSelectedWeight > 0 ? (totalSelectedWeight * calcPerKgValue).toFixed(2) : (dutySummaryData['TOT.ASS VAL'] || ""),
+        totalInvoiceValue: totalSelectedWeight > 0 
+          ? (totalSelectedWeight * calcPerKgValue).toFixed(2) 
+          : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummaryData['TOT.ASS VAL'] || "")),
         transportDistance: isImport ? 0 : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
       };
-      if (totalSelectedWeight > 0 && res.items?.length > 0) { res.items[0].quantity = totalSelectedWeight; res.items[0].taxableAmount = (totalSelectedWeight * calcPerKgValue).toFixed(2); }
+      if (totalSelectedWeight > 0 && res.items?.length > 0) { 
+        res.items[0].quantity = totalSelectedWeight; 
+        res.items[0].taxableAmount = (totalSelectedWeight * calcPerKgValue).toFixed(2); 
+      } else if (res.items?.length > 0 && calcTotalValue > 0) {
+        res.items[0].taxableAmount = calcTotalValue.toFixed(2);
+        res.items[0].quantity = totalGW || res.items[0].quantity || 1;
+      }
       if (prefilledAssessableValue && prefilledAssessableValue > 0) { res.totalInvoiceValue = prefilledAssessableValue; if (res.items?.length > 0) res.items[0].taxableAmount = prefilledAssessableValue; }
       if (res.consignorName.toLowerCase().includes("suraj") || detectedMode === 'import' || res.consignorState === "Other Countries" || res.consignorState === "Other Territory") { res.consignorGstin = "URP"; res.consignorPincode = "999999"; res.dispatchFromPincode = "999999"; }
       if (res.consigneeName.toLowerCase().includes("suraj") || detectedMode === 'export' || res.consigneeState === "Other Countries" || res.consigneeState === "Other Territory") { res.consigneeGstin = "URP"; res.consigneePincode = "999999"; res.shipToPincode = "999999"; }
@@ -2661,11 +2673,8 @@ function EwayBillGenerateLR({
 
                 {/* Duty Summary */}
                 {dutySummary && (() => {
-                  const isProp = selectedContainers?.length > 0;
-                  const pt = parseFloat(formData.items[0]?.taxableAmount) || 0;
-                  const pi = pt * (parseFloat(formData.items[0]?.igstRate) || 0) / 100;
-                  const dAss = isProp ? pt : parseFloat(dutySummary['TOT.ASS VAL'] || 0);
-                  const dIgst = isProp ? pi : parseFloat(dutySummary['IGST'] || 0);
+                  const dAss = parseFloat(dutySummary['TOT.ASS VAL'] || 0);
+                  const dIgst = parseFloat(dutySummary['IGST'] || 0);
                   return (
                     <div className="ewb-section">
                       <div className="ewb-section-title"><span className="title-accent"></span>Duty Summary <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(from Bill of Entry)</span></div>

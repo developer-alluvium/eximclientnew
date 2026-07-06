@@ -88,7 +88,7 @@ const defaultOrigins = [
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",
   "https://eximbot.alvision.in",
-  "http://192.168.2.65:3001"
+  "http://192.168.2.47:3001"
 
 ];
 
