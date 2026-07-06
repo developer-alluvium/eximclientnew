@@ -163,7 +163,7 @@ const TransportTable = ({
         minWidth: 160,
         Cell: ({ row }) => (
           <div className="t-cell">
-            {row.original.eWay_bill ? (
+            {/* {row.original.eWay_bill ? (
               <span 
                 className="t-link" 
                 style={{ cursor: 'pointer', textDecoration: 'underline' }}
@@ -179,7 +179,7 @@ const TransportTable = ({
               >
                 Generate EWB
               </span>
-            )}
+            )} */}
             <span className="t-sub">{row.original.vehicle_no || 'NA'}</span>
           </div>
         ),
