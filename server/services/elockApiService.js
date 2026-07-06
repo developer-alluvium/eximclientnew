@@ -296,10 +296,6 @@ class ElockApiService {
                 
                 const beforeCount = jobs.length;
                 jobs = jobs.filter((item) => {
-                    // Don't filter out records from assign-others - they are already
-                    // relevant to this client (the transport API handles that filtering)
-                    if (item._fromAssignOthers) return true;
-
                     const consignorIeCode = item.consignor?.ieCodeNo;
                     const consigneeIeCode = item.consignee?.ieCodeNo;
 

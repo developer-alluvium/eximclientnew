@@ -552,11 +552,12 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
             loading_port,
             port_of_reporting,
             custom_house,
+            
           } = cell.row.original;
 
           return (
             <div style={{ alignItems: "center" }}>
-              <strong>BL:</strong> {awb_bl_no}
+              <strong>BL:</strong>{" "}{awb_bl_no}
               {awb_bl_no && (
                 <Button
                   type="text"
@@ -567,14 +568,12 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 />
               )}{" "}
               {awb_bl_date} <br />
-              <strong>Gross Weight:</strong>
-              {gross_weight || ""} kg
+              <strong>Gross Weight:</strong>{" "}{gross_weight || ""} kg
               <br />
-              <strong>Net weight:</strong> {job_net_weight || ""} kg
+              <strong>Net weight:</strong>{" "}{job_net_weight || ""} kg
               <br />
-              <strong>Invoice:</strong> {invoice_number} {invoice_date} <br />
-              <strong>Value:</strong>
-              {total_inv_value || ""} <br />
+              <strong>Invoice:</strong>{" "}{invoice_number}{" "}{invoice_date} <br />
+              <strong>Value:</strong>{" "}{total_inv_value || "N/A"}{" "}{inv_currency ||""} <br />
               <strong>POL:</strong>{" "}
               {loading_port ? loading_port.replace(/\(.*?\)\s*/, "") : ""}{" "}
               <br />
@@ -583,7 +582,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 ? port_of_reporting.replace(/\(.*?\)\s*/, "")
                 : ""}{" "}
               <br />
-              <strong>ICD Port:</strong> {custom_house || "N/A"}
+              <strong>ICD Port:</strong>{" "}{custom_house || "N/A"}
             </div>
           );
         },
@@ -788,15 +787,28 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
             discharge_date,
             container_nos = [],
             out_of_charge,
-            delivery_date,
-            emptyContainerOffLoadDate,
-            consignment_type,
-            detention_from,
           } = cell.row.original;
 
           // Format dates
           const formattedOocDate = formatDate(out_of_charge);
           const formatDischargedate = formatDate(discharge_date);
+
+          // Get container level dates helper
+          const getContainerDates = (field, fallback) => {
+            if (!container_nos || !Array.isArray(container_nos) || container_nos.length === 0) {
+              return fallback;
+            }
+            const dates = container_nos
+              .map((c) => c[field])
+              .filter((d) => d && d.trim() !== "");
+            if (dates.length === 0) return fallback;
+            const uniqueFormatted = [...new Set(dates.map(d => formatDate(d)))];
+            return uniqueFormatted.join(", ");
+          };
+
+          const detentionFromDisplay = getContainerDates("detention_from", "N/A");
+          const deliveryDateDisplay = getContainerDates("delivery_date", "Pending");
+          const emptyOffloadDisplay = getContainerDates("emptyContainerOffLoadDate", "Pending");
 
           return (
             <div
@@ -813,12 +825,6 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 <span style={{ marginLeft: "8px" }}>
                   {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
                 </span>
-                {/* <div>
-                  <strong>Berthing Date:</strong>
-                  <span style={{ marginLeft: "8px" }}>
-                    {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
-                  </span>
-                </div> */}
               </div>
               <div>
                 <strong>Discharge Date:</strong>
@@ -838,25 +844,23 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   style={{
                     marginLeft: "8px",
                     fontWeight: "bold",
-                    color: detention_from ? "#b91c1c" : "inherit",
+                    color: detentionFromDisplay !== "N/A" ? "#b91c1c" : "inherit",
                   }}
                 >
-                  {detention_from ? formatDate(detention_from) : "N/A"}
+                  {detentionFromDisplay}
                 </span>
               </div>
               <div>
                 <strong>Delivery Date:</strong>
                 <span style={{ marginLeft: "8px" }}>
-                  {delivery_date ? formatDate(delivery_date) : "Pending"}
+                  {deliveryDateDisplay}
                 </span>
               </div>
 
               <div>
                 <strong>Empty Offload:</strong>
                 <span style={{ marginLeft: "8px" }}>
-                  {emptyContainerOffLoadDate
-                    ? formatDate(emptyContainerOffLoadDate)
-                    : "Pending"}
+                  {emptyOffloadDisplay}
                 </span>
               </div>
             </div>

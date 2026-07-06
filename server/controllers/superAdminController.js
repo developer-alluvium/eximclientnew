@@ -1754,3 +1754,59 @@ export const assignUsersToAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Change the password of a user (SuperAdmin only)
+ */
+export const changeUserPassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password are required."
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match."
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long."
+      });
+    }
+
+    // Find the target user
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    // Update password (pre-save hook hashes it)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully."
+    });
+  } catch (error) {
+    console.error("Change user password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to change user password.",
+      error: error.message
+    });
+  }
+};
+

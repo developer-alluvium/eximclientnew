@@ -24,7 +24,8 @@ import {
   bulkAssignIeCodeToUsers,
   getAvailableIecCodes,
   assignAdminToUser,
-  assignUsersToAdmin
+  assignUsersToAdmin,
+  changeUserPassword
 } from "../controllers/superAdminController.js";
 
 import { 
@@ -106,5 +107,6 @@ router.patch("/api/superadmin/customer/:customerId/tab-visibility", updateCustom
 // Admin-User assignment routes
 router.put("/api/superadmin/users/:userId/assign-admin", protectSuperAdmin, assignAdminToUser);
 router.put("/api/superadmin/admins/:adminId/assign-users", protectSuperAdmin, assignUsersToAdmin);
+router.put("/api/superadmin/users/:userId/change-password", protectSuperAdmin, changeUserPassword);
 
 export default router;

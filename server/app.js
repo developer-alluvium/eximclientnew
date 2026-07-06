@@ -42,6 +42,7 @@ import { updateContainerEwayBill } from "./controllers/importProxyController.js"
 import { authenticateUser } from "./middlewares/authMiddleware.js";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import "./services/reminderService.js";
 // Load environment variables
 dotenv.config();
 
@@ -88,7 +89,8 @@ const defaultOrigins = [
   "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
   "https://client.alvision.in",
   "https://eximbot.alvision.in",
-  "http://192.168.2.47:3001"
+  "http://192.168.2.47:3001",
+  "http://3.108.244.38:8002"
 
 ];
 

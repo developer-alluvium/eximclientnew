@@ -12,6 +12,7 @@ import {
   Button,
   Stack,
   InputAdornment,
+  Alert,
 } from "@mui/material";
 import { Search, Business, Person } from "@mui/icons-material";
 
@@ -29,6 +30,10 @@ const IeCodeDialog = React.memo(
     loading,
     handleIeCodeOperation,
     filteredIeCodes = [],
+    error,
+    setError,
+    success,
+    setSuccess,
   }) => {
     const baseOptions = useMemo(() => {
       return isRemovingIeCode
@@ -137,6 +142,16 @@ const IeCodeDialog = React.memo(
           </Box>
         </DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+              {success}
+            </Alert>
+          )}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {selectedEntity?.ie_code_assignments?.length > 0
               ? `Current IE Codes: ${selectedEntity.ie_code_assignments

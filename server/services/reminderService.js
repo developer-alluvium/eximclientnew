@@ -2,6 +2,7 @@
 import EximclientUser from "../models/eximclientUserModel.js";
 import { sendReminderEmail } from "./emailService.js";
 import cron from "node-cron";
+import { checkAndSendAEOReminders } from "./aeoReminderService.js";
 
 // Configuration object for reminder settings
 const reminderConfig = {
@@ -12,7 +13,7 @@ const reminderConfig = {
   },
   
   // Enable/disable testing mode
-  testMode:  'development',
+  testMode: process.env.NODE_ENV === 'development',
   
   // Test interval (in minutes) - for testing purposes
   testInterval: 2, // Run every 2 minutes in test mode
@@ -86,39 +87,41 @@ export const triggerReminderCheck = async () => {
 };
 
 // Schedule reminder check
-// const scheduleReminders = () => {
-//   if (reminderConfig.testMode) {
-//     // Test mode: run every X minutes
-//     console.log(`🧪 TEST MODE: Scheduling reminders every ${reminderConfig.testInterval} minutes`);
+const scheduleReminders = () => {
+  if (reminderConfig.testMode) {
+    // Test mode: run every X minutes
+    console.log(`🧪 TEST MODE: Scheduling reminders every ${reminderConfig.testInterval} minutes`);
     
-//     cron.schedule(`*/${reminderConfig.testInterval} * * * *`, () => {
-//       console.log('🧪 Running TEST document reminder check...');
-//       checkDocumentReminders();
-//     });
+    cron.schedule(`*/${reminderConfig.testInterval} * * * *`, () => {
+      console.log('🧪 Running TEST document and AEO reminder check...');
+      checkDocumentReminders();
+      checkAndSendAEOReminders().catch(err => console.error("AEO Cron check error:", err));
+    });
     
   
-//   } else {
-//     // Production mode: run daily at specified time
-//     const { hour, minute } = reminderConfig.reminderTime;
+  } else {
+    // Production mode: run daily at specified time
+    const { hour, minute } = reminderConfig.reminderTime;
     
-//     // Convert IST to UTC for cron (IST = UTC + 5:30)
-//     const utcHour = (hour - 5 + 24) % 24;
-//     const utcMinute = (minute - 30 + 60) % 60;
+    // Convert IST to UTC for cron (IST = UTC + 5:30)
+    const utcHour = (hour - 5 + 24) % 24;
+    const utcMinute = (minute - 30 + 60) % 60;
     
-//     const cronExpression = `${utcMinute} ${utcHour} * * *`;
+    const cronExpression = `${utcMinute} ${utcHour} * * *`;
     
-//     console.log(`📅 PRODUCTION MODE: Scheduling daily reminders at ${hour}:${minute} IST (${utcHour}:${utcMinute} UTC)`);
-//     console.log(`📅 Cron expression: ${cronExpression}`);
+    console.log(`📅 PRODUCTION MODE: Scheduling daily reminders at ${hour}:${minute} IST (${utcHour}:${utcMinute} UTC)`);
+    console.log(`📅 Cron expression: ${cronExpression}`);
     
-//     cron.schedule(cronExpression, () => {
-//       console.log(`📅 Running scheduled document reminder check at ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
-//       checkDocumentReminders();
-//     });
-//   }
-// };
+    cron.schedule(cronExpression, () => {
+      console.log(`📅 Running scheduled document and AEO reminder check at ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`);
+      checkDocumentReminders();
+      checkAndSendAEOReminders().catch(err => console.error("AEO Cron check error:", err));
+    });
+  }
+};
 
 // Initialize scheduling
-// scheduleReminders();
+scheduleReminders();
 
 // Export configuration for external use
 export { reminderConfig };

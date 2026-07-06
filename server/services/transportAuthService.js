@@ -25,9 +25,11 @@ class TransportAuthService {
         // Fetch new token
         try {
             console.log("🔑 Logging into transport API as dev_master to get service token...");
+            const username = process.env.TRANSPORT_USERNAME || "dev_master";
+            const password = process.env.TRANSPORT_PASSWORD || "1qazxsw2";
             const response = await axios.post(`${this.baseURL}/login`, {
-                username: "dev_master",
-                password: "1qazxsw2"
+                username,
+                password
             }, { timeout: 10000 });
 
             const token = response.data.exim_token || response.data.user?.token;
