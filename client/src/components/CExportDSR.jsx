@@ -237,8 +237,6 @@ function CExportDSR() {
 
   // Exporters list from user assignments
   const ieCodeAssignments = React.useMemo(() => {
-    const list = user?.exporter_ie_code_assignments || [];
-    if (list.length > 0) return list;
     return user?.exporter_ie_code_assignments || [];
   }, [user]);
 
@@ -383,7 +381,7 @@ function CExportDSR() {
       const results = await Promise.all(promises);
       const newCounts = {};
       results.forEach((res, idx) => {
-        if (res.data?.success) {
+        if (res.data?.success && !res.data?.noAccess) {
           const count = res.data.data?.total || res.data.data?.pagination?.totalCount || 0;
           newCounts[statuses[idx]] = count;
         } else {
@@ -420,20 +418,40 @@ function CExportDSR() {
       });
 
       if (response.data.success) {
+        if (response.data.noAccess) {
+          setUnfilteredJobs([]);
+          setClientQueriesStatus({});
+          setSnackbar({ open: true, message: response.data.message || "No exporter assigned. Please contact your administrator.", severity: "warning" });
+          return;
+        }
         const loadedJobs = response.data.data.jobs || [];
         setUnfilteredJobs(loadedJobs);
         
-        // Fetch client query status map
+        // Fetch client query status map in chunks to avoid PayloadTooLargeError
         const jobNos = loadedJobs.map(j => j.job_no).filter(Boolean);
         if (jobNos.length > 0) {
-          axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
-            jobNos,
-            isClient: true
-          }, { withCredentials: true }).then(statusRes => {
-            if (statusRes.data?.success) {
-              setClientQueriesStatus(statusRes.data.data || {});
-            }
-          }).catch(err => console.error("Error fetching client query status map:", err));
+          const CHUNK_SIZE = 200;
+          const chunks = [];
+          for (let i = 0; i < jobNos.length; i += CHUNK_SIZE) {
+            chunks.push(jobNos.slice(i, i + CHUNK_SIZE));
+          }
+
+          Promise.all(
+            chunks.map(chunk =>
+              axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
+                jobNos: chunk,
+                isClient: true
+              }, { withCredentials: true })
+            )
+          ).then(results => {
+            const combinedStatus = {};
+            results.forEach(res => {
+              if (res.data?.success) {
+                Object.assign(combinedStatus, res.data.data || {});
+              }
+            });
+            setClientQueriesStatus(combinedStatus);
+          }).catch(err => console.error("Error fetching client query status map in chunks:", err));
         } else {
           setClientQueriesStatus({});
         }

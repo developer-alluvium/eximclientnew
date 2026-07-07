@@ -83,7 +83,7 @@ export const proxyExportListing = async (req, res) => {
 
     // Fetch fresh user data to get IE code assignments
     const dbUser = await EximclientUser.findById(user.id || user._id)
-      .select("exporter_ie_code_assignments ie_code_assignments role name email selected_branches")
+      .select("exporter_ie_code_assignments role name email selected_branches")
       .lean();
 
     if (!dbUser) {
@@ -91,9 +91,7 @@ export const proxyExportListing = async (req, res) => {
     }
 
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
-    const ieCodeAssignments = dbUser.exporter_ie_code_assignments && dbUser.exporter_ie_code_assignments.length > 0
-      ? dbUser.exporter_ie_code_assignments
-      : dbUser.ie_code_assignments || [];
+    const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
 
     // Build query params to forward to the Export API
     const {
@@ -136,7 +134,8 @@ export const proxyExportListing = async (req, res) => {
       }
     } else {
       // Regular users with no IE code assignments get empty result immediately
-      if (!isAdmin) {
+      const isSuperAdmin = dbUser.role === "super_admin" || dbUser.role === "superadmin";
+      if (!isSuperAdmin) {
         return res.json({
           success: true,
           data: {
