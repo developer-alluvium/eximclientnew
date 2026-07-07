@@ -1052,6 +1052,7 @@ export const downloadReport = async (req, res) => {
     const response = await axios.get(
       `${IMPORT_API_BASE_URL}/download-report/${encodeURIComponent(yearString)}/${encodeURIComponent(importer)}/${encodeURIComponent(status)}`,
       {
+        params: req.query,
         headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 30000,
       }
@@ -1107,6 +1108,7 @@ export const downloadAllReport = async (req, res) => {
     const response = await axios.get(
       `${IMPORT_API_BASE_URL}/download-report/${encodeURIComponent(yearString)}/${encodeURIComponent(status)}`,
       {
+        params: req.query,
         headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
         timeout: 30000,
       }

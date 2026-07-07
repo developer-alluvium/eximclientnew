@@ -155,7 +155,13 @@ export default function CSelectImporterModal(props) {
           .replace(/\s+/g, "_")
           .replace(/[^\w]+/g, "")
           .replace(/_+/g, "_")
-          .replace(/^_|_$/g, "")}/${props.status}`
+          .replace(/^_|_$/g, "")}/${props.status}`,
+        {
+          params: {
+            detailedStatus: props.detailedStatus || "all",
+            branchId: props.branchId,
+          },
+        }
       );
 
       convertToExcel(

@@ -298,6 +298,7 @@ function CJobTabs({ gandhidham = false }) {
         handleClose={handleSelectImporterClose}
         status={value === 0 ? "Pending" : value === 1 ? "Completed" : "Cancelled"}
         detailedStatus="all"
+        branchId={selectedBranch}
       />
 
       {/* --- New Currency Rate Dialog --- */}

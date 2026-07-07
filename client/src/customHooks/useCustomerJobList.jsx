@@ -523,8 +523,8 @@ function useCustomerJobList() {
                           ))}
                         </span>
                       </div>
-                    )}
-                  </div>
+                     )}
+                 </div>
                 )}
               </div>
 

@@ -175,6 +175,49 @@ const formatDate = (dateStr) => {
   }
 };
 
+const getFiscalYear = (dateStr) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return "";
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  
+  if (isNaN(month) || isNaN(year)) return "";
+  
+  let startYear, endYear;
+  if (month >= 4) {
+    startYear = year;
+    endYear = year + 1;
+  } else {
+    startYear = year - 1;
+    endYear = year;
+  }
+  
+  const startYearShort = String(startYear).slice(-2);
+  const endYearShort = String(endYear).slice(-2);
+  return `${startYearShort}-${endYearShort}`;
+};
+
+const getJobYear = (job) => {
+  if (!job) return "";
+  if (job.year) return job.year;
+  
+  if (job.job_date) {
+    const fy = getFiscalYear(job.job_date);
+    if (fy) return fy;
+  }
+  
+  const refNo = job.exporter_ref_no || "";
+  const refMatch = refNo.match(/\/(\d{2}-\d{2})\//) || refNo.match(/\b(\d{2}-\d{2})\b/);
+  if (refMatch) return refMatch[1];
+
+  const jobNo = job.job_no || "";
+  const jobMatch = jobNo.match(/\/(\d{2}-\d{2})\//) || jobNo.match(/\b(\d{2}-\d{2})\b/);
+  if (jobMatch) return jobMatch[1];
+  
+  return "";
+};
+
 const STATUS_TABS = [
   { label: "Pending", value: "Pending" },
   { label: "Booking Pending", value: "Booking Pending" },
@@ -198,12 +241,12 @@ function CExportDSR() {
   }, [user]);
 
   // States
-  const [tabValue, setTabValue] = React.useState(0);
-  const [jobs, setJobs] = React.useState([]);
+  const [tabValue, setTabValue] = React.useState("Pending");
+  const [unfilteredJobs, setUnfilteredJobs] = React.useState([]);
+  const [tabCounts, setTabCounts] = React.useState({});
   const [loading, setLoading] = React.useState(false);
   const [page, setPage] = React.useState(0);
   const [limit, setLimit] = React.useState(100);
-  const [totalCount, setTotalCount] = React.useState(0);
 
   // Filters State
   const [search, setSearch] = React.useState("");
@@ -297,47 +340,76 @@ function CExportDSR() {
   const [raiseQuerySending, setRaiseQuerySending] = React.useState(false);
 
   // Dynamically populated filters from returned jobs
-  const customHousesList = React.useMemo(() => {
-    const set = new Set(["ICD SACHANA", "MUNDRA SEA", "HAZIRA PORT", "ICD KHODIYAR", "ICD SANAND"]);
-    jobs.forEach(j => {
-      if (j.custom_house) set.add(j.custom_house.toUpperCase().trim());
-    });
-    return Array.from(set).sort();
-  }, [jobs]);
+  // Fetch counts for all tabs under current active filters
+  const fetchTabCounts = React.useCallback(async () => {
+    const statuses = STATUS_TABS.map(t => t.value);
+    
+    // Build parameters matching current filters (but limit=1 to be lightweight)
+    const baseParams = {
+      page: 1,
+      limit: 1,
+      search,
+      year: year === "all" ? "" : year,
+      consignmentType,
+      branch,
+      customHouse,
+      month,
+      goods_stuffed_at: goodsStuffedAt,
+      jobOwner,
+      pendingQueries: pendingQueries ? "true" : "false"
+    };
 
-  const jobOwnersList = React.useMemo(() => {
-    const set = new Set();
-    jobs.forEach(j => {
-      if (j.job_owner) set.add(j.job_owner);
-    });
-    return Array.from(set).map(o => ({ username: o, fullName: o }));
-  }, [jobs]);
+    if (selectedExporter !== "all") {
+      baseParams.ieCode = selectedExporter;
+    }
 
-  // Fetch export jobs
+    if (detailedStatus && detailedStatus.length > 0) {
+      baseParams.detailedStatus = detailedStatus.join(",");
+    }
+
+    try {
+      const promises = statuses.map(status =>
+        axios.get(`${process.env.REACT_APP_API_STRING}/exports/${status}`, {
+          params: baseParams,
+          withCredentials: true
+        }).catch(err => {
+          console.error(`Error fetching count for tab ${status}:`, err);
+          return { data: { success: false } };
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const newCounts = {};
+      results.forEach((res, idx) => {
+        if (res.data?.success) {
+          const count = res.data.data?.total || res.data.data?.pagination?.totalCount || 0;
+          newCounts[statuses[idx]] = count;
+        } else {
+          newCounts[statuses[idx]] = 0;
+        }
+      });
+      setTabCounts(newCounts);
+    } catch (error) {
+      console.error("Error fetching tab counts:", error);
+    }
+  }, [search, year, consignmentType, branch, customHouse, month, goodsStuffedAt, jobOwner, pendingQueries, selectedExporter, detailedStatus]);
+
+  React.useEffect(() => {
+    fetchTabCounts();
+  }, [fetchTabCounts]);
+
+  // Fetch export jobs (unfiltered for the current status tab and exporter)
   const fetchJobs = React.useCallback(async () => {
     setLoading(true);
     try {
-      const status = STATUS_TABS[tabValue].value;
+      const status = tabValue;
       const params = {
-        page: page + 1,
-        limit,
-        search,
-        year: year === "all" ? "" : year,
-        consignmentType,
-        branch,
-        customHouse,
-        month,
-        goods_stuffed_at: goodsStuffedAt,
-        jobOwner,
-        pendingQueries: pendingQueries ? "true" : "false"
+        page: 1,
+        limit: 5000 // load complete list to filter in-memory
       };
 
       if (selectedExporter !== "all") {
         params.ieCode = selectedExporter;
-      }
-
-      if (detailedStatus && detailedStatus.length > 0) {
-        params.detailedStatus = detailedStatus.join(",");
       }
 
       const response = await axios.get(`${process.env.REACT_APP_API_STRING}/exports/${status}`, {
@@ -347,8 +419,7 @@ function CExportDSR() {
 
       if (response.data.success) {
         const loadedJobs = response.data.data.jobs || [];
-        setJobs(loadedJobs);
-        setTotalCount(response.data.data.total || response.data.data.pagination?.totalCount || 0);
+        setUnfilteredJobs(loadedJobs);
         
         // Fetch client query status map
         const jobNos = loadedJobs.map(j => j.job_no).filter(Boolean);
@@ -365,22 +436,166 @@ function CExportDSR() {
           setClientQueriesStatus({});
         }
       } else {
-        setJobs([]);
+        setUnfilteredJobs([]);
         setClientQueriesStatus({});
         setSnackbar({ open: true, message: response.data.message || "Failed to fetch jobs", severity: "error" });
       }
     } catch (error) {
       console.error("Fetch export jobs error:", error);
-      setJobs([]);
+      setUnfilteredJobs([]);
       setSnackbar({ open: true, message: "Error connecting to server", severity: "error" });
     } finally {
       setLoading(false);
     }
-  }, [tabValue, page, limit, search, year, consignmentType, branch, customHouse, month, goodsStuffedAt, jobOwner, pendingQueries, selectedExporter, detailedStatus]);
+  }, [tabValue, selectedExporter]);
 
   React.useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // Auto-switch to the first tab with results on filter change
+  React.useEffect(() => {
+    if (Object.keys(tabCounts).length === 0) return;
+    
+    const currentCount = tabCounts[tabValue] || 0;
+    if (currentCount === 0) {
+      const firstTabWithJobs = STATUS_TABS.find(t => (tabCounts[t.value] || 0) > 0);
+      if (firstTabWithJobs && firstTabWithJobs.value !== tabValue) {
+        setTabValue(firstTabWithJobs.value);
+        setPage(0);
+      }
+    }
+  }, [tabCounts, tabValue]);
+
+  // Derive unique filter options from unfiltered dataset
+  const filterOptions = React.useMemo(() => {
+    const yearsSet = new Set();
+    const monthsSet = new Set();
+    const branchesSet = new Set();
+    const customHousesSet = new Set();
+    const consignmentTypesSet = new Set();
+    const goodsStuffedAtSet = new Set();
+    const detailedStatusSet = new Set();
+
+    unfilteredJobs.forEach(job => {
+      const jobYear = getJobYear(job);
+      if (jobYear) yearsSet.add(jobYear);
+
+      if (job.job_date) {
+        const parts = job.job_date.split("-");
+        if (parts.length >= 2) {
+          const m = parts[1].padStart(2, "0");
+          monthsSet.add(m);
+        }
+      }
+      if (job.branch_code) branchesSet.add(job.branch_code);
+      if (job.custom_house) customHousesSet.add(job.custom_house.toUpperCase().trim());
+      if (job.consignmentType) consignmentTypesSet.add(job.consignmentType);
+      if (job.goods_stuffed_at) goodsStuffedAtSet.add(job.goods_stuffed_at);
+      
+      const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
+        ? job.detailedStatus[job.detailedStatus.length - 1]
+        : job.detailedStatus || job.status || "Pending");
+      if (currentStatus) detailedStatusSet.add(currentStatus);
+    });
+
+    return {
+      years: Array.from(yearsSet).sort(),
+      months: Array.from(monthsSet).sort(),
+      branches: Array.from(branchesSet).sort(),
+      customHouses: Array.from(customHousesSet).sort(),
+      consignmentTypes: Array.from(consignmentTypesSet).sort(),
+      goodsStuffedAt: Array.from(goodsStuffedAtSet).sort(),
+      detailedStatuses: Array.from(detailedStatusSet).sort()
+    };
+  }, [unfilteredJobs]);
+
+  const customHousesList = filterOptions.customHouses;
+
+  const jobOwnersList = React.useMemo(() => {
+    const set = new Set();
+    unfilteredJobs.forEach(j => {
+      if (j.job_owner) set.add(j.job_owner);
+    });
+    return Array.from(set).map(o => ({ username: o, fullName: o }));
+  }, [unfilteredJobs]);
+
+  // In-memory filtered jobs
+  const filteredJobs = React.useMemo(() => {
+    return unfilteredJobs.filter(job => {
+      // Search filter
+      if (search.trim()) {
+        const query = search.toLowerCase().trim();
+        const jobNo = (job.job_no || "").toLowerCase();
+        const exporter = (job.exporter || "").toLowerCase();
+        const sbNo = (job.sb_no || "").toLowerCase();
+        const invoiceNo = (job.invoices?.[0]?.invoiceNumber || "").toLowerCase();
+        const containerNo = (job.containers || []).some(c => (c.containerNo || "").toLowerCase().includes(query));
+        
+        const match = jobNo.includes(query) || exporter.includes(query) || sbNo.includes(query) || invoiceNo.includes(query) || containerNo;
+        if (!match) return false;
+      }
+
+      // Year filter
+      if (year && year !== "all") {
+        if (getJobYear(job) !== year) return false;
+      }
+
+      // Month filter
+      if (month) {
+        if (!job.job_date) return false;
+        const parts = job.job_date.split("-");
+        if (parts.length < 2) return false;
+        const jobMonth = parts[1].padStart(2, "0");
+        if (jobMonth !== month) return false;
+      }
+
+      // Branch filter
+      if (branch) {
+        if (job.branch_code !== branch) return false;
+      }
+
+      // Custom House filter
+      if (customHouse) {
+        if ((job.custom_house || "").toUpperCase().trim() !== customHouse.toUpperCase().trim()) return false;
+      }
+
+      // Consignment Type filter
+      if (consignmentType) {
+        if (job.consignmentType !== consignmentType) return false;
+      }
+
+      // Detailed Status filter
+      if (detailedStatus && detailedStatus.length > 0) {
+        const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
+          ? job.detailedStatus[job.detailedStatus.length - 1]
+          : job.detailedStatus || job.status || "Pending");
+        if (!detailedStatus.includes(currentStatus)) return false;
+      }
+
+      // Goods Stuffed At filter
+      if (goodsStuffedAt) {
+        if (job.goods_stuffed_at !== goodsStuffedAt) return false;
+      }
+
+      // Pending Queries filter
+      if (pendingQueries) {
+        const queryStat = clientQueriesStatus[job.job_no] || {};
+        if (!queryStat.hasOpenQueries) return false;
+      }
+
+      return true;
+    });
+  }, [unfilteredJobs, search, year, month, branch, customHouse, consignmentType, detailedStatus, goodsStuffedAt, pendingQueries, clientQueriesStatus]);
+
+  // In-memory paginated jobs
+  const paginatedJobs = React.useMemo(() => {
+    const startIndex = page * limit;
+    return filteredJobs.slice(startIndex, startIndex + limit);
+  }, [filteredJobs, page, limit]);
+
+  const totalCount = filteredJobs.length;
+  const jobs = paginatedJobs;
 
   // Auto-scroll chat to bottom
   React.useEffect(() => {
@@ -641,7 +856,7 @@ function CExportDSR() {
         throw new Error("Failed to save document.");
       }
 
-      setJobs((prevJobs) =>
+      setUnfilteredJobs((prevJobs) =>
         prevJobs.map((job) => {
           if (job._id && updatedJob._id && job._id === updatedJob._id) return updatedJob;
           if (job.job_no && updatedJob.job_no && job.job_no === updatedJob.job_no) return updatedJob;
@@ -682,7 +897,7 @@ function CExportDSR() {
       );
 
       const updatedJob = response.data?.data || response.data;
-      setJobs((prevJobs) =>
+      setUnfilteredJobs((prevJobs) =>
         prevJobs.map((job) => {
           if (job._id && updatedJob._id && job._id === updatedJob._id) return updatedJob;
           if (job.job_no && updatedJob.job_no && job.job_no === updatedJob.job_no) return updatedJob;
@@ -1555,28 +1770,36 @@ function CExportDSR() {
               }
             }}
           >
-            {STATUS_TABS.map((tab, idx) => (
-              <Tab 
-                key={tab.value} 
-                label={
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {tab.label}
-                    {tabValue === idx && totalCount > 0 && (
-                      <span style={{ 
-                        fontSize: "10px", 
-                        backgroundColor: "#eff6ff", 
-                        color: "#2563eb", 
-                        padding: "1px 6px", 
-                        borderRadius: "10px",
-                        fontWeight: "700"
-                      }}>
-                        {totalCount}
-                      </span>
-                    )}
-                  </Box>
-                } 
-              />
-            ))}
+            {STATUS_TABS.filter((tab) => {
+              const count = tabCounts[tab.value];
+              if (count === undefined) return true;
+              return count > 0 || tabValue === tab.value;
+            }).map((tab) => {
+              const count = tabCounts[tab.value] || 0;
+              return (
+                <Tab 
+                  key={tab.value} 
+                  value={tab.value}
+                  label={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {tab.label}
+                      {count > 0 && (
+                        <span style={{ 
+                          fontSize: "10px", 
+                          backgroundColor: "#eff6ff", 
+                          color: "#2563eb", 
+                          padding: "1px 6px", 
+                          borderRadius: "10px",
+                          fontWeight: "700"
+                        }}>
+                          {count}
+                        </span>
+                      )}
+                    </Box>
+                  } 
+                />
+              );
+            })}
           </Tabs>
         </Box>
       </Paper>
@@ -1600,76 +1823,82 @@ function CExportDSR() {
           }}
         >
           {/* Year dropdown */}
-          <select
-            style={selectStyle}
-            value={year}
-            onChange={(e) => { setYear(e.target.value); setPage(0); }}
-          >
-            <option value="all">All Years</option>
-            <option value="26-27">26-27</option>
-            <option value="25-26">25-26</option>
-            <option value="24-25">24-25</option>
-          </select>
+          {filterOptions.years.length > 1 && (
+            <select
+              style={selectStyle}
+              value={year}
+              onChange={(e) => { setYear(e.target.value); setPage(0); }}
+            >
+              <option value="all">All Years</option>
+              {filterOptions.years.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          )}
 
           {/* Month dropdown */}
-          <select
-            style={selectStyle}
-            value={month}
-            onChange={(e) => { setMonth(e.target.value); setPage(0); }}
-          >
-            <option value="">All Months</option>
-            <option value="04">April</option>
-            <option value="05">May</option>
-            <option value="06">June</option>
-            <option value="07">July</option>
-            <option value="08">August</option>
-            <option value="09">September</option>
-            <option value="10">October</option>
-            <option value="11">November</option>
-            <option value="12">December</option>
-            <option value="01">January</option>
-            <option value="02">February</option>
-            <option value="03">March</option>
-          </select>
+          {filterOptions.months.length > 1 && (
+            <select
+              style={selectStyle}
+              value={month}
+              onChange={(e) => { setMonth(e.target.value); setPage(0); }}
+            >
+              <option value="">All Months</option>
+              {Object.entries({
+                "04": "April", "05": "May", "06": "June", "07": "July",
+                "08": "August", "09": "September", "10": "October", "11": "November",
+                "12": "December", "01": "January", "02": "February", "03": "March"
+              }).filter(([mCode]) => filterOptions.months.includes(mCode))
+                .map(([mCode, mName]) => (
+                  <option key={mCode} value={mCode}>{mName}</option>
+                ))}
+            </select>
+          )}
 
           {/* Branch dropdown */}
-          <select
-            style={selectStyle}
-            value={branch}
-            onChange={(e) => { setBranch(e.target.value); setPage(0); }}
-          >
-            {branchOptions.map(opt => (
-              <option key={opt.code} value={opt.code}>{opt.label}</option>
-            ))}
-          </select>
+          {filterOptions.branches.length > 1 && (
+            <select
+              style={selectStyle}
+              value={branch}
+              onChange={(e) => { setBranch(e.target.value); setPage(0); }}
+            >
+              <option value="">All Branches</option>
+              {branchOptions.filter(opt => opt.code === "" || filterOptions.branches.includes(opt.code)).map(opt => (
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Custom House dropdown */}
-          <select
-            style={selectStyle}
-            value={customHouse}
-            onChange={(e) => { setCustomHouse(e.target.value); setPage(0); }}
-          >
-            <option value="">All Custom Houses</option>
-            {customHousesList.map(ch => (
-              <option key={ch} value={ch}>{ch}</option>
-            ))}
-          </select>
+          {customHousesList.length > 1 && (
+            <select
+              style={selectStyle}
+              value={customHouse}
+              onChange={(e) => { setCustomHouse(e.target.value); setPage(0); }}
+            >
+              <option value="">All Custom Houses</option>
+              {customHousesList.map(ch => (
+                <option key={ch} value={ch}>{ch}</option>
+              ))}
+            </select>
+          )}
 
           {/* Movement Type Filter */}
-          <select
-            style={selectStyle}
-            value={consignmentType}
-            onChange={(e) => { setConsignmentType(e.target.value); setPage(0); }}
-          >
-            {movementTypeOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-
-         
+          {filterOptions.consignmentTypes.length > 1 && (
+            <select
+              style={selectStyle}
+              value={consignmentType}
+              onChange={(e) => { setConsignmentType(e.target.value); setPage(0); }}
+            >
+              <option value="">All Movement</option>
+              {movementTypeOptions.filter(opt => opt.value === "" || filterOptions.consignmentTypes.includes(opt.value)).map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Exporter Filter (if multiple assigned) */}
-          {ieCodeAssignments.length > 0 && (
+          {ieCodeAssignments.length > 1 && (
             <select
               style={{ ...selectStyle, maxWidth: "180px" }}
               value={selectedExporter}
@@ -1685,64 +1914,69 @@ function CExportDSR() {
           )}
 
           {/* Detailed Status Select (Multi-Select) */}
-          <FormControl size="small" sx={{ width: 140, minWidth: 140 }}>
-            <Select
-              multiple
-              value={detailedStatus}
-              onChange={(e) => {
-                const value = e.target.value;
-                setDetailedStatus(typeof value === 'string' ? value.split(',') : value);
-                setPage(0);
-              }}
-              displayEmpty
-              renderValue={(selected) => {
-                if (selected.length === 0) return <em style={{ fontSize: "12px", color: "#64748b", fontStyle: "normal" }}>All Detailed Status</em>;
-                return <span style={{ fontSize: "12px" }}>{selected.join(", ")}</span>;
-              }}
-              sx={{
-                height: 28,
-                bgcolor: "#fff",
-                fontSize: "12px",
-                "& .MuiSelect-select": { py: 0.5, px: 1, display: "flex", alignItems: "center" }
-              }}
-            >
-              {[
-                "Pending",
-                "SB Filed",
-                "L.E.O",
-                "Container HO",
-                "File Handover to IATA",
-                "Rail Out",
-                "Departure",
-                "Billing Pending",
-                "Billing Done",
-              ].map((status) => (
-                <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px" }}>
-                  <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
-                  <span style={{
-                    display: "inline-block",
-                    width: 10, height: 10,
-                    borderRadius: "50%",
-                    backgroundColor: getStatusColor(status),
-                    border: "1px solid #94a3b8",
-                    marginRight: 8
-                  }} />
-                  <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {filterOptions.detailedStatuses.length > 1 && (
+            <FormControl size="small" sx={{ width: 140, minWidth: 140 }}>
+              <Select
+                multiple
+                value={detailedStatus}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDetailedStatus(typeof value === 'string' ? value.split(',') : value);
+                  setPage(0);
+                }}
+                displayEmpty
+                renderValue={(selected) => {
+                  if (selected.length === 0) return <em style={{ fontSize: "12px", color: "#64748b", fontStyle: "normal" }}>All Detailed Status</em>;
+                  return <span style={{ fontSize: "12px" }}>{selected.join(", ")}</span>;
+                }}
+                sx={{
+                  height: 28,
+                  bgcolor: "#fff",
+                  fontSize: "12px",
+                  "& .MuiSelect-select": { py: 0.5, px: 1, display: "flex", alignItems: "center" }
+                }}
+              >
+                {[
+                  "Pending",
+                  "SB Filed",
+                  "L.E.O",
+                  "Container HO",
+                  "File Handover to IATA",
+                  "Rail Out",
+                  "Departure",
+                  "Billing Pending",
+                  "Billing Done",
+                ].filter(status => filterOptions.detailedStatuses.includes(status)).map((status) => (
+                  <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px" }}>
+                    <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
+                    <span style={{
+                      display: "inline-block",
+                      width: 10, height: 10,
+                      borderRadius: "50%",
+                      backgroundColor: getStatusColor(status),
+                      border: "1px solid #94a3b8",
+                      marginRight: 8
+                    }} />
+                    <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           {/* Goods Stuffed At */}
-          <select
-            style={selectStyle}
-            value={goodsStuffedAt}
-            onChange={(e) => { setGoodsStuffedAt(e.target.value); setPage(0); }}
-          >
-            <option value="">All Stuffed At</option>
-            <option value="FACTORY">FACTORY</option>
-            <option value="DOCK">DOCK</option>
-          </select>
+          {filterOptions.goodsStuffedAt.length > 1 && (
+            <select
+              style={selectStyle}
+              value={goodsStuffedAt}
+              onChange={(e) => { setGoodsStuffedAt(e.target.value); setPage(0); }}
+            >
+              <option value="">All Stuffed At</option>
+              {filterOptions.goodsStuffedAt.map(loc => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
+            </select>
+          )}
 
          
 
