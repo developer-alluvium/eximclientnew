@@ -193,6 +193,10 @@ const EWBGenerationModal = ({ open, onClose, lrData, onSuccess }) => {
   };
 
   const fetchDistance = async (fromPin, toPin) => {
+    if (String(fromPin) === "999999" || String(toPin) === "999999") {
+      setFormData(prev => ({ ...prev, transportDistance: "" }));
+      return;
+    }
     try {
       const response = await axios.get(
         `${process.env.REACT_APP_API_STRING}/eway-bill/distance?fromPincode=${fromPin}&toPincode=${toPin}`

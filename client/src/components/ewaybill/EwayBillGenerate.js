@@ -209,6 +209,8 @@ function EwayBillGenerate({
   action = "", // "generate" or "update"
   existingEwb = "",
   prefilledLrId = "", 
+  prefilledDocNo = "",
+  prefilledDocDate = "",
   prData = null, 
   prefilledAssessableValue = null,
   hideTabs = false,
@@ -256,7 +258,7 @@ function EwayBillGenerate({
   const [selectedBoe, setSelectedBoe] = useState(null); // selected from autocomplete
   const [boeNumber, setBoeNumber] = useState('');
   const [boeDate, setBoeDate] = useState(new Date().toISOString().split('T')[0]);
-  const [boeLoading, setBoeLoading] = useState(false);
+  const [boeLoading, setBoeLoading] = useState(!!prefilledDocNo);
   const [boeLrLoading, setBoeLrLoading] = useState(false); // loading for internal LR lookup
   const [boeLrData, setBoeLrData] = useState(null); // internal LR data fetched on BOE select
   const [boeError, setBoeError] = useState('');
@@ -1008,15 +1010,12 @@ function EwayBillGenerate({
       if (boeResponse.status === 'fulfilled') {
         const boeData = boeResponse.value.data;
         if (!boeData || boeData.status === 'error') {
-          // Changed to warning toast as requested
           Swal.fire({
-            icon: 'warning',
+            icon: 'info',
             title: 'BOE Details Not Found',
-            text: 'No details found regarding this boe number so please fill details manually',
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 6000
+            text: 'No details found regarding this BOE number. Please fill details manually.',
+            confirmButtonColor: '#1e40af',
+            confirmButtonText: 'OK'
           });
           setBoeError(''); // Clear red error
           
@@ -1031,15 +1030,12 @@ function EwayBillGenerate({
           populateFromBoe(boeData, lrResponse.status === 'fulfilled' ? lrResponse.value.data?.data : null);
         }
       } else {
-        // External API failed — show yellow warning toast instead of red error
         Swal.fire({
-          icon: 'warning',
-          title: 'External API Unavailable',
-          text: 'No details found regarding this boe number so please fill details manually',
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 6000
+          icon: 'info',
+          title: 'BOE Details Not Found',
+          text: 'No details found regarding this BOE number. Please fill details manually.',
+          confirmButtonColor: '#1e40af',
+          confirmButtonText: 'OK'
         });
         setBoeError(''); // Clear red error
         
@@ -1052,13 +1048,11 @@ function EwayBillGenerate({
     } catch (error) {
       console.error('BOE fetch error:', error);
       Swal.fire({
-        icon: 'warning',
-        title: 'Fetch Error',
-        text: 'No details found regarding this boe number so please fill details manually',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 6000
+        icon: 'info',
+        title: 'BOE Details Not Found',
+        text: 'No details found regarding this BOE number. Please fill details manually.',
+        confirmButtonColor: '#1e40af',
+        confirmButtonText: 'OK'
       });
       setBoeError('');
     } finally {
@@ -1321,7 +1315,7 @@ function EwayBillGenerate({
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2)
           : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummary['TOT.ASS VAL'] || "")),
-        transportDistance: isImport ? 0 : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
+        transportDistance: (isImport || consignorPincode === "999999" || consigneePincode === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
       };
 
       // If we have selected containers, update the first item with combined weight and calculated assessable value
@@ -1713,6 +1707,14 @@ function EwayBillGenerate({
   const fetchDistance = async () => {
     const fromPincode = formData.dispatchFromPincode || formData.consignorPincode;
     const toPincode = formData.shipToPincode || formData.consigneePincode;
+
+    if (String(fromPincode) === "999999" || String(toPincode) === "999999") {
+      setFormData(prev => ({
+        ...prev,
+        transportDistance: ""
+      }));
+      return;
+    }
 
     if (!fromPincode || !toPincode) {
       Swal.fire("Info", "PIN codes not available for distance calculation", "info");
@@ -2768,6 +2770,28 @@ function EwayBillGenerate({
   );
 
   const container = selectedLr?.container_details;
+
+  if (boeLoading) {
+    return (
+      <div className={`ewaybill-container ${asDialog ? 'as-dialog' : ''}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '20px', padding: '40px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '8px' }}>
+        <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <div className="loading-spinner" style={{ width: '50px', height: '50px', border: '4px solid #f3f3f3', borderTop: '4px solid #1e40af', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+        <div>
+          <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: 700 }}>Extracting BOE Details...</h3>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem', maxWidth: '380px' }}>
+            We are extracting the BOE kindly wait for the data. This may take a few seconds — please wait.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`ewaybill-container ${asDialog ? 'as-dialog' : ''}`} style={asDialog ? { padding: '10px 0', margin: 0, boxShadow: 'none' } : {}}>

@@ -442,7 +442,7 @@ function EwayBillGenerateLR({
   const [selectedBoe, setSelectedBoe] = useState(null);
   const [boeNumber, setBoeNumber] = useState('');
   const [boeDate, setBoeDate] = useState(new Date().toISOString().split('T')[0]);
-  const [boeLoading, setBoeLoading] = useState(false);
+  const [boeLoading, setBoeLoading] = useState(!!document_no);
   const [boeLrLoading, setBoeLrLoading] = useState(false);
   const [boeLrData, setBoeLrData] = useState(null);
   const [boeError, setBoeError] = useState('');
@@ -1046,7 +1046,13 @@ function EwayBillGenerateLR({
       if (boeResponse.status === 'fulfilled') {
         const bd = boeResponse.value.data;
         if (!bd || bd.status === 'error') {
-          Swal.fire({ icon: 'warning', title: 'BOE Details Not Found', text: 'No details found regarding this boe number so please fill details manually', toast: true, position: 'top-end', showConfirmButton: false, timer: 6000 });
+          Swal.fire({
+            icon: 'info',
+            title: 'BOE Details Not Found',
+            text: 'No details found regarding this BOE number. Please fill details manually.',
+            confirmButtonColor: '#1e40af',
+            confirmButtonText: 'OK'
+          });
           setBoeError('');
           if (lrResponse.status === 'fulfilled' && lrResponse.value.data?.data) populateFromBoe({}, lrResponse.value.data.data);
         } else {
@@ -1054,13 +1060,25 @@ function EwayBillGenerateLR({
           populateFromBoe(bd, lrResponse.status === 'fulfilled' ? lrResponse.value.data?.data : null);
         }
       } else {
-        Swal.fire({ icon: 'warning', title: 'External API Unavailable', text: 'No details found regarding this boe number so please fill details manually', toast: true, position: 'top-end', showConfirmButton: false, timer: 6000 });
+        Swal.fire({
+          icon: 'info',
+          title: 'BOE Details Not Found',
+          text: 'No details found regarding this BOE number. Please fill details manually.',
+          confirmButtonColor: '#1e40af',
+          confirmButtonText: 'OK'
+        });
         setBoeError('');
         if (lrResponse.status === 'fulfilled' && lrResponse.value.data?.data) populateFromBoe({}, lrResponse.value.data.data);
       }
     } catch (e) {
       console.error('BOE fetch error:', e);
-      Swal.fire({ icon: 'warning', title: 'Fetch Error', text: 'No details found regarding this boe number so please fill details manually', toast: true, position: 'top-end', showConfirmButton: false, timer: 6000 });
+      Swal.fire({
+        icon: 'info',
+        title: 'BOE Details Not Found',
+        text: 'No details found regarding this BOE number. Please fill details manually.',
+        confirmButtonColor: '#1e40af',
+        confirmButtonText: 'OK'
+      });
       setBoeError('');
     } finally { setBoeLoading(false); }
   };
@@ -1218,7 +1236,7 @@ function EwayBillGenerateLR({
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2) 
           : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummaryData['TOT.ASS VAL'] || "")),
-        transportDistance: isImport ? 0 : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
+        transportDistance: (isImport || cSignorPin === "999999" || cSigneePin === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
       };
       if (totalSelectedWeight > 0 && res.items?.length > 0) { 
         res.items[0].quantity = totalSelectedWeight; 
@@ -1228,8 +1246,8 @@ function EwayBillGenerateLR({
         res.items[0].quantity = totalGW || res.items[0].quantity || 1;
       }
       if (prefilledAssessableValue && prefilledAssessableValue > 0) { res.totalInvoiceValue = prefilledAssessableValue; if (res.items?.length > 0) res.items[0].taxableAmount = prefilledAssessableValue; }
-      if (res.consignorName.toLowerCase().includes("suraj") || detectedMode === 'import' || res.consignorState === "Other Countries" || res.consignorState === "Other Territory") { res.consignorGstin = "URP"; res.consignorPincode = "999999"; res.dispatchFromPincode = "999999"; }
-      if (res.consigneeName.toLowerCase().includes("suraj") || detectedMode === 'export' || res.consigneeState === "Other Countries" || res.consigneeState === "Other Territory") { res.consigneeGstin = "URP"; res.consigneePincode = "999999"; res.shipToPincode = "999999"; }
+      if (res.consignorName.toLowerCase().includes("suraj") || detectedMode === 'import' || res.consignorState === "Other Countries" || res.consignorState === "Other Territory") { res.consignorGstin = "URP"; res.consignorPincode = "999999"; res.dispatchFromPincode = "999999"; res.transportDistance = ""; }
+      if (res.consigneeName.toLowerCase().includes("suraj") || detectedMode === 'export' || res.consigneeState === "Other Countries" || res.consigneeState === "Other Territory") { res.consigneeGstin = "URP"; res.consigneePincode = "999999"; res.shipToPincode = "999999"; res.transportDistance = ""; }
       return res;
     });
   };
@@ -1402,6 +1420,10 @@ function EwayBillGenerateLR({
   const fetchDistance = async () => {
     const fromPincode = formData.dispatchFromPincode || formData.consignorPincode;
     const toPincode = formData.shipToPincode || formData.consigneePincode;
+    if (String(fromPincode) === "999999" || String(toPincode) === "999999") {
+      setFormData(prev => ({ ...prev, transportDistance: "" }));
+      return;
+    }
     if (!fromPincode || !toPincode) { Swal.fire("Info", "PIN codes not available for distance calculation", "info"); return; }
     try {
       const r = await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/distance?fromPincode=${fromPincode}&toPincode=${toPincode}`);
@@ -2364,7 +2386,31 @@ function EwayBillGenerateLR({
     );
   };
 
-  // ── Main render ────────────────────────────────────────────────────────────
+  if (boeLoading) {
+    return (
+      <div className={`ewb-wrap${asDialog ? ' as-dialog' : ''}`}>
+        <style>{FLAT_STYLES}</style>
+        <div className="ewb-form" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '20px', padding: '40px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '8px' }}>
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <div className="ewb-spinner" style={{ width: '50px', height: '50px', border: '4px solid #f3f3f3', borderTop: '4px solid #1e40af', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+          <div>
+            <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: 700 }}>Extracting BOE Details...</h3>
+            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem', maxWidth: '380px' }}>
+              We are extracting the BOE kindly wait for the data. This may take a few seconds — please wait.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const container = selectedLr?.container_details;
 
   return (

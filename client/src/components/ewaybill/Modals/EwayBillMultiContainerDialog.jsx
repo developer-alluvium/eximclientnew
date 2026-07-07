@@ -67,14 +67,25 @@ const EwayBillMultiContainerDialog = ({ open, onClose, prData, containers, onSuc
   // Is this a single-container scenario?
   const isSingleContainer = activeContainers.length === 1;
 
+  const pending = useMemo(
+    () => activeContainers.filter((c) => !c.eWay_bill || c.eWay_bill === ""),
+    [activeContainers]
+  );
+  const pendingIds = useMemo(() => pending.map((c) => c._id), [pending]);
+  const allPendingSelected = useMemo(
+    () => pendingIds.length > 0 && pendingIds.every((id) => selectedIds.includes(id)),
+    [pendingIds, selectedIds]
+  );
+
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      // Auto-select all for single container
+      // Auto-select pending containers (those without an existing e-way bill number)
       if (isSingleContainer) {
-        setSelectedIds([activeContainers[0]?._id]);
+        const hasEwb = activeContainers[0]?.eWay_bill && activeContainers[0]?.eWay_bill !== "";
+        setSelectedIds(hasEwb ? [] : [activeContainers[0]?._id]);
       } else {
-        setSelectedIds([]);
+        setSelectedIds(pendingIds);
       }
       setStep("select");
       setBoeCalcData(null);
@@ -82,7 +93,7 @@ const EwayBillMultiContainerDialog = ({ open, onClose, prData, containers, onSuc
       setUserWeights({});
       setEwbDialogData(null);
     }
-  }, [open, isSingleContainer, activeContainers]);
+  }, [open, isSingleContainer, activeContainers, pendingIds]);
 
   // --- Selection Handlers ---
   const toggleContainer = (id) => {
@@ -92,10 +103,12 @@ const EwayBillMultiContainerDialog = ({ open, onClose, prData, containers, onSuc
   };
 
   const toggleAll = () => {
-    if (selectedIds.length === activeContainers.length) {
-      setSelectedIds([]);
+    if (allPendingSelected) {
+      // Deselect all pending
+      setSelectedIds((prev) => prev.filter((id) => !pendingIds.includes(id)));
     } else {
-      setSelectedIds(activeContainers.map((c) => c._id));
+      // Select all pending
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pendingIds])));
     }
   };
 
@@ -352,8 +365,8 @@ const EwayBillMultiContainerDialog = ({ open, onClose, prData, containers, onSuc
                 <TableRow sx={{ bgcolor: "#f1f5f9" }}>
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={allSelected && activeContainers.length > 0}
-                      indeterminate={selectedIds.length > 0 && !allSelected}
+                      checked={allPendingSelected && pending.length > 0}
+                      indeterminate={selectedIds.some((id) => pendingIds.includes(id)) && !allPendingSelected}
                       onChange={toggleAll}
                       size="small"
                     />

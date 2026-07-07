@@ -9,7 +9,7 @@ import BEStatusModal from "../customHooks/BeStatus"; // Import the modal compone
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PartAEwayBillModal from "./ewaybill/Modals/PartAEwayBillModal";
 import EwayBillActionModal from "./ewaybill/Modals/EwayBillActionModal";
-import { allContainersHaveEwb } from "./ewaybill/ewbContainerCoverage";
+import { allContainersHaveEwb, getExistingEwbForContainer } from "./ewaybill/ewbContainerCoverage";
 import Swal from "sweetalert2";
 
 const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
@@ -299,6 +299,7 @@ const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
 
 const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, onViewExisting }) => {
   const hasExistingEwbs = containers?.some(container => container.ewaybill_no);
+  const allContainersHaveEwb = containers?.length > 0 && containers.every(container => container.ewaybill_no);
   
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -307,7 +308,7 @@ const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, o
           Container E-Way Bill Status
         </Typography>
       </DialogTitle>
-
+ 
       <DialogContent sx={{ p: 3, bgcolor: "#f8fafc" }}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
           {containers?.map((container, index) => {
@@ -341,7 +342,7 @@ const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, o
           })}
         </Box>
       </DialogContent>
-
+ 
       <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #e2e8f0", bgcolor: "#ffffff", justifyContent: "space-between" }}>
         <Button onClick={onClose} variant="outlined" color="inherit" sx={{ textTransform: "none", fontWeight: 600 }}>
           Cancel
@@ -365,13 +366,15 @@ const ContainerEwaybillStatusModal = ({ open, onClose, onContinue, containers, o
               View Existing E-Way Bills
             </Button>
           )}
-          <Button
-            onClick={onContinue}
-            variant="contained"
-            sx={{ bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" }, textTransform: "none", fontWeight: 700 }}
-          >
-            Continue to Generate
-          </Button>
+          {!allContainersHaveEwb && (
+            <Button
+              onClick={onContinue}
+              variant="contained"
+              sx={{ bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" }, textTransform: "none", fontWeight: 700 }}
+            >
+              Continue to Generate
+            </Button>
+          )}
         </Box>
       </DialogActions>
     </Dialog>
@@ -397,6 +400,7 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
   const [selectedEwb, setSelectedEwb] = useState(null);
   const [prefetchedEwbList, setPrefetchedEwbList] = useState([]);
   const [isContainerEwaybillStatusModalOpen, setIsContainerEwaybillStatusModalOpen] = useState(false);
+  const [updatedContainersList, setUpdatedContainersList] = useState([]);
 
   const formatDate = useCallback((dateStr) => {
     const date = new Date(dateStr);
@@ -460,13 +464,75 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
     setModalOpen(true);
   };
 
-  const handleEwayBillClick = (event) => {
-    event.stopPropagation();
+  const handleEwayBillClick = async (event) => {
+    if (event) event.stopPropagation();
     if (!beNumber) {
       Swal.fire("Error", "No Bill of Entry (BE No) or Document No found.", "error");
       return;
     }
-    setIsContainerEwaybillStatusModalOpen(true);
+
+    try {
+      Swal.fire({
+        title: "Extracting BOE...",
+        html: `<div style="font-weight: 600; color: #1e293b; margin-top: 10px;">We are extracting the BOE kindly wait for the data</div>`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 1. Fetch latest E-Way Bills on file for this BE Number
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(beNumber)}`
+      );
+
+      // 2. Pre-fetch/cache BOE calculation details from backend
+      let docDate = "";
+      if (rawBeDate) {
+        try {
+          const d = new Date(rawBeDate);
+          if (!isNaN(d.getTime())) {
+            docDate = d.toISOString().split("T")[0];
+          }
+        } catch (_) {}
+      }
+      if (!docDate) {
+        docDate = new Date().toISOString().split("T")[0];
+      }
+
+      try {
+        await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-value-calc?document_no=${encodeURIComponent(beNumber)}&be_date=${docDate}`);
+      } catch (e) {
+        console.warn("BOE calc prefetch warning:", e);
+      }
+
+      Swal.close();
+
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const fetchedEwbs = res.data.data;
+        setPrefetchedEwbList(fetchedEwbs);
+
+        const origContainers = cell.row.original.container_nos || [];
+        const mapped = origContainers.map((c) => {
+          const matchingEwb = getExistingEwbForContainer(c, fetchedEwbs, beNumber);
+          return {
+            ...c,
+            ewaybill_no: matchingEwb ? matchingEwb.ewbNo : null,
+          };
+        });
+
+        setUpdatedContainersList(mapped);
+      } else {
+        setUpdatedContainersList(cell.row.original.container_nos || []);
+      }
+
+      setIsContainerEwaybillStatusModalOpen(true);
+    } catch (err) {
+      console.error("Error extracting BOE:", err);
+      Swal.close();
+      Swal.fire("Error", "Failed to extract BOE details. Please try again.", "error");
+    }
   };
 
   const handleContinueToGenerate = () => {
@@ -759,7 +825,7 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
         open={isContainerEwaybillStatusModalOpen}
         onClose={() => setIsContainerEwaybillStatusModalOpen(false)}
         onContinue={handleContinueToGenerate}
-        containers={cell.row.original.container_nos}
+        containers={updatedContainersList}
         onViewExisting={(list) => {
           setIsContainerEwaybillStatusModalOpen(false);
           setSelectedEwb(list);
@@ -784,9 +850,10 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
           setSelectedEwb(list);
           setIsActionModalOpen(true);
         }}
-        onSuccess={() => {
+        onSuccess={async () => {
           setIsPartAEwayBillDialogOpen(false);
           setPrefetchedEwbList([]);
+          await handleEwayBillClick();
           if (onEwayBillSuccess) {
             onEwayBillSuccess();
           }
