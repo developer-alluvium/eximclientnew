@@ -237,6 +237,8 @@ function CExportDSR() {
 
   // Exporters list from user assignments
   const ieCodeAssignments = React.useMemo(() => {
+    const list = user?.exporter_ie_code_assignments || [];
+    if (list.length > 0) return list;
     return user?.exporter_ie_code_assignments || [];
   }, [user]);
 
@@ -2454,7 +2456,7 @@ function CExportDSR() {
                                   color: msg.align === "right" ? "#15803d" : "#3f51b5",
                                   marginBottom: "3px"
                                 }}>
-                                  {msg.senderName} {msg.senderEmail ? `(${msg.senderEmail})` : ""} {msg.senderUsername ? `[${msg.senderUsername}]` : ""}
+                                  {msg.senderName}
                                 </div>
                                 
                                 {/* Subject Header */}
