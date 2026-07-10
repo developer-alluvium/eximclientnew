@@ -13,9 +13,6 @@ import {
   TableHead,
   TableRow,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
   IconButton,
   Chip,
   Tooltip,
@@ -24,15 +21,14 @@ import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import CancelIcon from "@mui/icons-material/Cancel";
-import CloseIcon from "@mui/icons-material/Close";
-import VisibilityIcon from "@mui/icons-material/Visibility";
+
 import PartAEwayBillModal from "./Modals/PartAEwayBillModal";
 
 function OthersEwayBillTab() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState(null);
   
   // Generation Modal State
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -320,98 +316,9 @@ function OthersEwayBillTab() {
     }
   };
 
-  const handleCancelEwayBill = async (record) => {
-    const ewbList = (record.containers || []).filter(
-      (c) => c.ewayBillStatus === "Generated" && c.ewayBillNo
-    );
-
-    let targetEwbNo = record.ewayBillNo;
-
-    if (ewbList.length > 1) {
-      // Prompt user to select which container's E-Way Bill to cancel
-      const inputOptions = {};
-      ewbList.forEach((ewb) => {
-        inputOptions[ewb.ewayBillNo] = `${ewb.containerNumber} (EWB: ${ewb.ewayBillNo})`;
-      });
-
-      const { value: selectedEwb } = await Swal.fire({
-        title: "Select E-Way Bill to Cancel",
-        input: "select",
-        inputOptions,
-        inputPlaceholder: "Select E-Way Bill",
-        showCancelButton: true,
-      });
-
-      if (!selectedEwb) return;
-      targetEwbNo = selectedEwb;
-    }
-
-    if (!targetEwbNo) return;
-
-    const { value: formValues } = await Swal.fire({
-      title: `Cancel E-Way Bill ${targetEwbNo}`,
-      html:
-        '<select id="cancel-reason" class="swal2-select" style="display:flex; width:80%; margin:10px auto;">' +
-        '<option value="1">1 - Duplicate</option>' +
-        '<option value="2">2 - Order Cancelled</option>' +
-        '<option value="3">3 - Data Entry Mistake</option>' +
-        '<option value="4">4 - Others</option>' +
-        "</select>" +
-        '<input id="cancel-remarks" class="swal2-input" placeholder="Remarks (minimum 3 characters)" style="width:80%; margin:10px auto;">',
-      focusConfirm: false,
-      showCancelButton: true,
-      preConfirm: () => {
-        const reason = document.getElementById("cancel-reason").value;
-        const remarks = document.getElementById("cancel-remarks").value;
-        if (!remarks || remarks.trim().length < 3) {
-          Swal.showValidationMessage("Remarks must be at least 3 characters long");
-          return false;
-        }
-        return { reason, remarks };
-      },
-    });
-
-    if (!formValues) return;
-
-    try {
-      Swal.fire({
-        title: "Cancelling E-Way Bill...",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-      });
-
-      // Proxy cancellation to Masters India
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_STRING}/eway-bill/cancel`,
-        {
-          ewayBillNo: targetEwbNo,
-          cancelReasonCode: parseInt(formValues.reason),
-          cancelRemarks: formValues.remarks,
-        }
-      );
-
-      if (response.data?.success) {
-        // Update local database record status
-        await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/others/update-cancellation`, {
-          otherEwayBillId: record._id,
-          ewayBillNo: targetEwbNo,
-        });
-
-        Swal.fire("Cancelled", `E-Way Bill ${targetEwbNo} cancelled successfully.`, "success");
-        fetchList();
-      } else {
-        throw new Error(response.data?.message || "Failed to cancel E-Way Bill");
-      }
-    } catch (err) {
-      console.error("Cancellation error:", err);
-      Swal.fire(
-        "Cancellation Failed",
-        err.response?.data?.message || err.message || "Failed to cancel E-Way Bill",
-        "error"
-      );
-    }
+  const handleViewBoePdf = (pdfUrl) => {
+    if (!pdfUrl) return;
+    window.open(pdfUrl, "_blank");
   };
 
   const handleDeleteRecord = async (record) => {
@@ -557,7 +464,6 @@ function OthersEwayBillTab() {
             >
               <TableRow>
                 <TableCell>BOE Number</TableCell>
-                <TableCell>Job Number</TableCell>
                 <TableCell>Containers</TableCell>
                 <TableCell>BOE Date</TableCell>
                 <TableCell>Upload Date</TableCell>
@@ -568,25 +474,33 @@ function OthersEwayBillTab() {
             </TableHead>
             <TableBody>
               {list.map((row) => (
-                <TableRow key={row._id} sx={{ "&:hover": { bgcolor: "#f1f5f9" } }}>
-                  <TableCell sx={{ fontWeight: 600, color: "#0f172a" }}>
+                <TableRow
+                  key={row._id}
+                  selected={selectedRowId === row._id}
+                  onClick={() => setSelectedRowId(row._id)}
+                  sx={{
+                    "&:hover": { bgcolor: "#eef2ff" },
+                    "&.Mui-selected": {
+                      bgcolor: "#e0e7ff !important",
+                      outline: "2px solid #6366f1",
+                      outlineOffset: -1,
+                    },
+                    "&.Mui-selected:hover": {
+                      bgcolor: "#c7d2fe !important",
+                    },
+                  }}
+                >
+                  <TableCell
+                    sx={{ fontWeight: 700, color: "#4338ca", cursor: row.pdfUrl ? "pointer" : "default" }}
+                    onClick={() => {
+                      if (row.pdfUrl) handleViewBoePdf(row.pdfUrl);
+                    }}
+                  >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {row.boeNumber || "—"}
-                      {row.pdfUrl && (
-                        <Tooltip title="View Uploaded BOE PDF">
-                          <IconButton size="small" onClick={() => handleDownloadPdf(row.pdfUrl)}>
-                            <VisibilityIcon fontSize="inherit" color="action" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <span style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>
+                        {row.boeNumber || "—"}
+                      </span>
                     </Box>
-                  </TableCell>
-                  <TableCell>
-                    {row.jobNo ? (
-                      <span style={{ color: "#2563eb", fontWeight: 600 }}>{row.jobNo}</span>
-                    ) : (
-                      <span style={{ color: "#94a3b8" }}>No Match</span>
-                    )}
                   </TableCell>
                   <TableCell>{renderContainersCell(row)}</TableCell>
                   <TableCell>{row.boeDate ? new Date(row.boeDate).toLocaleDateString() : "—"}</TableCell>
@@ -610,20 +524,6 @@ function OthersEwayBillTab() {
                           }}
                         >
                           Generate
-                        </Button>
-                      )}
-
-                      {/* Show Cancel button if Generated or Partially Generated */}
-                      {(row.ewayBillStatus === "Generated" || row.ewayBillStatus === "Partially Generated") && (
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          size="small"
-                          startIcon={<CancelIcon />}
-                          onClick={() => handleCancelEwayBill(row)}
-                          sx={{ textTransform: "none", borderRadius: 1.5 }}
-                        >
-                          Cancel EWB
                         </Button>
                       )}
 

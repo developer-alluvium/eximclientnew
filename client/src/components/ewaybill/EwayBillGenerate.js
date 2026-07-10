@@ -480,7 +480,7 @@ function EwayBillGenerate({
         );
 
         // Fetch BOE automatically to pull assessable value and items
-        if (boeNumber && !autoFetchedBoe) {
+        if (boeNumber && !autoFetchedBoe && !boeData) {
           setAutoFetchedBoe(true);
           handleBoeFetch();
         }
