@@ -456,7 +456,7 @@ function OthersEwayBillTab() {
             <TableHead
               sx={{
                 bgcolor: "#f8fafc",
-                "& .MuiTableCell-head": {
+                "& .MuiTableRow-root .MuiTableCell-head": {
                   color: "#000000 !important",
                   fontWeight: "700 !important",
                 },
