@@ -28,7 +28,7 @@ const otherEwayBillSchema = new mongoose.Schema(
       ref: "Job",
     },
     jobNo: { type: String, trim: true },
-    boeNumber: { type: String, trim: true },
+    boeNumber: { type: String, trim: true, unique: true },
     boeDate: { type: Date },
     pdfUrl: { type: String, trim: true },
     pdfKey: { type: String, trim: true },

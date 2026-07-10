@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 import transportAuthService from "../services/transportAuthService.js";
 import OtherEwayBill from "../models/otherEwayBillModel.js";
 import Job from "../models/jobModel.js";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -151,6 +151,34 @@ const pdfProxyHandler = async (req, res) => {
   if (!targetUrl.startsWith("http")) targetUrl = `https://${targetUrl}`;
 
   try {
+    const bucketName = process.env.REACT_APP_S3_BUCKET;
+    if (bucketName && targetUrl.includes(bucketName)) {
+      // It's our S3 bucket. Extract key.
+      const s3Marker = ".amazonaws.com/";
+      const markerIndex = targetUrl.indexOf(s3Marker);
+      if (markerIndex !== -1) {
+        const key = decodeURIComponent(targetUrl.substring(markerIndex + s3Marker.length));
+        try {
+          const s3Response = await s3.send(new GetObjectCommand({
+            Bucket: bucketName,
+            Key: key
+          }));
+          
+          res.setHeader("Content-Type", s3Response.ContentType || "application/pdf");
+          res.setHeader("Content-Disposition", "attachment");
+          if (s3Response.ContentLength) {
+            res.setHeader("Content-Length", s3Response.ContentLength);
+          }
+          
+          s3Response.Body.pipe(res);
+          return;
+        } catch (s3Err) {
+          console.error("[pdf-proxy] S3 fetch error:", s3Err.message);
+          return res.status(502).json({ success: false, message: `Failed to fetch S3 object: ${s3Err.message}` });
+        }
+      }
+    }
+
     const serviceToken = await transportAuthService.getServiceToken();
     const headers = {};
     if (serviceToken) headers.Authorization = `Bearer ${serviceToken}`;
@@ -185,8 +213,8 @@ const pdfProxyHandler = async (req, res) => {
   }
 };
 
-router.get("/pdf-proxy", pdfProxyHandler);
-router.get("/proxy-pdf", pdfProxyHandler); // backward compatibility
+router.get("/pdf-proxy", authenticateUser, pdfProxyHandler);
+router.get("/proxy-pdf", authenticateUser, pdfProxyHandler); // backward compatibility
 
 // Initialize S3 Client
 const s3 = new S3Client({
@@ -204,27 +232,20 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
       return res.status(400).json({ success: false, message: "No file provided" });
     }
 
+    // File type validation (must be PDF)
+    if (req.file.mimetype !== "application/pdf" && !req.file.originalname.toLowerCase().endsWith(".pdf")) {
+      return res.status(400).json({ success: false, message: "Invalid file type. Only PDF files are allowed." });
+    }
+
+    // File size validation (limit to 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > MAX_SIZE) {
+      return res.status(400).json({ success: false, message: "File is too large. Maximum allowed size is 10MB." });
+    }
+
     const file = req.file;
-    const timestamp = Date.now();
-    const originalName = file.originalname;
-    const extension = originalName.substring(originalName.lastIndexOf("."));
-    const baseName = originalName.substring(0, originalName.lastIndexOf("."));
-    const uniqueFileName = `${baseName}-${timestamp}${extension}`;
-    const key = `others-boe/${uniqueFileName}`;
 
-    // Upload to S3
-    const params = {
-      Bucket: process.env.REACT_APP_S3_BUCKET,
-      Key: key,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    };
-    const command = new PutObjectCommand(params);
-    await s3.send(command);
-
-    const s3Url = `https://${process.env.REACT_APP_S3_BUCKET}.s3.${process.env.REACT_APP_AWS_REGION}.amazonaws.com/${key}`;
-
-    // Call external parser API
+    // ── STEP 1: Parse the PDF first (before any S3 upload) ────────────────
     const BOE_API_BASE = process.env.BOE_API_BASE_URL || "http://3.108.244.38:8002/api/v1";
     const form = new FormData();
     form.append("files", file.buffer, {
@@ -232,7 +253,7 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
       contentType: file.mimetype,
     });
 
-    console.log(`📡 [Others Upload] Sending file buffer to parser: ${BOE_API_BASE}/upload`);
+    console.log(`📡 [Others Upload] Sending file to parser: ${BOE_API_BASE}/upload`);
     const parserResponse = await axios.post(`${BOE_API_BASE}/upload`, form, {
       headers: { ...form.getHeaders() },
       timeout: 60000,
@@ -255,6 +276,47 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     const boeNumber = importerDetails["BE No"] || importerDetails["BE_NO"] || invoiceDetails.BE_NO || invoiceDetails.document_no || boeRecord.documentNumber || "";
     const rawBoeDate = importerDetails["BE Date"] || importerDetails["BE_DATE"] || invoiceDetails.BE_DATE || invoiceDetails.document_date || "";
 
+    const normalizedBoeNumber = boeNumber.trim();
+    const effectiveClientId = (req.user.adminId?._id || req.user.adminId || req.user._id)?.toString();
+
+    console.log(`📋 [Others Upload] Parsed — boeNumber: "${normalizedBoeNumber}", clientId: ${effectiveClientId}`);
+
+    // ── STEP 2: Duplicate check BEFORE any S3 upload ──────────────────────
+    // boeNumber is globally unique in the OtherEwayBill collection (no clientId filter)
+    if (normalizedBoeNumber) {
+      const existingRecord = await OtherEwayBill.findOne({
+        boeNumber: normalizedBoeNumber,
+      }).populate("clientId", "name email").lean();
+
+      console.log(`🔍 [Others Upload] Duplicate check: ${existingRecord ? `FOUND existing record (id=${existingRecord._id}, status=${existingRecord.ewayBillStatus})` : "not found — OK to proceed"}`);
+
+      if (existingRecord) {
+        const uploadedByName = existingRecord.clientId?.name || "another account";
+        return res.status(400).json({
+          success: false,
+          message: `Bill of Entry ${normalizedBoeNumber} has already been registered by ${uploadedByName}. It cannot be uploaded again.`
+        });
+      }
+    }
+
+    // ── STEP 3: Only now upload to S3 (duplicate cleared) ─────────────────
+    const timestamp = Date.now();
+    const originalName = file.originalname;
+    const extension = originalName.substring(originalName.lastIndexOf("."));
+    const baseName = originalName.substring(0, originalName.lastIndexOf("."));
+    const uniqueFileName = `${baseName}-${timestamp}${extension}`;
+    const key = `others-boe/${uniqueFileName}`;
+
+    const s3Params = {
+      Bucket: process.env.REACT_APP_S3_BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    };
+    await s3.send(new PutObjectCommand(s3Params));
+    const s3Url = `https://${process.env.REACT_APP_S3_BUCKET}.s3.${process.env.REACT_APP_AWS_REGION}.amazonaws.com/${key}`;
+
+    // Parse BOE date
     let boeDate = null;
     if (rawBoeDate) {
       if (rawBoeDate.includes("/")) {
@@ -262,46 +324,45 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
         if (parts.length === 3) {
           const formatted = `${parts[2].length === 2 ? "20" + parts[2] : parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
           const d = new Date(formatted);
-          if (!isNaN(d.getTime())) {
-            boeDate = d;
-          }
+          if (!isNaN(d.getTime())) boeDate = d;
         }
       } else {
         const d = new Date(rawBoeDate);
-        if (!isNaN(d.getTime())) {
-          boeDate = d;
-        }
+        if (!isNaN(d.getTime())) boeDate = d;
       }
     }
 
-    // Try to find matching job in local database
+    // ── STEP 4: Try to find matching Job ───────────────────────────────────
     let job = null;
-    if (boeNumber) {
+    if (normalizedBoeNumber) {
       try {
-        job = await Job.findOne({ be_no: { $regex: new RegExp(`^${boeNumber.trim()}$`, "i") } });
+        job = await Job.findOne({ be_no: { $regex: new RegExp(`^${normalizedBoeNumber}$`, "i") } });
       } catch (jobErr) {
         console.warn("⚠️ Failed to check matching Job:", jobErr.message);
       }
     }
 
-    // Fetch enriched details from boe-extract
+    // ── STEP 5: Enrich with boe-extract (fetches NIC item details, duties, etc.) ─
+    // This data is stored in parsedData and passed as boeData prop to EwayBillGenerate,
+    // so the frontend REUSES this saved data and does NOT need to call boe-extract again.
     let enrichedData = boeRecord;
-    if (boeNumber) {
+    if (normalizedBoeNumber) {
       try {
         const dateStr = boeDate ? boeDate.toISOString().split("T")[0] : "";
         const serviceToken = await transportAuthService.getServiceToken();
         const targetBase = getTargetUrl();
-        console.log(`📡 [Others Upload] Querying boe-extract from: ${targetBase}/boe-extract for doc: ${boeNumber} date: ${dateStr}`);
+        console.log(`📡 [Others Upload] Enriching with boe-extract for: ${normalizedBoeNumber} (${dateStr})`);
         const enrichRes = await axios.get(`${targetBase}/boe-extract`, {
-          params: { be_no: boeNumber, be_date: dateStr },
+          params: { be_no: normalizedBoeNumber, be_date: dateStr },
           headers: serviceToken ? { Authorization: `Bearer ${serviceToken}` } : {},
           timeout: 20000,
         });
         if (enrichRes.data && enrichRes.data.success !== false) {
           enrichedData = enrichRes.data;
+          console.log("✅ [Others Upload] boe-extract enrichment successful — data saved to record (no repeat call needed)");
         }
       } catch (enrichErr) {
-        console.warn("⚠️ Failed to enrich BOE details with Job/PrData:", enrichErr.message);
+        console.warn("⚠️ [Others Upload] boe-extract enrichment failed (non-critical):", enrichErr.message);
       }
     }
 
@@ -309,22 +370,20 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     const containerDetails = boeDetailForConts.ContainerDetails || [];
     const containers = containerDetails.map(bc => {
       const cNo = bc["CONTAINER NUMBER"] || bc.ContainerNo || bc.container_number || bc.CONTR_NO || bc.CONTR || bc.containerNo || "";
-      return {
-        containerNumber: cNo.trim(),
-        ewayBillStatus: "Pending"
-      };
+      return { containerNumber: cNo.trim(), ewayBillStatus: "Pending" };
     }).filter(c => c.containerNumber);
 
+    // ── STEP 6: Save record ────────────────────────────────────────────────
     const otherEwb = new OtherEwayBill({
-      clientId: req.user.adminId || req.user._id,
+      clientId: effectiveClientId,
       uploadedBy: req.user._id,
       jobId: job ? job._id : undefined,
       jobNo: job ? job.job_no : undefined,
-      boeNumber,
+      boeNumber: normalizedBoeNumber,
       boeDate,
       pdfUrl: s3Url,
       pdfKey: key,
-      parsedData: enrichedData,
+      parsedData: enrichedData,   // ← Saved here so frontend reuses it; no second boe-extract call needed
       containers,
       ewayBillStatus: "Pending",
     });
@@ -333,13 +392,22 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     res.status(200).json({ success: true, data: otherEwb });
   } catch (error) {
     console.error("Error in others/upload-boe:", error.response?.data || error.message);
+    // MongoDB duplicate key error (unique index on clientId + boeNumber)
+    if (error.code === 11000) {
+      const boe = error.keyValue?.boeNumber || "";
+      return res.status(400).json({
+        success: false,
+        message: `Bill of Entry ${boe} has already been uploaded and is active. Please generate the E-Way Bill from the existing entry in the list.`,
+      });
+    }
     res.status(500).json({ success: false, message: error.message || "Failed to process BOE upload" });
   }
 });
 
 router.get("/others/list", authenticateUser, async (req, res) => {
   try {
-    const query = req.user.role === "superadmin" ? {} : { clientId: req.user.adminId || req.user._id };
+    const effectiveClientId = (req.user.adminId?._id || req.user.adminId || req.user._id)?.toString();
+    const query = req.user.role === "superadmin" ? {} : { clientId: effectiveClientId };
     const list = await OtherEwayBill.find(query).sort({ createdAt: -1 });
 
     // Auto-heal / migrate any legacy records with empty containers array
@@ -418,9 +486,10 @@ router.post("/others/update-status", authenticateUser, async (req, res) => {
       return res.status(400).json({ success: false, message: "otherEwayBillId is required" });
     }
 
-    const record = await OtherEwayBill.findById(otherEwayBillId);
+    const query = req.user.role === "superadmin" ? { _id: otherEwayBillId } : { _id: otherEwayBillId, clientId: req.user.adminId?._id || req.user.adminId || req.user._id };
+    const record = await OtherEwayBill.findOne(query);
     if (!record) {
-      return res.status(404).json({ success: false, message: "Record not found" });
+      return res.status(404).json({ success: false, message: "Record not found or unauthorized" });
     }
 
     // Legacy fallback: if containers array is empty, initialize it on the fly
@@ -512,9 +581,10 @@ router.post("/others/update-cancellation", authenticateUser, async (req, res) =>
       return res.status(400).json({ success: false, message: "otherEwayBillId is required" });
     }
 
-    const record = await OtherEwayBill.findById(otherEwayBillId);
+    const query = req.user.role === "superadmin" ? { _id: otherEwayBillId } : { _id: otherEwayBillId, clientId: req.user.adminId?._id || req.user.adminId || req.user._id };
+    const record = await OtherEwayBill.findOne(query);
     if (!record) {
-      return res.status(404).json({ success: false, message: "Record not found" });
+      return res.status(404).json({ success: false, message: "Record not found or unauthorized" });
     }
 
     if (ewayBillNo) {
@@ -583,9 +653,10 @@ router.post("/others/update-cancellation", authenticateUser, async (req, res) =>
 
 router.delete("/others/:id", authenticateUser, async (req, res) => {
   try {
-    const deleted = await OtherEwayBill.findByIdAndDelete(req.params.id);
+    const query = req.user.role === "superadmin" ? { _id: req.params.id } : { _id: req.params.id, clientId: req.user.adminId?._id || req.user.adminId || req.user._id };
+    const deleted = await OtherEwayBill.findOneAndDelete(query);
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Record not found" });
+      return res.status(404).json({ success: false, message: "Record not found or unauthorized to delete" });
     }
     res.status(200).json({ success: true, message: "Record deleted successfully" });
   } catch (error) {
@@ -595,6 +666,6 @@ router.delete("/others/:id", authenticateUser, async (req, res) => {
 });
 
 // Define routes
-router.use(multipartHandler, proxyRequest);
+router.use(authenticateUser, multipartHandler, proxyRequest);
 
 export default router;

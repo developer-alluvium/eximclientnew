@@ -310,12 +310,6 @@ function OthersEwayBillTab() {
         ewayBillData: results,
       });
 
-      Swal.fire({
-        icon: "success",
-        title: "E-Way Bill Generated",
-        text: `E-Way Bill number ${ewbNo || "N/A"} has been generated successfully!`,
-        timer: 3000,
-      });
       fetchList();
       handleCloseGenerate();
     } catch (err) {
@@ -445,10 +439,24 @@ function OthersEwayBillTab() {
     });
   };
 
-  const handleDownloadPdf = (pdfUrl) => {
+  const handleDownloadPdf = async (pdfUrl) => {
     if (!pdfUrl) return;
-    const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
-    window.open(proxyUrl, "_blank");
+    try {
+      const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
+      const response = await axios.get(proxyUrl, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `EWB_BOE_PDF.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      Swal.fire("Error", "Failed to download PDF", "error");
+    }
   };
 
   const getStatusChip = (status) => {

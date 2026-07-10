@@ -891,13 +891,8 @@ const LrEwayBillDialog = ({
     try {
       // Fetch via server-side proxy to avoid CORS / binary encoding issues
       const proxyUrl = `${process.env.REACT_APP_API_STRING}/eway-bill/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`;
-      const res = await fetch(proxyUrl, { credentials: "include" });
-      if (!res.ok) {
-        let errMsg = "Failed to download PDF";
-        try { const j = await res.json(); errMsg = j.message || errMsg; } catch (_) {}
-        throw new Error(errMsg);
-      }
-      const blob = await res.blob();
+      const response = await axios.get(proxyUrl, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
       if (!blob.size) throw new Error("Empty PDF received");
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -909,7 +904,8 @@ const LrEwayBillDialog = ({
       window.URL.revokeObjectURL(blobUrl);
       showToast("PDF download started", "success");
     } catch (err) {
-      showToast(err.message || "Failed to download PDF", "error");
+      console.error("PDF download failed:", err);
+      showToast(err.response?.data?.message || err.message || "Failed to download PDF", "error");
     }
   };
 

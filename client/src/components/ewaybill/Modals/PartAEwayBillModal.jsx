@@ -64,8 +64,10 @@ const PartAEwayBillModal = ({
   const [checkedKeys, setCheckedKeys] = useState([]);
   const [selectionMode, setSelectionMode] = useState("all");
   const [activeContainers, setActiveContainers] = useState([]);
-  const [existingEwbs, setExistingEwbs] = useState([]);
-  const [ewbLoading, setEwbLoading] = useState(false);
+  const [existingEwbs, setExistingEwbs] = useState(initialExistingEwbs || []);
+  const [ewbLoading, setEwbLoading] = useState(
+    !skipFetchExisting && (!initialExistingEwbs || initialExistingEwbs.length === 0)
+  );
   const initializedRef = useRef(false);
 
   const allContainers = useMemo(() => selectedContainers || [], [selectedContainers]);
@@ -87,6 +89,19 @@ const PartAEwayBillModal = ({
   const pendingContainers = useMemo(
     () => getPendingContainers(allContainers, existingEwbs, beNo),
     [allContainers, existingEwbs, beNo]
+  );
+
+  const resolveContainerByKey = useCallback(
+    (key) => {
+      const idx = allContainers.findIndex((c, i) => getContainerKey(c, i) === key);
+      return idx >= 0 ? allContainers[idx] : null;
+    },
+    [allContainers]
+  );
+
+  const checkedContainers = useMemo(
+    () => checkedKeys.map(resolveContainerByKey).filter(Boolean),
+    [checkedKeys, resolveContainerByKey]
   );
 
   useEffect(() => {
@@ -128,7 +143,8 @@ const PartAEwayBillModal = ({
       setStep("select");
       setCheckedKeys([]);
       setActiveContainers([]);
-      setExistingEwbs([]);
+      setExistingEwbs(initialExistingEwbs || []);
+      setEwbLoading(!skipFetchExisting && (!initialExistingEwbs || initialExistingEwbs.length === 0));
       setSelectionMode("all");
       initializedRef.current = false;
       return;
@@ -148,6 +164,12 @@ const PartAEwayBillModal = ({
   }, [open, combinedEwbExists]);
 
   useEffect(() => {
+    if (open && checkedContainers.length === allContainers.length && allContainers.length > 0) {
+      setSelectionMode("all");
+    }
+  }, [open, checkedContainers.length, allContainers.length]);
+
+  useEffect(() => {
     if (!open || !hasMultiple || ewbLoading) return;
     if (initializedRef.current) return;
     
@@ -160,18 +182,7 @@ const PartAEwayBillModal = ({
     initializedRef.current = true;
   }, [open, hasMultiple, ewbLoading, pendingContainers, allContainers]);
 
-  const resolveContainerByKey = useCallback(
-    (key) => {
-      const idx = allContainers.findIndex((c, i) => getContainerKey(c, i) === key);
-      return idx >= 0 ? allContainers[idx] : null;
-    },
-    [allContainers]
-  );
 
-  const checkedContainers = useMemo(
-    () => checkedKeys.map(resolveContainerByKey).filter(Boolean),
-    [checkedKeys, resolveContainerByKey]
-  );
 
   const handleToggleContainer = (cont, idx) => {
     const key = getContainerKey(cont, idx);
@@ -385,7 +396,11 @@ const PartAEwayBillModal = ({
               >
                 Combined — one EWB for selected containers
               </ToggleButton>
-              <ToggleButton value="selected" sx={{ textTransform: "none", fontWeight: 600, px: 2 }}>
+              <ToggleButton 
+                value="selected" 
+                disabled={checkedContainers.length === allContainers.length}
+                sx={{ textTransform: "none", fontWeight: 600, px: 2 }}
+              >
                 Individual — separate EWB per selected container
               </ToggleButton>
             </ToggleButtonGroup>

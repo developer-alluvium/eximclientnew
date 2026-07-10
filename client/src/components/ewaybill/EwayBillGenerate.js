@@ -84,28 +84,73 @@ const INDIAN_STATES = [
 ];
 
 // Helper to split company name and address based on common suffixes
+const parseAddressString = (addrStr) => {
+  if (!addrStr) return { address: "", city: "", state: "", pincode: "" };
+  
+  let address = addrStr.trim();
+  let city = "";
+  let state = "";
+  let pincode = "";
+
+  // 1. Try to extract 6-digit Indian pincode if present (e.g., 370201 or 370 201)
+  const pinMatch = address.match(/\b\d{6}\b|\b\d{3}\s\d{3}\b/);
+  if (pinMatch) {
+    pincode = pinMatch[0].replace(/\s/g, "");
+    address = address.replace(pinMatch[0], "").trim();
+  }
+
+  // Clean up trailing/leading dashes/commas left over from removing pincode
+  address = address.replace(/[-,\s]+$/g, "").replace(/^[-,\s]+/g, "").trim();
+
+  // 2. Split by commas
+  const parts = address.split(",").map(p => p.trim()).filter(Boolean);
+  
+  if (parts.length >= 3) {
+    // e.g. ["123 Street Name", "Hamburg", "Germany"] or ["456 Sector Road", "Gandhidham", "Gujarat"]
+    state = parts.pop();
+    city = parts.pop();
+    address = parts.join(", ");
+  } else if (parts.length === 2) {
+    // e.g. ["123 Street Name", "Hamburg"]
+    city = parts.pop();
+    address = parts[0];
+  } else if (parts.length === 1) {
+    // Try word-based fallback if no commas
+    const words = address.split(/\s+/);
+    if (words.length >= 3) {
+      state = words.pop();
+      city = words.pop();
+      address = words.join(" ");
+    }
+  }
+
+  return { address, city, state, pincode };
+};
+
 const splitCompanyNameAndAddress = (fullString) => {
-  if (!fullString) return { name: "", address: "" };
+  if (!fullString) return { name: "", address: "", city: "", state: "", pincode: "" };
   
   // Suffixes based on user request
   const suffixes = ["Private Limited", "Pvt Ltd", "Ltd", "Inc", "LLP", "Corporation"];
-  // Create regex pattern: match up to the end of any suffix (case-insensitive)
-  // Example: /^(.+?\b(?:Private Limited|Pvt Ltd|Ltd|Inc|LLP|Corporation)\b)(.*)$/i
   const pattern = new RegExp(`^(.+?\\b(?:${suffixes.join('|')})\\b)(.*)$`, 'i');
+  
+  let name = "";
+  let rest = "";
   
   const match = fullString.match(pattern);
   if (match) {
-    return {
-      name: match[1].trim(),
-      address: match[2].trim().replace(/^[., \s]+|[., \s]+$/g, '') // clean leading/trailing dots/commas/spaces
-    };
+    name = match[1].trim();
+    rest = match[2].trim().replace(/^[., \s]+|[., \s]+$/g, '');
+  } else {
+    const fallbackParts = fullString.split(/\s{2,}|,/);
+    name = fallbackParts[0]?.trim() || "";
+    rest = fallbackParts.slice(1).join(',').trim() || fullString;
   }
   
-  // Fallback: if no suffix found, try splitting by first comma or double space
-  const fallbackParts = fullString.split(/\s{2,}|,/);
+  const parsedAddr = parseAddressString(rest);
   return {
-    name: fallbackParts[0]?.trim() || "",
-    address: fallbackParts.slice(1).join(',').trim() || fullString
+    name,
+    ...parsedAddr
   };
 };
 
@@ -1128,8 +1173,23 @@ function EwayBillGenerate({
     const supplierAddr = invoiceDetails.SUPPLIER_NAME_ADDRESS || '';
     const buyerAddr = invoiceDetails.BUYER_NAME_ADDRESS || '';
     
-    const parsedSupplier = record._parsedData?.supplier || splitCompanyNameAndAddress(supplierAddr);
-    const parsedBuyer = record._parsedData?.buyer || splitCompanyNameAndAddress(buyerAddr);
+    const parsedSupplierFallback = splitCompanyNameAndAddress(supplierAddr);
+    const parsedSupplier = {
+      name: record._parsedData?.supplier?.name || parsedSupplierFallback.name || '',
+      address: record._parsedData?.supplier?.address || parsedSupplierFallback.address || '',
+      city: record._parsedData?.supplier?.city || parsedSupplierFallback.city || '',
+      state: record._parsedData?.supplier?.state || parsedSupplierFallback.state || '',
+      pincode: record._parsedData?.supplier?.pincode || parsedSupplierFallback.pincode || '',
+    };
+
+    const parsedBuyerFallback = splitCompanyNameAndAddress(buyerAddr);
+    const parsedBuyer = {
+      name: record._parsedData?.buyer?.name || parsedBuyerFallback.name || '',
+      address: record._parsedData?.buyer?.address || parsedBuyerFallback.address || '',
+      city: record._parsedData?.buyer?.city || parsedBuyerFallback.city || '',
+      state: record._parsedData?.buyer?.state || parsedBuyerFallback.state || '',
+      pincode: record._parsedData?.buyer?.pincode || parsedBuyerFallback.pincode || '',
+    };
     
     const supplierName = parsedSupplier.name || '';
     const supplierCleanAddr = cleanTransacting(parsedSupplier.address || '');
@@ -2071,6 +2131,29 @@ function EwayBillGenerate({
 
     setFieldErrors({});
 
+    // ---- Tax Type Mismatch Block ----
+    const isInterState = formData.consignorState?.toLowerCase() !== formData.consigneeState?.toLowerCase();
+    for (const item of formData.items || []) {
+      if (isInterState && (parseFloat(item.cgstRate) > 0 || parseFloat(item.sgstRate) > 0)) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Tax Type Mismatch',
+          text: `Inter-state shipment (Consignor: ${formData.consignorState || "Other"}, Consignee: ${formData.consigneeState || "Other"}) must use IGST. CGST/SGST rates should be 0.`,
+          confirmButtonColor: "#3085d6"
+        });
+        return;
+      }
+      if (!isInterState && (parseFloat(item.igstRate) > 0)) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Tax Type Mismatch',
+          text: `Intra-state shipment (Consignor and Consignee are both in ${formData.consignorState || "same state"}) must use CGST + SGST. IGST rate should be 0.`,
+          confirmButtonColor: "#3085d6"
+        });
+        return;
+      }
+    }
+
     // ---- Multi-container batch submission (NEW - Scenario 3) ----
     if (isMultiContainerMode && generationMode === "batch-selected" && selectedContainers.length > 0) {
       // Submit separate EWB for each selected container
@@ -2286,17 +2369,6 @@ function EwayBillGenerate({
     }
     // ───────────────────────────────────────────────────────────────────────
 
-    const isInterState = formData.consignorState?.toLowerCase() !== formData.consigneeState?.toLowerCase();
-
-    for (const item of formData.items) {
-      if (isInterState && (parseFloat(item.cgstRate) > 0 || parseFloat(item.sgstRate) > 0)) {
-        console.warn("Possible tax mismatch: Inter-state detected but CGST/SGST present.");
-      }
-      if (!isInterState && (parseFloat(item.igstRate) > 0)) {
-        console.warn("Possible tax mismatch: Intra-state detected but IGST present.");
-      }
-    }
-
     try {
       setGenerating(true);
 
@@ -2386,16 +2458,22 @@ function EwayBillGenerate({
           }
         }
 
-        if (onSuccess) {
-          onSuccess(response.data.data);
-        }
         Swal.fire({
           icon: "success",
           title: "E-Way Bill Generated",
           html: `
             <p><strong>EWB No:</strong> ${response.data.data.ewbNo}</p>
-            <p><strong>Valid Until:</strong> ${response.data.data.validUpto}</p>
+            <p><strong>Valid Until:</strong> ${response.data.data.validUpto || "N/A"}</p>
           `,
+          confirmButtonText: "OK",
+          allowOutsideClick: false
+        }).then(() => {
+          if (onSuccess) {
+            onSuccess(response.data.data);
+          }
+          if (onClose) {
+            onClose();
+          }
         });
       }
     } catch (error) {
@@ -2818,7 +2896,7 @@ function EwayBillGenerate({
             <p>Valid Until: {success.validUpto}</p>
           </div>
           <div className="form-actions" style={{ justifyContent: "center" }}>
-            {success.pdfUrl && (
+            {success.pdfUrl ? (
               <a
                 href={`${success.pdfUrl}`}
                 target="_blank"
@@ -2827,6 +2905,10 @@ function EwayBillGenerate({
               >
                 Download PDF
               </a>
+            ) : (
+              <div style={{ color: "#475569", fontSize: "0.85rem", fontStyle: "italic", display: "inline-block", padding: "10px 20px" }}>
+                📄 PDF is being generated and will be available shortly
+              </div>
             )}
             <button className="btn btn-secondary" onClick={handleReset}>
               Generate Another
@@ -3497,11 +3579,14 @@ function EwayBillGenerate({
                                   <p><strong>Step 1: Determine Per KG Value</strong></p>
                                   <p>Total Value (Y) = Assessable Value + BCD + SWS</p>
                                   <p>Y = ₹${totalValueFromBoe.toLocaleString('en-IN')}</p>
-                                  <p>Per KG = ₹${totalValueFromBoe.toLocaleString('en-IN')} / ${(weightPerContainer * boeContainers.length).toFixed(2)} KG = <strong>₹${perKgValue.toFixed(2)} / kg</strong></p>
-                                  
-                                  <hr/>
-                                  <p><strong>Step 2: Proportional Container Value</strong></p>
-                                  <p>Container Value = Your Input Weight × ₹${perKgValue.toFixed(2)}</p>
+                                  ${(weightPerContainer * boeContainers.length) > 0 && perKgValue > 0 && !isNaN(perKgValue) && isFinite(perKgValue) ? `
+                                    <p>Per KG = ₹${totalValueFromBoe.toLocaleString('en-IN')} / ${(weightPerContainer * boeContainers.length).toFixed(2)} KG = <strong>₹${perKgValue.toFixed(2)} / kg</strong></p>
+                                    <hr/>
+                                    <p><strong>Step 2: Proportional Container Value</strong></p>
+                                    <p>Container Value = Your Input Weight × ₹${perKgValue.toFixed(2)}</p>
+                                  ` : `
+                                    <p style="color: #dc2626; font-weight: 600; margin-top: 8px;">⚠️ Weight data unavailable or zero. Per KG value calculation is not possible.</p>
+                                  `}
                                 </div>
                               `,
                               icon: 'info'
