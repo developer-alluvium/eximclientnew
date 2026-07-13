@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import { getAvailableExporters, proxyExportListing } from "../controllers/exportProxyController.js";
+import { getAvailableExporters, proxyExportListing, proxyExportFilterOptions, proxyExportTabCounts } from "../controllers/exportProxyController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -21,6 +21,8 @@ router.get("/api/superadmin/available-exporters", protectSuperAdmin, getAvailabl
  * Automatically injects the logged-in user's IE code assignments as a filter.
  * Accessible to any authenticated user who has the /export module assigned.
  */
+router.get("/api/exports/filter-options", authenticateUser, proxyExportFilterOptions);
+router.get("/api/exports/tab-counts", authenticateUser, proxyExportTabCounts);
 router.get("/api/exports/:status", authenticateUser, proxyExportListing);
 
 /**

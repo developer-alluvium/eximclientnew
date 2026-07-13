@@ -1,10 +1,10 @@
 import * as React from "react";
-import { 
-  Box, 
-  Typography, 
-  Tabs, 
-  Tab, 
-  Snackbar, 
+import {
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  Snackbar,
   Alert,
   CircularProgress,
   Paper,
@@ -15,7 +15,7 @@ import {
   IconButton,
   Tooltip,
   FormControl,
- 
+
   Select,
   MenuItem,
   Checkbox,
@@ -32,9 +32,9 @@ import {
   TableHead,
   TableRow
 } from "@mui/material";
-import { 
-  Search, 
-  Refresh, 
+import {
+  Search,
+  Refresh,
   FileDownload,
   Visibility,
   Business,
@@ -198,7 +198,8 @@ function CExportDSR() {
   }, [user]);
 
   // States
-  const [tabValue, setTabValue] = React.useState(0);
+  const [activeTab, setActiveTab] = React.useState("Pending");
+  const [tabCounts, setTabCounts] = React.useState({});
   const [jobs, setJobs] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [page, setPage] = React.useState(0);
@@ -218,6 +219,172 @@ function CExportDSR() {
   const [goodsStuffedAt, setGoodsStuffedAt] = React.useState("");
   const [pendingQueries, setPendingQueries] = React.useState(false);
 
+  const getFilterStyle = (isActive) => ({
+    ...selectStyle,
+    transition: "all 0.15s ease",
+    ...(isActive ? {
+      backgroundColor: "#eff6ff",
+      borderColor: "#3b82f6",
+      color: "#1d4ed8",
+      fontWeight: "700",
+    } : {})
+  });
+
+  // Dynamic filter options state
+  const [filterOptions, setFilterOptions] = React.useState({
+    branches: ["BRD", "GIM", "HAZ", "AMD", "COK"],
+    customHouses: ["ICD SACHANA", "MUNDRA SEA", "HAZIRA PORT", "ICD KHODIYAR", "ICD SANAND"],
+    consignmentTypes: ["FCL", "LCL", "AIR"],
+    goodsStuffedAt: ["FACTORY", "DOCK"],
+    years: ["26-27", "25-26", "24-25"],
+    exporters: [],
+    detailedStatuses: ["Pending", "SB Filed", "L.E.O", "Container HO", "File Handover to IATA", "Rail Out", "Departure", "Billing Pending", "Billing Done"],
+    months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  });
+  const [filterOptionsLoading, setFilterOptionsLoading] = React.useState(false);
+
+  // Fetch dynamic filter options based on assignments and selected exporter
+  React.useEffect(() => {
+    const fetchOptions = async () => {
+      setFilterOptionsLoading(true);
+      try {
+        const params = {};
+        if (selectedExporter !== "all") {
+          params.ieCode = selectedExporter;
+        }
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_STRING}/exports/filter-options`,
+          { params, withCredentials: true }
+        );
+        if (response.data.success && response.data.data) {
+          setFilterOptions(response.data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching filter options:", err);
+      } finally {
+        setFilterOptionsLoading(false);
+      }
+    };
+    fetchOptions();
+  }, [selectedExporter]);
+
+  // Reset selections if they are no longer in the active options list
+  React.useEffect(() => {
+    if (branch && filterOptions.branches.length > 0 && !filterOptions.branches.includes(branch)) {
+      setBranch("");
+    }
+    if (customHouse && filterOptions.customHouses.length > 0 && !filterOptions.customHouses.includes(customHouse)) {
+      setCustomHouse("");
+    }
+    if (consignmentType && filterOptions.consignmentTypes.length > 0 && !filterOptions.consignmentTypes.includes(consignmentType)) {
+      setConsignmentType("");
+    }
+    if (goodsStuffedAt && filterOptions.goodsStuffedAt.length > 0 && !filterOptions.goodsStuffedAt.includes(goodsStuffedAt)) {
+      setGoodsStuffedAt("");
+    }
+    if (year && year !== "all" && filterOptions.years.length > 0 && !filterOptions.years.includes(year)) {
+      setYear(filterOptions.years[0]);
+    }
+  }, [filterOptions]);
+
+  const displayBranches = React.useMemo(() => {
+    const list = (filterOptions.branches || [])
+      .map(b => (b || "").toUpperCase().trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(list));
+    const ALL_BRANCH_MAP = {
+      "BRD": "BRD - BARODA",
+      "GIM": "GIM - GANDHIDHAM",
+      "HAZ": "HAZ - HAZIRA",
+      "AMD": "AMD - AHMEDABAD",
+      "COK": "COK - COCHIN"
+    };
+    return unique.map(b => ({
+      code: b,
+      label: ALL_BRANCH_MAP[b] || `${b} - ${b}`
+    }));
+  }, [filterOptions.branches]);
+
+  const displayCustomHouses = React.useMemo(() => {
+    const list = (filterOptions.customHouses || [])
+      .map(ch => (ch || "").toUpperCase().trim())
+      .filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [filterOptions.customHouses]);
+
+  const displayConsignmentTypes = React.useMemo(() => {
+    const list = (filterOptions.consignmentTypes || [])
+      .map(t => (t || "").toUpperCase().trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(list));
+    const ALL_TYPES = {
+      "FCL": "FCL",
+      "LCL": "LCL",
+      "AIR": "AIR"
+    };
+    return unique.map(t => ({
+      value: t,
+      label: ALL_TYPES[t] || t
+    }));
+  }, [filterOptions.consignmentTypes]);
+
+  const displayGoodsStuffedAt = React.useMemo(() => {
+    const list = (filterOptions.goodsStuffedAt || [])
+      .map(g => (g || "").toUpperCase().trim())
+      .filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [filterOptions.goodsStuffedAt]);
+
+  const displayYears = React.useMemo(() => {
+    const list = (filterOptions.years || [])
+      .map(y => (y || "").toUpperCase().trim())
+      .filter(Boolean);
+    return Array.from(new Set(list)).sort().reverse();
+  }, [filterOptions.years]);
+
+  const displayMonths = React.useMemo(() => {
+    const ALL_MONTHS = [
+      { value: "04", label: "April", num: 4 },
+      { value: "05", label: "May", num: 5 },
+      { value: "06", label: "June", num: 6 },
+      { value: "07", label: "July", num: 7 },
+      { value: "08", label: "August", num: 8 },
+      { value: "09", label: "September", num: 9 },
+      { value: "10", label: "October", num: 10 },
+      { value: "11", label: "November", num: 11 },
+      { value: "12", label: "December", num: 12 },
+      { value: "01", label: "January", num: 1 },
+      { value: "02", label: "February", num: 2 },
+      { value: "03", label: "March", num: 3 },
+    ];
+    const availableNums = filterOptions.months || [];
+    return ALL_MONTHS.filter(m => availableNums.includes(m.num));
+  }, [filterOptions.months]);
+
+  const displayExporters = React.useMemo(() => {
+    if (!filterOptions.exporters || filterOptions.exporters.length === 0) {
+      return ieCodeAssignments;
+    }
+    const activeIeCodes = filterOptions.exporters.map(e => e.ieCode);
+    return ieCodeAssignments.filter(a => activeIeCodes.includes(a.ie_code_no));
+  }, [filterOptions.exporters, ieCodeAssignments]);
+
+  const displayDetailedStatuses = React.useMemo(() => {
+    const ALL_STATUSES = [
+      "Pending",
+      "SB Filed",
+      "L.E.O",
+      "Container HO",
+      "File Handover to IATA",
+      "Rail Out",
+      "Departure",
+      "Billing Pending",
+      "Billing Done",
+    ];
+    const available = new Set((filterOptions.detailedStatuses || []).map(s => (s || "").toLowerCase().trim()));
+    return ALL_STATUSES.filter(s => available.has(s.toLowerCase()));
+  }, [filterOptions.detailedStatuses]);
+
   // Dynamically calculate the exporter name to display in the top header
   const displayExporterName = React.useMemo(() => {
     if (selectedExporter && selectedExporter !== "all") {
@@ -229,6 +396,15 @@ function CExportDSR() {
     }
     return "";
   }, [selectedExporter, ieCodeAssignments]);
+
+  const visibleTabs = React.useMemo(() => {
+    return STATUS_TABS.filter((tab) => {
+      const statusKey = tab.value.toLowerCase();
+      const count = tabCounts[statusKey];
+      if (count === undefined) return true;
+      return count > 0 || tab.value === activeTab;
+    });
+  }, [tabCounts, activeTab]);
 
   const exportColumnDefinitions = React.useMemo(() => [
     { id: "job_no", label: "JOB NO", width: "12%" },
@@ -297,14 +473,6 @@ function CExportDSR() {
   const [raiseQuerySending, setRaiseQuerySending] = React.useState(false);
 
   // Dynamically populated filters from returned jobs
-  const customHousesList = React.useMemo(() => {
-    const set = new Set(["ICD SACHANA", "MUNDRA SEA", "HAZIRA PORT", "ICD KHODIYAR", "ICD SANAND"]);
-    jobs.forEach(j => {
-      if (j.custom_house) set.add(j.custom_house.toUpperCase().trim());
-    });
-    return Array.from(set).sort();
-  }, [jobs]);
-
   const jobOwnersList = React.useMemo(() => {
     const set = new Set();
     jobs.forEach(j => {
@@ -313,11 +481,47 @@ function CExportDSR() {
     return Array.from(set).map(o => ({ username: o, fullName: o }));
   }, [jobs]);
 
+  // Fetch tab counts
+  const fetchTabCounts = React.useCallback(async () => {
+    try {
+      const params = {
+        search,
+        year: year === "all" ? "" : year,
+        consignmentType,
+        branch,
+        customHouse,
+        month,
+        goods_stuffed_at: goodsStuffedAt,
+        jobOwner,
+        pendingQueries: pendingQueries ? "true" : "false"
+      };
+
+      if (selectedExporter !== "all") {
+        params.ieCode = selectedExporter;
+      }
+
+      if (detailedStatus && detailedStatus.length > 0) {
+        params.detailedStatus = detailedStatus.join(",");
+      }
+
+      const response = await axios.get(`${process.env.REACT_APP_API_STRING}/exports/tab-counts`, {
+        params,
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        setTabCounts(response.data.data || {});
+      }
+    } catch (err) {
+      console.error("Error fetching tab counts:", err);
+    }
+  }, [search, year, consignmentType, branch, customHouse, month, goodsStuffedAt, jobOwner, pendingQueries, selectedExporter, detailedStatus]);
+
   // Fetch export jobs
   const fetchJobs = React.useCallback(async () => {
     setLoading(true);
     try {
-      const status = STATUS_TABS[tabValue].value;
+      const status = activeTab;
       const params = {
         page: page + 1,
         limit,
@@ -349,7 +553,7 @@ function CExportDSR() {
         const loadedJobs = response.data.data.jobs || [];
         setJobs(loadedJobs);
         setTotalCount(response.data.data.total || response.data.data.pagination?.totalCount || 0);
-        
+
         // Fetch client query status map
         const jobNos = loadedJobs.map(j => j.job_no).filter(Boolean);
         if (jobNos.length > 0) {
@@ -376,11 +580,15 @@ function CExportDSR() {
     } finally {
       setLoading(false);
     }
-  }, [tabValue, page, limit, search, year, consignmentType, branch, customHouse, month, goodsStuffedAt, jobOwner, pendingQueries, selectedExporter, detailedStatus]);
+  }, [activeTab, page, limit, search, year, consignmentType, branch, customHouse, month, goodsStuffedAt, jobOwner, pendingQueries, selectedExporter, detailedStatus]);
 
   React.useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  React.useEffect(() => {
+    fetchTabCounts();
+  }, [fetchTabCounts]);
 
   // Auto-scroll chat to bottom
   React.useEffect(() => {
@@ -450,7 +658,7 @@ function CExportDSR() {
       // Add rows
       jobs.forEach((job) => {
         // Map Container info
-        const containerStrs = (job.containers || []).map(c => 
+        const containerStrs = (job.containers || []).map(c =>
           `${c.containerNo || ""}${c.type ? ` (${getContainerSizeLabel(c.type)})` : ""}`
         ).join("\n");
 
@@ -502,7 +710,7 @@ function CExportDSR() {
             bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
             right: { style: "thin", color: { argb: "FFE2E8F0" } }
           };
-          
+
           // Color coding status column
           if (cell.col === 12) {
             const statusTheme = getStatusTheme(rowData.status);
@@ -1223,7 +1431,7 @@ function CExportDSR() {
       );
       const queries = resp.data?.queries || [];
       setQueryChatData(queries);
-      
+
       if (queries.length > 0) {
         // Mark as seen by client
         const unseenIds = queries.filter(q => !q.seenByClient).map(q => q._id);
@@ -1304,7 +1512,7 @@ function CExportDSR() {
 
       setSnackbar({ open: true, message: "Query raised successfully", severity: "success" });
       setRaiseQueryOpen(false);
-      
+
       // Refresh status map for this job
       if (raiseQueryJob?.job_no) {
         const statusRes = await axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
@@ -1355,99 +1563,99 @@ function CExportDSR() {
       >
         <Box sx={{ p: 1, bgcolor: "#fff", minWidth: 240 }}>
           <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 1 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5 }}>
-            <Box>
-              <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: "#0f172a", textTransform: "uppercase" }}>
-                ESANCHIT DOCUMENTS
-              </Typography>
-              <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: "#334155", mt: 0.5 }}>
-                {currentJobTitle}
-              </Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: "#0f172a", textTransform: "uppercase" }}>
+                  ESANCHIT DOCUMENTS
+                </Typography>
+                <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: "#334155", mt: 0.5 }}>
+                  {currentJobTitle}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={handleCloseDocsMenu} sx={{ p: 0.4 }}>
+                <Close sx={{ fontSize: 18 }} />
+              </IconButton>
             </Box>
-            <IconButton size="small" onClick={handleCloseDocsMenu} sx={{ p: 0.4 }}>
-              <Close sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Box>
-          {categoryItems.map((category) => (
-            <Box key={category.name} sx={{ mb: 1.5 }}>
-              <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", mb: 1 }}>
-                {category.name}
-              </Typography>
-              {category.items.map((item) => {
-                const hasUrl = Array.isArray(item.urls) && item.urls.length > 0;
-                const firstUrl = hasUrl ? item.urls[0] : null;
-                return (
-                  <Box
-                    key={`${item.field}-${item.idx}`}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 1,
-                      py: 0.5,
-                      borderRadius: "8px",
-                      bgcolor: hasUrl ? "#eff6ff" : "#f8fafc",
-                      mb: 0.5,
-                      px: 1,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-                      <PictureAsPdf sx={{ fontSize: 16, color: hasUrl ? "#2563eb" : "#94a3b8" }} />
-                      {firstUrl ? (
-                        <a
-                          href={firstUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: "0.8rem",
-                            fontWeight: 700,
-                            color: "#2563eb",
-                            textDecoration: "none",
-                            overflow: "hidden",
-                            whiteSpace: "nowrap",
-                            textOverflow: "ellipsis",
-                            maxWidth: "175px",
-                          }}
-                          title={item.label}
-                        >
-                          {item.label}
-                        </a>
-                      ) : (
-                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
-                          {item.label}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRequestDocUpload(item, item.idx);
-                        }}
-                        sx={{ p: 0.5, bgcolor: "#f8fafc", borderRadius: "10px" }}
-                        disabled={docUploadLoading}
-                      >
-                        <CloudUpload sx={{ fontSize: 16, color: "#2563eb" }} />
-                      </IconButton>
-                      {hasUrl && firstUrl.includes("export-job-documents") && (
+            {categoryItems.map((category) => (
+              <Box key={category.name} sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", mb: 1 }}>
+                  {category.name}
+                </Typography>
+                {category.items.map((item) => {
+                  const hasUrl = Array.isArray(item.urls) && item.urls.length > 0;
+                  const firstUrl = hasUrl ? item.urls[0] : null;
+                  return (
+                    <Box
+                      key={`${item.field}-${item.idx}`}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        py: 0.5,
+                        borderRadius: "8px",
+                        bgcolor: hasUrl ? "#eff6ff" : "#f8fafc",
+                        mb: 0.5,
+                        px: 1,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                        <PictureAsPdf sx={{ fontSize: 16, color: hasUrl ? "#2563eb" : "#94a3b8" }} />
+                        {firstUrl ? (
+                          <a
+                            href={firstUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontSize: "0.8rem",
+                              fontWeight: 700,
+                              color: "#2563eb",
+                              textDecoration: "none",
+                              overflow: "hidden",
+                              whiteSpace: "nowrap",
+                              textOverflow: "ellipsis",
+                              maxWidth: "175px",
+                            }}
+                            title={item.label}
+                          >
+                            {item.label}
+                          </a>
+                        ) : (
+                          <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>
+                            {item.label}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                         <IconButton
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRemoveDoc(item, firstUrl, item.idx);
+                            handleRequestDocUpload(item, item.idx);
                           }}
-                          sx={{ p: 0.5, bgcolor: "#fee2e2", borderRadius: "10px" }}
+                          sx={{ p: 0.5, bgcolor: "#f8fafc", borderRadius: "10px" }}
+                          disabled={docUploadLoading}
                         >
-                          <Delete sx={{ fontSize: 16, color: "#b91c1c" }} />
+                          <CloudUpload sx={{ fontSize: 16, color: "#2563eb" }} />
                         </IconButton>
-                      )}
+                        {hasUrl && firstUrl.includes("export-job-documents") && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveDoc(item, firstUrl, item.idx);
+                            }}
+                            sx={{ p: 0.5, bgcolor: "#fee2e2", borderRadius: "10px" }}
+                          >
+                            <Delete sx={{ fontSize: 16, color: "#b91c1c" }} />
+                          </IconButton>
+                        )}
+                      </Box>
                     </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-          ))}
+                  );
+                })}
+              </Box>
+            ))}
           </Box>
         </Box>
       </Menu>
@@ -1527,10 +1735,10 @@ function CExportDSR() {
 
         {/* Tab switcher matching standalone Export Job tab style */}
         <Box sx={{ mt: 1 }}>
-          <Tabs 
-            value={tabValue} 
+          <Tabs
+            value={activeTab}
             onChange={(e, val) => {
-              setTabValue(val);
+              setActiveTab(val);
               setPage(0);
             }}
             sx={{
@@ -1555,18 +1763,19 @@ function CExportDSR() {
               }
             }}
           >
-            {STATUS_TABS.map((tab, idx) => (
-              <Tab 
-                key={tab.value} 
+            {visibleTabs.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
                 label={
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     {tab.label}
-                    {tabValue === idx && totalCount > 0 && (
-                      <span style={{ 
-                        fontSize: "10px", 
-                        backgroundColor: "#eff6ff", 
-                        color: "#2563eb", 
-                        padding: "1px 6px", 
+                    {activeTab === tab.value && totalCount > 0 && (
+                      <span style={{
+                        fontSize: "10px",
+                        backgroundColor: "#eff6ff",
+                        color: "#2563eb",
+                        padding: "1px 6px",
                         borderRadius: "10px",
                         fontWeight: "700"
                       }}>
@@ -1574,7 +1783,7 @@ function CExportDSR() {
                       </span>
                     )}
                   </Box>
-                } 
+                }
               />
             ))}
           </Tabs>
@@ -1583,100 +1792,101 @@ function CExportDSR() {
 
       {/* Main DSR Table Layout & Filters */}
       <Box sx={{ p: 2, maxWidth: "100%", overflow: "hidden" }}>
-        
+
         {/* Filters Toolbar */}
-        <Box 
-          sx={{ 
-            display: "flex", 
-            gap: { xs: 0.5, sm: 1 }, 
-            alignItems: "center", 
-            mb: 1.5, 
-            flexWrap: "wrap", 
-            bgcolor: "#fff", 
-            p: { xs: 0.75, sm: 1 }, 
+        <Box
+          sx={{
+            display: "flex",
+            gap: { xs: 0.5, sm: 1 },
+            alignItems: "center",
+            mb: 1.5,
+            flexWrap: "wrap",
+            bgcolor: "#fff",
+            p: { xs: 0.75, sm: 1 },
             borderRadius: "6px",
             border: "1px solid #e2e8f0",
             boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)"
           }}
         >
           {/* Year dropdown */}
-          <select
-            style={selectStyle}
-            value={year}
-            onChange={(e) => { setYear(e.target.value); setPage(0); }}
-          >
-            <option value="all">All Years</option>
-            <option value="26-27">26-27</option>
-            <option value="25-26">25-26</option>
-            <option value="24-25">24-25</option>
-          </select>
+          {displayYears.length > 1 && (
+            <select
+              style={getFilterStyle(year !== "26-27")}
+              value={year}
+              onChange={(e) => { setYear(e.target.value); setPage(0); }}
+            >
+              <option value="all">All Years</option>
+              {displayYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          )}
 
           {/* Month dropdown */}
-          <select
-            style={selectStyle}
-            value={month}
-            onChange={(e) => { setMonth(e.target.value); setPage(0); }}
-          >
-            <option value="">All Months</option>
-            <option value="04">April</option>
-            <option value="05">May</option>
-            <option value="06">June</option>
-            <option value="07">July</option>
-            <option value="08">August</option>
-            <option value="09">September</option>
-            <option value="10">October</option>
-            <option value="11">November</option>
-            <option value="12">December</option>
-            <option value="01">January</option>
-            <option value="02">February</option>
-            <option value="03">March</option>
-          </select>
+          {displayMonths.length > 1 && (
+            <select
+              style={getFilterStyle(month !== "")}
+              value={month}
+              onChange={(e) => { setMonth(e.target.value); setPage(0); }}
+            >
+              <option value="">All Months</option>
+              {displayMonths.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Branch dropdown */}
-          <select
-            style={selectStyle}
-            value={branch}
-            onChange={(e) => { setBranch(e.target.value); setPage(0); }}
-          >
-            {branchOptions.map(opt => (
-              <option key={opt.code} value={opt.code}>{opt.label}</option>
-            ))}
-          </select>
+          {displayBranches.length > 1 && (
+            <select
+              style={getFilterStyle(branch !== "")}
+              value={branch}
+              onChange={(e) => { setBranch(e.target.value); setPage(0); }}
+            >
+              <option value="">All Branches</option>
+              {displayBranches.map(opt => (
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Custom House dropdown */}
-          <select
-            style={selectStyle}
-            value={customHouse}
-            onChange={(e) => { setCustomHouse(e.target.value); setPage(0); }}
-          >
-            <option value="">All Custom Houses</option>
-            {customHousesList.map(ch => (
-              <option key={ch} value={ch}>{ch}</option>
-            ))}
-          </select>
+          {displayCustomHouses.length > 1 && (
+            <select
+              style={getFilterStyle(customHouse !== "")}
+              value={customHouse}
+              onChange={(e) => { setCustomHouse(e.target.value); setPage(0); }}
+            >
+              <option value="">All Custom Houses</option>
+              {displayCustomHouses.map(ch => (
+                <option key={ch} value={ch}>{ch}</option>
+              ))}
+            </select>
+          )}
 
           {/* Movement Type Filter */}
-          <select
-            style={selectStyle}
-            value={consignmentType}
-            onChange={(e) => { setConsignmentType(e.target.value); setPage(0); }}
-          >
-            {movementTypeOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-
-         
+          {displayConsignmentTypes.length > 1 && (
+            <select
+              style={getFilterStyle(consignmentType !== "")}
+              value={consignmentType}
+              onChange={(e) => { setConsignmentType(e.target.value); setPage(0); }}
+            >
+              <option value="">All Movement</option>
+              {displayConsignmentTypes.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Exporter Filter (if multiple assigned) */}
-          {ieCodeAssignments.length > 0 && (
+          {displayExporters.length > 1 && ieCodeAssignments.length > 1 && (
             <select
-              style={{ ...selectStyle, maxWidth: "180px" }}
+              style={{ ...getFilterStyle(selectedExporter !== "all"), maxWidth: "180px" }}
               value={selectedExporter}
               onChange={(e) => { setSelectedExporter(e.target.value); setPage(0); }}
             >
               <option value="all">All Assigned Exporters</option>
-              {ieCodeAssignments.map(a => (
+              {displayExporters.map(a => (
                 <option key={a.ie_code_no} value={a.ie_code_no}>
                   {a.importer_name} ({a.ie_code_no})
                 </option>
@@ -1685,66 +1895,72 @@ function CExportDSR() {
           )}
 
           {/* Detailed Status Select (Multi-Select) */}
-          <FormControl size="small" sx={{ width: 140, minWidth: 140 }}>
-            <Select
-              multiple
-              value={detailedStatus}
-              onChange={(e) => {
-                const value = e.target.value;
-                setDetailedStatus(typeof value === 'string' ? value.split(',') : value);
-                setPage(0);
-              }}
-              displayEmpty
-              renderValue={(selected) => {
-                if (selected.length === 0) return <em style={{ fontSize: "12px", color: "#64748b", fontStyle: "normal" }}>All Detailed Status</em>;
-                return <span style={{ fontSize: "12px" }}>{selected.join(", ")}</span>;
-              }}
-              sx={{
-                height: 28,
-                bgcolor: "#fff",
-                fontSize: "12px",
-                "& .MuiSelect-select": { py: 0.5, px: 1, display: "flex", alignItems: "center" }
-              }}
-            >
-              {[
-                "Pending",
-                "SB Filed",
-                "L.E.O",
-                "Container HO",
-                "File Handover to IATA",
-                "Rail Out",
-                "Departure",
-                "Billing Pending",
-                "Billing Done",
-              ].map((status) => (
-                <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px" }}>
-                  <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
-                  <span style={{
-                    display: "inline-block",
-                    width: 10, height: 10,
-                    borderRadius: "50%",
-                    backgroundColor: getStatusColor(status),
-                    border: "1px solid #94a3b8",
-                    marginRight: 8
-                  }} />
-                  <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {displayDetailedStatuses.length > 1 && (
+            <FormControl size="small" sx={{ width: 140, minWidth: 140 }}>
+              <Select
+                multiple
+                value={detailedStatus}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDetailedStatus(typeof value === 'string' ? value.split(',') : value);
+                  setPage(0);
+                }}
+                displayEmpty
+                renderValue={(selected) => {
+                  if (selected.length === 0) return <em style={{ fontSize: "12px", color: "#64748b", fontStyle: "normal" }}>All Detailed Status</em>;
+                  return <span style={{ fontSize: "12px" }}>{selected.join(", ")}</span>;
+                }}
+                sx={{
+                  height: 28,
+                  bgcolor: detailedStatus.length > 0 ? "#eff6ff" : "#fff",
+                  fontSize: "12px",
+                  fontWeight: detailedStatus.length > 0 ? 700 : 500,
+                  "& .MuiSelect-select": {
+                    py: 0.5,
+                    px: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    color: detailedStatus.length > 0 ? "#1d4ed8" : "#1e293b"
+                  },
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: detailedStatus.length > 0 ? "#3b82f6" : "#cbd5e1"
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#3b82f6"
+                  }
+                }}
+              >
+                {displayDetailedStatuses.map((status) => (
+                  <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px" }}>
+                    <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
+                    <span style={{
+                      display: "inline-block",
+                      width: 10, height: 10,
+                      borderRadius: "50%",
+                      backgroundColor: getStatusColor(status),
+                      border: "1px solid #94a3b8",
+                      marginRight: 8
+                    }} />
+                    <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           {/* Goods Stuffed At */}
-          <select
-            style={selectStyle}
-            value={goodsStuffedAt}
-            onChange={(e) => { setGoodsStuffedAt(e.target.value); setPage(0); }}
-          >
-            <option value="">All Stuffed At</option>
-            <option value="FACTORY">FACTORY</option>
-            <option value="DOCK">DOCK</option>
-          </select>
-
-         
+          {displayGoodsStuffedAt.length > 1 && (
+            <select
+              style={getFilterStyle(goodsStuffedAt !== "")}
+              value={goodsStuffedAt}
+              onChange={(e) => { setGoodsStuffedAt(e.target.value); setPage(0); }}
+            >
+              <option value="">All Stuffed At</option>
+              {displayGoodsStuffedAt.map(gs => (
+                <option key={gs} value={gs}>{gs}</option>
+              ))}
+            </select>
+          )}
 
           {/* Search Box on Right */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto", minWidth: "160px" }}>
@@ -1753,22 +1969,26 @@ function CExportDSR() {
                 height: "28px",
                 padding: "0 8px",
                 fontSize: "12px",
-                border: "1px solid #cbd5e1",
+                border: "1px solid",
+                borderColor: search ? "#3b82f6" : "#cbd5e1",
                 borderRadius: "4px",
                 outline: "none",
-                color: "#1e293b",
-                width: "100%"
+                color: search ? "#1d4ed8" : "#1e293b",
+                backgroundColor: search ? "#eff6ff" : "#fff",
+                fontWeight: search ? 700 : 500,
+                width: "100%",
+                transition: "all 0.15s ease"
               }}
               placeholder="Search by Job No, Exporter..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <Tooltip title="Clear Filters">
-              <IconButton 
-                onClick={handleClearFilters} 
-                size="small" 
-                sx={{ 
-                  bgcolor: "#f1f5f9", 
+              <IconButton
+                onClick={handleClearFilters}
+                size="small"
+                sx={{
+                  bgcolor: "#f1f5f9",
                   border: "1px solid #cbd5e1",
                   borderRadius: "4px",
                   height: "28px",
@@ -1782,11 +2002,11 @@ function CExportDSR() {
         </Box>
 
         {/* Premium Table Container */}
-        <TableContainer 
-          component={Paper} 
-          sx={{ 
-            borderRadius: "6px", 
-            border: "1px solid #cbd5e1", 
+        <TableContainer
+          component={Paper}
+          sx={{
+            borderRadius: "6px",
+            border: "1px solid #cbd5e1",
             boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
             overflowX: "auto",
             width: "100%"
@@ -1855,10 +2075,10 @@ function CExportDSR() {
                     <TableRow
                       key={job._id || idx}
                       sx={{
-                        bgcolor: theme.bg,
+                        bgcolor: `${theme.bg} !important`,
                         borderLeft: `4px solid ${theme.border}`,
                         transition: "background-color 0.15s ease",
-                        "&:hover": { bgcolor: "#f8fafc" },
+                        "&:hover": { bgcolor: "#f1f5f9 !important" },
                       }}
                     >
                       {columnOrder.map((columnId, colIdx) => renderExportRowCell(columnId, job, colIdx === columnOrder.length - 1))}
@@ -1870,20 +2090,20 @@ function CExportDSR() {
           </Table>
 
           {/* Table pagination footer */}
-          <Box 
-            sx={{ 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "space-between", 
-              p: 1.5, 
-              bgcolor: "#f8fafc", 
-              borderTop: "1px solid #cbd5e1" 
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              p: 1.5,
+              bgcolor: "#f8fafc",
+              borderTop: "1px solid #cbd5e1"
             }}
           >
             <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
               Showing {jobs.length} of {totalCount} Records
             </Typography>
-            
+
             <Box sx={{ display: "flex", gap: 1 }}>
               <Button
                 variant="outlined"
@@ -1954,9 +2174,9 @@ function CExportDSR() {
       />
 
       {/* Global Snackbar */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
       >
         <Alert severity={snackbar.severity} sx={{ width: '100%', borderRadius: 2 }}>
@@ -2141,7 +2361,7 @@ function CExportDSR() {
                           }}>
                             {activeQuery.client_name ? activeQuery.client_name[0].toUpperCase() : "C"}
                           </div>
-                          
+
                           {/* Info Text */}
                           <div>
                             <div style={{ fontWeight: "700", fontSize: "13.5px", color: "#1f2937" }}>
@@ -2152,7 +2372,7 @@ function CExportDSR() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Status Pill */}
                         <span style={{
                           fontSize: "10px",
@@ -2179,9 +2399,9 @@ function CExportDSR() {
                       gap: "12px"
                     }}>
                       {chatMessages.map((msg, index) => {
-                        const showDateSeparator = index === 0 || 
+                        const showDateSeparator = index === 0 ||
                           getChatDateString(chatMessages[index - 1].createdAt) !== getChatDateString(msg.createdAt);
-                          
+
                         return (
                           <React.Fragment key={msg.id}>
                             {showDateSeparator && (
@@ -2199,7 +2419,7 @@ function CExportDSR() {
                                 </span>
                               </div>
                             )}
-                            
+
                             <div style={{
                               display: "flex",
                               justifyContent: msg.align === "right" ? "flex-end" : "flex-start",
@@ -2222,7 +2442,7 @@ function CExportDSR() {
                                 }}>
                                   {msg.senderName} {msg.senderEmail ? `(${msg.senderEmail})` : ""} {msg.senderUsername ? `[${msg.senderUsername}]` : ""}
                                 </div>
-                                
+
                                 {/* Subject Header */}
                                 {msg.subject && !msg.isReply && (
                                   <div style={{
@@ -2236,7 +2456,7 @@ function CExportDSR() {
                                     Subject: {msg.subject}
                                   </div>
                                 )}
-                                
+
                                 {/* Message text */}
                                 <div style={{
                                   fontSize: "13px",
@@ -2246,7 +2466,7 @@ function CExportDSR() {
                                 }}>
                                   {msg.message}
                                 </div>
-                                
+
                                 {/* Timestamp / double ticks */}
                                 <div style={{
                                   display: "flex",
@@ -2334,7 +2554,7 @@ function CExportDSR() {
                               color: "#374151"
                             }}
                           />
-                          
+
                           {/* Attachment Icon */}
                           <button
                             type="button"

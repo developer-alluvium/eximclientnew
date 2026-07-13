@@ -107,6 +107,9 @@ export const proxyExportListing = async (req, res) => {
       detailedStatus = "",
       jobOwner = "",
       month = "",
+      customHouse = "",
+      goods_stuffed_at = "",
+      pendingQueries = false,
     } = req.query;
 
     const forwardParams = {
@@ -120,6 +123,9 @@ export const proxyExportListing = async (req, res) => {
       detailedStatus,
       jobOwner,
       month,
+      customHouse,
+      goods_stuffed_at,
+      pendingQueries,
     };
 
     // Check if the user has assigned exporters (both Admin and Client User roles can have assignments)
@@ -197,6 +203,220 @@ export const proxyExportListing = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch export jobs.",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/exports/filter-options
+ * Proxies the request to get dynamic filter options based on the client's assigned exporters.
+ */
+export const proxyExportFilterOptions = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    // Fetch fresh user data to get IE code assignments
+    const dbUser = await EximclientUser.findById(user.id || user._id)
+      .select("exporter_ie_code_assignments role")
+      .lean();
+
+    if (!dbUser) {
+      return res.status(401).json({ success: false, message: "User not found." });
+    }
+
+    const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
+    const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
+
+    const { ieCode = "" } = req.query;
+    const forwardParams = {};
+
+    if (ieCode && ieCode !== "all") {
+      const assignedCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
+      if (assignedCodes.includes(ieCode) || isAdmin) {
+        forwardParams.ieCode = ieCode;
+      } else {
+        return res.status(403).json({ success: false, message: "Access denied to exporter." });
+      }
+    } else if (ieCodeAssignments.length > 0) {
+      const assignedCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
+      forwardParams.ieCode = assignedCodes.join(",");
+    } else if (!isAdmin) {
+      // Non-admins with no assignments get empty filters list
+      return res.json({
+        success: true,
+        data: {
+          branches: [],
+          customHouses: [],
+          consignmentTypes: [],
+          goodsStuffedAt: [],
+          years: [],
+          exporters: [],
+          detailedStatuses: [],
+          months: []
+        }
+      });
+    }
+
+    const exportFilterUrl = `${EXPORT_API_BASE_URL}/operation-jobs-filters`;
+
+    const response = await axios.get(exportFilterUrl, {
+      params: forwardParams,
+      headers: {
+        username: "Admin",
+        "x-username": "Admin"
+      },
+      timeout: 30000,
+    });
+
+    return res.json(response.data);
+  } catch (error) {
+    console.error("Export proxy filter options error:", error);
+
+    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      return res.status(503).json({
+        success: false,
+        message: "Export API is currently unavailable. Please ensure the Export server is running.",
+        error: error.message,
+      });
+    }
+
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch export filter options.",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * GET /api/exports/tab-counts
+ * Proxies the requests to list jobs of each status in parallel with limit=1, returning total tab counts.
+ */
+export const proxyExportTabCounts = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const dbUser = await EximclientUser.findById(user.id || user._id)
+      .select("exporter_ie_code_assignments role selected_branches")
+      .lean();
+
+    if (!dbUser) {
+      return res.status(401).json({ success: false, message: "User not found." });
+    }
+
+    const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
+    const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
+
+    const {
+      search = "",
+      exporter = "",
+      ieCode = "",
+      country = "",
+      consignmentType = "",
+      branch = "",
+      year = "",
+      detailedStatus = "",
+      jobOwner = "",
+      month = "",
+      customHouse = "",
+      goods_stuffed_at = "",
+      pendingQueries = false,
+    } = req.query;
+
+    const forwardParams = {
+      limit: 1,
+      search,
+      country,
+      consignmentType,
+      branch,
+      year,
+      detailedStatus,
+      jobOwner,
+      month,
+      customHouse,
+      goods_stuffed_at,
+      pendingQueries,
+    };
+
+    if (ieCodeAssignments.length > 0) {
+      const ieCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
+      if (ieCode && ieCodes.includes(ieCode)) {
+        forwardParams.ieCode = ieCode;
+      } else {
+        forwardParams.ieCode = ieCodes.join(",");
+      }
+    } else if (!isAdmin) {
+      return res.json({
+        success: true,
+        data: { pending: 0, "booking pending": 0, "handover pending": 0, "billing pending": 0, completed: 0, cancelled: 0 }
+      });
+    }
+
+    if (isAdmin) {
+      const branchRestrictions = dbUser.selected_branches || [];
+      if (branchRestrictions.length > 0) {
+        forwardParams.branch = branchRestrictions.join(",");
+      }
+    }
+
+    if (exporter) {
+      forwardParams.exporter = exporter;
+    }
+
+    const statuses = ["pending", "booking pending", "handover pending", "billing pending", "completed", "cancelled"];
+    
+    // Call main backend in parallel
+    const requests = statuses.map(status => {
+      const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
+      return axios.get(exportApiUrl, {
+        params: forwardParams,
+        headers: { username: "Admin", "x-username": "Admin" },
+        timeout: 10000,
+      });
+    });
+
+    const results = await Promise.all(requests);
+    const counts = {};
+    statuses.forEach((status, idx) => {
+      const resData = results[idx].data;
+      counts[status] = resData.data?.pagination?.totalCount || 0;
+    });
+
+    return res.json({
+      success: true,
+      data: counts
+    });
+
+  } catch (error) {
+    console.error("Export proxy tab counts error:", error);
+    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      return res.status(503).json({
+        success: false,
+        message: "Export API is currently unavailable. Please ensure the Export server is running.",
+        error: error.message,
+      });
+    }
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch export tab counts.",
       error: error.message,
     });
   }
