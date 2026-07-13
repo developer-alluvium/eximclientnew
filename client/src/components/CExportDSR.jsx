@@ -270,19 +270,19 @@ function CExportDSR() {
 
   // Reset selections if they are no longer in the active options list
   React.useEffect(() => {
-    if (branch && filterOptions.branches.length > 0 && !filterOptions.branches.includes(branch)) {
+    if (branch && filterOptions.branches && filterOptions.branches.length > 0 && !filterOptions.branches.includes(branch)) {
       setBranch("");
     }
-    if (customHouse && filterOptions.customHouses.length > 0 && !filterOptions.customHouses.includes(customHouse)) {
+    if (customHouse && filterOptions.customHouses && filterOptions.customHouses.length > 0 && !filterOptions.customHouses.includes(customHouse)) {
       setCustomHouse("");
     }
-    if (consignmentType && filterOptions.consignmentTypes.length > 0 && !filterOptions.consignmentTypes.includes(consignmentType)) {
+    if (consignmentType && filterOptions.consignmentTypes && filterOptions.consignmentTypes.length > 0 && !filterOptions.consignmentTypes.includes(consignmentType)) {
       setConsignmentType("");
     }
-    if (goodsStuffedAt && filterOptions.goodsStuffedAt.length > 0 && !filterOptions.goodsStuffedAt.includes(goodsStuffedAt)) {
+    if (goodsStuffedAt && filterOptions.goodsStuffedAt && filterOptions.goodsStuffedAt.length > 0 && !filterOptions.goodsStuffedAt.includes(goodsStuffedAt)) {
       setGoodsStuffedAt("");
     }
-    if (year && year !== "all" && filterOptions.years.length > 0 && !filterOptions.years.includes(year)) {
+    if (year && year !== "all" && filterOptions.years && filterOptions.years.length > 0 && !filterOptions.years.includes(year)) {
       setYear(filterOptions.years[0]);
     }
   }, [filterOptions]);
