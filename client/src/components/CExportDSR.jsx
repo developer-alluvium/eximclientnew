@@ -1809,7 +1809,7 @@ function CExportDSR() {
           }}
         >
           {/* Year dropdown */}
-          {displayYears.length > 1 && (
+          {displayYears.length > 0 && (
             <select
               style={getFilterStyle(year !== "26-27")}
               value={year}
@@ -1823,7 +1823,7 @@ function CExportDSR() {
           )}
 
           {/* Month dropdown */}
-          {displayMonths.length > 1 && (
+          {displayMonths.length > 0 && (
             <select
               style={getFilterStyle(month !== "")}
               value={month}
@@ -1837,7 +1837,7 @@ function CExportDSR() {
           )}
 
           {/* Branch dropdown */}
-          {displayBranches.length > 1 && (
+          {displayBranches.length > 0 && (
             <select
               style={getFilterStyle(branch !== "")}
               value={branch}
@@ -1851,7 +1851,7 @@ function CExportDSR() {
           )}
 
           {/* Custom House dropdown */}
-          {displayCustomHouses.length > 1 && (
+          {displayCustomHouses.length > 0 && (
             <select
               style={getFilterStyle(customHouse !== "")}
               value={customHouse}
@@ -1865,7 +1865,7 @@ function CExportDSR() {
           )}
 
           {/* Movement Type Filter */}
-          {displayConsignmentTypes.length > 1 && (
+          {displayConsignmentTypes.length > 0 && (
             <select
               style={getFilterStyle(consignmentType !== "")}
               value={consignmentType}
@@ -1879,7 +1879,7 @@ function CExportDSR() {
           )}
 
           {/* Exporter Filter (if multiple assigned) */}
-          {displayExporters.length > 1 && ieCodeAssignments.length > 1 && (
+          {displayExporters.length > 0 && ieCodeAssignments.length > 1 && (
             <select
               style={{ ...getFilterStyle(selectedExporter !== "all"), maxWidth: "180px" }}
               value={selectedExporter}
@@ -1895,7 +1895,7 @@ function CExportDSR() {
           )}
 
           {/* Detailed Status Select (Multi-Select) */}
-          {displayDetailedStatuses.length > 1 && (
+          {displayDetailedStatuses.length > 0 && (
             <FormControl size="small" sx={{ width: 140, minWidth: 140 }}>
               <Select
                 multiple
@@ -1949,7 +1949,7 @@ function CExportDSR() {
           )}
 
           {/* Goods Stuffed At */}
-          {displayGoodsStuffedAt.length > 1 && (
+          {displayGoodsStuffedAt.length > 0 && (
             <select
               style={getFilterStyle(goodsStuffedAt !== "")}
               value={goodsStuffedAt}
