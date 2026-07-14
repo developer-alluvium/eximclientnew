@@ -90,7 +90,8 @@ const defaultOrigins = [
   "https://client.alvision.in",
   "https://eximbot.alvision.in",
   "http://192.168.2.47:3001",
-  "http://3.108.244.38:8002"
+  "http://3.108.244.38:8002",
+  "http://localhost:9003/api"
 
 ];
 

@@ -198,6 +198,20 @@ function CDgftModule() {
 
   const summary = calculateImportSummary();
 
+  const calculateUtilizationSums = () => {
+    return utilizationRecords.reduce(
+      (acc, item) => {
+        acc.totalQty += parseFloat(String(item.qty || "0").replace(/[^0-9.-]/g, "")) || 0;
+        acc.totalUSD += parseFloat(String(item.cif_usd || "0").replace(/[^0-9.-]/g, "")) || 0;
+        acc.totalINR += parseFloat(String(item.cif_inr || "0").replace(/[^0-9.-]/g, "")) || 0;
+        return acc;
+      },
+      { totalQty: 0, totalUSD: 0, totalINR: 0 }
+    );
+  };
+
+  const utilSums = calculateUtilizationSums();
+
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
       {/* Title & Navigation */}
@@ -339,49 +353,7 @@ function CDgftModule() {
               </CardContent>
             </Card>
 
-            {/* 3. Summary Cards (Import) Table */}
-            <Card sx={{ borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", border: "1px solid #E2E8F0" }}>
-              <Box sx={{ backgroundColor: "#F1F5F9", px: 3, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                <TimelineIcon color="primary" sx={{ fontSize: 20 }} />
-                <Typography variant="subtitle1" fontWeight="700" color="#1E293B">
-                  Summary Cards (Import)
-                </Typography>
-              </Box>
-              <CardContent sx={{ p: 0 }}>
-                <TableContainer>
-                  <Table>
-                    <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569", px: 3 }}>Metric</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Licensed</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Utilized</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Balance</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      <TableRow sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
-                        <TableCell sx={{ fontWeight: "600", color: "#475569", px: 3 }}>Quantity</TableCell>
-                        <TableCell>{formatNumber(summary.licensedQty)}</TableCell>
-                        <TableCell>{formatNumber(summary.utilizedQty)}</TableCell>
-                        <TableCell>{formatNumber(summary.balanceQty)}</TableCell>
-                      </TableRow>
-                      <TableRow sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
-                        <TableCell sx={{ fontWeight: "600", color: "#475569", px: 3 }}>CIF Value (USD)</TableCell>
-                        <TableCell>{formatUSD(summary.licensedUSD)}</TableCell>
-                        <TableCell>{formatUSD(summary.utilizedUSD)}</TableCell>
-                        <TableCell>{formatUSD(summary.balanceUSD)}</TableCell>
-                      </TableRow>
-                      <TableRow sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
-                        <TableCell sx={{ fontWeight: "600", color: "#475569", px: 3 }}>CIF Value (INR)</TableCell>
-                        <TableCell>{formatINR(summary.licensedINR)}</TableCell>
-                        <TableCell>{formatINR(summary.utilizedINR)}</TableCell>
-                        <TableCell>{formatINR(summary.balanceINR)}</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
+
 
             {/* 4. Item Details (Import) Table */}
             <Card sx={{ borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", border: "1px solid #E2E8F0" }}>
@@ -394,15 +366,15 @@ function CDgftModule() {
               <CardContent sx={{ p: 0 }}>
                 <TableContainer>
                   <Table>
-                    <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
+                    <TableHead sx={{ backgroundColor: "#e2e8f0" }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569", px: 3 }}>Sr No</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>HS Code</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Description</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Licensed Qty</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Utilized Qty</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Balance Qty</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Utilization %</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ px: 3, borderBottom: "2px solid #cbd5e1" }}>Sr No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>HS Code</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Description</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Licensed Qty</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Utilized Qty</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Balance Qty</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Utilization %</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -448,14 +420,14 @@ function CDgftModule() {
               <CardContent sx={{ p: 0 }}>
                 <TableContainer>
                   <Table>
-                    <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
+                    <TableHead sx={{ backgroundColor: "#e2e8f0" }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569", px: 3 }}>Sr No</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>HS Code</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Description</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Export Qty</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>FOB USD</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>FOB Rs</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ px: 3, borderBottom: "2px solid #cbd5e1" }}>Sr No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>HS Code</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Description</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Export Qty</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>FOB USD</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>FOB Rs</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -494,28 +466,36 @@ function CDgftModule() {
               <CardContent sx={{ p: 0 }}>
                 <TableContainer>
                   <Table>
-                    <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
+                    <TableHead sx={{ backgroundColor: "#e2e8f0" }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569", px: 3 }}>BE No</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>BE Date</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Port No</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>Qty Utilized</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>CIF USD</TableCell>
-                        <TableCell sx={{ fontWeight: "700", color: "#475569" }}>CIF INR</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ px: 3, borderBottom: "2px solid #cbd5e1" }}>BE No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>BE Date</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Port No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Qty Utilized</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>CIF USD</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>CIF INR</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {utilizationRecords.length > 0 ? (
-                        utilizationRecords.map((item, idx) => (
-                          <TableRow key={idx} sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
-                            <TableCell sx={{ px: 3, fontWeight: "600", color: "#3B82F6" }}>{item.be_no || "—"}</TableCell>
-                            <TableCell>{item.be_date || "—"}</TableCell>
-                            <TableCell>{item.port || "—"}</TableCell>
-                            <TableCell>{formatNumber(item.qty)} {item.unit || ""}</TableCell>
-                            <TableCell>{formatUSD(item.cif_usd)}</TableCell>
-                            <TableCell>{formatINR(item.cif_inr)}</TableCell>
+                        <>
+                          {utilizationRecords.map((item, idx) => (
+                            <TableRow key={idx} sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
+                              <TableCell sx={{ px: 3, fontWeight: "600", color: "#3B82F6" }}>{item.be_no || "—"}</TableCell>
+                              <TableCell>{item.be_date || "—"}</TableCell>
+                              <TableCell>{item.port || "—"}</TableCell>
+                              <TableCell>{formatNumber(item.qty)} {item.unit || ""}</TableCell>
+                              <TableCell>{formatUSD(item.cif_usd)}</TableCell>
+                              <TableCell>{formatINR(item.cif_inr)}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow sx={{ backgroundColor: "#f1f5f9", "& td": { borderTop: "2px solid #cbd5e1", fontWeight: "800", color: "#0f172a" } }}>
+                            <TableCell sx={{ px: 3 }} colSpan={3}>Total</TableCell>
+                            <TableCell>{formatNumber(utilSums.totalQty)} {utilizationRecords[0]?.unit || ""}</TableCell>
+                            <TableCell>{formatUSD(utilSums.totalUSD)}</TableCell>
+                            <TableCell>{formatINR(utilSums.totalINR)}</TableCell>
                           </TableRow>
-                        ))
+                        </>
                       ) : (
                         <TableRow>
                           <TableCell colSpan={6} align="center" sx={{ py: 3, color: "#64748B" }}>

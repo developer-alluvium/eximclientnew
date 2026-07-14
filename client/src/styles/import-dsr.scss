@@ -47,78 +47,78 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
     overflow: hidden;
   }
-}
 
-/* Table Header Styling - Dark Blue Theme */
-.MuiTableHead-root {
-  .MuiTableRow-root {
-    // background: #1e293b !important;
-
-    .MuiTableCell-head {
+  /* Table Header Styling - Dark Blue Theme */
+  .MuiTableHead-root {
+    .MuiTableRow-root {
       // background: #1e293b !important;
-      color: #ffffff !important;
-      font-weight: 600 !important;
-      font-size: 0.75rem !important;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 12px 16px !important;
-      border-bottom: none !important;
-      white-space: nowrap;
 
-      .Mui-TableHeadCell-Content {
-        color: #ffffff;
-      }
-
-      .MuiTableSortLabel-root {
+      .MuiTableCell-head {
+        // background: #1e293b !important;
         color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 0.75rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 16px !important;
+        border-bottom: none !important;
+        white-space: nowrap;
 
-        &:hover {
-          color: #94a3b8 !important;
+        .Mui-TableHeadCell-Content {
+          color: #ffffff;
         }
 
-        .MuiTableSortLabel-icon {
-          color: #94a3b8 !important;
-        }
-      }
-
-      /* Column action icons */
-      .MuiIconButton-root {
-        color: rgba(255, 255, 255, 0.7) !important;
-
-        &:hover {
+        .MuiTableSortLabel-root {
           color: #ffffff !important;
-          background-color: rgba(255, 255, 255, 0.1) !important;
+
+          &:hover {
+            color: #94a3b8 !important;
+          }
+
+          .MuiTableSortLabel-icon {
+            color: #94a3b8 !important;
+          }
+        }
+
+        /* Column action icons */
+        .MuiIconButton-root {
+          color: rgba(255, 255, 255, 0.7) !important;
+
+          &:hover {
+            color: #ffffff !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
+          }
         }
       }
     }
   }
-}
 
-/* Table Body Styling */
-.MuiTableBody-root {
-  .MuiTableRow-root {
-    transition: background-color 0.15s ease;
-    border-bottom: 1px solid #f1f5f9;
+  /* Table Body Styling */
+  .MuiTableBody-root {
+    .MuiTableRow-root {
+      transition: background-color 0.15s ease;
+      border-bottom: 1px solid #f1f5f9;
 
-    &:hover {
-      background-color: #f8fafc !important;
-    }
+      &:hover {
+        background-color: #f8fafc !important;
+      }
 
-    &:nth-of-type(even) {
-      background-color: #fafbfc;
-    }
+      &:nth-of-type(even) {
+        background-color: #fafbfc;
+      }
 
-    .MuiTableCell-root {
-      padding: 10px 16px !important;
-      font-size: 0.8rem !important;
-      color: #334155;
-      border-bottom: 1px solid #f1f5f9 !important;
-      white-space: nowrap;
+      .MuiTableCell-root {
+        padding: 10px 16px !important;
+        font-size: 0.8rem !important;
+        color: #334155;
+        border-bottom: 1px solid #f1f5f9 !important;
+        white-space: nowrap;
 
-      /* Job No column styling */
-      &:first-of-type {
-        font-weight: 600;
-        // color: #1e293b;
+        /* Job No column styling */
+        &:first-of-type {
+          font-weight: 600;
+          // color: #1e293b;
+        }
       }
     }
   }
