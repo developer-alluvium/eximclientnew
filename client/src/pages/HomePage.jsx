@@ -249,6 +249,59 @@ function HomePage() {
       category: "core",
     },
     {
+      name: "Export DSR",
+      description:
+        "Comprehensive export shipment tracking and IEC-wise data management",
+      path: "/export",
+      icon: <AssessmentOutlinedIcon />,
+      category: "core",
+    },
+    {
+      name: "DGFT",
+      description: "View DGFT registers and authorization details by IEC code",
+      path: "/dgft",
+      icon: <DescriptionOutlinedIcon />,
+      category: "core",
+    },
+    {
+      name: "Transport",
+      description: "View transport details, track shipments, and manage logistics",
+      path: "/transport",
+      icon: <LocalShippingOutlinedIcon />,
+      category: "core",
+    },
+    {
+      name: "E-Lock",
+      description:
+        "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
+      path: "/elock",
+      icon: <LockOutlinedIcon />,
+      category: "core",
+      isExternal: false,
+    },
+    {
+      name: "E-Way Bill",
+      description: "Generate and manage e-way bills with direct ICEGATE Integration",
+      path: "/ewaybill",
+      icon: <LocalShippingOutlinedIcon />,
+      category: "beta",
+    },
+    {
+      name: "Trade Master Guide",
+      description: "Tutorials to master import and export procedures",
+      path: "/trademasterguide",
+      icon: <VideocamOutlinedIcon />,
+      category: "core",
+    },
+    {
+      name: "Open Points",
+      description: "Manage project discussion points, task assignments, and review timelines",
+      path: "/open-points",
+      icon: <AssessmentOutlinedIcon />,
+      category: "core",
+    },
+    /*
+    {
       name: "CostIQ",
       description:
         "Calculate shipping costs per kilogram for better pricing decisions",
@@ -283,22 +336,6 @@ function HomePage() {
       isExternal: true,
     },
     {
-      name: "E-Lock",
-      description:
-        "E-Lock is a device used for secure transport of goods, ensuring tamper-proof delivery.",
-      path: "/elock",
-      icon: <LockOutlinedIcon />,
-      category: "core",
-      isExternal: false,
-    },
-    {
-      name: "E-Way Bill",
-      description: "Generate and manage e-way bills with direct ICEGATE Integration",
-      path: "/ewaybill",
-      icon: <LocalShippingOutlinedIcon />,
-      category: "core",
-    },
-    {
       name: "Intendor Management System",
       description:
         "Coming Soon -  Complete solution in material procurement and purchase indent.",
@@ -314,20 +351,7 @@ function HomePage() {
       icon: <DescriptionOutlinedIcon />,
       category: "coming-soon",
     },
-    {
-      name: "Trademaster Guide",
-      description: "Tutorials to master import and export procedures",
-      path: "/trademasterguide",
-      icon: <VideocamOutlinedIcon />,
-      category: "core",
-    },
-    {
-      name: "DGFT",
-      description: "View DGFT registers and authorization details by IEC code",
-      path: "/dgft",
-      icon: <DescriptionOutlinedIcon />,
-      category: "core",
-    },
+    */
   ];
 
   // Filter modules based on user access (reactive to module changes)

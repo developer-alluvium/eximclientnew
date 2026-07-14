@@ -577,11 +577,18 @@ function UserDashboard() {
       category: "core",
     },
     {
-      name: "CostIQ",
+      name: "DGFT",
+      description: "View DGFT registers and authorization details by IEC code",
+      path: "/dgft",
+      categoryLabel: "TRADE MANAGEMENT",
+      category: "core",
+    },
+    {
+      name: "Transport",
       description:
-        "Advanced freight cost calculator with per-kilogram pricing analysis",
-      path: "/netpage",
-      categoryLabel: "FINANCIAL ANALYSIS",
+        "View transport details, track shipments, and manage logistics",
+      path: "/transport",
+      categoryLabel: "TRANSPORT MANAGEMENT",
       category: "core",
     },
     {
@@ -598,6 +605,30 @@ function UserDashboard() {
       description: "Generate and manage e-way bills with direct ICEGATE Integration",
       path: "/ewaybill",
       categoryLabel: "TRANSPORT MANAGEMENT",
+      category: "beta",
+    },
+    {
+      name: "Trade Master Guide",
+      description:
+        "Comprehensive trade documentation with compliance guidelines",
+      path: "/trademasterguide",
+      categoryLabel: "TRADE MANAGEMENT",
+      category: "core",
+    },
+    {
+      name: "Open Points",
+      description: "Manage project discussion points, task assignments, and review timelines",
+      path: "/open-points",
+      categoryLabel: "TASK MANAGEMENT",
+      category: "core",
+    },
+    /*
+    {
+      name: "CostIQ",
+      description:
+        "Advanced freight cost calculator with per-kilogram pricing analysis",
+      path: "/netpage",
+      categoryLabel: "FINANCIAL ANALYSIS",
       category: "core",
     },
     {
@@ -627,37 +658,7 @@ function UserDashboard() {
       category: "core",
       isExternal: true,
     },
-    {
-      name: "Trade Master Guide",
-      description:
-        "Comprehensive trade documentation with compliance guidelines",
-      path: "/trademasterguide",
-      categoryLabel: "TRADE MANAGEMENT",
-      category: "core",
-    },
-
-    {
-      name: "Transport",
-      description:
-        "View transport details, track shipments, and manage logistics",
-      path: "/transport",
-      categoryLabel: "TRANSPORT MANAGEMENT",
-      category: "core",
-    },
-    {
-      name: "Open Points",
-      description: "Manage project discussion points, task assignments, and review timelines",
-      path: "/open-points",
-      categoryLabel: "TASK MANAGEMENT",
-      category: "core",
-    },
-    {
-      name: "DGFT",
-      description: "View DGFT registers and authorization details by IEC code",
-      path: "/dgft",
-      categoryLabel: "TRADE MANAGEMENT",
-      category: "core",
-    },
+    */
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-GB", {
