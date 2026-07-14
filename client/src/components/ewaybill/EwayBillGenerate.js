@@ -239,7 +239,7 @@ const DEFAULT_FORM = {
   transporterId: process.env.REACT_APP_DEFAULT_GSTIN || "",
   transporterName: "",
   transporterDocNo: "",
-  transporterDocDate: new Date().toISOString().split('T')[0],
+  transporterDocDate: "",
   transportationMode: "Road",
   transportDistance: "",
   vehicleNo: "",
@@ -697,8 +697,8 @@ function EwayBillGenerate({
           setFormData(prev => ({
             ...prev,
             ...modeDefaults,
-            vehicleNo: lrData.container_details?.vehicle_no || '',
-            transporterDocNo: lrData.container_details?.tr_no || '',
+            vehicleNo: prev.partAOnly ? '' : (lrData.container_details?.vehicle_no || ''),
+            transporterDocNo: prev.partAOnly ? '' : (lrData.container_details?.tr_no || ''),
             documentNumber: documentNo,
             documentDate: documentDate || prev.documentDate,
           }));
@@ -726,8 +726,8 @@ function EwayBillGenerate({
               consigneeAddress1: lrData.consignee?.branches?.[0]?.address || '',
               consigneeCity: lrData.consignee?.branches?.[0]?.city || '',
               consigneePincode: lrData.consignee?.branches?.[0]?.postalCode || '',
-              vehicleNo: lrData.container_details?.vehicle_no || '',
-              transporterDocNo: lrData.container_details?.tr_no || '',
+              vehicleNo: prev.partAOnly ? '' : (lrData.container_details?.vehicle_no || ''),
+              transporterDocNo: prev.partAOnly ? '' : (lrData.container_details?.tr_no || ''),
             };
 
             // Apply special rule: Suraj
@@ -826,8 +826,8 @@ function EwayBillGenerate({
       // Still populate transport details for Part B
       setFormData(prev => ({
         ...prev,
-        vehicleNo: selected.container_details?.vehicle_no || "",
-        transporterDocNo: selected.tr_no || "",
+        vehicleNo: prev.partAOnly ? '' : (selected.container_details?.vehicle_no || ''),
+        transporterDocNo: prev.partAOnly ? '' : (selected.tr_no || ''),
       }));
       return;
     }
@@ -894,8 +894,8 @@ function EwayBillGenerate({
         shipToPincode: consigneePincode,
         shipToState: consigneeState,
 
-        transporterDocNo: selected.tr_no || "",
-        vehicleNo: selected.container_details?.vehicle_no || "",
+        transporterDocNo: prev.partAOnly ? '' : (selected.tr_no || ''),
+        vehicleNo: prev.partAOnly ? '' : (selected.container_details?.vehicle_no || ''),
 
         items: [{
           productName: "Goods",
@@ -1365,9 +1365,9 @@ function EwayBillGenerate({
         shipToPincode: consigneePincode,
         shipToState: consigneeState,
 
-        // Vehicle/Transport from LR if available
-        vehicleNo: lrData?.container_details?.vehicle_no || prev.vehicleNo || "",
-        transporterDocNo: lrData?.container_details?.tr_no || prev.transporterDocNo || "",
+        // Vehicle/Transport from LR if available (skip if Part A Only is checked)
+        vehicleNo: prev.partAOnly ? '' : (lrData?.container_details?.vehicle_no || prev.vehicleNo || ''),
+        transporterDocNo: prev.partAOnly ? '' : (lrData?.container_details?.tr_no || prev.transporterDocNo || ''),
 
         // Items from external API (import line item details)
         items: mappedItems,
@@ -1375,7 +1375,7 @@ function EwayBillGenerate({
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2)
           : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummary['TOT.ASS VAL'] || "")),
-        transportDistance: (isImport || consignorPincode === "999999" || consigneePincode === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
+        transportDistance: prev.partAOnly ? '' : ((isImport || consignorPincode === "999999" || consigneePincode === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000)),
       };
 
       // If we have selected containers, update the first item with combined weight and calculated assessable value
@@ -2224,12 +2224,7 @@ function EwayBillGenerate({
             icon: "success",
             title: "Part B Updated",
             html: `<p><strong>EWB:</strong> ${existingEwbNo}</p><p><strong>Vehicle:</strong> ${formData.vehicleNo}</p>`,
-          });
-          setSuccess({
-            ewbNo: existingEwbNo,
-            ewbDate: response.data.data?.ewbDate || "",
-            validUpto: response.data.data?.validUpto || "",
-          });
+          }).then(() => { if (onClose) onClose(); });
         }
       } catch (error) {
         console.error("Part B update error:", error);
@@ -2443,7 +2438,6 @@ function EwayBillGenerate({
 
       if (response.data.success) {
         markBoeDocumentGenerated(formData.documentNumber || boeNumber);
-        setSuccess(response.data.data);
 
         // Save E-Way Bill to database at container level
         const ewbNo = response.data.data.ewbNo;
@@ -2632,6 +2626,7 @@ function EwayBillGenerate({
     setExistingEwbNo('');
     setFieldErrors({});
     setFormData({ ...DEFAULT_FORM, items: [{ ...EMPTY_ITEM }] });
+    if (onClose) onClose();
   };
 
   // ==========================================
@@ -2878,7 +2873,7 @@ function EwayBillGenerate({
           <h2>Generate E-Way Bill</h2>
         </div>
       )}
-      {asDialog && (
+      {asDialog && !success && (
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0 20px' }}>
             <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#1e293b' }}>Generate E-Way Bill</h2>
             {onClose && (
@@ -2887,36 +2882,7 @@ function EwayBillGenerate({
          </div>
       )}
 
-      {success ? (
-        <div className="success-card">
-          <h3>✓ E-Way Bill {isPartBOnly ? "Part B Updated" : "Generated"} Successfully</h3>
-          <div className="ewb-number">{success.ewbNo}</div>
-          <div className="ewb-details">
-            <p>Date: {success.ewbDate}</p>
-            <p>Valid Until: {success.validUpto}</p>
-          </div>
-          <div className="form-actions" style={{ justifyContent: "center" }}>
-            {success.pdfUrl ? (
-              <a
-                href={`${success.pdfUrl}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary"
-              >
-                Download PDF
-              </a>
-            ) : (
-              <div style={{ color: "#475569", fontSize: "0.85rem", fontStyle: "italic", display: "inline-block", padding: "10px 20px" }}>
-                📄 PDF is being generated and will be available shortly
-              </div>
-            )}
-            <button className="btn btn-secondary" onClick={handleReset}>
-              Generate Another
-            </button>
-          </div>
-        </div>
-      ) : (
-          <form className="ewaybill-form" onSubmit={handleSubmit}>
+      <form className="ewaybill-form" onSubmit={handleSubmit}>
 
           {/* ===== CALCULATED VALUE BANNER (Multi-Container Individual Mode) ===== */}
           {isMultiContainerMode && generationMode === 'batch-selected' && selectedContainers && selectedContainers.length === 1 && containerAssessableValues[selectedContainers[0]._id] && (
@@ -4074,9 +4040,14 @@ function EwayBillGenerate({
                           ...prev,
                           partAOnly: isChecked,
                           ...(isChecked && {
+                            transporterId: "",
+                            transporterName: "",
+                            transportDistance: "",
+                            vehicleType: "Regular",
+                            transportationMode: "Road",
                             vehicleNo: "",
                             transporterDocNo: "",
-                            transportationMode: ""
+                            transporterDocDate: "",
                           })
                         }));
                       }}
@@ -4181,7 +4152,6 @@ function EwayBillGenerate({
             </>
           )}
         </form>
-      )}
     </div>
   );
 }
