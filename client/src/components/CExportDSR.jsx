@@ -1093,23 +1093,37 @@ function CExportDSR() {
                   <span style={{ color: "#64748b", fontWeight: 600 }}>{inv.termsOfInvoice}</span>{" "}
                   <span style={{ fontWeight: 700 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
                 </Typography>
-                {job.scheme && (
-                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.5 }}>
-                    Scheme: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.scheme}</span>
-                  </Typography>
-                )}
-                {inv.drawback_scroll_no && (
-                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
-                    DBK Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{inv.drawback_scroll_no}</span>
-                    {inv.drawback_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(inv.drawback_scroll_date)})</span>}
-                  </Typography>
-                )}
-                {inv.rosctl_scroll_no && (
-                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
-                    RoSCTL Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{inv.rosctl_scroll_no}</span>
-                    {inv.rosctl_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(inv.rosctl_scroll_date)})</span>}
-                  </Typography>
-                )}
+                {(() => {
+                  const product = inv.products?.[0] || {};
+                  const drawback = product.drawbackDetails?.[0] || {};
+                  const scheme = product.eximCode || job.scheme || "";
+                  const drawback_scroll_no = drawback.drawback_scroll_no || inv.drawback_scroll_no || "";
+                  const drawback_scroll_date = drawback.drawback_scroll_date || inv.drawback_scroll_date || "";
+                  const rosctl_scroll_no = drawback.rosctl_scroll_no || inv.rosctl_scroll_no || "";
+                  const rosctl_scroll_date = drawback.rosctl_scroll_date || inv.rosctl_scroll_date || "";
+
+                  return (
+                    <>
+                      {scheme && (
+                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.5 }}>
+                          Scheme: <span style={{ fontWeight: 500, color: "#0f172a" }}>{scheme}</span>
+                        </Typography>
+                      )}
+                      {drawback_scroll_no && (
+                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
+                          DBK Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{drawback_scroll_no}</span>
+                          {drawback_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(drawback_scroll_date)})</span>}
+                        </Typography>
+                      )}
+                      {rosctl_scroll_no && (
+                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
+                          RoSCTL Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{rosctl_scroll_no}</span>
+                          {rosctl_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(rosctl_scroll_date)})</span>}
+                        </Typography>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             ) : (
               <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
@@ -1145,12 +1159,19 @@ function CExportDSR() {
         return (
           <TableCell style={cellStyle}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DEST</span>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px", mt: 0.5 }}>DEST</span>
                 <Box sx={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 700 }}>
-                    {job.destination_port}
-                  </span>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 700 }}>
+                      {job.destination_port}
+                    </span>
+                    {job.destination_port && (
+                      <IconButton size="small" onClick={(e) => handleCopyText(job.destination_port, e)} sx={{ p: 0.2 }}>
+                        <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                      </IconButton>
+                    )}
+                  </Box>
                   {job.destination_country && (
                     <span style={{ fontSize: "9px", color: "#64748b", fontWeight: 500 }}>
                       ({job.destination_country})
@@ -1158,33 +1179,24 @@ function CExportDSR() {
                   )}
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                 <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>POL</span>
                 <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_loading}</span>
+                {job.port_of_loading && (
+                  <IconButton size="small" onClick={(e) => handleCopyText(job.port_of_loading, e)} sx={{ p: 0.2 }}>
+                    <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                  </IconButton>
+                )}
               </Box>
-              <Box sx={{ display: "flex", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                 <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DISCH</span>
                 <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_discharge}</span>
+                {job.port_of_discharge && (
+                  <IconButton size="small" onClick={(e) => handleCopyText(job.port_of_discharge, e)} sx={{ p: 0.2 }}>
+                    <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                  </IconButton>
+                )}
               </Box>
-              {(job.vgm_date || job.form13_date || job.esanchit_completed_date_time) && (
-                <Box sx={{ mt: 0.75, pt: 0.75, borderTop: "1px dashed #e2e8f0", display: "flex", flexDirection: "column", gap: 0.2 }}>
-                  {job.vgm_date && (
-                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
-                      VGM: <span style={{ fontWeight: 700, color: "#166534" }}>{formatDate(job.vgm_date)}</span>
-                    </Typography>
-                  )}
-                  {job.form13_date && (
-                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
-                      F-13: <span style={{ fontWeight: 700, color: "#1e3a8a" }}>{formatDate(job.form13_date)}</span>
-                    </Typography>
-                  )}
-                  {job.esanchit_completed_date_time && (
-                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
-                      ES: <span style={{ fontWeight: 700, color: "#b45309" }}>{formatDate(job.esanchit_completed_date_time)}</span>
-                    </Typography>
-                  )}
-                </Box>
-              )}
             </Box>
           </TableCell>
         );
@@ -1280,6 +1292,9 @@ function CExportDSR() {
         const isRoad = opDetails.railRoad === "road";
         const milestoneItems = [
           { label: "LEO", val: opDetails.leoDate ? formatDate(opDetails.leoDate) : null },
+          { label: "VGM", val: job.vgm_date ? formatDate(job.vgm_date) : null },
+          { label: "F-13", val: job.form13_date ? formatDate(job.form13_date) : null },
+          { label: "ESB", val: job.shipping_bill_done_date ? formatDate(job.shipping_bill_done_date) : null },
           { label: "DHO", val: opDetails.handoverForwardingNoteDate ? formatDate(opDetails.handoverForwardingNoteDate) : null },
           { label: isRoad ? "ROAD OUT" : "RAIL OUT", val: opDetails.handoverConcorTharSanganaRailRoadDate ? formatDate(opDetails.handoverConcorTharSanganaRailRoadDate) : null },
           { label: isRoad ? "ROAD RCH" : "RAIL RCH", val: opDetails.railOutReachedDate ? formatDate(opDetails.railOutReachedDate) : null },
