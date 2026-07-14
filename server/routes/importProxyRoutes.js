@@ -25,7 +25,11 @@ import {
   getUserDashboardStats,
   getJobsOverview,
   getHsCodes,
-  getSuppliers
+  getSuppliers,
+  getDgftRegisters,
+  getAuthorizationsByIec,
+  getAuthorizationByNo,
+  getLicenseUtilizationRecords
 } from "../controllers/importProxyController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -95,5 +99,11 @@ router.get("/api/user-dashboard-stats", authenticateUser, getUserDashboardStats)
 router.get("/api/get-jobs-overview/:year", authenticateUser, getJobsOverview);
 router.get("/api/get-hs-codes", authenticateUser, getHsCodes);
 router.get("/api/get-suppliers", authenticateUser, getSuppliers);
+
+// DGFT Module Routes
+router.get("/api/get-dgft-registers", authenticateUser, getDgftRegisters);
+router.get("/api/get-authorizations-by-iec", authenticateUser, getAuthorizationsByIec);
+router.get("/api/get-authorization-by-no", authenticateUser, getAuthorizationByNo);
+router.get("/api/license-utilization/records", authenticateUser, getLicenseUtilizationRecords);
 
 export default router;

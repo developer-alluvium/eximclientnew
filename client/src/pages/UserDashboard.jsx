@@ -651,6 +651,13 @@ function UserDashboard() {
       categoryLabel: "TASK MANAGEMENT",
       category: "core",
     },
+    {
+      name: "DGFT",
+      description: "View DGFT registers and authorization details by IEC code",
+      path: "/dgft",
+      categoryLabel: "TRADE MANAGEMENT",
+      category: "core",
+    },
   ];
 
   const formattedDate = currentDateTime.toLocaleDateString("en-GB", {

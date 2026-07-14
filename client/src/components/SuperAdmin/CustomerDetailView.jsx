@@ -231,6 +231,7 @@ const CustomerDetailView = ({
     if (moduleId.includes("snapcheck")) return <CheckCircle />;
     if (moduleId.includes("qrlocker")) return <Lock />;
     if (moduleId.includes("task-flow")) return <Settings />;
+    if (moduleId.includes("dgft")) return <Assignment />;
     return <Extension />;
   };
 

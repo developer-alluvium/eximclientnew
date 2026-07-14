@@ -183,6 +183,9 @@ class ModuleAssignmentFrontendTester {
       "/trademasterguide": "Import Video",
       "/transport": "Transport",
       "/ewaybill": "E-Way Bill",
+      "/export": "Export DSR",
+      "/open-points": "Open Points",
+      "/dgft": "DGFT",
     };
 
     let accessibleModules = 0;

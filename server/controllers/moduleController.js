@@ -74,6 +74,12 @@ const AVAILABLE_MODULES = [
     name: "Open Points",
     description: "Manage project discussion points, task assignments, and review timelines",
     category: "core",
+  },
+  {
+    id: "/dgft",
+    name: "DGFT",
+    description: "DGFT Register & Authorization License Details module",
+    category: "core",
   }
 ];
 

@@ -1094,3 +1094,73 @@ export const updateContainerEwayBill = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/get-dgft-registers
+ */
+export const getDgftRegisters = async (req, res) => {
+  try {
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-dgft-registers`, {
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getDgftRegisters error:", error.message);
+    res.status(500).json({ error: "Failed to fetch DGFT registers." });
+  }
+};
+
+/**
+ * GET /api/get-authorizations-by-iec
+ */
+export const getAuthorizationsByIec = async (req, res) => {
+  try {
+    const { iec_no } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorizations-by-iec`, {
+      params: { iec_no },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getAuthorizationsByIec error:", error.message);
+    res.status(500).json({ error: "Failed to fetch authorizations by IEC." });
+  }
+};
+
+/**
+ * GET /api/get-authorization-by-no
+ */
+export const getAuthorizationByNo = async (req, res) => {
+  try {
+    const { authorization_no } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorization-by-no`, {
+      params: { authorization_no },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getAuthorizationByNo error:", error.message);
+    res.status(500).json({ error: "Failed to fetch authorization by number." });
+  }
+};
+
+/**
+ * GET /api/license-utilization/records
+ */
+export const getLicenseUtilizationRecords = async (req, res) => {
+  try {
+    const { authorization_no } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/license-utilization/records`, {
+      params: { authorization_no },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getLicenseUtilizationRecords error:", error.message);
+    res.status(500).json({ error: "Failed to fetch license utilization records." });
+  }
+};
+

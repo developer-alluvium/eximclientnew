@@ -187,6 +187,12 @@ const AVAILABLE_MODULES = [
     description: "Manage project discussion points, task assignments, and review timelines",
     category: "core",
   },
+  {
+    id: "/dgft",
+    name: "DGFT",
+    description: "DGFT Register & Authorization License Details module",
+    category: "core",
+  },
 ];
 
 const AdminManagement = ({ onRefresh }) => {
@@ -983,6 +989,7 @@ const AdminManagement = ({ onRefresh }) => {
     if (moduleId.includes("elock") || moduleId.includes("lock")) return "🔐";
     if (moduleId.includes("trade")) return "📚";
     if (moduleId.includes("transport")) return "🚚";
+    if (moduleId.includes("dgft")) return "💼";
     return "📱";
   };
 

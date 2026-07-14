@@ -407,15 +407,15 @@ function CExportDSR() {
   }, [tabCounts, activeTab]);
 
   const exportColumnDefinitions = React.useMemo(() => [
-    { id: "job_no", label: "JOB NO", width: "12%" },
-    { id: "exporter", label: "EXPORTER", width: "17%" },
-    { id: "invoice", label: "INVOICE", width: "11%" },
-    { id: "sb_no", label: "SB NO", width: "9%" },
-    { id: "port", label: "PORT", width: "16%" },
+    { id: "job_no", label: "JOB NO", width: "14%" },
+    { id: "exporter", label: "CONSIGNEE", width: "17%" },
+    { id: "invoice", label: "INVOICE", width: "9%" },
+    { id: "sb_no", label: "SB NO", width: "8%" },
+    { id: "port", label: "PORT", width: "13%" },
     { id: "container", label: "CONTAINER", width: "11%" },
-    { id: "handover", label: "HANDOVER", width: "7%" },
-    { id: "docs", label: "DOCS", width: "12%" },
-    { id: "query", label: "QUERY", width: "10%" },
+    { id: "handover", label: "HANDOVER", width: "10%" },
+    { id: "docs", label: "DOCS", width: "9%" },
+    { id: "query", label: "QUERY", width: "9%" },
   ], []);
 
   const [columnOrder, setColumnOrder] = React.useState(exportColumnDefinitions.map((col) => col.id));
@@ -468,9 +468,63 @@ function CExportDSR() {
   // For raising a query:
   const [raiseQueryOpen, setRaiseQueryOpen] = React.useState(false);
   const [raiseQueryJob, setRaiseQueryJob] = React.useState(null);
-  const [raiseQuerySubject, setRaiseQuerySubject] = React.useState("");
   const [raiseQueryMessage, setRaiseQueryMessage] = React.useState("");
   const [raiseQuerySending, setRaiseQuerySending] = React.useState(false);
+
+  const handleRedClick = (job) => {
+    setRaiseQueryJob(job);
+    setRaiseQueryMessage("");
+    setRaiseQueryOpen(true);
+  };
+
+  const handleYellowClick = (job) => {
+    const queryStat = clientQueriesStatus[job.job_no] || { hasQueries: false };
+    if (!queryStat.hasQueries) {
+      setSnackbar({ open: true, message: "No query history found. Click Red to raise a query.", severity: "info" });
+      return;
+    }
+    handleOpenQueryChat(job);
+  };
+
+  const handleResolveOpenQuery = async (job) => {
+    try {
+      const resp = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/client-queries`,
+        { params: { job_no: job.job_no, status: "open" } }
+      );
+      const openQueries = resp.data?.queries || [];
+      if (openQueries.length === 0) {
+        setSnackbar({ open: true, message: "No open queries found for this job.", severity: "warning" });
+        return;
+      }
+
+      const targetQuery = openQueries[0];
+      await axios.put(
+        `${process.env.REACT_APP_API_STRING}/client-queries/${targetQuery._id}/resolve`,
+        {
+          resolvedBy: user?.name || "Client",
+          resolutionNote: "Resolved by client from dashboard"
+        }
+      );
+
+      setSnackbar({ open: true, message: "Query resolved successfully.", severity: "success" });
+
+      // Refresh query status map
+      const statusRes = await axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
+        jobNos: [job.job_no],
+        isClient: true
+      }, { withCredentials: true });
+      if (statusRes.data?.success) {
+        setClientQueriesStatus(prev => ({
+          ...prev,
+          ...statusRes.data.data
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to resolve query:", error);
+      setSnackbar({ open: true, message: "Failed to resolve query.", severity: "error" });
+    }
+  };
 
   // Dynamically populated filters from returned jobs
   const jobOwnersList = React.useMemo(() => {
@@ -970,39 +1024,48 @@ function CExportDSR() {
       case "exporter":
         return (
           <TableCell style={cellStyle}>
-            {/* Exporter name hidden per user request; displayed in top center header */}
-            {/* <Typography sx={{ fontWeight: 700, fontSize: "11px", color: "#0f172a" }}>
-              {job.exporter}
-              {job.exporter_branch_name && job.exporter_branch_name.toLowerCase() !== "main" && (
-                <span style={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}>
-                  {` (${job.exporter_branch_name})`}
-                </span>
-              )}
-            </Typography> */}
-
             {job.consignees?.[0]?.consignee_name && (
-              <Typography sx={{ fontSize: "10px", color: "#475569", mt: 0.5, display: "flex", gap: 0.5 }}>
-                <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>CONS:</span>
-                {job.consignees[0].consignee_name.length > 35
-                  ? `${job.consignees[0].consignee_name.substring(0, 35)}...`
-                  : job.consignees[0].consignee_name}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+                <Typography sx={{ fontSize: "10px", color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
+                  <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>CONS:</span>
+                  {job.consignees[0].consignee_name}
+                </Typography>
+                <IconButton size="small" onClick={(e) => handleCopyText(job.consignees[0].consignee_name, e)} sx={{ p: 0.2 }}>
+                  <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                </IconButton>
+              </Box>
             )}
 
             {job.buyerThirdPartyInfo?.buyer?.name && (
-              <Typography sx={{ fontSize: "10px", color: "#475569", mt: 0.5, display: "flex", gap: 0.5 }}>
-                <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>3rd PARTY:</span>
-                {job.buyerThirdPartyInfo.buyer.name}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+                <Typography sx={{ fontSize: "10px", color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
+                  <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>3rd PARTY:</span>
+                  {job.buyerThirdPartyInfo.buyer.name}
+                </Typography>
+                <IconButton size="small" onClick={(e) => handleCopyText(job.buyerThirdPartyInfo.buyer.name, e)} sx={{ p: 0.2 }}>
+                  <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                </IconButton>
+              </Box>
+            )}
+
+            {job.shipping_line_airline && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
+                  Line: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.shipping_line_airline}</span>
+                </Typography>
+                <IconButton size="small" onClick={(e) => handleCopyText(job.shipping_line_airline, e)} sx={{ p: 0.2 }}>
+                  <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                </IconButton>
+              </Box>
             )}
 
             {job.booking_no && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
-                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569" }}>
+                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
                   Bk No: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.booking_no}</span>
                 </Typography>
                 <IconButton size="small" onClick={(e) => handleCopyText(job.booking_no, e)} sx={{ p: 0.2 }}>
-                  <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                  <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                 </IconButton>
               </Box>
             )}
@@ -1030,6 +1093,23 @@ function CExportDSR() {
                   <span style={{ color: "#64748b", fontWeight: 600 }}>{inv.termsOfInvoice}</span>{" "}
                   <span style={{ fontWeight: 700 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
                 </Typography>
+                {job.scheme && (
+                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.5 }}>
+                    Scheme: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.scheme}</span>
+                  </Typography>
+                )}
+                {inv.drawback_scroll_no && (
+                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
+                    DBK Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{inv.drawback_scroll_no}</span>
+                    {inv.drawback_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(inv.drawback_scroll_date)})</span>}
+                  </Typography>
+                )}
+                {inv.rosctl_scroll_no && (
+                  <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
+                    RoSCTL Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{inv.rosctl_scroll_no}</span>
+                    {inv.rosctl_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(inv.rosctl_scroll_date)})</span>}
+                  </Typography>
+                )}
               </>
             ) : (
               <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
@@ -1086,6 +1166,25 @@ function CExportDSR() {
                 <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DISCH</span>
                 <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_discharge}</span>
               </Box>
+              {(job.vgm_date || job.form13_date || job.esanchit_completed_date_time) && (
+                <Box sx={{ mt: 0.75, pt: 0.75, borderTop: "1px dashed #e2e8f0", display: "flex", flexDirection: "column", gap: 0.2 }}>
+                  {job.vgm_date && (
+                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
+                      VGM: <span style={{ fontWeight: 700, color: "#166534" }}>{formatDate(job.vgm_date)}</span>
+                    </Typography>
+                  )}
+                  {job.form13_date && (
+                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
+                      F-13: <span style={{ fontWeight: 700, color: "#1e3a8a" }}>{formatDate(job.form13_date)}</span>
+                    </Typography>
+                  )}
+                  {job.esanchit_completed_date_time && (
+                    <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569" }}>
+                      ES: <span style={{ fontWeight: 700, color: "#b45309" }}>{formatDate(job.esanchit_completed_date_time)}</span>
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
           </TableCell>
         );
@@ -1132,7 +1231,7 @@ function CExportDSR() {
                       </Box>
                       {container.type && (
                         <span style={{ fontSize: "8px", fontWeight: 900, backgroundColor: "#e2e8f0", padding: "0 6px", borderRadius: "2px" }}>
-                          {getContainerSizeLabel(container.type)}
+                          {container.type.toString().toUpperCase()}
                         </span>
                       )}
                     </Box>
@@ -1234,7 +1333,78 @@ function CExportDSR() {
         return (
           <TableCell style={cellStyle} align="left">
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, alignItems: "flex-start" }}>
-              {queryStat.hasQueries ? (
+              <Box sx={{ display: "flex", gap: 1, mt: 0.5, mb: 0.5, alignItems: "center" }}>
+                <IconButton
+                  size="small"
+                  onClick={() => handleRedClick(job)}
+                  sx={{
+                    width: 14,
+                    height: 14,
+                    p: 0,
+                    backgroundColor: "#ef4444",
+                    borderRadius: "50%",
+                    "&:hover": { backgroundColor: "#dc2626", transform: "scale(1.2)" },
+                    transition: "all 0.15s ease",
+                    border: "none",
+                  }}
+                  title="Raise new query"
+                />
+                
+                {queryStat.hasQueries && (
+                  <Box sx={{ position: "relative", display: "inline-flex" }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleYellowClick(job)}
+                      sx={{
+                        width: 14,
+                        height: 14,
+                        p: 0,
+                        backgroundColor: "#f59e0b",
+                        borderRadius: "50%",
+                        "&:hover": { backgroundColor: "#d97706", transform: "scale(1.2)" },
+                        transition: "all 0.15s ease",
+                        border: "none",
+                      }}
+                      title="View replies & reply back"
+                    />
+                    {queryStat.hasUnseen && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          top: -3,
+                          right: -3,
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          backgroundColor: "#ef4444",
+                          border: "1px solid #fff",
+                          pointerEvents: "none",
+                        }}
+                      />
+                    )}
+                  </Box>
+                )}
+
+                {queryStat.hasOpenQueries && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleResolveOpenQuery(job)}
+                    sx={{
+                      width: 14,
+                      height: 14,
+                      p: 0,
+                      backgroundColor: "#10b981",
+                      borderRadius: "50%",
+                      "&:hover": { backgroundColor: "#059669", transform: "scale(1.2)" },
+                      transition: "all 0.15s ease",
+                      border: "none",
+                    }}
+                    title="Resolve open query"
+                  />
+                )}
+              </Box>
+
+              {queryStat.hasQueries && (
                 <span
                   style={{
                     ...pillStyle,
@@ -1244,55 +1414,15 @@ function CExportDSR() {
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
-                    gap: "4px"
+                    gap: "4px",
+                    fontSize: "9px",
+                    mt: 0.5
                   }}
                   onClick={() => handleOpenQueryChat(job)}
                 >
                   {queryStat.hasUnseen ? "● New Message" : queryStat.hasOpenQueries ? "Open Query" : "Resolved"}
                 </span>
-              ) : (
-                <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
-                  No queries
-                </Typography>
               )}
-              <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
-                {queryStat.hasQueries && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => handleOpenQueryChat(job)}
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "9px",
-                      py: 0.1,
-                      px: 0.75,
-                      borderRadius: "4px",
-                      color: "#4f46e5",
-                      borderColor: "#c7d2fe",
-                      "&:hover": { bgcolor: "#f5f3ff" }
-                    }}
-                  >
-                    Chat
-                  </Button>
-                )}
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleOpenRaiseQuery(job)}
-                  sx={{
-                    textTransform: "none",
-                    fontSize: "9px",
-                    py: 0.1,
-                    px: 0.75,
-                    borderRadius: "4px",
-                    color: "#2563eb",
-                    borderColor: "#bfdbfe",
-                    "&:hover": { bgcolor: "#eff6ff" }
-                  }}
-                >
-                  Raise
-                </Button>
-              </Box>
             </Box>
           </TableCell>
         );
@@ -1482,16 +1612,9 @@ function CExportDSR() {
     }
   };
 
-  const handleOpenRaiseQuery = (job) => {
-    setRaiseQueryJob(job);
-    setRaiseQuerySubject("");
-    setRaiseQueryMessage("");
-    setRaiseQueryOpen(true);
-  };
-
   const handleRaiseQuerySubmit = async () => {
-    if (!raiseQuerySubject.trim() || !raiseQueryMessage.trim()) {
-      setSnackbar({ open: true, message: "Subject and Message are required", severity: "warning" });
+    if (!raiseQueryMessage.trim()) {
+      setSnackbar({ open: true, message: "Message is required", severity: "warning" });
       return;
     }
     setRaiseQuerySending(true);
@@ -1499,7 +1622,7 @@ function CExportDSR() {
       const payload = {
         job_no: raiseQueryJob.job_no,
         job_id: raiseQueryJob._id,
-        subject: raiseQuerySubject.trim(),
+        subject: "Client Query",
         message: raiseQueryMessage.trim(),
         client_id: user?.ie_code_no || user?.email,
         client_name: user?.name || "Client",
@@ -1763,29 +1886,31 @@ function CExportDSR() {
               }
             }}
           >
-            {visibleTabs.map((tab) => (
-              <Tab
-                key={tab.value}
-                value={tab.value}
-                label={
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {tab.label}
-                    {activeTab === tab.value && totalCount > 0 && (
+            {visibleTabs.map((tab) => {
+              const statusKey = tab.value.toLowerCase();
+              const count = tabCounts[statusKey] ?? (activeTab === tab.value ? totalCount : 0);
+              return (
+                <Tab
+                  key={tab.value}
+                  value={tab.value}
+                  label={
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {tab.label}
                       <span style={{
                         fontSize: "10px",
-                        backgroundColor: "#eff6ff",
-                        color: "#2563eb",
+                        backgroundColor: activeTab === tab.value ? "#2563eb" : "#f1f5f9",
+                        color: activeTab === tab.value ? "#ffffff" : "#64748b",
                         padding: "1px 6px",
                         borderRadius: "10px",
                         fontWeight: "700"
                       }}>
-                        {totalCount}
+                        {count}
                       </span>
-                    )}
-                  </Box>
-                }
-              />
-            ))}
+                    </Box>
+                  }
+                />
+              );
+            })}
           </Tabs>
         </Box>
       </Paper>
@@ -2031,6 +2156,7 @@ function CExportDSR() {
                       style={{
                         ...tableHeaderStyle,
                         borderRight: isLast ? "none" : "1px solid #e2e8f0",
+                        width: definition?.width || "auto",
                       }}
                     >
                       {definition?.label || columnId.toUpperCase()}
@@ -2643,21 +2769,13 @@ function CExportDSR() {
         <DialogContent sx={{ pt: 2 }}>
           <TextField
             fullWidth
-            label="Subject"
-            size="small"
-            placeholder="e.g., Missing document, Wrong weight"
-            value={raiseQuerySubject}
-            onChange={(e) => setRaiseQuerySubject(e.target.value)}
-            sx={{ mb: 2, mt: 1 }}
-          />
-          <TextField
-            fullWidth
             multiline
             rows={4}
             label="Message"
             placeholder="Write detail message..."
             value={raiseQueryMessage}
             onChange={(e) => setRaiseQueryMessage(e.target.value)}
+            sx={{ mt: 1 }}
           />
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
@@ -2670,7 +2788,7 @@ function CExportDSR() {
           <Button
             variant="contained"
             onClick={handleRaiseQuerySubmit}
-            disabled={raiseQuerySending || !raiseQuerySubject.trim() || !raiseQueryMessage.trim()}
+            disabled={raiseQuerySending || !raiseQueryMessage.trim()}
             sx={{ textTransform: "none", fontSize: "12px", bgcolor: "#2563eb" }}
           >
             {raiseQuerySending ? "Submitting..." : "Submit Query"}

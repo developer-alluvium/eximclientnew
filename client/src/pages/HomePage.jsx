@@ -321,6 +321,13 @@ function HomePage() {
       icon: <VideocamOutlinedIcon />,
       category: "core",
     },
+    {
+      name: "DGFT",
+      description: "View DGFT registers and authorization details by IEC code",
+      path: "/dgft",
+      icon: <DescriptionOutlinedIcon />,
+      category: "core",
+    },
   ];
 
   // Filter modules based on user access (reactive to module changes)
