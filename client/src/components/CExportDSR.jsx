@@ -975,7 +975,7 @@ function CExportDSR() {
                 variant="subtitle2"
                 onClick={() => handleCopyText(job.job_no)}
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: "#2563eb",
                   fontSize: "11px",
                   cursor: "pointer",
@@ -989,14 +989,39 @@ function CExportDSR() {
               </IconButton>
             </Box>
 
-            <Typography sx={{ fontSize: "10px", color: "#64748b", mt: 0.5 }}>
+            <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500, mt: 0.5 }}>
               {formatDate(job.job_date)}
             </Typography>
 
             {job.custom_house && (
-              <Typography sx={{ fontSize: "10px", fontWeight: 600, color: "#475569", mt: 0.5 }}>
+              <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569", mt: 0.5 }}>
                 {job.custom_house}
               </Typography>
+            )}
+
+            {(job.egm_no || job.egm_date) && (
+              <Box
+                sx={{
+                  marginTop: "4px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontSize: "9px",
+                  fontWeight: "700",
+                  color: "#b45309",
+                  backgroundColor: "#fff7ed",
+                  border: "1px solid #ffedd5",
+                  display: "flex",
+                  alignItems: "center",
+                  width: "fit-content",
+                  gap: "3px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.02)",
+                  whiteSpace: "nowrap"
+                }}
+                title="EGM No & Date"
+              >
+                <span style={{ fontSize: "10px" }}>✈️</span>
+                <span>EGM: {job.egm_no || "N/A"} {job.egm_date ? `(${formatDate(job.egm_date)})` : ""}</span>
+              </Box>
             )}
 
             <Box sx={{ display: "flex", gap: 0.5, mt: 0.8, flexWrap: "wrap" }}>
@@ -1027,7 +1052,7 @@ function CExportDSR() {
             {job.consignees?.[0]?.consignee_name && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
                 <Typography sx={{ fontSize: "10px", color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>CONS:</span>
+                  <span style={{ fontWeight: 800, color: "#94a3b8", fontSize: "9px" }}>CONS:</span>
                   {job.consignees[0].consignee_name}
                 </Typography>
                 <IconButton size="small" onClick={(e) => handleCopyText(job.consignees[0].consignee_name, e)} sx={{ p: 0.2 }}>
@@ -1036,10 +1061,22 @@ function CExportDSR() {
               </Box>
             )}
 
+            {(job.forwarder || job.operations?.[0]?.statusDetails?.[0]?.forwarderName) && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+                <Typography sx={{ fontSize: "10px", color: "#fc8019", display: "flex", gap: 0.5, alignItems: "center", fontWeight: "700" }}>
+                  <span style={{ fontWeight: 800, color: "#fc8019", fontSize: "9px" }}>FWDR:</span>
+                  {job.forwarder || job.operations[0].statusDetails[0].forwarderName}
+                </Typography>
+                <IconButton size="small" onClick={(e) => handleCopyText(job.forwarder || job.operations[0].statusDetails[0].forwarderName, e)} sx={{ p: 0.2 }}>
+                  <ContentCopy sx={{ fontSize: 11, color: "#fc8019", "&:hover": { color: "#d97706" } }} />
+                </IconButton>
+              </Box>
+            )}
+
             {job.buyerThirdPartyInfo?.buyer?.name && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
                 <Typography sx={{ fontSize: "10px", color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, color: "#94a3b8", fontSize: "9px" }}>3rd PARTY:</span>
+                  <span style={{ fontWeight: 800, color: "#94a3b8", fontSize: "9px" }}>3rd PARTY:</span>
                   {job.buyerThirdPartyInfo.buyer.name}
                 </Typography>
                 <IconButton size="small" onClick={(e) => handleCopyText(job.buyerThirdPartyInfo.buyer.name, e)} sx={{ p: 0.2 }}>
@@ -1050,8 +1087,8 @@ function CExportDSR() {
 
             {job.shipping_line_airline && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
-                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
-                  Line: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.shipping_line_airline}</span>
+                <Typography sx={{ fontSize: "10px", fontWeight: 800, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
+                  Line: <span style={{ fontWeight: 600, color: "#0f172a" }}>{job.shipping_line_airline}</span>
                 </Typography>
                 <IconButton size="small" onClick={(e) => handleCopyText(job.shipping_line_airline, e)} sx={{ p: 0.2 }}>
                   <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
@@ -1061,8 +1098,8 @@ function CExportDSR() {
 
             {job.booking_no && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
-                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
-                  Bk No: <span style={{ fontWeight: 500, color: "#0f172a" }}>{job.booking_no}</span>
+                <Typography sx={{ fontSize: "10px", fontWeight: 800, color: "#475569", display: "flex", gap: 0.5, alignItems: "center" }}>
+                  Bk No: <span style={{ fontWeight: 600, color: "#0f172a" }}>{job.booking_no}</span>
                 </Typography>
                 <IconButton size="small" onClick={(e) => handleCopyText(job.booking_no, e)} sx={{ p: 0.2 }}>
                   <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
@@ -1079,19 +1116,19 @@ function CExportDSR() {
             {inv.invoiceNumber ? (
               <>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Typography sx={{ fontWeight: 700, fontSize: "11px", color: "#0f172a" }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#0f172a" }}>
                     {inv.invoiceNumber}
                   </Typography>
                   <IconButton size="small" onClick={(e) => handleCopyText(inv.invoiceNumber, e)} sx={{ p: 0.2 }}>
                     <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                   </IconButton>
                 </Box>
-                <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
+                <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
                   {formatDate(inv.invoiceDate)}
                 </Typography>
                 <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.5 }}>
-                  <span style={{ color: "#64748b", fontWeight: 600 }}>{inv.termsOfInvoice}</span>{" "}
-                  <span style={{ fontWeight: 700 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
+                  <span style={{ color: "#64748b", fontWeight: 700 }}>{inv.termsOfInvoice}</span>{" "}
+                  <span style={{ fontWeight: 800 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
                 </Typography>
                 {(() => {
                   const product = inv.products?.[0] || {};
@@ -1105,20 +1142,20 @@ function CExportDSR() {
                   return (
                     <>
                       {scheme && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.5 }}>
-                          Scheme: <span style={{ fontWeight: 500, color: "#0f172a" }}>{scheme}</span>
+                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.5 }}>
+                          Scheme: <span style={{ fontWeight: 600, color: "#0f172a" }}>{scheme}</span>
                         </Typography>
                       )}
                       {drawback_scroll_no && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
-                          DBK Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{drawback_scroll_no}</span>
-                          {drawback_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(drawback_scroll_date)})</span>}
+                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                          DBK Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{drawback_scroll_no}</span>
+                          {drawback_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(drawback_scroll_date)})</span>}
                         </Typography>
                       )}
                       {rosctl_scroll_no && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 600, color: "#475569", mt: 0.2 }}>
-                          RoSCTL Scroll: <span style={{ fontWeight: 500, color: "#0f172a" }}>{rosctl_scroll_no}</span>
-                          {rosctl_scroll_date && <span style={{ color: "#64748b" }}> ({formatDate(rosctl_scroll_date)})</span>}
+                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                          RoSCTL Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{rosctl_scroll_no}</span>
+                          {rosctl_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(rosctl_scroll_date)})</span>}
                         </Typography>
                       )}
                     </>
@@ -1138,19 +1175,19 @@ function CExportDSR() {
             {job.sb_no ? (
               <>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#2563eb", textDecoration: "underline" }}>
+                  <Typography sx={{ fontWeight: 900, fontSize: "11px", color: "#2563eb", textDecoration: "underline" }}>
                     {job.sb_no}
                   </Typography>
                   <IconButton size="small" onClick={(e) => handleCopyText(job.sb_no, e)} sx={{ p: 0.2 }}>
                     <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                   </IconButton>
                 </Box>
-                <Typography sx={{ fontSize: "10px", color: "#64748b" }}>
+                <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
                   {formatDate(job.sb_date)}
                 </Typography>
               </>
             ) : (
-              <span style={{ color: "#ef4444", fontWeight: 700, fontSize: "12px" }}>-</span>
+              <span style={{ color: "#ef4444", fontWeight: 800, fontSize: "12px" }}>-</span>
             )}
           </TableCell>
         );
@@ -1160,10 +1197,10 @@ function CExportDSR() {
           <TableCell style={cellStyle}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
               <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px", mt: 0.5 }}>DEST</span>
+                <span style={{ fontWeight: 900, fontSize: "9px", color: "#94a3b8", width: "35px", mt: 0.5 }}>DEST</span>
                 <Box sx={{ display: "flex", flexDirection: "column" }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 700 }}>
+                    <span style={{ fontSize: "10px", color: "#0f172a", fontWeight: 800 }}>
                       {job.destination_port}
                     </span>
                     {job.destination_port && (
@@ -1173,15 +1210,15 @@ function CExportDSR() {
                     )}
                   </Box>
                   {job.destination_country && (
-                    <span style={{ fontSize: "9px", color: "#64748b", fontWeight: 500 }}>
+                    <span style={{ fontSize: "9px", color: "#64748b", fontWeight: 600 }}>
                       ({job.destination_country})
                     </span>
                   )}
                 </Box>
               </Box>
               <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>POL</span>
-                <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_loading}</span>
+                <span style={{ fontWeight: 900, fontSize: "9px", color: "#94a3b8", width: "35px" }}>POL</span>
+                <span style={{ fontSize: "10px", color: "#475569", fontWeight: 800 }}>{job.port_of_loading}</span>
                 {job.port_of_loading && (
                   <IconButton size="small" onClick={(e) => handleCopyText(job.port_of_loading, e)} sx={{ p: 0.2 }}>
                     <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
@@ -1189,8 +1226,8 @@ function CExportDSR() {
                 )}
               </Box>
               <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                <span style={{ fontWeight: 800, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DISCH</span>
-                <span style={{ fontSize: "10px", color: "#475569", fontWeight: 700 }}>{job.port_of_discharge}</span>
+                <span style={{ fontWeight: 900, fontSize: "9px", color: "#94a3b8", width: "35px" }}>DISCH</span>
+                <span style={{ fontSize: "10px", color: "#475569", fontWeight: 800 }}>{job.port_of_discharge}</span>
                 {job.port_of_discharge && (
                   <IconButton size="small" onClick={(e) => handleCopyText(job.port_of_discharge, e)} sx={{ p: 0.2 }}>
                     <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
@@ -1232,7 +1269,7 @@ function CExportDSR() {
                           href={`https://www.ldb.co.in/ldb/containersearch/39/${container.containerNo}/1726651147706`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "#2563eb", fontWeight: 700, fontSize: "10px", textDecoration: "none" }}
+                          style={{ color: "#2563eb", fontWeight: 800, fontSize: "10px", textDecoration: "none" }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           {container.containerNo}
@@ -1256,7 +1293,7 @@ function CExportDSR() {
               {hiddenCount > 0 && (
                 <span
                   onClick={(e) => toggleContainers(e, key)}
-                  style={{ fontSize: "9px", color: "#b45309", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                  style={{ fontSize: "9px", color: "#b45309", fontWeight: 800, cursor: "pointer", textDecoration: "underline" }}
                 >
                   Show {hiddenCount} more
                 </span>
@@ -1264,20 +1301,20 @@ function CExportDSR() {
               {isExpanded && (
                 <span
                   onClick={(e) => toggleContainers(e, key)}
-                  style={{ fontSize: "9px", color: "#475569", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}
+                  style={{ fontSize: "9px", color: "#475569", fontWeight: 800, cursor: "pointer", textDecoration: "underline" }}
                 >
                   Show less
                 </span>
               )}
 
               {totalPkgs && (
-                <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#1e293b", mt: 0.5 }}>
+                <Typography sx={{ fontSize: "10px", fontWeight: 800, color: "#1e293b", mt: 0.5 }}>
                   {totalPkgs} {pkgUnit}
                 </Typography>
               )}
 
               {(totalGrossWt || totalNetWt) && (
-                <Typography sx={{ fontSize: "9px", color: "#64748b" }}>
+                <Typography sx={{ fontSize: "9px", color: "#64748b", fontWeight: 500 }}>
                   G: {totalGrossWt ? `${parseFloat(totalGrossWt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg` : "-"}
                   {totalNetWt ? ` | N: ${parseFloat(totalNetWt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg` : ""}
                 </Typography>
@@ -1301,14 +1338,28 @@ function CExportDSR() {
         ];
         return (
           <TableCell style={cellStyle}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.2 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
               {milestoneItems.map((m, mIdx) => (
-                <Typography
+                <Box
                   key={mIdx}
-                  sx={{ fontSize: "10px", fontWeight: m.val ? 700 : 500, color: m.val ? "#1e293b" : "#94a3b8" }}
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    gap: "12px",
+                    fontFamily: "'Inter', sans-serif"
+                  }}
                 >
-                  {m.label}{m.val ? `: ${m.val}` : ""}
-                </Typography>
+                  <span style={{ fontSize: "9px", fontWeight: "800", color: m.val ? "#64748b" : "#94a3b8" }}>
+                    {m.label}
+                  </span>
+                  {m.val && (
+                    <span style={{ fontSize: "10px", fontWeight: "800", color: "#1e293b", fontFamily: "'Inter', sans-serif" }}>
+                      {m.val}
+                    </span>
+                  )}
+                </Box>
               ))}
             </Box>
           </TableCell>
@@ -1319,7 +1370,7 @@ function CExportDSR() {
         return (
           <TableCell style={cellStyle} align="left">
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, alignItems: "flex-start" }}>
-              <Typography sx={{ fontSize: "10px", fontWeight: 700, color: "#475569" }}>
+              <Typography sx={{ fontSize: "10px", fontWeight: 800, color: "#475569" }}>
                 {files.length > 0 ? `${files.length} file${files.length > 1 ? "s" : ""}` : "No documents uploaded"}
               </Typography>
               <Button
@@ -1364,7 +1415,7 @@ function CExportDSR() {
                   }}
                   title="Raise new query"
                 />
-                
+
                 {queryStat.hasQueries && (
                   <Box sx={{ position: "relative", display: "inline-flex" }}>
                     <IconButton
@@ -1675,7 +1726,7 @@ function CExportDSR() {
   const categoryItems = getDisplayableCategoryItems();
 
   return (
-    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", p: 0, fontFamily: "sans-serif", maxWidth: "100%", overflowX: "hidden" }}>
+    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", p: 0, fontFamily: "'Inter', sans-serif", maxWidth: "100%", overflowX: "hidden" }}>
       <input
         ref={hiddenFileInputRef}
         type="file"
@@ -2828,11 +2879,11 @@ const selectStyle = {
 };
 
 const tableHeaderStyle = {
-  backgroundColor: "#1e293b",
+  background: "linear-gradient(135deg, #2c5aa0 0%, #1e3a6f 100%)",
   color: "white",
-  padding: "10px 12px",
+  padding: "8px 12px",
   textAlign: "left",
-  fontWeight: "600",
+  fontWeight: "700",
   fontSize: "0.75rem",
   textTransform: "uppercase",
   letterSpacing: "0.05em",
@@ -2842,7 +2893,8 @@ const tableHeaderStyle = {
   borderRight: "1px solid rgba(255, 255, 255, 0.15)",
   position: "sticky",
   top: 0,
-  zIndex: 10
+  zIndex: 10,
+  fontFamily: "'Inter', sans-serif"
 };
 
 const tableCellStyle = {
@@ -2853,7 +2905,9 @@ const tableCellStyle = {
   fontSize: "0.8rem",
   verticalAlign: "top",
   wordBreak: "break-word",
-  whiteSpace: "normal"
+  whiteSpace: "normal",
+  fontWeight: "500",
+  fontFamily: "'Inter', sans-serif"
 };
 
 const pillStyle = {

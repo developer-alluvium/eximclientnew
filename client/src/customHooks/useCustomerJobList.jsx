@@ -124,8 +124,8 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
         accessorKey: "supplier_exporter",
         header: (<>Exporter,<br/> Job Number & Free Time</>),
         size: 200,
-        Cell: ({ cell }) => {
-          const { job_no, job_date, detailed_status, free_time } =
+      Cell: ({ cell }) => {
+          const { job_no, job_date, detailed_status, free_time, shipping_line_airline } =
             cell.row.original;
 
           // Get color based on status
@@ -148,10 +148,29 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 whiteSpace: "pre-wrap",
                 maxWidth: "320px",
                 padding: "8px",
-                gap: "8px",
+                gap: "4px",
               }}
             >
-              <div>{cell.getValue() || "N/A"}</div>
+              <div style={{ fontWeight: "700", fontSize: "12px", color: "rgba(0,0,0,0.85)", lineHeight: "1.3", textAlign: "center" }}>
+                {cell.getValue() || "N/A"}
+              </div>
+
+              {/* Freight Forwarder / Shipping Line — styled like ExportJobsTable FWDR label */}
+              {shipping_line_airline && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  marginTop: "2px",
+                  justifyContent: "center",
+                }}>
+                  <span style={{ fontWeight: "700", color: "#fc8019", fontSize: "9px" }}>FWDR:</span>
+                  <span style={{ color: "#fc8019", fontWeight: "700", fontSize: "10px" }}>
+                    {shipping_line_airline}
+                  </span>
+                </div>
+              )}
+
               <div
                 style={{
                   color: textColor,
@@ -161,9 +180,9 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   cursor: "pointer",
                   fontSize: "0.9em",
                   fontWeight: "bold",
+                  marginTop: "4px",
                 }}
               >
-                {/* <div>{job_no}</div> */}
                 <div
                   key="job-number"
                   style={{
@@ -198,6 +217,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
             </div>
           );
         },
+
       },
 
       // {

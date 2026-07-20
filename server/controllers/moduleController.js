@@ -76,6 +76,18 @@ const AVAILABLE_MODULES = [
     category: "core",
   },
   {
+    id: "/export",
+    name: "Export DSR",
+    description: "View and manage export shipment jobs, track IEC-wise export data from the Export module",
+    category: "core",
+  },
+  {
+    id: "/freight-forwarding",
+    name: "Freight Forwarding",
+    description: "View freight enquiries, quotations, success shipments, and historic rates (read-only)",
+    category: "core",
+  },
+  {
     id: "/dgft",
     name: "DGFT",
     description: "DGFT Register & Authorization License Details module",

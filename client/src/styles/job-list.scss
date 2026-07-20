@@ -1,209 +1,206 @@
-/* Job List Table Styles */
+/* Job List Table Styles — Premium UI (inspired by ExportJobsTable) */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ─── Layout ──────────────────────────────────────────────── */
 
 .jobs-list-layout {
   display: flex;
   flex-direction: column;
-  /* 
-     height: calc(100vh - 190px); 
-     Explanation: 
-     - 70px (Main App Header) 
-     - 50px (CImportDSR Tabs/Header) 
-     - 50px (CJobTabs Tabs/Header) 
-     - 20px (Padding/Margins) 
-     Adjust as needed to fit perfectly in viewport.
-  */
-  height: calc(100vh - 180px); 
-  background-color: #f8fafc;
+  height: calc(100vh - 180px);
+  background-color: #f0f4f8;
   overflow: hidden;
-  border-radius: 8px; /* Optional rounded corners for the module */
+  border-radius: 8px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 12px;
 }
+
+/* ─── Header / Toolbar ────────────────────────────────────── */
 
 .jobs-list-header {
   background-color: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  padding: 12px 16px;
+  padding: 8px 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0; /* Prevent header from shrinking */
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .header-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
   justify-content: flex-end;
 }
 
+/* Ant Design overrides — compact look matching ExportJobsTable */
+.header-filters,
+.header-left {
+  .ant-select-selector {
+    height: 28px !important;
+    font-size: 12px !important;
+    border-color: #d1d5db !important;
+    border-radius: 4px !important;
+    align-items: center;
+  }
+
+  .ant-select-selection-item {
+    font-size: 12px !important;
+    line-height: 26px !important;
+  }
+
+  .ant-select-selection-placeholder {
+    font-size: 12px !important;
+    line-height: 26px !important;
+  }
+
+  .ant-input-affix-wrapper {
+    height: 28px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+    border-color: #d1d5db !important;
+    padding: 0 8px;
+  }
+
+  .ant-btn {
+    height: 28px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+/* ─── Content area ────────────────────────────────────────── */
+
 .jobs-list-content {
   flex: 1;
-  overflow: hidden; /* Scroll is handled by inner table container */
+  overflow: hidden;
   padding: 8px;
   position: relative;
 }
 
-/* Modal Styles */
-.modal-content-grid {
-    margin-top: 16px;
-}
+/* ─── Table Container ─────────────────────────────────────── */
 
-.tracking-header, .images-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.tracking-icon-box, .images-icon-box {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-}
-
-.tracking-icon-box {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.images-icon-box {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #333;
-}
-
-.tracking-card {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-}
-
-.images-card {
-    background: linear-gradient(135deg, #fdfbf7 0%, #fff1eb 100%); 
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.container-tag {
-    margin-bottom: 16px;
-}
-
-.images-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* Table Container */
 .table-container {
   height: 100%;
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  border: 1px solid #cccccc;
   overflow: hidden;
 }
 
-/* Custom Table Styles */
 .custom-table-container {
-  /* overflow-x handled by inner div now */
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  border: 1px solid #cccccc;
   background: white;
 
-  /* The actual scrolling element */
   .table-scroll-area {
-      overflow: auto;
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      
-      /* Custom Scrollbar */
-      &::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+    overflow: auto;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    max-height: 700px;
+
+    /* Custom scrollbar */
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+      &:hover {
+        background: #94a3b8;
       }
-      &::-webkit-scrollbar-track {
-        background: #f1f5f9;
-      }
-      &::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-        &:hover {
-          background: #94a3b8;
-        }
-      }
+    }
   }
 
   table {
     width: 100%;
-    min-width: 1800px; /* Forces horizontal scroll */
-    border-collapse: collapse;
-    table-layout: fixed; /* Better performance and control */
+    min-width: 1800px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 11px;
+    table-layout: auto;
 
+    /* ─── Header ── */
     thead {
-      background-color: #1e293b;
       position: sticky;
       top: 0;
       z-index: 10;
 
+      tr {
+        background: linear-gradient(135deg, #2c5aa0 0%, #1e3a6f 100%);
+      }
+
       th {
-        color: white;
-        padding: 12px 16px;
+        padding: 10px 8px;
         text-align: left;
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        white-space: nowrap;
+        font-weight: 700;
+        font-size: 12px;
+        color: #ffffff;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        white-space: normal;
+        word-break: break-word;
+        vertical-align: middle;
         user-select: none;
-        background-color: #1e293b; /* Ensure background covers content when scrolling */
-        border-right: 1px solid rgba(255, 255, 255, 0.15); /* Separator between columns */
-        border-bottom: 2px solid #0f172a; /* Darker bottom border for header */
+        letter-spacing: 0.02em;
 
         &:last-child {
-            border-right: none;
+          border-right: none;
         }
       }
     }
 
+    /* ─── Body ── */
     tbody {
       tr {
-        border-bottom: 1px solid #e2e8f0; // Visible row border
-        transition: background-color 0.2s;
+        border-bottom: 1px solid #e2e8f0;
+        border-left: 4px solid transparent;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        cursor: default;
 
         &:hover {
           background-color: #f8fafc !important;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+          z-index: 2;
+          position: relative;
         }
 
         td {
-          padding: 12px 16px;
-          font-size: 0.8rem;
-          color: #334155;
+          padding: 10px 8px;
+          font-size: 11px;
+          color: #1e293b;
           vertical-align: top;
-          word-break: break-word; /* Allow content to wrap */
+          word-break: break-word;
           white-space: normal;
-          border-right: 1px solid #f1f5f9; // Separator between columns
+          border-right: 1px solid #f1f5f9;
+          transition: all 0.2s ease;
 
           &:last-child {
-              border-right: none;
+            border-right: none;
           }
         }
       }
@@ -211,12 +208,108 @@
   }
 }
 
-/* Pagination Wrapper */
+/* ─── Status colour strips (row left-border) ──────────────── */
+
+.row-status-pending       { border-left-color: #94a3b8 !important; }
+.row-status-custom        { border-left-color: #0ea5e9 !important; }
+.row-status-leo           { border-left-color: #f43f5e !important; }
+.row-status-container-ho  { border-left-color: #22c55e !important; }
+.row-status-rail-out      { border-left-color: #8b5cf6 !important; }
+.row-status-billing-pend  { border-left-color: #f59e0b !important; }
+.row-status-billing-done  { border-left-color: #14b8a6 !important; }
+.row-status-completed     { border-left-color: #64748b !important; }
+
+/* ─── Pagination ──────────────────────────────────────────── */
+
 .pagination-wrapper {
-    padding: 12px 16px;
-    display: flex;
-    justify-content: flex-end;
-    background: #ffffff;
-    border-top: 1px solid #e2e8f0;
-    flex-shrink: 0; /* Prevent pagination from shrinking */
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #6b7280;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+
+  .ant-pagination-item,
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    height: 28px;
+    min-width: 28px;
+    line-height: 26px;
+    font-size: 12px;
+  }
+}
+
+/* ─── Modal utility styles ────────────────────────────────── */
+
+.modal-content-grid {
+  margin-top: 16px;
+}
+
+.tracking-header, .images-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tracking-icon-box, .images-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.tracking-icon-box {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.images-icon-box {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #333;
+}
+
+.tracking-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.images-card {
+  background: linear-gradient(135deg, #fdfbf7 0%, #fff1eb 100%);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.container-tag {
+  margin-bottom: 16px;
+}
+
+.images-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .jobs-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-filters {
+    justify-content: flex-start;
+  }
 }
