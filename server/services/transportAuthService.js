@@ -9,13 +9,29 @@ class TransportAuthService {
         // Configure axios request interceptor to automatically add the x-api-key header
         axios.interceptors.request.use(
             (config) => {
-                const isUpstream = (config.url && config.url.startsWith(this.baseURL)) ||
-                                   (config.baseURL && config.baseURL.startsWith(this.baseURL));
-                if (isUpstream) {
+                const targetUrl = config.url || "";
+                const targetBaseUrl = config.baseURL || "";
+                
+                // Identify if request goes to the transport API (development or production)
+                const isTransportApi = 
+                    targetUrl.includes("eximbot.alvision.in") || 
+                    targetUrl.includes("localhost:9007") ||
+                    targetBaseUrl.includes("eximbot.alvision.in") || 
+                    targetBaseUrl.includes("localhost:9007");
+
+                if (isTransportApi) {
                     config.headers = config.headers || {};
-                    config.headers["x-api-key"] = process.env.YOUR_SHARED_API_KEY_HERE;
-                    delete config.headers.Authorization;
-                    delete config.headers.authorization;
+
+                    // Axios 1.x Hotfix: Use .set() if available, otherwise fallback
+                    if (typeof config.headers.set === 'function') {
+                        config.headers.set("x-api-key", process.env.YOUR_SHARED_API_KEY_HERE);
+                        config.headers.delete("Authorization");
+                        config.headers.delete("authorization");
+                    } else {
+                        config.headers["x-api-key"] = process.env.YOUR_SHARED_API_KEY_HERE;
+                        delete config.headers.Authorization;
+                        delete config.headers.authorization;
+                    }
                 }
                 return config;
             },
