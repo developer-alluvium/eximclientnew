@@ -12,11 +12,11 @@ class TransportAuthService {
                 const targetUrl = config.url || "";
                 const targetBaseUrl = config.baseURL || "";
                 
-                // Identify if request goes to the transport API (development or production)
+                // Identify if request goes specifically to the transport API (development or production)
                 const isTransportApi = 
-                    targetUrl.includes("eximbot.alvision.in") || 
+                    targetUrl.includes("eximbot.alvision.in/transport") || 
                     targetUrl.includes("localhost:9007") ||
-                    targetBaseUrl.includes("eximbot.alvision.in") || 
+                    targetBaseUrl.includes("eximbot.alvision.in/transport") || 
                     targetBaseUrl.includes("localhost:9007");
 
                 if (isTransportApi) {
