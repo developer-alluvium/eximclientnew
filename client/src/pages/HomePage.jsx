@@ -257,6 +257,14 @@ function HomePage() {
       category: "core",
     },
     {
+      name: "Freight Forwarding",
+      description:
+        "View freight enquiries, quotations, success shipments, and historic rates",
+      path: "/freight-forwarding",
+      icon: <LocalShippingOutlinedIcon />,
+      category: "core",
+    },
+    {
       name: "DGFT",
       description: "View DGFT registers and authorization details by IEC code",
       path: "/dgft",

@@ -184,6 +184,7 @@ class ModuleAssignmentFrontendTester {
       "/transport": "Transport",
       "/ewaybill": "E-Way Bill",
       "/export": "Export DSR",
+      "/freight-forwarding": "Freight Forwarding",
       "/open-points": "Open Points",
       "/dgft": "DGFT",
     };

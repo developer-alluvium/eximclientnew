@@ -9,9 +9,15 @@ const CJobListTable = ({
   // setColumnOrder, // No longer needed here if dragging is removed or handled via modal only
   isLoading = false,
   getStatusColor,
+  getStatusTheme,
   // pagination, // Moved to parent
   // onPaginationChange // Moved to parent
 }) => {
+  // Fallback if getStatusTheme not provided
+  const resolveTheme = (statusValue) => {
+    if (getStatusTheme) return getStatusTheme(statusValue);
+    return { bg: getStatusColor ? getStatusColor(statusValue) : 'transparent', border: '#e2e8f0' };
+  };
   
   // Define default minimum widths for specific columns if not present in column def
   const defaultMinCode = {
@@ -90,11 +96,15 @@ const CJobListTable = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {data.map((row, rowIndex) => (
+                    {data.map((row, rowIndex) => {
+                        const theme = resolveTheme(row.detailed_status);
+                        return (
                         <tr 
                             key={row._id || row.id || rowIndex} 
                             style={{ 
-                                backgroundColor: getStatusColor ? getStatusColor(row.detailed_status) : 'inherit' 
+                                backgroundColor: theme.bg,
+                                borderLeft: `4px solid ${theme.border}`,
+                                transition: 'all 0.15s ease',
                             }}
                         >
                             {visibleColumns.map((col) => (
@@ -117,7 +127,8 @@ const CJobListTable = ({
                                 </td>
                             ))}
                         </tr>
-                    ))}
+                        );
+                    })}
                 </tbody>
             </table>
          )}

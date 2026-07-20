@@ -35,6 +35,7 @@ import currencyRate from "./routes/currencyRate.js";
 import transportRoutes from "./routes/transportRoutes.js"; // Transport module routes
 import exportProxyRoutes from "./routes/exportProxyRoutes.js"; // Export module proxy routes
 import importProxyRoutes from "./routes/importProxyRoutes.js"; // Import module proxy routes
+import freightProxyRoutes from "./routes/freightProxyRoutes.js"; // Freight Forwarding proxy routes
 import openPointsRoutes from "./routes/openPointsRoutes.js";
 import transportAuthService from "./services/transportAuthService.js";
 import ewayBillProxyRoutes from "./routes/ewayBillProxyRoutes.js";
@@ -90,7 +91,8 @@ const defaultOrigins = [
   "https://client.alvision.in",
   "https://eximbot.alvision.in",
   "http://192.168.2.47:3001",
-  "http://3.108.244.38:8002"
+  "http://3.108.244.38:8002",
+  "http://localhost:9003/api"
 
 ];
 
@@ -161,6 +163,7 @@ app.use(currencyRate);
 app.use("/api/transport", transportRoutes);
 app.use(exportProxyRoutes); // Export module proxy routes
 app.use(importProxyRoutes); // Import module proxy routes
+app.use(freightProxyRoutes); // Freight Forwarding proxy routes
 app.use(analytics);
 app.use(openPointsRoutes); // Open Points routes
 app.use("/api/eway-bill", ewayBillProxyRoutes);

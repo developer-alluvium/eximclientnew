@@ -182,6 +182,12 @@ const AVAILABLE_MODULES = [
     category: "core",
   },
   {
+    id: "/freight-forwarding",
+    name: "Freight Forwarding",
+    description: "View freight enquiries, quotations, success shipments, and historic rates (read-only)",
+    category: "core",
+  },
+  {
     id: "/open-points",
     name: "Open Points",
     description: "Manage project discussion points, task assignments, and review timelines",
