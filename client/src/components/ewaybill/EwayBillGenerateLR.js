@@ -1645,8 +1645,8 @@ function EwayBillGenerateLR({
         };
         const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/update-vehicle`, payload);
         if (r.data.success) {
-          Swal.fire({ icon: "success", title: "Part B Updated", html: `<p><strong>EWB:</strong> ${existingEwbNo}</p><p><strong>Vehicle:</strong> ${formData.vehicleNo}</p>` });
-          setSuccess({ ewbNo: existingEwbNo, ewbDate: r.data.data?.ewbDate || "", validUpto: r.data.data?.validUpto || "" });
+          Swal.fire({ icon: "success", title: "Part B Updated", html: `<p><strong>EWB:</strong> ${existingEwbNo}</p><p><strong>Vehicle:</strong> ${formData.vehicleNo}</p>` })
+            .then(() => { if (onClose) onClose(); });
         }
       } catch (err) {
         console.error("Part B update error:", err);
@@ -1725,9 +1725,9 @@ function EwayBillGenerateLR({
       const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, payload);
       if (r.data.success) {
         markBoeDocumentGenerated(formData.documentNumber || boeNumber);
-        setSuccess(r.data.data);
         if (onSuccess) onSuccess(r.data.data);
-        Swal.fire({ icon: "success", title: "E-Way Bill Generated", html: `<p><strong>EWB No:</strong> ${r.data.data.ewbNo}</p><p><strong>Valid Until:</strong> ${r.data.data.validUpto}</p>` });
+        Swal.fire({ icon: "success", title: "E-Way Bill Generated", html: `<p><strong>EWB No:</strong> ${r.data.data.ewbNo}</p><p><strong>Valid Until:</strong> ${r.data.data.validUpto}</p>` })
+          .then(() => { if (onClose) onClose(); });
       }
     } catch (error) {
       console.error("Generate EWB error:", error);
@@ -1762,7 +1762,7 @@ function EwayBillGenerateLR({
         userGstin: getEffectiveUserGstin(),
       };
       const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/extend-validity`, payload);
-      if (r.data.success) { Swal.fire("Success", "Validity Extended", "success"); setSuccess(r.data.data); if (onSuccess) onSuccess(r.data.data); }
+      if (r.data.success) { Swal.fire("Success", "Validity Extended", "success").then(() => { if (onClose) onClose(); }); if (onSuccess) onSuccess(r.data.data); }
     } catch (err) { Swal.fire("Error", err.response?.data?.message || err.message, "error"); }
     finally { setGenerating(false); }
   };
@@ -2428,22 +2428,7 @@ function EwayBillGenerateLR({
           {asDialog && onClose && <button className="ewb-close-btn" onClick={onClose}>×</button>}
         </div>
 
-        {/* Success state */}
-        {success ? (
-          <div className="ewb-form">
-            <div className="ewb-success">
-              <div className="success-icon">✅</div>
-              <h3>E-Way Bill {isPartBOnly ? "Part B Updated" : "Generated"} Successfully</h3>
-              <div className="ewb-no">{success.ewbNo}</div>
-              <div className="ewb-meta">Date: {success.ewbDate} &nbsp;·&nbsp; Valid Until: {success.validUpto}</div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-                {success.pdfUrl && <a href={success.pdfUrl} target="_blank" rel="noopener noreferrer" className="ewb-btn primary">Download PDF</a>}
-                <button className="ewb-btn secondary" onClick={handleReset}>Generate Another</button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <form className="ewb-form" onSubmit={handleSubmit}>
+        <form className="ewb-form" onSubmit={handleSubmit}>
 
             {/* Calculated value banner */}
             {renderCalcBanner()}
@@ -2801,7 +2786,6 @@ function EwayBillGenerateLR({
               </>
             )}
           </form>
-        )}
         {renderFormulaDialog()}
       </div>
     </FieldErrorContext.Provider>
