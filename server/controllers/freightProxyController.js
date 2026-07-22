@@ -38,6 +38,30 @@ const enquiryMatchesOrgs = (enquiry, orgNames) => {
   );
 };
 
+const getPipelineStage = (e) => {
+  if (e.status !== "Converted") {
+    if (e.status === "Open") return "Enquiry";
+    if (e.status === "Rejected") return "Rejected";
+    return "";
+  }
+  const draftApproved = e.draft_bl_approved === true;
+  if (!draftApproved) return "Draft BL";
+  const sboDate = !!(e.sailing_date);
+  if (!sboDate) return "SBO";
+  const hasBillingDetails = !!(
+    e.billing_details?.agency_bill_no &&
+    e.billing_details?.agency_bill_date &&
+    e.billing_details?.reimbursement_bill_no &&
+    e.billing_details?.reimbursement_bill_date
+  );
+  if (!hasBillingDetails) return "Billing";
+  const hasArrivalDate = !!(e.arrival_date);
+  if (!hasArrivalDate) return "ETA Pending";
+  const hasFinalDelivery = !!(e.final_delivery_date);
+  if (!hasFinalDelivery) return "Delivery";
+  return "Completed";
+};
+
 const handleExportApiError = (error, res, fallbackMessage) => {
   console.error(fallbackMessage, error?.message || error);
 
@@ -91,15 +115,65 @@ export const proxyFreightEnquiries = async (req, res) => {
     }
 
     const response = await axios.get(`${EXPORT_API_BASE_URL}/freight-enquiries`, {
+      params: isAdmin ? { tab: req.query.tab } : {}, // Fetch all if not admin to calculate counts properly
       timeout: 30000,
     });
 
     const all = Array.isArray(response.data?.data) ? response.data.data : [];
-    const data = isAdmin ? all : all.filter((e) => enquiryMatchesOrgs(e, orgNames));
+    
+    // Ensure all items have computedTab (legacy remote backend might not provide it)
+    all.forEach(e => {
+      if (!e.computedTab) {
+        e.computedTab = getPipelineStage(e);
+      }
+    });
+
+    let data = [];
+    let counts = response.data?.counts || {};
+
+    if (isAdmin) {
+      data = all;
+    } else {
+      // Filter all jobs by user's assigned orgs
+      const orgFilteredData = all.filter((e) => enquiryMatchesOrgs(e, orgNames));
+
+      // Re-tally counts based on org-filtered data
+      const PRE_ETA = new Set(["Draft BL", "SBO", "Billing"]);
+      const recounted = {
+        Enquiry: 0, Rejected: 0, Pending: 0,
+        "Draft BL": 0, SBO: 0, Billing: 0,
+        "ETA Pending": 0, Delivery: 0, Completed: 0
+      };
+      orgFilteredData.forEach(e => {
+        const ct = e.computedTab || "";
+        if (ct === "Enquiry") recounted.Enquiry++;
+        else if (ct === "Rejected") recounted.Rejected++;
+        else if (ct === "Draft BL") { recounted["Draft BL"]++; recounted.Pending++; }
+        else if (ct === "SBO") { recounted.SBO++; recounted.Pending++; }
+        else if (ct === "Billing") { recounted.Billing++; recounted.Pending++; }
+        else if (ct === "ETA Pending") recounted["ETA Pending"]++;
+        else if (ct === "Delivery") recounted.Delivery++;
+        else if (ct === "Completed") recounted.Completed++;
+      });
+      counts = recounted;
+
+      // Now filter by the requested tab
+      const reqTab = req.query.tab;
+      if (reqTab) {
+        if (reqTab === "Pending") {
+          data = orgFilteredData.filter(e => PRE_ETA.has(e.computedTab));
+        } else {
+          data = orgFilteredData.filter(e => e.computedTab === reqTab);
+        }
+      } else {
+        data = orgFilteredData;
+      }
+    }
 
     return res.json({
       success: true,
       data,
+      counts,
       message: `Found ${data.length} freight enquiry(ies)`,
     });
   } catch (error) {
@@ -181,5 +255,23 @@ export const proxyFreightDsrDownload = async (req, res) => {
       }
     }
     return handleExportApiError(error, res, "Failed to download Freight Forwarding DSR.");
+  }
+};
+
+/**
+ * PUT /api/freight-enquiries/:id
+ */
+export const proxyUpdateFreightEnquiry = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const response = await axios.put(`${EXPORT_API_BASE_URL}/freight-enquiries/${req.params.id}`, req.body, {
+      timeout: 15000,
+    });
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    return handleExportApiError(error, res, "Failed to update freight enquiry.");
   }
 };

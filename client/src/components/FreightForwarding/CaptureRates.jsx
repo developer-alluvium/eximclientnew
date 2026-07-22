@@ -64,7 +64,7 @@ function CaptureRates({ enquiry }) {
   const pipe = isConverted ? {
     draftUploaded: !!enquiry.documents?.hbl_copy || !!enquiry.documents?.booking_copy || !!enquiry.documents?.draft_bl || !!enquiry.saved_quotation,
     draftApproved: localStorage.getItem(`draft_bl_approved_${jobId}`) === "true",
-    sboDate: enquiry.shipped_on_board_date || "",
+    sboDate: enquiry.sailing_date || "",
     agencyBillNo: enquiry.billing_details?.agency_bill_no || "",
     agencyBillDate: enquiry.billing_details?.agency_bill_date || "",
     reimbursementBillNo: enquiry.billing_details?.reimbursement_bill_no || "",
@@ -111,7 +111,10 @@ function CaptureRates({ enquiry }) {
         <div style={s.grid}>
           {Object.entries({
             No: enquiry.enquiry_no,
-            "Shipper/Org": enquiry.organization_name,
+            Consignee: (() => {
+              const text = enquiry.consignee_name || enquiry.bl_details?.consignee || enquiry.organization_name || "";
+              return text.split("\n")[0].replace(/\r$/, "").trim();
+            })(),
             POL: enquiry.port_of_loading,
             POD: enquiry.port_of_destination,
             Type: enquiry.consignment_type,

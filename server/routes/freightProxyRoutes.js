@@ -2,6 +2,7 @@ import express from "express";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 import {
   proxyFreightEnquiries,
+  proxyUpdateFreightEnquiry,
   proxyHistoricalFreight,
   proxyPorts,
   proxyFreightDsrDownload,
@@ -10,6 +11,7 @@ import {
 const router = express.Router();
 
 router.get("/api/freight-enquiries", authenticateUser, proxyFreightEnquiries);
+router.put("/api/freight-enquiries/:id", authenticateUser, proxyUpdateFreightEnquiry);
 router.get("/api/export-dsr/historical-freight", authenticateUser, proxyHistoricalFreight);
 router.get("/api/ports", authenticateUser, proxyPorts);
 router.get("/api/freight-forwarding/generate-dsr", authenticateUser, proxyFreightDsrDownload);

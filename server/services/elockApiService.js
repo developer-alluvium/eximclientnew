@@ -174,7 +174,7 @@ class ElockApiService {
 
             console.log("📡 Backend: Calling third-party API to fetch all records");
 
-            const serviceToken = await transportAuthService.getServiceToken();
+            const apiKey = process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET || "3c7c6bab80b4ca6f1980fe6c99ca20e6265ea2ed27b83fc355ab30bee18030ad";
 
             // Fetch from both endpoints in parallel
             const [response, othersResponse] = await Promise.all([
@@ -186,7 +186,9 @@ class ElockApiService {
                         headers: {
                             Accept: "application/json",
                             "Content-Type": "application/json",
+                            "x-api-key": apiKey,
                             ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                            ...(authToken && { Authorization: `Bearer ${authToken}` }),
                         },
                     }
                 ),
@@ -198,7 +200,9 @@ class ElockApiService {
                         headers: {
                             Accept: "application/json",
                             "Content-Type": "application/json",
+                            "x-api-key": apiKey,
                             ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
+                            ...(authToken && { Authorization: `Bearer ${authToken}` }),
                         },
                     }
                 ).catch(err => {

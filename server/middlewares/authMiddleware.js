@@ -609,12 +609,9 @@ export const authenticateUser = async (req, res, next) => {
       console.log('❌ User account pending verification');
       return res.status(403).json({
         success: false,
-        message:
-          "Account pending verification. Please wait for admin approval.",
+        message: "Account pending verification. Please wait for admin approval.",
       });
     }
-
-    console.log('✅ Authentication successful for user:', user.email);
 
     // Attach user to request
     req.user = user;

@@ -143,7 +143,7 @@ const Dashboard = () => {
       setUploadingForecast(true);
       return;
     }
-    
+
     // We handle the actual upload in customRequest or beforeUpload, 
     // but here we'll just use a simple approach if the user selects a file.
   };
@@ -151,11 +151,11 @@ const Dashboard = () => {
   const handleDownloadSample = async () => {
     const sampleUrl = "https://exim-images-p1.s3.ap-south-1.amazonaws.com/notes/import_organisation-1777012649789.xlsx";
     window.open(sampleUrl, '_blank');
-    
+
     if (!sampleDownloaded) {
       setSampleDownloaded(true);
       message.success("Sample file download started. Upload Forecast is now enabled.");
-      
+
       // Persist to backend globally for this user
       try {
         await apiService.markSampleDownloaded();
@@ -406,7 +406,7 @@ const Dashboard = () => {
     }
     if (!limits && filterType) {
       return <Tag icon={<ExclamationCircleOutlined />} color="warning" style={{ fontSize: '12px' }}>Sync Needed</Tag>;
-    } 
+    }
     if (limits) {
       return (
         <div className="limit-pills-container compact">
@@ -688,7 +688,6 @@ const Dashboard = () => {
                       >
                         {userData.ieCodes.map((code) => {
                           const assignment = userData.ieCodeAssignments?.find(a => a.ie_code_no === code);
-                          console.log("IE Code:", code, "Assignment:", assignment);
                           return (
                             <Option key={code} value={code}>
                               <div style={{ display: 'flex', flexDirection: 'column', py: 4 }}>
@@ -721,7 +720,7 @@ const Dashboard = () => {
             </Space>
           </Col>
         </Row>
-        
+
         {/* Centered Importer Name */}
         {userData && getImporterName() && (
           <Title
@@ -794,7 +793,7 @@ const Dashboard = () => {
             tabBarGutter={24}
             tabBarExtraContent={
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                 <Input
+                <Input
                   placeholder="Search container..."
                   prefix={<SearchOutlined />}
                   value={searchTerm}

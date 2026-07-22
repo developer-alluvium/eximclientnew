@@ -79,6 +79,29 @@ const getStatusTheme = (statusValue) => {
   return statusThemes[statusValue] || statusThemes["default"];
 };
 
+const getPreviousDayDate = (dateVal) => {
+  if (!dateVal) return "";
+  const str = String(dateVal).trim();
+  let d = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const parts = str.split("-");
+    d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  } else {
+    const dmy = str.match(/^(\d{2})[\-\/](\d{2})[\-\/](\d{4})/);
+    if (dmy) {
+      d = new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10));
+    } else {
+      d = new Date(str);
+    }
+  }
+  if (!d || isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() - 1);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const getStatusColor = (statusValue) => getStatusTheme(statusValue).bg;
 
 // Branch options
@@ -1278,16 +1301,34 @@ function CExportDSR() {
                           <ContentCopy sx={{ fontSize: 11, color: "#334155", "&:hover": { color: "#0f172a" } }} />
                         </IconButton>
                       </Box>
-                      {container.type && (
-                        <span style={{ fontSize: "8px", fontWeight: 900, backgroundColor: "#e2e8f0", padding: "0 6px", borderRadius: "2px" }}>
-                          {container.type.toString().toUpperCase()}
-                        </span>
-                      )}
+                      {(() => {
+                        const size = container.container_size || container.containerSize || container.size || container.isoCode || job.container_size || "";
+                        const type = container.container_type || container.containerType || container.type || job.container_type || "";
+                        const text = [size, type].filter(Boolean).join(" ");
+                        if (!text) return null;
+                        return (
+                          <span style={{ fontSize: "8px", fontWeight: 900, backgroundColor: "#e2e8f0", padding: "0 6px", borderRadius: "2px" }}>
+                            {text.toUpperCase()}
+                          </span>
+                        );
+                      })()}
                     </Box>
                   </Box>
                 ))
               ) : (
-                <Typography sx={{ fontSize: "11px", color: "#64748b" }}>-</Typography>
+                (() => {
+                  const size = job.container_size || job.containerSize || "";
+                  const type = job.container_type || job.containerType || "";
+                  const text = [size, type].filter(Boolean).join(" ");
+                  if (text) {
+                    return (
+                      <span style={{ fontSize: "9px", fontWeight: 700, backgroundColor: "#f1f5f9", padding: "2px 6px", borderRadius: "3px", color: "#334155" }}>
+                        {text.toUpperCase()}
+                      </span>
+                    );
+                  }
+                  return <Typography sx={{ fontSize: "11px", color: "#64748b" }}>-</Typography>;
+                })()
               )}
 
               {hiddenCount > 0 && (
@@ -1327,13 +1368,17 @@ function CExportDSR() {
       case "handover": {
         const opDetails = job.operations?.[0]?.statusDetails?.[0] || {};
         const isRoad = opDetails.railRoad === "road";
+        const railOutVal = opDetails.handoverConcorTharSanganaRailRoadDate 
+          || (opDetails.railOutReachedDate ? getPreviousDayDate(opDetails.railOutReachedDate) : null);
+
         const milestoneItems = [
           { label: "LEO", val: opDetails.leoDate ? formatDate(opDetails.leoDate) : null },
           { label: "VGM", val: job.vgm_date ? formatDate(job.vgm_date) : null },
           { label: "F-13", val: job.form13_date ? formatDate(job.form13_date) : null },
           { label: "ESB", val: job.shipping_bill_done_date ? formatDate(job.shipping_bill_done_date) : null },
+          { label: "STUFFING", val: opDetails.stuffingDate ? formatDate(opDetails.stuffingDate) : null },
           { label: "DHO", val: opDetails.handoverForwardingNoteDate ? formatDate(opDetails.handoverForwardingNoteDate) : null },
-          { label: isRoad ? "ROAD OUT" : "RAIL OUT", val: opDetails.handoverConcorTharSanganaRailRoadDate ? formatDate(opDetails.handoverConcorTharSanganaRailRoadDate) : null },
+          { label: isRoad ? "ROAD OUT" : "RAIL OUT", val: railOutVal ? formatDate(railOutVal) : null },
           { label: isRoad ? "ROAD RCH" : "RAIL RCH", val: opDetails.railOutReachedDate ? formatDate(opDetails.railOutReachedDate) : null },
         ];
         return (
