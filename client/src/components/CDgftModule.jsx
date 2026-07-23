@@ -352,7 +352,7 @@ function CDgftModule() {
               <TableBody>
                 {paginatedAuthorizations.length > 0 ? (
                   paginatedAuthorizations.map((auth, idx) => {
-                    const srNo = page * rowsPerP     age + idx + 1;
+                    const srNo = page * rowsPerPage + idx + 1;
                     const authNoStr = auth.authorization_no || auth.licence_no || auth.registration_no || "—";
                     const authDateStr = auth.authorization_date || auth.licence_date || auth.auth_date || "—";
                     const bondNoStr = auth.bond_number || auth.bond_no || "—";
