@@ -23,7 +23,8 @@ import {
   Drawer,
   TextField,
   TablePagination,
-  Alert
+  Alert,
+  Button
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -75,7 +76,19 @@ function CDgftModule() {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch all authorizations matching the logged in user's ie_code_assignments
+  // Active Tab: 0 = "DGFT License Details", 1 = "ROADTEP details"
+  const [activeTab, setActiveTab] = useState(0);
+
+  // RoDTEP States
+  const [rodtepList, setRodtepList] = useState([]);
+  const [rodtepPage, setRodtepPage] = useState(0);
+  const [rodtepRowsPerPage, setRodtepRowsPerPage] = useState(50);
+  const [selectedRodtepItem, setSelectedRodtepItem] = useState(null);
+  const [rodtepDrawerOpen, setRodtepDrawerOpen] = useState(false);
+  const [rodtepUtilizationList, setRodtepUtilizationList] = useState([]);
+  const [loadingRodtepDetails, setLoadingRodtepDetails] = useState(false);
+
+  // Fetch all authorizations & RoDTEPs matching the logged in user's ie_code_assignments
   useEffect(() => {
     async function loadAuthorizations() {
       setLoadingList(true);
@@ -97,6 +110,48 @@ function CDgftModule() {
           firm_name: name
         }));
         setAssignedIecList(iecList);
+
+        // --- Fetch RoDTEP Records ---
+        try {
+          let fetchedRodteps = [];
+          if (iecList.length > 0) {
+            const rodtepRes = await Promise.all(
+              iecList.map(async (iecObj) => {
+                try {
+                  const res = await axios.get(
+                    `${process.env.REACT_APP_API_STRING}/get-rodteps-by-iec`,
+                    { params: { iec_no: iecObj.iec_no } }
+                  );
+                  return res.data && Array.isArray(res.data) ? res.data : [];
+                } catch (e) {
+                  return [];
+                }
+              })
+            );
+            fetchedRodteps = rodtepRes.flat();
+          }
+
+          if (fetchedRodteps.length === 0) {
+            const allRodtepRes = await axios.get(`${process.env.REACT_APP_API_STRING}/get-rodteps`);
+            if (allRodtepRes.data && Array.isArray(allRodtepRes.data)) {
+              fetchedRodteps = allRodtepRes.data;
+            }
+          }
+
+          const seenRodtep = new Set();
+          const uniqueRodtep = [];
+          fetchedRodteps.forEach((r) => {
+            const key = r._id || r.rodtep;
+            if (key && !seenRodtep.has(key)) {
+              seenRodtep.add(key);
+              uniqueRodtep.push(r);
+            }
+          });
+
+          setRodtepList(uniqueRodtep);
+        } catch (rErr) {
+          console.error("Error loading RoDTEP list:", rErr);
+        }
 
         if (iecList.length === 0) {
           setAuthorizations([]);
@@ -203,6 +258,25 @@ function CDgftModule() {
       setLoadingDetails(false);
     }
   };
+  // Open Drawer and load details for RoDTEP scrip
+  const handleOpenRodtepDetails = async (item) => {
+    if (!item) return;
+    setSelectedRodtepItem(item);
+    setRodtepDrawerOpen(true);
+    setLoadingRodtepDetails(true);
+    setRodtepUtilizationList([]);
+
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_STRING}/get-rodtep-utilization`, {
+        params: { rodtep: item.rodtep }
+      });
+      setRodtepUtilizationList(res.data?.utilizationList || []);
+    } catch (err) {
+      console.error("Failed to load RoDTEP utilization", err);
+    } finally {
+      setLoadingRodtepDetails(false);
+    }
+  };
 
   // Filter authorizations by selected IEC Code and Search Query
   const filteredAuthorizations = authorizations.filter((item) => {
@@ -237,6 +311,31 @@ function CDgftModule() {
     page * rowsPerPage + rowsPerPage
   );
 
+  // Filter RoDTEPs by selected IEC Code and Search Query
+  const filteredRodteps = rodtepList.filter((item) => {
+    if (selectedIec !== "ALL") {
+      const itemIec = (item.iec_code || "").toUpperCase().trim();
+      if (itemIec !== selectedIec) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const rodtepNo = String(item.rodtep || "").toLowerCase();
+      const iecCode = String(item.iec_code || "").toLowerCase();
+      const portCode = String(item.port_code || "").toLowerCase();
+      return (
+        rodtepNo.includes(q) ||
+        iecCode.includes(q) ||
+        portCode.includes(q)
+      );
+    }
+    return true;
+  });
+
+  const paginatedRodteps = filteredRodteps.slice(
+    rodtepPage * rodtepRowsPerPage,
+    rodtepPage * rodtepRowsPerPage + rodtepRowsPerPage
+  );
+
   const calculateUtilizationSums = () => {
     return utilizationRecords.reduce(
       (acc, item) => {
@@ -251,10 +350,210 @@ function CDgftModule() {
 
   const utilSums = calculateUtilizationSums();
 
+  const renderLicenseTable = () => {
+    if (authorizations.length === 0) {
+      return (
+        <Paper sx={{ p: 4, textAlign: "center", borderRadius: "12px", border: "1px dashed #CBD5E1" }}>
+          <Typography variant="body1" color="text.secondary">
+            No active DGFT authorizations found for your assigned IEC codes.
+          </Typography>
+        </Paper>
+      );
+    }
+    return (
+      <Paper sx={{ borderRadius: "8px", border: "1px solid #1e3a8a", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead style={{ background: "linear-gradient(180deg, #19448a 0%, #102a56 100%)" }}>
+              <TableRow>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>Sr No.</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>AUTHORIZATION NUMBER</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>AUTHORIZATION DATE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND NO</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND AMOUNT</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND EXPIRY</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>SCHEME CODE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>JOB CATEGORIES</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>PORT CODE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>JOB STATUS</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paginatedAuthorizations.length > 0 ? (
+                paginatedAuthorizations.map((auth, idx) => {
+                  const srNo = page * rowsPerPage + idx + 1;
+                  const authNoStr = auth.authorization_no || auth.licence_no || auth.registration_no || "—";
+                  const authDateStr = auth.authorization_date || auth.licence_date || auth.auth_date || "—";
+                  const bondNoStr = auth.bond_number || auth.bond_no || "—";
+                  const bondAmtStr = auth.bond_amount ? (String(auth.bond_amount).startsWith("Rs.") ? auth.bond_amount : formatINR(auth.bond_amount)) : "—";
+                  const bondExpiryStr = auth.bond_expiry_date || auth.bond_expiry || "—";
+                  const statusStr = auth.job_status || auth.status || "Completed";
+
+                  return (
+                    <TableRow
+                      key={auth._id || authNoStr || idx}
+                      hover
+                      onClick={() => handleOpenDetails(authNoStr)}
+                      sx={{ "&:hover": { backgroundColor: "#f8fafc" }, cursor: "pointer" }}
+                    >
+                      <TableCell sx={{ py: 1.2, color: "#475569", fontWeight: "600", fontSize: "12px" }}>
+                        {srNo}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2 }}>
+                        <Typography
+                          variant="body2"
+                          fontWeight="700"
+                          color="#2563eb"
+                          sx={{ textDecoration: "underline", cursor: "pointer" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetails(authNoStr);
+                          }}
+                        >
+                          {authNoStr}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
+                        {authDateStr}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
+                        {bondNoStr}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
+                        {bondAmtStr}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
+                        {bondExpiryStr}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#1e293b", fontWeight: "600", fontSize: "12px" }}>
+                        {auth.scheme_code || "—"}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
+                        {auth.job_category || auth.job_categories || auth.category || "BOND AA"}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#1e293b", fontWeight: "600", fontSize: "12px" }}>
+                        {auth.port_code || auth.port || "INSBI6"}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.2 }}>
+                        <Chip
+                          label={statusStr}
+                          size="small"
+                          sx={{
+                            fontWeight: "700",
+                            fontSize: "11px",
+                            borderRadius: "6px",
+                            color: statusStr === "Completed" ? "#15803d" : statusStr === "Billing" || statusStr === "Blling" ? "#c2410c" : "#1d4ed8",
+                            backgroundColor: statusStr === "Completed" ? "#f0fdf4" : statusStr === "Billing" || statusStr === "Blling" ? "#fff7ed" : "#eff6ff",
+                            border: "1px solid",
+                            borderColor: statusStr === "Completed" ? "#bbf7d0" : statusStr === "Billing" || statusStr === "Blling" ? "#ffedd5" : "#bfdbfe"
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4, color: "#64748b" }}>
+                    No matching records found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100]}
+          component="div"
+          count={filteredAuthorizations.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </Paper>
+    );
+  };
+
+  const renderRodtepTable = () => {
+    return (
+      <Paper sx={{ borderRadius: "8px", border: "1px solid #0d2352", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead style={{ background: "linear-gradient(180deg, #0d2352 0%, #071533 100%)" }}>
+              <TableRow>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>SR NO</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>RODTEP NO</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>ISSUE DATE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>EXPIRY DATE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>VALUE INR</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>UTILIZED INR</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BALANCE INR</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>IEC CODE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>PORT CODE</TableCell>
+                <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>ACTIONS</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paginatedRodteps.length > 0 ? (
+                paginatedRodteps.map((item, idx) => {
+                  const srNo = rodtepPage * rodtepRowsPerPage + idx + 1;
+                  const utilized = item.totalUtilized || item.utilized_amount || 0;
+                  const balance = item.balance_inr !== undefined ? item.balance_inr : ((item.value_inr || 0) - utilized);
+                  return (
+                    <TableRow key={item._id || idx} hover sx={{ "&:hover": { backgroundColor: "#f8fafc" } }}>
+                      <TableCell sx={{ py: 1.2, color: "#475569", fontWeight: "600", fontSize: "12px" }}>{item.sr_no || srNo}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#1e40af", fontWeight: "700", fontSize: "12px" }}>{item.rodtep || "—"}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontSize: "12px" }}>{item.issue_date || "—"}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontSize: "12px" }}>{item.expiry_date || "—"}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#0f766e", fontWeight: "700", fontSize: "12px" }}>{formatINR(item.value_inr)}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#c2410c", fontWeight: "700", fontSize: "12px" }}>{formatINR(utilized)}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#15803d", fontWeight: "700", fontSize: "12px" }}>{formatINR(balance)}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontSize: "12px" }}>{item.iec_code || "—"}</TableCell>
+                      <TableCell sx={{ py: 1.2, color: "#334155", fontSize: "12px" }}>{item.port_code || "—"}</TableCell>
+                      <TableCell sx={{ py: 1.2 }}>
+                        <IconButton size="small" onClick={() => handleOpenRodtepDetails(item)}>
+                          <InfoIcon fontSize="small" sx={{ color: "#2563eb" }} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={10} align="center" sx={{ py: 6, color: "#64748b" }}>
+                    No records found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100]}
+          component="div"
+          count={filteredRodteps.length}
+          rowsPerPage={rodtepRowsPerPage}
+          page={rodtepPage}
+          onPageChange={(_, newPage) => setRodtepPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRodtepRowsPerPage(parseInt(e.target.value, 10));
+            setRodtepPage(0);
+          }}
+        />
+      </Paper>
+    );
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, backgroundColor: "#F8FAFC", minHeight: "100vh" }}>
       {/* Header Bar */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2}>
         <Box display="flex" alignItems="center" gap={2}>
           <IconButton onClick={() => navigate("/user/dashboard")} sx={{ color: "#0F172A" }}>
             <ArrowBackIcon />
@@ -276,6 +575,7 @@ function CDgftModule() {
                 onChange={(e) => {
                   setSelectedIec(e.target.value);
                   setPage(0);
+                  setRodtepPage(0);
                 }}
                 sx={{
                   borderRadius: "8px",
@@ -296,17 +596,18 @@ function CDgftModule() {
 
             <TextField
               size="small"
-              placeholder="Search License / Job / Scheme..."
+              placeholder={activeTab === 0 ? "Search License / Job / Scheme..." : "Search RODTEP No, IEC Code, Port..."}
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setPage(0);
+                setRodtepPage(0);
               }}
               InputProps={{
                 startAdornment: <SearchIcon sx={{ color: "#94a3b8", fontSize: 18, mr: 1 }} />
               }}
               sx={{
-                width: 240,
+                width: 260,
                 backgroundColor: "#fff",
                 borderRadius: "8px",
                 "& .MuiOutlinedInput-root": { borderRadius: "8px" }
@@ -316,7 +617,70 @@ function CDgftModule() {
         )}
       </Box>
 
-      {/* Main Table View */}
+      {/* Two Tabs: DGFT License Details & ROADTEP details */}
+      <Box display="flex" borderBottom="1px solid #CBD5E1" mb={3} gap={1}>
+        <Button
+          onClick={() => { setActiveTab(0); setPage(0); }}
+          sx={{
+            textTransform: "none",
+            fontSize: "14px",
+            fontWeight: "700",
+            pb: 1,
+            pt: 1,
+            px: 2,
+            borderRadius: 0,
+            color: activeTab === 0 ? "#2563eb" : "#64748b",
+            borderBottom: activeTab === 0 ? "3px solid #2563eb" : "3px solid transparent",
+            "&:hover": { backgroundColor: "transparent" }
+          }}
+        >
+          DGFT License Details
+          <Chip
+            label={authorizations.length}
+            size="small"
+            sx={{
+              ml: 1,
+              fontSize: "11px",
+              fontWeight: "700",
+              height: "20px",
+              backgroundColor: activeTab === 0 ? "#eff6ff" : "#f1f5f9",
+              color: activeTab === 0 ? "#2563eb" : "#64748b"
+            }}
+          />
+        </Button>
+
+        <Button
+          onClick={() => { setActiveTab(1); setRodtepPage(0); }}
+          sx={{
+            textTransform: "none",
+            fontSize: "14px",
+            fontWeight: "700",
+            pb: 1,
+            pt: 1,
+            px: 2,
+            borderRadius: 0,
+            color: activeTab === 1 ? "#2563eb" : "#64748b",
+            borderBottom: activeTab === 1 ? "3px solid #2563eb" : "3px solid transparent",
+            "&:hover": { backgroundColor: "transparent" }
+          }}
+        >
+          ROADTEP details
+          <Chip
+            label={rodtepList.length}
+            size="small"
+            sx={{
+              ml: 1,
+              fontSize: "11px",
+              fontWeight: "700",
+              height: "20px",
+              backgroundColor: activeTab === 1 ? "#eff6ff" : "#f1f5f9",
+              color: activeTab === 1 ? "#2563eb" : "#64748b"
+            }}
+          />
+        </Button>
+      </Box>
+
+      {/* Main Content View */}
       {loadingList ? (
         <Box display="flex" justifyContent="center" py={8}>
           <CircularProgress />
@@ -325,149 +689,128 @@ function CDgftModule() {
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
-      ) : authorizations.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: "center", borderRadius: "12px", border: "1px dashed #CBD5E1" }}>
-          <Typography variant="body1" color="text.secondary">
-            No active DGFT authorizations found for your assigned IEC codes.
-          </Typography>
-        </Paper>
+      ) : activeTab === 0 ? (
+        renderLicenseTable()
       ) : (
-        <Paper sx={{ borderRadius: "8px", border: "1px solid #1e3a8a", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead style={{ background: "linear-gradient(180deg, #19448a 0%, #102a56 100%)" }}>
-                <TableRow>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>Sr No.</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>AUTHORIZATION NUMBER</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>AUTHORIZATION DATE</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND NO</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND AMOUNT</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>BOND EXPIRY</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>SCHEME CODE</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>JOB CATEGORIES</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>PORT CODE</TableCell>
-                  <TableCell style={{ color: "#ffffff", fontWeight: "800", fontSize: "11px", letterSpacing: "0.5px" }}>JOB STATUS</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedAuthorizations.length > 0 ? (
-                  paginatedAuthorizations.map((auth, idx) => {
-                    const srNo = page * rowsPerPage + idx + 1;
-                    const authNoStr = auth.authorization_no || auth.licence_no || auth.registration_no || "—";
-                    const authDateStr = auth.authorization_date || auth.licence_date || auth.auth_date || "—";
-                    const bondNoStr = auth.bond_number || auth.bond_no || "—";
-                    const bondAmtStr = auth.bond_amount ? (String(auth.bond_amount).startsWith("Rs.") ? auth.bond_amount : formatINR(auth.bond_amount)) : "—";
-                    const bondExpiryStr = auth.bond_expiry_date || auth.bond_expiry || "—";
-                    const statusStr = auth.job_status || auth.status || "Completed";
-
-                    return (
-                      <TableRow
-                        key={auth._id || authNoStr || idx}
-                        hover
-                        onClick={() => handleOpenDetails(authNoStr)}
-                        sx={{ "&:hover": { backgroundColor: "#f8fafc" }, cursor: "pointer" }}
-                      >
-                        {/* Sr No. */}
-                        <TableCell sx={{ py: 1.2, color: "#475569", fontWeight: "600", fontSize: "12px" }}>
-                          {srNo}
-                        </TableCell>
-
-                        {/* Authorization Number Link */}
-                        <TableCell sx={{ py: 1.2 }}>
-                          <Typography
-                            variant="body2"
-                            fontWeight="700"
-                            color="#2563eb"
-                            sx={{ textDecoration: "underline", cursor: "pointer" }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDetails(authNoStr);
-                            }}
-                          >
-                            {authNoStr}
-                          </Typography>
-                        </TableCell>
-
-                        {/* Authorization Date */}
-                        <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
-                          {authDateStr}
-                        </TableCell>
-
-                        {/* Bond No */}
-                        <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
-                          {bondNoStr}
-                        </TableCell>
-
-                        {/* Bond Amount */}
-                        <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
-                          {bondAmtStr}
-                        </TableCell>
-
-                        {/* Bond Expiry */}
-                        <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
-                          {bondExpiryStr}
-                        </TableCell>
-
-                        {/* Scheme Code */}
-                        <TableCell sx={{ py: 1.2, color: "#1e293b", fontWeight: "600", fontSize: "12px" }}>
-                          {auth.scheme_code || "—"}
-                        </TableCell>
-
-                        {/* Job Categories */}
-                        <TableCell sx={{ py: 1.2, color: "#334155", fontWeight: "500", fontSize: "12px" }}>
-                          {auth.job_category || auth.job_categories || auth.category || "BOND AA"}
-                        </TableCell>
-
-                        {/* Port Code */}
-                        <TableCell sx={{ py: 1.2, color: "#1e293b", fontWeight: "600", fontSize: "12px" }}>
-                          {auth.port_code || auth.port || "INSBI6"}
-                        </TableCell>
-
-                        {/* Job Status - View Only Badge */}
-                        <TableCell sx={{ py: 1.2 }}>
-                          <Chip
-                            label={statusStr}
-                            size="small"
-                            sx={{
-                              fontWeight: "700",
-                              fontSize: "11px",
-                              borderRadius: "6px",
-                              color: statusStr === "Completed" ? "#15803d" : statusStr === "Billing" || statusStr === "Blling" ? "#c2410c" : "#1d4ed8",
-                              backgroundColor: statusStr === "Completed" ? "#f0fdf4" : statusStr === "Billing" || statusStr === "Blling" ? "#fff7ed" : "#eff6ff",
-                              border: "1px solid",
-                              borderColor: statusStr === "Completed" ? "#bbf7d0" : statusStr === "Billing" || statusStr === "Blling" ? "#ffedd5" : "#bfdbfe"
-                            }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: "#64748b" }}>
-                      No matching records found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Table Pagination */}
-          <TablePagination
-            rowsPerPageOptions={[25, 50, 100]}
-            component="div"
-            count={filteredAuthorizations.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-          />
-        </Paper>
+        renderRodtepTable()
       )}
+
+      {/* RoDTEP Utilization Details Drawer */}
+      <Drawer
+        anchor="right"
+        open={rodtepDrawerOpen}
+        onClose={() => setRodtepDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: "100%", sm: "90%", md: "75%", lg: "60%" },
+            p: { xs: 2, md: 3 },
+            backgroundColor: "#F8FAFC"
+          }
+        }}
+      >
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} pb={2} borderBottom="1px solid #E2E8F0">
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <DescriptionIcon color="primary" sx={{ fontSize: 28 }} />
+            <Box>
+              <Typography variant="h6" fontWeight="700" color="#0F172A">
+                RODTEP Scrip: {selectedRodtepItem?.rodtep}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                IEC: {selectedRodtepItem?.iec_code || "—"} | Port: {selectedRodtepItem?.port_code || "—"}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setRodtepDrawerOpen(false)} sx={{ backgroundColor: "#e2e8f0" }}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        {loadingRodtepDetails ? (
+          <Box display="flex" justifyContent="center" py={8}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box display="flex" flexDirection="column" gap={3}>
+            <Card sx={{ borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", border: "1px solid #E2E8F0" }}>
+              <Box sx={{ backgroundColor: "#F1F5F9", px: 3, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <InfoIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography variant="subtitle1" fontWeight="700" color="#1E293B">
+                  Scrip Overview
+                </Typography>
+              </Box>
+              <CardContent sx={{ p: 0 }}>
+                <TableContainer>
+                  <Table sx={{ borderCollapse: "collapse" }}>
+                    <TableBody>
+                      <TableRow sx={{ "& td": { borderBottom: "1px solid #E2E8F0", py: 1.5, px: 3 } }}>
+                        <TableCell sx={{ width: "25%", fontWeight: "600", color: "#475569" }}>RODTEP No</TableCell>
+                        <TableCell sx={{ width: "25%", fontWeight: "700", color: "#1e40af" }}>{selectedRodtepItem?.rodtep}</TableCell>
+                        <TableCell sx={{ width: "25%", fontWeight: "600", color: "#475569" }}>IEC Code</TableCell>
+                        <TableCell sx={{ width: "25%" }}>{selectedRodtepItem?.iec_code || "—"}</TableCell>
+                      </TableRow>
+                      <TableRow sx={{ "& td": { borderBottom: "1px solid #E2E8F0", py: 1.5, px: 3 } }}>
+                        <TableCell sx={{ fontWeight: "600", color: "#475569" }}>Issue Date</TableCell>
+                        <TableCell>{selectedRodtepItem?.issue_date || "—"}</TableCell>
+                        <TableCell sx={{ fontWeight: "600", color: "#475569" }}>Expiry Date</TableCell>
+                        <TableCell>{selectedRodtepItem?.expiry_date || "—"}</TableCell>
+                      </TableRow>
+                      <TableRow sx={{ "& td": { borderBottom: "none", py: 1.5, px: 3 } }}>
+                        <TableCell sx={{ fontWeight: "600", color: "#475569" }}>Value INR</TableCell>
+                        <TableCell sx={{ fontWeight: "700", color: "#0f766e" }}>{formatINR(selectedRodtepItem?.value_inr)}</TableCell>
+                        <TableCell sx={{ fontWeight: "600", color: "#475569" }}>Port Code</TableCell>
+                        <TableCell>{selectedRodtepItem?.port_code || "—"}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.03)", border: "1px solid #E2E8F0" }}>
+              <Box sx={{ backgroundColor: "#F1F5F9", px: 3, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <ReceiptIcon color="primary" sx={{ fontSize: 20 }} />
+                <Typography variant="subtitle1" fontWeight="700" color="#1E293B">
+                  Utilizing Jobs
+                </Typography>
+              </Box>
+              <CardContent sx={{ p: 0 }}>
+                <TableContainer>
+                  <Table>
+                    <TableHead sx={{ backgroundColor: "#e2e8f0" }}>
+                      <TableRow>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ px: 3, borderBottom: "2px solid #cbd5e1" }}>Job No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Year</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>BE No</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>BE Date</TableCell>
+                        <TableCell style={{ color: "#1e293b", fontWeight: "800" }} sx={{ borderBottom: "2px solid #cbd5e1" }}>Duty Utilized (INR)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rodtepUtilizationList.length > 0 ? (
+                        rodtepUtilizationList.map((jobItem, idx) => (
+                          <TableRow key={idx} sx={{ "&:hover": { backgroundColor: "#F8FAFC" } }}>
+                            <TableCell sx={{ px: 3, fontWeight: "700", color: "#2563eb" }}>{jobItem.job_no || "—"}</TableCell>
+                            <TableCell>{jobItem.year || "—"}</TableCell>
+                            <TableCell>{jobItem.be_no || "—"}</TableCell>
+                            <TableCell>{jobItem.be_date || "—"}</TableCell>
+                            <TableCell sx={{ fontWeight: "700", color: "#c2410c" }}>{formatINR(jobItem.duty_amount)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#64748B" }}>
+                            No utilizing jobs recorded for this RODTEP scrip.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </Drawer>
 
       {/* Floating Right Drawer Overlay for License Details */}
       <Drawer

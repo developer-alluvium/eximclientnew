@@ -43,6 +43,7 @@ const connectDB = async () => {
     };
 
     // Connect to MongoDB with provided options
+    console.log(`🔌 [eximclientnew] Connecting to MongoDB URI (env: ${env}):`, mongoURI);
     const conn = await mongoose.connect(mongoURI, mongooseOptions);
 
     console.log("MongoDB Connected", {

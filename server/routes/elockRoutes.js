@@ -72,13 +72,11 @@ router.get("/assignments", async (req, res) => {
         // Pass query parameters to the service method
         const result = await elockApiService.getElockAssignments(queryParams, authToken);
 
-        // Set appropriate HTTP status based on result
-        const statusCode = result.success ? 200 : 500;
-
+        // Always return 200 — the success/error status is in the response body
         console.log(
-            `✅ Assignment response sent with ${result.data?.length} records`
+            `✅ Assignment response sent with ${result.data?.length || 0} records (success: ${result.success})`
         );
-        res.status(statusCode).json(result);
+        res.status(200).json(result);
     } catch (error) {
         console.error("❌ Error in assignments endpoint:", error.message);
         res.status(500).json({
@@ -244,6 +242,7 @@ router.get("/assign-limits", async (req, res) => {
       `📨 Proxying assignment limits request for IE: ${ieCodeNo}, Type: ${type}`
     );
 
+    const apiKey = process.env.TRANSPORT_API_KEY || "1234567890";
     const serviceToken = await transportAuthService.getServiceToken();
 
     const targetBaseUrl = process.env.NODE_ENV === "development"
@@ -254,7 +253,11 @@ router.get("/assign-limits", async (req, res) => {
       `${targetBaseUrl}/client-elock-assign-limits`,
       {
         params: { ieCodeNo, type },
+        timeout: 10000,
         headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
             ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
         }
       }
@@ -263,11 +266,12 @@ router.get("/assign-limits", async (req, res) => {
     console.log(`✅ Limits response received for IE: ${ieCodeNo}`);
     res.json(response.data);
   } catch (error) {
-    console.error("❌ Error proxying limits:", error.message);
-    res.status(500).json({
+    console.warn("⚠️ Warning proxying limits:", error.message);
+    res.status(200).json({
       success: false,
       error: error.message,
-      message: "Failed to fetch assignment limits from third-party service",
+      data: null,
+      message: "Assignment limits currently unavailable from third-party service",
     });
   }
 });

@@ -1164,3 +1164,56 @@ export const getLicenseUtilizationRecords = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/get-rodteps
+ */
+export const getRodteps = async (req, res) => {
+  try {
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps`, {
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodteps error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP records." });
+  }
+};
+
+/**
+ * GET /api/get-rodteps-by-iec
+ */
+export const getRodtepsByIec = async (req, res) => {
+  try {
+    const { iec_no } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps-by-iec`, {
+      params: { iec_no },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodtepsByIec error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP records by IEC." });
+  }
+};
+
+/**
+ * GET /api/get-rodtep-utilization
+ */
+export const getRodtepUtilizationProxy = async (req, res) => {
+  try {
+    const { rodtep } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodtep-utilization`, {
+      params: { rodtep },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodtepUtilization error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP utilization records." });
+  }
+};
+
+

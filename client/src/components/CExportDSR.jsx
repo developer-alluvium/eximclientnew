@@ -60,6 +60,89 @@ import ColumnSettingsModal from "./Transport/ColumnSettingsModal";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+const ExportRaiseQueryContent = React.memo(({
+  job,
+  onSubmit,
+  onClose,
+  sending,
+  uploadingAttachment,
+  attachments,
+  onFileUpload,
+  onDeleteAttachment,
+  fileInputRef
+}) => {
+  const [msg, setMsg] = React.useState("");
+
+  return (
+    <>
+      <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #e2e8f0", py: 2 }}>
+        Raise Query for Job {job?.job_no}
+      </DialogTitle>
+      <DialogContent sx={{ pt: 2 }}>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          label="Message"
+          placeholder="Write detail message..."
+          value={msg}
+          onChange={(e) => setMsg(e.target.value)}
+          sx={{ mt: 1 }}
+        />
+
+        {attachments && attachments.length > 0 && (
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+            {attachments.map((att, idx) => (
+              <Chip
+                key={idx}
+                size="small"
+                label={att.fileName}
+                onDelete={() => onDeleteAttachment(idx)}
+                color="primary"
+                variant="outlined"
+              />
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={onFileUpload}
+          />
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingAttachment}
+            sx={{ textTransform: "none", fontSize: "12px" }}
+          >
+            {uploadingAttachment ? "Uploading..." : "📎 Attach Document"}
+          </Button>
+        </div>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
+        <Button
+          onClick={onClose}
+          sx={{ textTransform: "none", fontSize: "12px" }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onSubmit(msg)}
+          disabled={sending || (!msg.trim() && attachments.length === 0)}
+          sx={{ textTransform: "none", fontSize: "12px", bgcolor: "#2563eb" }}
+        >
+          {sending ? "Submitting..." : "Submit Query"}
+        </Button>
+      </DialogActions>
+    </>
+  );
+});
+
 // Status themes matching the standalone Export DSR
 const statusThemes = {
   "Pending": { bg: "#f8fafc", border: "#94a3b8", text: "#475569", light: "#f1f5f9" },
@@ -486,17 +569,90 @@ function CExportDSR() {
   const [queryChatReply, setQueryChatReply] = React.useState("");
   const [queryChatSending, setQueryChatSending] = React.useState(false);
   const [activeQueryIndex, setActiveQueryIndex] = React.useState(0);
+  const [exportChatAttachments, setExportChatAttachments] = React.useState([]);
+  const [exportUploadingAttachment, setExportUploadingAttachment] = React.useState(false);
+  const exportChatFileInputRef = React.useRef(null);
   const chatEndRef = React.useRef(null);
+
+  // File Upload Handler for Export Query Chat
+  const handleExportFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExportUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/client-queries/upload-attachment`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      if (res.data?.fileUrl) {
+        const fileObj = {
+          fileName: res.data.fileName || file.name,
+          fileUrl: res.data.fileUrl,
+          fileType: res.data.fileType || file.type,
+        };
+        setExportChatAttachments((prev) => [...prev, fileObj]);
+        setSnackbar({ open: true, message: `Attachment uploaded: ${file.name}`, severity: "success" });
+      }
+    } catch (err) {
+      console.error("Export attachment upload failed:", err);
+      setSnackbar({ open: true, message: "Attachment upload failed.", severity: "error" });
+    } finally {
+      setExportUploadingAttachment(false);
+      e.target.value = "";
+    }
+  };
 
   // For raising a query:
   const [raiseQueryOpen, setRaiseQueryOpen] = React.useState(false);
   const [raiseQueryJob, setRaiseQueryJob] = React.useState(null);
   const [raiseQueryMessage, setRaiseQueryMessage] = React.useState("");
   const [raiseQuerySending, setRaiseQuerySending] = React.useState(false);
+  const [raiseQueryAttachments, setRaiseQueryAttachments] = React.useState([]);
+  const exportRaiseFileInputRef = React.useRef(null);
+
+  const handleExportRaiseFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExportUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/client-queries/upload-attachment`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      if (res.data?.fileUrl) {
+        const fileObj = {
+          fileName: res.data.fileName || file.name,
+          fileUrl: res.data.fileUrl,
+          fileType: res.data.fileType || file.type,
+        };
+        setRaiseQueryAttachments((prev) => [...prev, fileObj]);
+        setSnackbar({ open: true, message: `Attachment uploaded: ${file.name}`, severity: "success" });
+      }
+    } catch (err) {
+      console.error("Export attachment upload failed:", err);
+      setSnackbar({ open: true, message: "Attachment upload failed.", severity: "error" });
+    } finally {
+      setExportUploadingAttachment(false);
+      e.target.value = "";
+    }
+  };
 
   const handleRedClick = (job) => {
     setRaiseQueryJob(job);
     setRaiseQueryMessage("");
+    setRaiseQueryAttachments([]);
     setRaiseQueryOpen(true);
   };
 
@@ -548,6 +704,20 @@ function CExportDSR() {
       setSnackbar({ open: true, message: "Failed to resolve query.", severity: "error" });
     }
   };
+
+  // Sort export jobs with query priority at TOP
+  const sortedExportJobs = React.useMemo(() => {
+    if (!jobs || jobs.length === 0) return [];
+    return [...jobs].sort((a, b) => {
+      const statA = clientQueriesStatus[a.job_no] || {};
+      const statB = clientQueriesStatus[b.job_no] || {};
+
+      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : statA.hasQueries ? 1 : 0;
+      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : statB.hasQueries ? 1 : 0;
+
+      return scoreB - scoreA;
+    });
+  }, [jobs, clientQueriesStatus]);
 
   // Dynamically populated filters from returned jobs
   const jobOwnersList = React.useMemo(() => {
@@ -1697,7 +1867,7 @@ function CExportDSR() {
   };
 
   const handleSendReply = async (queryId) => {
-    if (!queryChatReply.trim()) return;
+    if (!queryChatReply.trim() && exportChatAttachments.length === 0) return;
     setQueryChatSending(true);
     try {
       await axios.put(
@@ -1706,6 +1876,7 @@ function CExportDSR() {
           message: queryChatReply.trim(),
           repliedBy: user?.name || "Client",
           senderType: "client",
+          attachments: exportChatAttachments,
         }
       );
       // Reload chat
@@ -1715,6 +1886,7 @@ function CExportDSR() {
       );
       setQueryChatData(resp.data?.queries || []);
       setQueryChatReply("");
+      setExportChatAttachments([]);
     } catch (error) {
       console.error("Failed to send reply:", error);
       setSnackbar({ open: true, message: "Failed to send reply", severity: "error" });
@@ -1723,20 +1895,23 @@ function CExportDSR() {
     }
   };
 
-  const handleRaiseQuerySubmit = async () => {
-    if (!raiseQueryMessage.trim()) {
-      setSnackbar({ open: true, message: "Message is required", severity: "warning" });
+  const handleRaiseQuerySubmit = async (messageText) => {
+    const msg = messageText !== undefined ? messageText : raiseQueryMessage;
+    if (!msg.trim() && raiseQueryAttachments.length === 0) {
+      setSnackbar({ open: true, message: "Message or attachment is required", severity: "warning" });
       return;
     }
     setRaiseQuerySending(true);
     try {
       const payload = {
+        module_type: "export",
         job_no: raiseQueryJob.job_no,
         job_id: raiseQueryJob._id,
         subject: "Client Query",
-        message: raiseQueryMessage.trim(),
+        message: msg.trim() || "Query raised with attachment",
         client_id: user?.ie_code_no || user?.email,
         client_name: user?.name || "Client",
+        attachments: raiseQueryAttachments,
       };
 
       await axios.post(
@@ -1746,6 +1921,8 @@ function CExportDSR() {
 
       setSnackbar({ open: true, message: "Query raised successfully", severity: "success" });
       setRaiseQueryOpen(false);
+      setRaiseQueryMessage("");
+      setRaiseQueryAttachments([]);
 
       // Refresh status map for this job
       if (raiseQueryJob?.job_no) {
@@ -2302,7 +2479,7 @@ function CExportDSR() {
                   </TableCell>
                 </TableRow>
               ) : (
-                jobs.map((job, idx) => {
+                sortedExportJobs.map((job, idx) => {
                   const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
                     ? job.detailedStatus[job.detailedStatus.length - 1]
                     : job.detailedStatus || job.status || "Pending");
@@ -2468,6 +2645,7 @@ function CExportDSR() {
               createdAt: activeQuery.createdAt,
               align: "left",
               isReply: false,
+              attachments: activeQuery.attachments || [],
               senderType: "client"
             });
 
@@ -2482,6 +2660,7 @@ function CExportDSR() {
                   createdAt: r.repliedAt,
                   align: r.senderType === "client" ? "left" : "right",
                   isReply: true,
+                  attachments: r.attachments || [],
                   senderType: r.senderType || "admin"
                 });
               });
@@ -2693,7 +2872,6 @@ function CExportDSR() {
                                     Subject: {msg.subject}
                                   </div>
                                 )}
-
                                 {/* Message text */}
                                 <div style={{
                                   fontSize: "13px",
@@ -2703,6 +2881,35 @@ function CExportDSR() {
                                 }}>
                                   {msg.message}
                                 </div>
+
+                                {/* Render Attachments */}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    {msg.attachments.map((att, attIdx) => (
+                                      <a
+                                        key={attIdx}
+                                        href={att.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: "6px",
+                                          padding: "4px 8px",
+                                          backgroundColor: "#e0f2fe",
+                                          border: "1px solid #7dd3fc",
+                                          borderRadius: "6px",
+                                          color: "#0369a1",
+                                          fontSize: "11px",
+                                          fontWeight: "600",
+                                          textDecoration: "none",
+                                        }}
+                                      >
+                                        📄 {att.fileName || "View Attachment"}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
 
                                 {/* Timestamp / double ticks */}
                                 <div style={{
@@ -2735,67 +2942,40 @@ function CExportDSR() {
                         backgroundColor: "#f0f2f5",
                         padding: "10px 16px",
                         display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
+                        flexDirection: "column",
+                        gap: "8px",
                         borderTop: "1px solid #e5e7eb",
                         flexShrink: 0
                       }}>
-                        {/* Smile Emoji Icon */}
-                        <button
-                          type="button"
-                          title="Add Emoji"
-                          style={{
-                            border: "none",
-                            background: "none",
-                            cursor: "pointer",
-                            padding: "4px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#6b7280"
-                          }}
-                        >
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                          </svg>
-                        </button>
+                        {/* Hidden file input */}
+                        <input
+                          type="file"
+                          ref={exportChatFileInputRef}
+                          style={{ display: "none" }}
+                          onChange={handleExportFileUpload}
+                        />
 
-                        {/* Rounded Pill Textfield */}
-                        <div style={{
-                          backgroundColor: "#fff",
-                          borderRadius: "24px",
-                          padding: "6px 16px",
-                          display: "flex",
-                          alignItems: "center",
-                          flex: 1,
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                        }}>
-                          <input
-                            type="text"
-                            placeholder="Type your reply here..."
-                            value={queryChatReply}
-                            onChange={(e) => setQueryChatReply(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !queryChatSending) {
-                                handleSendReply(activeQuery._id);
-                              }
-                            }}
-                            style={{
-                              border: "none",
-                              outline: "none",
-                              width: "100%",
-                              fontSize: "13px",
-                              color: "#374151"
-                            }}
-                          />
+                        {/* Uploaded Attachments preview pills */}
+                        {exportChatAttachments.length > 0 && (
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {exportChatAttachments.map((att, idx) => (
+                              <Chip
+                                key={idx}
+                                size="small"
+                                label={att.fileName}
+                                onDelete={() => setExportChatAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                                color="primary"
+                                variant="outlined"
+                              />
+                            ))}
+                          </div>
+                        )}
 
-                          {/* Attachment Icon */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%" }}>
+                          {/* Smile Emoji Icon */}
                           <button
                             type="button"
-                            title="Attach file"
+                            title="Add Emoji"
                             style={{
                               border: "none",
                               background: "none",
@@ -2804,36 +2984,94 @@ function CExportDSR() {
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              color: "#6b7280",
-                              marginLeft: "8px"
+                              color: "#6b7280"
                             }}
                           >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                              <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                              <line x1="15" y1="9" x2="15.01" y2="9"></line>
                             </svg>
                           </button>
-                        </div>
 
-                        {/* Send Button */}
-                        <button
-                          onClick={() => handleSendReply(activeQuery._id)}
-                          disabled={queryChatSending || !queryChatReply.trim()}
-                          style={{
-                            width: "38px",
-                            height: "38px",
-                            borderRadius: "50%",
-                            backgroundColor: "#00a884",
-                            border: "none",
-                            color: "#fff",
+                          {/* Rounded Pill Textfield */}
+                          <div style={{
+                            backgroundColor: "#fff",
+                            borderRadius: "24px",
+                            padding: "6px 16px",
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            opacity: (queryChatSending || !queryChatReply.trim()) ? 0.6 : 1,
-                            transition: "all 0.15s",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
-                          }}
-                        >
+                            flex: 1,
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                          }}>
+                            <input
+                              type="text"
+                              placeholder="Type your reply here..."
+                              value={queryChatReply}
+                              onChange={(e) => setQueryChatReply(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !queryChatSending) {
+                                  handleSendReply(activeQuery._id);
+                                }
+                              }}
+                              style={{
+                                border: "none",
+                                outline: "none",
+                                width: "100%",
+                                fontSize: "13px",
+                                color: "#374151"
+                              }}
+                            />
+
+                            {/* Attachment Icon */}
+                            <button
+                              type="button"
+                              title="Attach file"
+                              onClick={() => exportChatFileInputRef.current?.click()}
+                              disabled={exportUploadingAttachment}
+                              style={{
+                                border: "none",
+                                background: "none",
+                                cursor: "pointer",
+                                padding: "4px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: exportUploadingAttachment ? "#2563eb" : "#6b7280",
+                                marginLeft: "8px"
+                              }}
+                            >
+                              {exportUploadingAttachment ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Send Button */}
+                          <button
+                            onClick={() => handleSendReply(activeQuery._id)}
+                            disabled={queryChatSending || (!queryChatReply.trim() && exportChatAttachments.length === 0)}
+                            style={{
+                              width: "38px",
+                              height: "38px",
+                              borderRadius: "50%",
+                              backgroundColor: "#00a884",
+                              border: "none",
+                              color: "#fff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              opacity: (queryChatSending || (!queryChatReply.trim() && exportChatAttachments.length === 0)) ? 0.6 : 1,
+                              transition: "all 0.15s",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
+                            }}
+                          >
                           {queryChatSending ? (
                             <CircularProgress size={16} color="inherit" />
                           ) : (
@@ -2844,7 +3082,8 @@ function CExportDSR() {
                           )}
                         </button>
                       </div>
-                    ) : (
+                    </div>
+                  ) : (
                       <div style={{
                         backgroundColor: "#d1fae5",
                         color: "#065f46",
@@ -2874,37 +3113,19 @@ function CExportDSR() {
         fullWidth
         PaperProps={{ sx: { borderRadius: "12px" } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #e2e8f0", py: 2 }}>
-          Raise Query for Job {raiseQueryJob?.job_no}
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="Message"
-            placeholder="Write detail message..."
-            value={raiseQueryMessage}
-            onChange={(e) => setRaiseQueryMessage(e.target.value)}
-            sx={{ mt: 1 }}
+        {raiseQueryOpen && (
+          <ExportRaiseQueryContent
+            job={raiseQueryJob}
+            onSubmit={handleRaiseQuerySubmit}
+            onClose={() => setRaiseQueryOpen(false)}
+            sending={raiseQuerySending}
+            uploadingAttachment={exportUploadingAttachment}
+            attachments={raiseQueryAttachments}
+            onFileUpload={handleExportRaiseFileUpload}
+            onDeleteAttachment={(idx) => setRaiseQueryAttachments((prev) => prev.filter((_, i) => i !== idx))}
+            fileInputRef={exportRaiseFileInputRef}
           />
-        </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
-          <Button
-            onClick={() => setRaiseQueryOpen(false)}
-            sx={{ textTransform: "none", fontSize: "12px" }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleRaiseQuerySubmit}
-            disabled={raiseQuerySending || !raiseQueryMessage.trim()}
-            sx={{ textTransform: "none", fontSize: "12px", bgcolor: "#2563eb" }}
-          >
-            {raiseQuerySending ? "Submitting..." : "Submit Query"}
-          </Button>
-        </DialogActions>
+        )}
       </Dialog>
     </Box>
   );

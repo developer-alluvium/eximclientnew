@@ -13,6 +13,187 @@ import ChecklistCell from "../components/ChecklistCell"; // Adjust the path as n
 import DoPlanningToggle from "../components/DoPlanningToggle"; // Adjust the path as needed
 import EditableTransporterCell from "../components/EditableTransporterCell";
 import BENumberCell from "../components/BEnumberCell.jsx";
+import axios from "axios";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button as MuiButton,
+  IconButton,
+  Typography,
+  Box,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Chip,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import SendIcon from "@mui/icons-material/Send";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+
+// Subcomponent for Raise Query Dialog to isolate text input state and eliminate typing lag
+const RaiseQueryDialogContent = React.memo(({
+  job,
+  onSubmit,
+  onClose,
+  sending,
+  uploadingAttachment,
+  attachments,
+  onFileUpload,
+  onDeleteAttachment,
+  fileInputRef
+}) => {
+  const [msg, setMsg] = useState("");
+
+  return (
+    <>
+      <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #e2e8f0", py: 2 }}>
+        Raise Query for Job {job?.job_no}
+      </DialogTitle>
+      <DialogContent sx={{ pt: 2 }}>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          label="Message"
+          placeholder="Write detailed message..."
+          value={msg}
+          onChange={(e) => setMsg(e.target.value)}
+          sx={{ mt: 1 }}
+        />
+
+        {attachments && attachments.length > 0 && (
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+            {attachments.map((att, idx) => (
+              <Chip
+                key={idx}
+                size="small"
+                label={att.fileName}
+                onDelete={() => onDeleteAttachment(idx)}
+                color="primary"
+                variant="outlined"
+              />
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={onFileUpload}
+          />
+          <MuiButton
+            size="small"
+            variant="outlined"
+            startIcon={<AttachFileIcon />}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingAttachment}
+            sx={{ textTransform: "none", fontSize: "12px" }}
+          >
+            {uploadingAttachment ? "Uploading..." : "Attach Document"}
+          </MuiButton>
+        </div>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
+        <MuiButton onClick={onClose} sx={{ textTransform: "none", fontSize: "12px" }}>
+          Cancel
+        </MuiButton>
+        <MuiButton
+          variant="contained"
+          onClick={() => onSubmit(msg)}
+          disabled={sending || (!msg.trim() && attachments.length === 0)}
+          sx={{ textTransform: "none", fontSize: "12px", bgcolor: "#2563eb" }}
+        >
+          {sending ? "Submitting..." : "Submit Query"}
+        </MuiButton>
+      </DialogActions>
+    </>
+  );
+});
+
+// Subcomponent for Chat Reply Input to isolate text input state and eliminate typing lag
+const ChatReplyInputSection = React.memo(({
+  onSendReply,
+  sending,
+  uploadingAttachment,
+  attachments,
+  onFileUpload,
+  onDeleteAttachment,
+  fileInputRef,
+  activeQueryId
+}) => {
+  const [replyText, setReplyText] = useState("");
+
+  const handleSend = () => {
+    if (!replyText.trim() && attachments.length === 0) return;
+    onSendReply(activeQueryId, replyText, () => setReplyText(""));
+  };
+
+  return (
+    <div style={{ marginTop: "12px", paddingTop: "8px", borderTop: "1px solid #cbd5e1" }}>
+      {attachments.length > 0 && (
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "6px" }}>
+          {attachments.map((att, idx) => (
+            <Chip
+              key={idx}
+              size="small"
+              label={att.fileName}
+              onDelete={() => onDeleteAttachment(idx)}
+              color="primary"
+              variant="outlined"
+            />
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          onChange={onFileUpload}
+        />
+        <IconButton
+          size="small"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadingAttachment}
+          title="Attach file"
+          sx={{ color: "#475569" }}
+        >
+          {uploadingAttachment ? <CircularProgress size={18} /> : <AttachFileIcon style={{ fontSize: 20 }} />}
+        </IconButton>
+
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Type your reply..."
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !sending) {
+              handleSend();
+            }
+          }}
+          sx={{ bgcolor: "#fff", borderRadius: "20px", "& .MuiOutlinedInput-root": { borderRadius: "20px" } }}
+        />
+
+        <IconButton
+          onClick={handleSend}
+          disabled={sending || (!replyText.trim() && attachments.length === 0)}
+          sx={{ bgcolor: "#2563eb", color: "#fff", "&:hover": { bgcolor: "#1d4ed8" }, p: 1 }}
+        >
+          {sending ? <CircularProgress size={18} color="inherit" /> : <SendIcon style={{ fontSize: 18 }} />}
+        </IconButton>
+      </div>
+    </div>
+  );
+});
+
 // Custom hook to manage job columns configuration with centered content
 function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
   const badge = (bg, color, bold = false) => ({
@@ -29,10 +210,254 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [modalInitialTab, setModalInitialTab] = useState("tracking");
 
+  // Query Management States
+  const [clientQueriesStatus, setClientQueriesStatus] = useState({});
+  const [queryChatOpen, setQueryChatOpen] = useState(false);
+  const [queryChatJob, setQueryChatJob] = useState(null);
+  const [queryChatData, setQueryChatData] = useState([]);
+  const [queryChatLoading, setQueryChatLoading] = useState(false);
+  const [queryChatReply, setQueryChatReply] = useState("");
+  const [queryChatSending, setQueryChatSending] = useState(false);
+  const [activeQueryIndex, setActiveQueryIndex] = useState(0);
+  const [chatAttachments, setChatAttachments] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+
+  // For raising a query
+  const [raiseQueryOpen, setRaiseQueryOpen] = useState(false);
+  const [raiseQueryJob, setRaiseQueryJob] = useState(null);
+  const [raiseQueryMessage, setRaiseQueryMessage] = useState("");
+  const [raiseQuerySending, setRaiseQuerySending] = useState(false);
+  const [raiseQueryAttachments, setRaiseQueryAttachments] = useState([]);
+
+  // Snackbar state
+  const [querySnackbar, setQuerySnackbar] = useState({ open: false, message: "", severity: "info" });
+
+  const fileInputRef = React.useRef(null);
+  const raiseFileInputRef = React.useRef(null);
+  const chatEndRef = React.useRef(null);
+
+  // Fetch query status for a list of job numbers
+  const fetchQueryStatusForJobs = useCallback(async (jobNos = []) => {
+    if (!Array.isArray(jobNos) || jobNos.length === 0) return;
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const res = await axios.post(`${apiString}/client-queries/jobs-status`, {
+        jobNos,
+        isClient: true,
+      });
+      if (res.data?.success) {
+        setClientQueriesStatus((prev) => ({
+          ...prev,
+          ...res.data.data,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch client queries status:", err);
+    }
+  }, []);
+
+  // Sort jobs list with query priority at TOP
+  const sortJobsByQueryPriority = useCallback((jobsList = []) => {
+    if (!Array.isArray(jobsList) || jobsList.length === 0) return jobsList;
+
+    return [...jobsList].sort((a, b) => {
+      const statA = clientQueriesStatus[a.job_no] || {};
+      const statB = clientQueriesStatus[b.job_no] || {};
+
+      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : statA.hasQueries ? 1 : 0;
+      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : statB.hasQueries ? 1 : 0;
+
+      return scoreB - scoreA;
+    });
+  }, [clientQueriesStatus]);
+
+  const handleRedClick = useCallback((job) => {
+    setRaiseQueryJob(job);
+    setRaiseQueryMessage("");
+    setRaiseQueryAttachments([]);
+    setRaiseQueryOpen(true);
+  }, []);
+
+  const handleYellowClick = useCallback((job) => {
+    const queryStat = clientQueriesStatus[job.job_no] || { hasQueries: false };
+    if (!queryStat.hasQueries) {
+      setQuerySnackbar({ open: true, message: "No query history found. Click Red to raise a query.", severity: "info" });
+      return;
+    }
+    handleOpenQueryChat(job);
+  }, [clientQueriesStatus]);
+
+  const handleOpenQueryChat = useCallback(async (job) => {
+    setQueryChatJob(job);
+    setQueryChatOpen(true);
+    setActiveQueryIndex(0);
+    setQueryChatLoading(true);
+    setChatAttachments([]);
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const resp = await axios.get(`${apiString}/client-queries`, {
+        params: { job_no: job.job_no },
+      });
+      const queries = resp.data?.queries || [];
+      setQueryChatData(queries);
+
+      if (queries.length > 0) {
+        const unseenIds = queries.filter((q) => !q.seenByClient).map((q) => q._id);
+        if (unseenIds.length > 0) {
+          await axios.put(`${apiString}/client-queries/mark-seen`, {
+            queryIds: unseenIds,
+            isClient: true,
+          });
+          setClientQueriesStatus((prev) => ({
+            ...prev,
+            [job.job_no]: { ...prev[job.job_no], hasUnseen: false },
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load client queries:", error);
+      setQuerySnackbar({ open: true, message: "Failed to load queries", severity: "error" });
+    } finally {
+      setQueryChatLoading(false);
+    }
+  }, []);
+
+  const handleResolveOpenQuery = useCallback(async (job) => {
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const resp = await axios.get(`${apiString}/client-queries`, {
+        params: { job_no: job.job_no, status: "open" },
+      });
+      const openQueries = resp.data?.queries || [];
+      if (openQueries.length === 0) {
+        setQuerySnackbar({ open: true, message: "No open queries found for this job.", severity: "warning" });
+        return;
+      }
+
+      const targetQuery = openQueries[0];
+      await axios.put(`${apiString}/client-queries/${targetQuery._id}/resolve`, {
+        resolvedBy: "Client",
+        resolutionNote: "Resolved from dashboard",
+      });
+
+      setQuerySnackbar({ open: true, message: "Query resolved successfully.", severity: "success" });
+      fetchQueryStatusForJobs([job.job_no]);
+      if (queryChatOpen && queryChatJob?.job_no === job.job_no) {
+        handleOpenQueryChat(job);
+      }
+    } catch (error) {
+      console.error("Failed to resolve query:", error);
+      setQuerySnackbar({ open: true, message: "Failed to resolve query.", severity: "error" });
+    }
+  }, [fetchQueryStatusForJobs, queryChatOpen, queryChatJob, handleOpenQueryChat]);
+
+  const handleFileUpload = useCallback(async (e, isRaise = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAttachment(true);
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await axios.post(`${apiString}/client-queries/upload-attachment`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data?.fileUrl) {
+        const fileObj = {
+          fileName: res.data.fileName || file.name,
+          fileUrl: res.data.fileUrl,
+          fileType: res.data.fileType || file.type,
+        };
+
+        if (isRaise) {
+          setRaiseQueryAttachments((prev) => [...prev, fileObj]);
+        } else {
+          setChatAttachments((prev) => [...prev, fileObj]);
+        }
+        setQuerySnackbar({ open: true, message: `Attachment uploaded: ${file.name}`, severity: "success" });
+      }
+    } catch (err) {
+      console.error("Attachment upload failed:", err);
+      setQuerySnackbar({ open: true, message: "Attachment upload failed.", severity: "error" });
+    } finally {
+      setUploadingAttachment(false);
+      e.target.value = "";
+    }
+  }, []);
+
+  const handleSendReply = useCallback(async (queryId, replyText, resetCallback) => {
+    const textToSend = replyText !== undefined ? replyText : queryChatReply;
+    if (!textToSend.trim() && chatAttachments.length === 0) return;
+    setQueryChatSending(true);
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      await axios.put(`${apiString}/client-queries/${queryId}/reply`, {
+        message: textToSend.trim(),
+        repliedBy: "Client",
+        senderType: "client",
+        attachments: chatAttachments,
+      });
+
+      const resp = await axios.get(`${apiString}/client-queries`, {
+        params: { job_no: queryChatJob.job_no },
+      });
+      setQueryChatData(resp.data?.queries || []);
+      setQueryChatReply("");
+      setChatAttachments([]);
+      if (resetCallback) resetCallback();
+      fetchQueryStatusForJobs([queryChatJob.job_no]);
+    } catch (error) {
+      console.error("Failed to send reply:", error);
+      setQuerySnackbar({ open: true, message: "Failed to send reply", severity: "error" });
+    } finally {
+      setQueryChatSending(false);
+    }
+  }, [queryChatReply, chatAttachments, queryChatJob, fetchQueryStatusForJobs]);
+
+  const handleRaiseQuerySubmit = useCallback(async (messageText) => {
+    const msg = messageText !== undefined ? messageText : raiseQueryMessage;
+    if (!msg.trim() && raiseQueryAttachments.length === 0) {
+      setQuerySnackbar({ open: true, message: "Message or attachment is required", severity: "warning" });
+      return;
+    }
+    setRaiseQuerySending(true);
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const payload = {
+        module_type: "import",
+        job_no: raiseQueryJob.job_no,
+        job_id: raiseQueryJob._id,
+        subject: "Client Query",
+        message: msg.trim() || "Query raised with attachment",
+        client_name: "Client",
+        attachments: raiseQueryAttachments,
+      };
+
+      await axios.post(`${apiString}/client-queries`, payload);
+
+      setQuerySnackbar({ open: true, message: "Query raised successfully", severity: "success" });
+      setRaiseQueryOpen(false);
+      setRaiseQueryMessage("");
+      setRaiseQueryAttachments([]);
+
+      if (raiseQueryJob?.job_no) {
+        fetchQueryStatusForJobs([raiseQueryJob.job_no]);
+      }
+    } catch (error) {
+      console.error("Failed to raise query:", error);
+      setQuerySnackbar({ open: true, message: "Failed to raise query", severity: "error" });
+    } finally {
+      setRaiseQuerySending(false);
+    }
+  }, [raiseQueryMessage, raiseQueryAttachments, raiseQueryJob, fetchQueryStatusForJobs]);
+
   const handleContainerClick = useCallback((container, jobData = null, tab = "tracking") => {
     setSelectedContainer(container);
     if (jobData) {
-        setSelectedJob(jobData);
+      setSelectedJob(jobData);
     }
     setModalInitialTab(tab);
     setContainerModalOpen(true);
@@ -82,6 +507,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
   const formatDate = useCallback((dateStr) => {
     if (!dateStr) return "N/A";
     const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -122,9 +548,9 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
       {
         // Group 2: Exporter & Job Number
         accessorKey: "supplier_exporter",
-        header: (<>Exporter,<br/> Job Number & Free Time</>),
+        header: (<>Exporter,<br /> Job Number & Free Time</>),
         size: 200,
-      Cell: ({ cell }) => {
+        Cell: ({ cell }) => {
           const { job_no, job_date, detailed_status, free_time, shipping_line_airline } =
             cell.row.original;
 
@@ -213,6 +639,111 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 >
                   Free Time: {free_time}
                 </div>
+
+                {/* Query Action Buttons & Status inside Job Number Cell */}
+                {(() => {
+                  const queryStat = clientQueriesStatus[job_no] || {
+                    hasQueries: false,
+                    hasUnseen: false,
+                    hasOpenQueries: false,
+                  };
+                  return (
+                    <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "4px", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        {/* Red Dot - Raise Query */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleRedClick(cell.row.original); }}
+                          style={{
+                            width: "14px",
+                            height: "14px",
+                            padding: 0,
+                            backgroundColor: "#ef4444",
+                            borderRadius: "50%",
+                            border: "none",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          title="Raise new query"
+                        />
+
+                        {/* Yellow Dot - View & Reply Chat */}
+                        {queryStat.hasQueries && (
+                          <div style={{ position: "relative", display: "inline-flex" }}>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleYellowClick(cell.row.original); }}
+                              style={{
+                                width: "14px",
+                                height: "14px",
+                                padding: 0,
+                                backgroundColor: "#f59e0b",
+                                borderRadius: "50%",
+                                border: "none",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                              title="View replies & reply back"
+                            />
+                            {queryStat.hasUnseen && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: "-3px",
+                                  right: "-3px",
+                                  width: "7px",
+                                  height: "7px",
+                                  borderRadius: "50%",
+                                  backgroundColor: "#ef4444",
+                                  border: "1px solid #fff",
+                                  pointerEvents: "none",
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Green Dot - Resolve Query */}
+                        {queryStat.hasOpenQueries && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleResolveOpenQuery(cell.row.original); }}
+                            style={{
+                              width: "14px",
+                              height: "14px",
+                              padding: 0,
+                              backgroundColor: "#10b981",
+                              borderRadius: "50%",
+                              border: "none",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                            title="Resolve open query"
+                          />
+                        )}
+                      </div>
+
+                      {/* Status Pill */}
+                      {queryStat.hasQueries && (
+                        <span
+                          style={{
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            fontSize: "9px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            backgroundColor: queryStat.hasUnseen ? "#fee2e2" : queryStat.hasOpenQueries ? "#fef3c7" : "#dcfce7",
+                            border: `1px solid ${queryStat.hasUnseen ? "#ef4444" : queryStat.hasOpenQueries ? "#f59e0b" : "#22c55e"}`,
+                            color: queryStat.hasUnseen ? "#b91c1c" : queryStat.hasOpenQueries ? "#b45309" : "#15803d",
+                          }}
+                          onClick={(e) => { e.stopPropagation(); handleOpenQueryChat(cell.row.original); }}
+                        >
+                          {queryStat.hasUnseen ? "● New Message" : queryStat.hasOpenQueries ? "Open Query" : "Resolved"}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -335,7 +866,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
         //     <span>and Date</span>
         //   </div>
         // ),
-         header: <>BE Number and Date</>,
+        header: <>BE Number and Date</>,
         size: 230,
         Cell: ({ cell }) => <BENumberCell cell={cell} copyFn={handleCopy} onEwayBillSuccess={onEwayBillSuccess} />,
       },
@@ -382,7 +913,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                         style={{
                           backgroundColor: "#dbeafe",
                           // color: "#1e3a8a",
-                          color:"#1E293B",
+                          color: "#1E293B",
                           wordBreak: "break-word",
                           padding: "2px 6px",
                           borderRadius: "4px",
@@ -557,7 +1088,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
 
       {
         accessorKey: "shipment_details",
-        header: <>Shipment & <br/>Commercial Details</>,
+        header: <>Shipment & <br />Commercial Details</>,
         size: 240,
         Cell: ({ cell }) => {
           const {
@@ -572,7 +1103,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
             loading_port,
             port_of_reporting,
             custom_house,
-            
+
           } = cell.row.original;
 
           return (
@@ -593,7 +1124,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
               <strong>Net weight:</strong>{" "}{job_net_weight || ""} kg
               <br />
               <strong>Invoice:</strong>{" "}{invoice_number}{" "}{invoice_date} <br />
-              <strong>Value:</strong>{" "}{total_inv_value || "N/A"}{" "}{inv_currency ||""} <br />
+              <strong>Value:</strong>{" "}{total_inv_value || "N/A"}{" "}{inv_currency || ""} <br />
               <strong>POL:</strong>{" "}
               {loading_port ? loading_port.replace(/\(.*?\)\s*/, "") : ""}{" "}
               <br />
@@ -602,7 +1133,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 ? port_of_reporting.replace(/\(.*?\)\s*/, "")
                 : ""}{" "}
               <br />
-              <strong>ICD Port:</strong>{" "}{custom_house || "N/A"}
+              <strong>ICD Port:</strong>{" "}{custom_house || "N/A"} <br />
             </div>
           );
         },
@@ -648,13 +1179,13 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                     <div
                       key={id}
                       className="mb-2 w-full"
-                      style={{ 
-                        marginBottom: "4px", 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "center", 
+                      style={{
+                        marginBottom: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         gap: "6px",
-                        whiteSpace: "nowrap" 
+                        whiteSpace: "nowrap"
                       }}
                     >
                       <Tooltip title={tooltipText} arrow placement="top">
@@ -725,77 +1256,6 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
         },
       },
 
-      // {
-      //   accessorKey: "container_numbers",
-      //   header: "Container Numbers and Size",
-      //   size: 230,
-      //   Cell: ({ cell }) => {
-      //     const containerNos = cell.row.original.container_nos;
-      //     const jobData = cell.row.original;
-
-      //     // Helper function to get color based on shortage amount
-      //     const getShortageColor = (shortage) => {
-      //       if (shortage < 0) {
-      //         return "#e02251"; // Red for shortage
-      //       } else {
-      //         return "#2e7d32"; // Green for no shortage
-      //       }
-      //     };
-
-      //     // Helper function to get shortage text for tooltip
-      //     const getShortageText = (shortage) => {
-      //       if (shortage < 0) {
-      //         return `Shortage: -${Math.abs(shortage).toFixed(2)} kg`;
-      //       } else if (shortage > 0) {
-      //         return `Excess: +${Math.abs(shortage).toFixed(2)} kg`;
-      //       } else {
-      //         return "No shortage/excess";
-      //       }
-      //     };
-
-      //     return (
-      //       <div className="flex flex-col gap-1 w-full text-sm">
-      //         {containerNos?.map((container, id) => {
-      //           const weightShortage =
-      //             parseFloat(container.weight_shortage) || 0;
-      //           const containerColor = getShortageColor(weightShortage);
-      //           const tooltipText = getShortageText(weightShortage);
-
-      //           return (
-      //             <div
-      //               key={id}
-      //               className="flex items-center gap-1 mb-1"
-      //               title={tooltipText}
-      //             >
-      //               <a
-      //                 href={`https://www.ldb.co.in/ldb/containersearch/39/${container.container_number}/1726651147706`}
-      //                 target="_blank"
-      //                 rel="noopener noreferrer"
-      //                 className="font-bold no-underline hover:underline"
-      //                 style={{ color: containerColor }}
-      //               >
-      //                 {container.container_number}
-      //               </a>
-
-      //               <span className="text-gray-600">| "{container.size}"</span>
-
-      //                 <Tooltip title="Copy Container Number" arrow>
-      //                     <Button
-      //                       type="text"
-      //                       size="small"
-      //                       onClick={(event) =>
-      //                         handleCopy(event, container.container_number)
-      //                       }
-      //                       icon={<CopyOutlined />}
-      //                     />
-      //                   </Tooltip>
-      //             </div>
-      //           );
-      //         })}
-      //       </div>
-      //     );
-      //   },
-      // },
       {
         // Group 5: Movement Timeline
         accessorKey: "movement_timeline",
@@ -803,32 +1263,56 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
         size: 300,
         Cell: ({ cell }) => {
           const {
+            etd_date,
+            etd,
             vessel_berthing,
+            gateway_igm_date,
+            gigm_date,
+            igm_date,
             discharge_date,
-            container_nos = [],
+            arrival_date: job_arrival_date,
+            arrivalDate: job_arrivalDate,
+            rail_out_date: job_rail_out_date,
+            rail_out: job_rail_out,
+            pcv_date,
             out_of_charge,
+            container_nos = [],
           } = cell.row.original;
 
-          // Format dates
-          const formattedOocDate = formatDate(out_of_charge);
-          const formatDischargedate = formatDate(discharge_date);
-
-          // Get container level dates helper
-          const getContainerDates = (field, fallback) => {
-            if (!container_nos || !Array.isArray(container_nos) || container_nos.length === 0) {
-              return fallback;
+          // Helper to fetch container or job level dates
+          const getDatesDisplay = (field, jobFallbacks = []) => {
+            const dates = [];
+            if (container_nos && Array.isArray(container_nos)) {
+              container_nos.forEach((c) => {
+                if (c[field] && String(c[field]).trim() !== "") {
+                  dates.push(c[field]);
+                }
+              });
             }
-            const dates = container_nos
-              .map((c) => c[field])
-              .filter((d) => d && d.trim() !== "");
-            if (dates.length === 0) return fallback;
-            const uniqueFormatted = [...new Set(dates.map(d => formatDate(d)))];
+            if (dates.length === 0) {
+              for (const fb of jobFallbacks) {
+                if (fb && String(fb).trim() !== "") {
+                  dates.push(fb);
+                  break;
+                }
+              }
+            }
+            if (dates.length === 0) return null;
+            const uniqueFormatted = [...new Set(dates.map((d) => formatDate(d)))];
             return uniqueFormatted.join(", ");
           };
 
-          const detentionFromDisplay = getContainerDates("detention_from", "N/A");
-          const deliveryDateDisplay = getContainerDates("delivery_date", "Pending");
-          const emptyOffloadDisplay = getContainerDates("emptyContainerOffLoadDate", "Pending");
+          const etdVal = etd_date || etd;
+          const etaVal = vessel_berthing;
+          const gigmVal = gateway_igm_date || gigm_date || igm_date;
+          const dischargeVal = discharge_date;
+          const railOutVal = getDatesDisplay("container_rail_out_date", [job_rail_out_date, job_rail_out]) || getDatesDisplay("rail_out_date");
+          const arrivalVal = getDatesDisplay("arrival_date", [job_arrival_date, job_arrivalDate]);
+          const pcvVal = pcv_date;
+          const oocVal = out_of_charge;
+          const deliveryVal = getDatesDisplay("delivery_date");
+          const emptyOffVal = getDatesDisplay("emptyContainerOffLoadDate") || getDatesDisplay("empty_off_date");
+          const detentionVal = getDatesDisplay("detention_from");
 
           return (
             <div
@@ -840,47 +1324,86 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 width: "100%",
               }}
             >
+              {etdVal && (
+                <div>
+                  <strong>ETD Date:</strong>
+                  <span style={{ marginLeft: "8px" }}>{formatDate(etdVal)}</span>
+                </div>
+              )}
+
               <div>
                 <strong>ETA:</strong>
                 <span style={{ marginLeft: "8px" }}>
-                  {vessel_berthing ? formatDate(vessel_berthing) : "Pending"}
+                  {etaVal ? formatDate(etaVal) : "Pending"}
                 </span>
               </div>
+
+              {gigmVal && (
+                <div>
+                  <strong>GIGM Date:</strong>
+                  <span style={{ marginLeft: "8px" }}>{formatDate(gigmVal)}</span>
+                </div>
+              )}
+
               <div>
                 <strong>Discharge Date:</strong>
                 <span style={{ marginLeft: "8px" }}>
-                  {discharge_date ? formatDate(discharge_date) : "Pending"}
+                  {dischargeVal ? formatDate(dischargeVal) : "Pending"}
                 </span>
               </div>
+
+              {railOutVal && (
+                <div>
+                  <strong>Rail Out:</strong>
+                  <span style={{ marginLeft: "8px" }}>{railOutVal}</span>
+                </div>
+              )}
+
+              {arrivalVal && (
+                <div>
+                  <strong>Arrival Date:</strong>
+                  <span style={{ marginLeft: "8px" }}>{arrivalVal}</span>
+                </div>
+              )}
+
+              {pcvVal && (
+                <div>
+                  <strong>PCV Date:</strong>
+                  <span style={{ marginLeft: "8px" }}>{formatDate(pcvVal)}</span>
+                </div>
+              )}
+
               <div>
                 <strong>OOC Date:</strong>
                 <span style={{ marginLeft: "8px" }}>
-                  {out_of_charge ? formatDate(out_of_charge) : "Pending"}
+                  {oocVal ? formatDate(oocVal) : "Pending"}
                 </span>
               </div>
+
+              <div>
+                <strong>Delivery Date:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {deliveryVal || "Pending"}
+                </span>
+              </div>
+
+              <div>
+                <strong>Empty Off:</strong>
+                <span style={{ marginLeft: "8px" }}>
+                  {emptyOffVal || "Pending"}
+                </span>
+              </div>
+
               <div>
                 <strong>Detention From:</strong>
                 <span
                   style={{
                     marginLeft: "8px",
                     fontWeight: "bold",
-                    color: detentionFromDisplay !== "N/A" ? "#b91c1c" : "inherit",
+                    color: detentionVal ? "#b91c1c" : "inherit",
                   }}
                 >
-                  {detentionFromDisplay}
-                </span>
-              </div>
-              <div>
-                <strong>Delivery Date:</strong>
-                <span style={{ marginLeft: "8px" }}>
-                  {deliveryDateDisplay}
-                </span>
-              </div>
-
-              <div>
-                <strong>Empty Offload:</strong>
-                <span style={{ marginLeft: "8px" }}>
-                  {emptyOffloadDisplay}
+                  {detentionVal || "N/A"}
                 </span>
               </div>
             </div>
@@ -1153,8 +1676,300 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
       handleModalClose,
       selectedContainer,
       onEwayBillSuccess,
+      clientQueriesStatus,
+      handleRedClick,
+      handleYellowClick,
+      handleResolveOpenQuery,
+      handleOpenQueryChat,
     ],
   );
+
+  const renderQueryModals = useCallback(() => {
+    const activeQuery = queryChatData[activeQueryIndex];
+
+    const chatMessages = [];
+    if (activeQuery) {
+      chatMessages.push({
+        id: "original",
+        senderName: activeQuery.client_name || "Client",
+        message: activeQuery.message,
+        subject: activeQuery.subject,
+        createdAt: activeQuery.createdAt,
+        align: "left",
+        attachments: activeQuery.attachments || [],
+        senderType: "client",
+      });
+
+      if (activeQuery.replies) {
+        activeQuery.replies.forEach((r, ri) => {
+          chatMessages.push({
+            id: r._id || `reply-${ri}`,
+            senderName: r.repliedBy,
+            message: r.message,
+            createdAt: r.repliedAt,
+            align: r.senderType === "client" ? "left" : "right",
+            attachments: r.attachments || [],
+            senderType: r.senderType || "admin",
+          });
+        });
+      }
+    }
+
+    const formatChatTime = (dateStr) => {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+    };
+
+    return (
+      <>
+        {/* Client Query Chat Dialog */}
+        <Dialog
+          open={queryChatOpen}
+          onClose={() => {
+            setQueryChatOpen(false);
+            setQueryChatJob(null);
+            setQueryChatData([]);
+            setQueryChatReply("");
+            setChatAttachments([]);
+          }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: "12px", overflow: "hidden" } }}
+        >
+          <DialogTitle
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              py: 1.5,
+              px: 3,
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              color: "#fff",
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                Queries &amp; Replies
+              </Typography>
+              {queryChatJob?.job_no && (
+                <Typography variant="caption" sx={{ opacity: 0.9, display: "block", mt: 0.2 }}>
+                  Job: {queryChatJob.job_no}
+                </Typography>
+              )}
+            </Box>
+            <IconButton
+              onClick={() => {
+                setQueryChatOpen(false);
+                setQueryChatJob(null);
+                setQueryChatData([]);
+                setQueryChatReply("");
+                setChatAttachments([]);
+              }}
+              size="small"
+              sx={{ color: "#fff" }}
+            >
+              <CloseIcon sx={{ fontSize: 20 }} />
+            </IconButton>
+          </DialogTitle>
+
+          {/* Multiple Queries Tabs */}
+          {queryChatData.length > 1 && (
+            <div style={{ display: "flex", gap: "8px", padding: "8px 12px", borderBottom: "1px solid #e5e7eb", backgroundColor: "#f9fafb", overflowX: "auto", whiteSpace: "nowrap" }}>
+              {queryChatData.map((q, idx) => (
+                <button
+                  key={q._id || idx}
+                  onClick={() => setActiveQueryIndex(idx)}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: "16px",
+                    border: "1px solid",
+                    borderColor: activeQueryIndex === idx ? "#2563eb" : "#d1d5db",
+                    backgroundColor: activeQueryIndex === idx ? "#eff6ff" : "#fff",
+                    color: activeQueryIndex === idx ? "#2563eb" : "#374151",
+                    fontWeight: "600",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  Query #{idx + 1} ({q.status?.toUpperCase()})
+                </button>
+              ))}
+            </div>
+          )}
+
+          <DialogContent sx={{ p: 2, bgcolor: "#efeae2", minHeight: "320px", maxHeight: "420px", display: "flex", flexDirection: "column" }}>
+            {queryChatLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 6 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : !activeQuery ? (
+              <Typography sx={{ textTransform: "none", textAlign: "center", color: "#6b7280", py: 4 }}>
+                No queries found.
+              </Typography>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1, overflowY: "auto", paddingRight: "4px" }}>
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: msg.align === "right" ? "flex-end" : "flex-start",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: msg.align === "right" ? "#d9fdd3" : "#ffffff",
+                        padding: "8px 12px",
+                        borderRadius: "12px",
+                        maxWidth: "82%",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: "#475569", marginBottom: "2px" }}>
+                        {msg.senderName}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {msg.message}
+                      </div>
+
+                      {/* Render File Attachments */}
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                          {msg.attachments.map((att, attIdx) => (
+                            <a
+                              key={attIdx}
+                              href={att.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "4px 8px",
+                                backgroundColor: "#e0f2fe",
+                                border: "1px solid #7dd3fc",
+                                borderRadius: "6px",
+                                color: "#0369a1",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                textDecoration: "none",
+                              }}
+                            >
+                              <InsertDriveFileIcon style={{ fontSize: "14px" }} />
+                              {att.fileName || "View Attachment"}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: "10px", color: "#94a3b8", textAlign: "right", marginTop: "4px" }}>
+                        {formatChatTime(msg.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+            )}
+
+            {/* Input & Reply Bar */}
+            {activeQuery && activeQuery.status === "open" ? (
+              <div style={{ marginTop: "12px", paddingTop: "8px", borderTop: "1px solid #cbd5e1" }}>
+                {/* Uploaded Attachments preview pill */}
+                {chatAttachments.length > 0 && (
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "6px" }}>
+                    {chatAttachments.map((att, idx) => (
+                      <Chip
+                        key={idx}
+                        size="small"
+                        label={att.fileName}
+                        onDelete={() => setChatAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <ChatReplyInputSection
+                  onSendReply={handleSendReply}
+                  sending={queryChatSending}
+                  uploadingAttachment={uploadingAttachment}
+                  attachments={chatAttachments}
+                  onFileUpload={(e) => handleFileUpload(e, false)}
+                  onDeleteAttachment={(idx) => setChatAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                  fileInputRef={fileInputRef}
+                  activeQueryId={activeQuery._id}
+                />
+              </div>
+            ) : (
+              <div style={{ marginTop: "12px", padding: "8px", backgroundColor: "#dcfce7", color: "#15803d", borderRadius: "8px", textAlign: "center", fontWeight: "700", fontSize: "12px" }}>
+                This query has been marked as RESOLVED.
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Raise Query Dialog */}
+        <Dialog
+          open={raiseQueryOpen}
+          onClose={() => setRaiseQueryOpen(false)}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: "12px" } }}
+        >
+          {raiseQueryOpen && (
+            <RaiseQueryDialogContent
+              job={raiseQueryJob}
+              onSubmit={handleRaiseQuerySubmit}
+              onClose={() => setRaiseQueryOpen(false)}
+              sending={raiseQuerySending}
+              uploadingAttachment={uploadingAttachment}
+              attachments={raiseQueryAttachments}
+              onFileUpload={(e) => handleFileUpload(e, true)}
+              onDeleteAttachment={(idx) => setRaiseQueryAttachments((prev) => prev.filter((_, i) => i !== idx))}
+              fileInputRef={raiseFileInputRef}
+            />
+          )}
+        </Dialog>
+
+        {/* Global Query Snackbar */}
+        <Snackbar
+          open={querySnackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setQuerySnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          <Alert severity={querySnackbar.severity} sx={{ width: "100%", borderRadius: 2 }}>
+            {querySnackbar.message}
+          </Alert>
+        </Snackbar>
+      </>
+    );
+  }, [
+    queryChatOpen,
+    queryChatData,
+    queryChatJob,
+    queryChatLoading,
+    queryChatReply,
+    queryChatSending,
+    activeQueryIndex,
+    chatAttachments,
+    uploadingAttachment,
+    raiseQueryOpen,
+    raiseQueryJob,
+    raiseQueryMessage,
+    raiseQuerySending,
+    raiseQueryAttachments,
+    querySnackbar,
+    handleFileUpload,
+    handleSendReply,
+    handleRaiseQuerySubmit,
+  ]);
 
   return {
     columns,
@@ -1163,6 +1978,10 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
     selectedContainer,
     selectedJob,
     modalInitialTab,
+    renderQueryModals,
+    fetchQueryStatusForJobs,
+    sortJobsByQueryPriority,
+    clientQueriesStatus,
   };
 }
 
