@@ -1470,41 +1470,41 @@ function CFreightForwarding() {
 
                         {/* Col 5: Tracking Dates */}
                         <td style={{ padding: "10px 12px", verticalAlign: "top", minWidth: "170px" }}>
-                          {(row.booking_date || row.cut_off_date || row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate || row.eta_date || row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate || row.consol_date) ? (
+                          {(row.booking_date || row.cut_off_date || row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate || row.eta_date || row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate || row.consol_date || row.bl_details?.booking_date || row.bl_details?.cut_off_date || row.bl_details?.sailing_date || row.bl_details?.eta_date || row.bl_details?.arrival_date) ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px", backgroundColor: "#f8fafc", padding: "8px 10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                               <div style={{ fontSize: "8.5px", fontWeight: "800", color: "#475569", borderBottom: "1px solid #cbd5e1", paddingBottom: "2px", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                 TRANSIT DATES
                               </div>
-                              {row.booking_date && (
+                              {(row.booking_date || row.bl_details?.booking_date) && (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                   <span style={{ color: "#64748b", fontWeight: "600" }}>Booking:</span>
                                   <span style={{ fontWeight: "700", color: "#0f172a" }}>
-                                    {row.booking_no ? `${row.booking_no} (${formatDateDisplay(row.booking_date)})` : formatDateDisplay(row.booking_date)}
+                                    {(row.booking_no || row.bl_details?.booking_no) ? `${row.booking_no || row.bl_details?.booking_no} (${formatDateDisplay(row.booking_date || row.bl_details?.booking_date)})` : formatDateDisplay(row.booking_date || row.bl_details?.booking_date)}
                                   </span>
                                 </div>
                               )}
-                              {row.cut_off_date && (
+                              {(row.cut_off_date || row.bl_details?.cut_off_date) && (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                   <span style={{ color: "#64748b", fontWeight: "600" }}>Cut-off:</span>
-                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.cut_off_date)}</span>
+                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.cut_off_date || row.bl_details?.cut_off_date)}</span>
                                 </div>
                               )}
-                              {(row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate) && (
+                              {(row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate || row.bl_details?.sailing_date) && (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                   <span style={{ color: "#64748b", fontWeight: "600" }}>ETD:</span>
-                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate)}</span>
+                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.sailing_date || pipelineData[row._id || row.enquiry_no]?.sboDate || row.bl_details?.sailing_date)}</span>
                                 </div>
                               )}
-                              {row.eta_date && (
+                              {(row.eta_date || row.bl_details?.eta_date) && (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                   <span style={{ color: "#64748b", fontWeight: "600" }}>E.T.A:</span>
-                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.eta_date)}</span>
+                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.eta_date || row.bl_details?.eta_date)}</span>
                                 </div>
                               )}
-                              {(row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate) && (
+                              {(row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate || row.bl_details?.arrival_date) && (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                   <span style={{ color: "#64748b", fontWeight: "600" }}>Arrival:</span>
-                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate)}</span>
+                                  <span style={{ fontWeight: "700", color: "#0f172a" }}>{formatDateDisplay(row.arrival_date || pipelineData[row._id || row.enquiry_no]?.arrivalDate || row.bl_details?.arrival_date)}</span>
                                 </div>
                               )}
                               {row.consol_date && (
@@ -1525,27 +1525,27 @@ function CFreightForwarding() {
                         <td style={{ padding: "10px 12px", verticalAlign: "top", minWidth: "175px" }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                             {/* Transport & Sales Box */}
-                            {(row.shipment_terms || row.cargo_type || row.freight_type || row.booking_thru || row.sales_person) && (
+                            {(row.shipment_terms || row.cargo_type || row.freight_type || row.booking_thru || row.sales_person || row.bl_details?.shipment_terms || row.bl_details?.cargo_type || row.bl_details?.freight_type) && (
                               <div style={{ backgroundColor: "#f0fdfa", border: "1px solid #ccfbf1", padding: "6px 8px", borderRadius: "6px", display: "flex", flexDirection: "column", gap: "3px" }}>
                                 <div style={{ fontSize: "8.5px", fontWeight: "800", color: "#0f766e", borderBottom: "1px solid #99f6e4", paddingBottom: "2px", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                   TRANSPORT & SALES
                                 </div>
-                                {row.shipment_terms && (
+                                {(row.shipment_terms || row.bl_details?.shipment_terms) && (
                                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                     <span style={{ color: "#14b8a6", fontWeight: "600" }}>Terms:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.shipment_terms}</span>
+                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.shipment_terms || row.bl_details?.shipment_terms}</span>
                                   </div>
                                 )}
-                                {row.cargo_type && (
+                                {(row.cargo_type || row.bl_details?.cargo_type) && (
                                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                     <span style={{ color: "#14b8a6", fontWeight: "600" }}>Cargo Type:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.cargo_type}</span>
+                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.cargo_type || row.bl_details?.cargo_type}</span>
                                   </div>
                                 )}
-                                {row.freight_type && (
+                                {(row.freight_type || row.bl_details?.freight_type) && (
                                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
                                     <span style={{ color: "#14b8a6", fontWeight: "600" }}>Freight:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.freight_type}</span>
+                                    <span style={{ fontWeight: "700", color: "#0f766e" }}>{row.freight_type || row.bl_details?.freight_type}</span>
                                   </div>
                                 )}
                                 {row.booking_thru && (
@@ -1564,33 +1564,33 @@ function CFreightForwarding() {
                             )}
 
                             {/* Manual Weights Box (Clean neutral slate styling) */}
-                            {(row.net_weight_kg || row.gross_weight_kg || row.total_no_of_pkgs) && (
+                            {(row.net_weight_kg || row.gross_weight_kg || row.total_no_of_pkgs || row.net_weight || row.gross_weight || row.no_packages || row.volume_cbm) && (
                               <div style={{ display: "flex", flexDirection: "column", gap: "3px", backgroundColor: "#f8fafc", padding: "6px 8px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "10px" }}>
                                 <div style={{ fontSize: "8.5px", fontWeight: "800", color: "#475569", borderBottom: "1px solid #cbd5e1", paddingBottom: "2px", marginBottom: "2px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                                   MANUAL WEIGHTS
                                 </div>
-                                {row.net_weight_kg && (
+                                {(row.net_weight_kg || row.net_weight) && (
                                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                                     <span style={{ color: "#64748b", fontWeight: "600" }}>Net Wt:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.net_weight_kg} KG</span>
+                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.net_weight_kg || row.net_weight} {row.net_weight_unit || "KG"}</span>
                                   </div>
                                 )}
-                                {row.gross_weight_kg && (
+                                {(row.gross_weight_kg || row.gross_weight) && (
                                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                                     <span style={{ color: "#64748b", fontWeight: "600" }}>Gross Wt:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.gross_weight_kg} KG</span>
+                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.gross_weight_kg || row.gross_weight} {row.gross_weight_unit || "KG"}</span>
                                   </div>
                                 )}
-                                {row.total_no_of_pkgs && (
+                                {(row.total_no_of_pkgs || row.no_packages) && (
                                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                                     <span style={{ color: "#64748b", fontWeight: "600" }}>Pkgs:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.total_no_of_pkgs} PKGS</span>
+                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.total_no_of_pkgs || row.no_packages} {row.package_unit || "PKGS"}</span>
                                   </div>
                                 )}
                                 {row.volume_cbm && (
                                   <div style={{ display: "flex", justifyContent: "space-between" }}>
                                     <span style={{ color: "#64748b", fontWeight: "600" }}>Volume:</span>
-                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.volume_cbm} CBM</span>
+                                    <span style={{ fontWeight: "700", color: "#0f172a" }}>{row.volume_cbm} {row.volume_unit || "CBM"}</span>
                                   </div>
                                 )}
                               </div>

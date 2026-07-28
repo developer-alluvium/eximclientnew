@@ -147,14 +147,45 @@ export const convertToExcel = async (
     const size = item.container_nos
       .map((container) => container.size)
       .join(",\n");
-    const cif_amount = new Big(item.cif_amount);
-    const exrate = new Big(item.exrate);
-    // const inv_value = cif_amount.div(exrate).toFixed(2); // Currently unused
-    const exact_inv_value = item.total_inv_value
-      ? item.total_inv_value.split(" ")[0]
-      : "";
+    let exact_inv_value = "";
+    let invDetails = item.invoice_details;
+    if (typeof invDetails === "string") {
+      try { invDetails = JSON.parse(invDetails); } catch (e) {}
+    }
+    if (Array.isArray(invDetails) && invDetails.length > 0) {
+      const sumPV = invDetails.reduce((sum, r) => {
+        const pv = parseFloat(r.product_value || r.amount);
+        if (!isNaN(pv) && pv > 0) return sum + pv;
+        return sum;
+      }, 0);
+      if (sumPV > 0) exact_inv_value = sumPV.toFixed(2);
+    }
 
-    const invoice_value_and_unit_price = `${item.inv_currency} |${exact_inv_value} | ${item.unit_price}`;
+    if (!exact_inv_value && item.product_value && !isNaN(parseFloat(item.product_value)) && parseFloat(item.product_value) > 0) {
+      exact_inv_value = parseFloat(item.product_value).toFixed(2);
+    }
+
+    let descDetails = item.description_details;
+    if (typeof descDetails === "string") {
+      try { descDetails = JSON.parse(descDetails); } catch (e) {}
+    }
+    if (!exact_inv_value && Array.isArray(descDetails) && descDetails.length > 0) {
+      const sumDesc = descDetails.reduce((sum, d) => {
+        const amt = parseFloat(d.amount);
+        if (!isNaN(amt) && amt > 0) return sum + amt;
+        const up = parseFloat(d.unit_price);
+        const qty = parseFloat(d.quantity);
+        if (!isNaN(up) && up > 0 && !isNaN(qty) && qty > 0) return sum + (up * qty);
+        return sum;
+      }, 0);
+      if (sumDesc > 0) exact_inv_value = sumDesc.toFixed(2);
+    }
+
+    if (!exact_inv_value) {
+      exact_inv_value = item.product_value ? String(item.product_value).split(" ")[0] : "";
+    }
+
+    const invoice_value_and_unit_price = `${item.inv_currency || ''} |${exact_inv_value} | ${item.unit_price || ''}`;
     // const net_weight = item.container_nos?.reduce((sum, container) => { // Currently unused
     //   const weight = parseFloat(container.net_weight);
     //   return sum + (isNaN(weight) ? 0 : weight);

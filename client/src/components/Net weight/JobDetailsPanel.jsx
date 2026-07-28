@@ -821,7 +821,41 @@ const JobDetailsPanel = ({
               />
               <DetailField
                 label="Total Invoice Value"
-                value={`$ ${jobData.total_inv_value || "0.00"}`}
+                value={`${jobData?.inv_currency || "$"} ${(() => {
+                  let invDetails = jobData?.invoice_details;
+                  if (typeof invDetails === "string") {
+                    try { invDetails = JSON.parse(invDetails); } catch (e) {}
+                  }
+                  if (Array.isArray(invDetails) && invDetails.length > 0) {
+                    const sumPV = invDetails.reduce((sum, r) => {
+                      const pv = parseFloat(r.product_value || r.amount);
+                      if (!isNaN(pv) && pv > 0) return sum + pv;
+                      return sum;
+                    }, 0);
+                    if (sumPV > 0) return sumPV.toFixed(2);
+                  }
+
+                  const topPV = parseFloat(jobData?.product_value);
+                  if (!isNaN(topPV) && topPV > 0) return topPV.toFixed(2);
+
+                  let descDetails = jobData?.description_details;
+                  if (typeof descDetails === "string") {
+                    try { descDetails = JSON.parse(descDetails); } catch (e) {}
+                  }
+                  if (Array.isArray(descDetails) && descDetails.length > 0) {
+                    const sumDesc = descDetails.reduce((sum, d) => {
+                      const amt = parseFloat(d.amount);
+                      if (!isNaN(amt) && amt > 0) return sum + amt;
+                      const up = parseFloat(d.unit_price);
+                      const qty = parseFloat(d.quantity);
+                      if (!isNaN(up) && up > 0 && !isNaN(qty) && qty > 0) return sum + (up * qty);
+                      return sum;
+                    }, 0);
+                    if (sumDesc > 0) return sumDesc.toFixed(2);
+                  }
+
+                  return jobData?.product_value || "0.00";
+                })()}`}
               />
               <DetailField
                 label="Exchange Rate"

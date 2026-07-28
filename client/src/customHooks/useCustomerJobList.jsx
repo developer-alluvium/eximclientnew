@@ -194,6 +194,76 @@ const ChatReplyInputSection = React.memo(({
   );
 });
 
+// Component to handle editable ETD Date in movement timeline
+const EditableEtdCell = ({ job, formatDate }) => {
+  const [etdValue, setEtdValue] = useState(() => job.etd_date || job.etd || job.etdDate || "");
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async (newVal) => {
+    if (!job._id && !job.job_no) return;
+    setLoading(true);
+    try {
+      const apiString = process.env.REACT_APP_API_STRING || "";
+      const targetId = job._id || job.job_no;
+      await axios.patch(`${apiString}/jobs/${targetId}`, {
+        etd_date: newVal,
+        etd: newVal,
+        etdDate: newVal,
+      });
+      setEtdValue(newVal);
+      job.etd_date = newVal;
+      job.etd = newVal;
+      job.etdDate = newVal;
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Failed to update ETD Date:", err);
+      alert("Failed to save ETD Date.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+      <strong>ETD Date:</strong>
+      {isEditing ? (
+        <input
+          type="date"
+          defaultValue={etdValue ? String(etdValue).split("T")[0] : ""}
+          disabled={loading}
+          onChange={(e) => {
+            if (e.target.value) handleSave(e.target.value);
+          }}
+          onBlur={() => setIsEditing(false)}
+          style={{
+            padding: "1px 4px",
+            fontSize: "11px",
+            borderRadius: "4px",
+            border: "1px solid #0066cc",
+          }}
+          autoFocus
+        />
+      ) : (
+        <span
+          onClick={() => setIsEditing(true)}
+          style={{
+            cursor: "pointer",
+            color: etdValue ? "#333" : "#0066cc",
+            fontWeight: etdValue ? "normal" : "600",
+            textDecoration: "underline",
+            fontSize: "12px",
+          }}
+          title="Click to enter or edit ETD Date"
+        >
+          {etdValue ? formatDate(etdValue) : "+ Add ETD"}
+          <span style={{ marginLeft: "4px", fontSize: "10px", opacity: 0.6 }}>✏️</span>
+        </span>
+      )}
+    </div>
+  );
+};
+
 // Custom hook to manage job columns configuration with centered content
 function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
   const badge = (bg, color, bold = false) => ({
@@ -551,7 +621,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
         header: (<>Exporter,<br /> Job Number & Free Time</>),
         size: 200,
         Cell: ({ cell }) => {
-          const { job_no, job_date, detailed_status, free_time, shipping_line_airline } =
+          const { job_no, job_date, detailed_status, free_time, shipping_line_airline, consignment_type } =
             cell.row.original;
 
           // Get color based on status
@@ -639,6 +709,25 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 >
                   Free Time: {free_time}
                 </div>
+                {consignment_type && (
+                  <div
+                    key="consignment-type"
+                    style={{
+                      fontWeight: "bold",
+                      fontSize: "0.8rem",
+                      border: "1px solid black",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      marginBottom: "4px",
+                      backgroundColor: "#e0f2fe",
+                      color: "#0369a1",
+                      display: "inline-block",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {consignment_type}
+                  </div>
+                )}
 
                 {/* Query Action Buttons & Status inside Job Number Cell */}
                 {(() => {
@@ -958,7 +1047,67 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                             flex: 1,
                           }}
                         >
-                          {do_shipping_line_invoice.map((invoice, index) => (
+                          {(() => {
+                            const damageInvoices = [];
+                            const { charges = [] } = cell.row.original;
+                            if (Array.isArray(charges)) {
+                              const damageMap = new Map();
+                              charges.forEach(charge => {
+                                if (charge.chargeHead && charge.chargeHead.toLowerCase().includes("damage")) {
+                                  const headName = charge.chargeHead;
+                                  if (!damageMap.has(headName)) {
+                                    damageMap.set(headName, new Set());
+                                  }
+                                  const urlSet = damageMap.get(headName);
+                                  
+                                  if (charge.revenue?.url && Array.isArray(charge.revenue.url)) {
+                                    charge.revenue.url.forEach(u => u && urlSet.add(u));
+                                  }
+                                  if (charge.cost?.url && Array.isArray(charge.cost.url)) {
+                                    charge.cost.url.forEach(u => u && urlSet.add(u));
+                                  }
+                                }
+                              });
+                              
+                              damageMap.forEach((urlSet, headName) => {
+                                if (urlSet.size > 0) {
+                                  damageInvoices.push({
+                                    document_name: headName,
+                                    url: Array.from(urlSet),
+                                    is_draft: false,
+                                    is_final: false,
+                                  });
+                                }
+                              });
+                            }
+                            
+                            const extraInvoices = [];
+                            const { shipping_line_invoice_imgs = [] } = cell.row.original;
+                            if (Array.isArray(shipping_line_invoice_imgs) && shipping_line_invoice_imgs.length > 0) {
+                              extraInvoices.push({
+                                document_name: "Shipping Line Invoice",
+                                url: shipping_line_invoice_imgs,
+                                is_draft: false,
+                                is_final: false,
+                              });
+                            }
+                            
+                            let allShippingInvoices = [...damageInvoices, ...do_shipping_line_invoice, ...extraInvoices];
+                            
+                            // Deduplicate invoices with empty URLs if we injected the same name with actual URLs
+                            const hasValidShippingLine = allShippingInvoices.some(inv => 
+                              inv.document_name === "Shipping Line Invoice" && Array.isArray(inv.url) && inv.url.length > 0
+                            );
+                            if (hasValidShippingLine) {
+                              allShippingInvoices = allShippingInvoices.filter(inv => 
+                                !(inv.document_name === "Shipping Line Invoice" && (!Array.isArray(inv.url) || inv.url.length === 0))
+                              );
+                            }
+
+                            return allShippingInvoices.map((invoice, index) => {
+                            const isDamage = (invoice.document_name || "").toLowerCase().includes("damage");
+                            const firstUrl = Array.isArray(invoice.url) && invoice.url.length > 0 ? invoice.url[0] : (typeof invoice.url === "string" ? invoice.url : null);
+                            return (
                             <span
                               key={index}
                               style={{
@@ -967,6 +1116,13 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                 gap: "2px",
                                 borderBottom: "1px solid #f3f4f6",
                                 paddingBottom: "4px",
+                                ...(isDamage ? {
+                                  backgroundColor: "#fee2e2",
+                                  border: "1px solid #ef4444",
+                                  padding: "4px",
+                                  borderRadius: "4px",
+                                  marginTop: "2px"
+                                } : {})
                               }}
                             >
                               {/* Top row */}
@@ -978,20 +1134,42 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                   gap: "6px",
                                 }}
                               >
-                                <span
-                                  title={invoice.document_name}
-                                  style={{
-                                    fontWeight: 500,
-                                    color: "#1d4ed8",
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    maxWidth: "65%",
-                                  }}
-                                >
-                                  {invoice.document_name ||
-                                    `Invoice ${index + 1}`}
-                                </span>
+                                {firstUrl ? (
+                                  <a
+                                    href={firstUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={invoice.document_name}
+                                    style={{
+                                      fontWeight: 500,
+                                      color: isDamage ? "#b91c1c" : "#1d4ed8",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      maxWidth: "65%",
+                                      textDecoration: "underline",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    {invoice.document_name ||
+                                      `Invoice ${index + 1}`}
+                                  </a>
+                                ) : (
+                                  <span
+                                    title={invoice.document_name}
+                                    style={{
+                                      fontWeight: 500,
+                                      color: isDamage ? "#b91c1c" : "#1d4ed8",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      maxWidth: "65%",
+                                    }}
+                                  >
+                                    {invoice.document_name ||
+                                      `Invoice ${index + 1}`}
+                                  </span>
+                                )}
 
                                 {/* Status badges */}
                                 <span style={{ display: "flex", gap: "4px" }}>
@@ -1071,7 +1249,9 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                   </span>
                                 )}
                             </span>
-                          ))}
+                            );
+                          });
+                          })()}
                         </span>
                       </div>
                     )}
@@ -1094,37 +1274,119 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
           const {
             awb_bl_no,
             awb_bl_date,
+            hawb_hbl_no,
+            hawb_hbl_date,
             gross_weight,
             job_net_weight,
             invoice_number,
             invoice_date,
-            total_inv_value,
             inv_currency,
             loading_port,
             port_of_reporting,
             custom_house,
-
+            freight,
+            insurance,
+            toi,
+            importer_reference_no,
+            consignment_type,
           } = cell.row.original;
+
+          let toiStr = (toi !== undefined && toi !== null && toi !== "") ? toi : "N/A";
+          let freightStr = (freight !== undefined && freight !== null && freight !== "") ? freight : "N/A";
+          let insuranceStr = (insurance !== undefined && insurance !== null && insurance !== "") ? insurance : "N/A";
+
+          let invDetails = cell.row.original.invoice_details;
+          if (typeof invDetails === "string") {
+            try { invDetails = JSON.parse(invDetails); } catch (e) {}
+          }
+          if (Array.isArray(invDetails) && invDetails.length > 0) {
+            const validToiInv = invDetails.find(inv => inv.toi !== undefined && inv.toi !== null && inv.toi !== "");
+            if (validToiInv) toiStr = validToiInv.toi;
+
+            const validFreightInv = invDetails.find(inv => inv.freight !== undefined && inv.freight !== null && inv.freight !== "");
+            if (validFreightInv) freightStr = `${validFreightInv.freight} ${validFreightInv.freight_currency || ""}`.trim();
+
+            const validInsuranceInv = invDetails.find(inv => inv.insurance !== undefined && inv.insurance !== null && inv.insurance !== "");
+            if (validInsuranceInv) insuranceStr = `${validInsuranceInv.insurance} ${validInsuranceInv.insurance_currency || ""}`.trim();
+          }
 
           return (
             <div style={{ alignItems: "center" }}>
-              <strong>BL:</strong>{" "}{awb_bl_no}
+              <strong>MBL:</strong>{" "}{awb_bl_no || "N/A"}
               {awb_bl_no && (
                 <Button
                   type="text"
                   size="small"
                   onClick={(event) => handleCopy(event, awb_bl_no)}
                   icon={<CopyOutlined />}
-                  title="Copy BL Number"
+                  title="Copy MBL Number"
                 />
               )}{" "}
               {awb_bl_date} <br />
+              <strong>HBL:</strong>{" "}{hawb_hbl_no || "N/A"}
+              {hawb_hbl_no && (
+                <Button
+                  type="text"
+                  size="small"
+                  onClick={(event) => handleCopy(event, hawb_hbl_no)}
+                  icon={<CopyOutlined />}
+                  title="Copy HBL Number"
+                />
+              )}{" "}
+              {hawb_hbl_date} <br />
+              {importer_reference_no && (
+                <>
+                  <strong>Importer Ref No:</strong>{" "}{importer_reference_no} <br />
+                </>
+              )}
               <strong>Gross Weight:</strong>{" "}{gross_weight || ""} kg
               <br />
               <strong>Net weight:</strong>{" "}{job_net_weight || ""} kg
               <br />
               <strong>Invoice:</strong>{" "}{invoice_number}{" "}{invoice_date} <br />
-              <strong>Value:</strong>{" "}{total_inv_value || "N/A"}{" "}{inv_currency || ""} <br />
+              <strong>Value:</strong>{" "}{(() => {
+                const job = cell.row.original;
+                if (Array.isArray(invDetails) && invDetails.length > 0) {
+                  const sumPV = invDetails.reduce((sum, r) => {
+                    const pv = parseFloat(r.product_value || r.amount);
+                    if (!isNaN(pv) && pv > 0) return sum + pv;
+                    return sum;
+                  }, 0);
+                  if (sumPV > 0) return sumPV.toFixed(2);
+                }
+
+                const topPV = parseFloat(job.product_value);
+                if (!isNaN(topPV) && topPV > 0) return topPV.toFixed(2);
+
+                let descDetails = job.description_details;
+                if (typeof descDetails === "string") {
+                  try { descDetails = JSON.parse(descDetails); } catch (e) {}
+                }
+                if (Array.isArray(descDetails) && descDetails.length > 0) {
+                  const sumDesc = descDetails.reduce((sum, d) => {
+                    const amt = parseFloat(d.amount);
+                    if (!isNaN(amt) && amt > 0) return sum + amt;
+                    const up = parseFloat(d.unit_price);
+                    const qty = parseFloat(d.quantity);
+                    if (!isNaN(up) && up > 0 && !isNaN(qty) && qty > 0) return sum + (up * qty);
+                    return sum;
+                  }, 0);
+                  if (sumDesc > 0) return sumDesc.toFixed(2);
+                }
+
+                return job.product_value || "N/A";
+              })()}{" "}{inv_currency || ""} <br />
+              <strong>TOI:</strong>{" "}{toiStr} <br />
+              {freightStr !== "N/A" && (
+                <>
+                  <strong>Freight:</strong>{" "}{freightStr} <br />
+                </>
+              )}
+              {insuranceStr !== "N/A" && (
+                <>
+                  <strong>Insurance:</strong>{" "}{insuranceStr} <br />
+                </>
+              )}
               <strong>POL:</strong>{" "}
               {loading_port ? loading_port.replace(/\(.*?\)\s*/, "") : ""}{" "}
               <br />
@@ -1134,6 +1396,11 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 : ""}{" "}
               <br />
               <strong>ICD Port:</strong>{" "}{custom_house || "N/A"} <br />
+              {consignment_type && (
+                <>
+                  <strong>Consignment Type:</strong>{" "}{consignment_type} <br />
+                </>
+              )}
             </div>
           );
         },
@@ -1302,7 +1569,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
             return uniqueFormatted.join(", ");
           };
 
-          const etdVal = etd_date || etd;
+          const etdVal = etd_date || etd || cell.row.original.etdDate;
           const etaVal = vessel_berthing;
           const gigmVal = gateway_igm_date || gigm_date || igm_date;
           const dischargeVal = discharge_date;
@@ -1324,12 +1591,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 width: "100%",
               }}
             >
-              {etdVal && (
-                <div>
-                  <strong>ETD Date:</strong>
-                  <span style={{ marginLeft: "8px" }}>{formatDate(etdVal)}</span>
-                </div>
-              )}
+              <EditableEtdCell job={cell.row.original} formatDate={formatDate} />
 
               <div>
                 <strong>ETA:</strong>

@@ -329,6 +329,69 @@ export const proxyImportListing = async (req, res) => {
     const startIndex = (currentPageNum - 1) * itemsPerPage;
     const paginatedJobs = jobs.slice(startIndex, startIndex + itemsPerPage);
 
+    // Enrich paginated jobs with product_value, invoice_details, and description_details from MongoDB if missing
+    if (paginatedJobs.length > 0) {
+      try {
+        const jobIds = paginatedJobs.map((j) => j._id).filter(Boolean);
+        const objectIds = jobIds.map((id) => {
+          try {
+            return typeof id === "string" && id.length === 24 ? new mongoose.Types.ObjectId(id) : id;
+          } catch (e) {
+            return id;
+          }
+        });
+
+        const jobsCol = mongoose.connection.db.collection("jobs");
+        const dbJobs = await jobsCol
+          .find(
+            { $or: [{ _id: { $in: objectIds } }, { _id: { $in: jobIds } }, { job_no: { $in: paginatedJobs.map((j) => j.job_no).filter(Boolean) } }] },
+            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1 } }
+          )
+          .toArray();
+
+        const dbJobMap = new Map();
+        dbJobs.forEach((dbJ) => {
+          if (dbJ._id) dbJobMap.set(dbJ._id.toString(), dbJ);
+          if (dbJ.job_no) dbJobMap.set(dbJ.job_no.toString(), dbJ);
+        });
+
+        paginatedJobs.forEach((j) => {
+          const dbJ = dbJobMap.get(j._id?.toString()) || dbJobMap.get(j.job_no?.toString());
+          if (dbJ) {
+            if (!j.product_value && dbJ.product_value) j.product_value = dbJ.product_value;
+            if ((!j.invoice_details || (Array.isArray(j.invoice_details) && j.invoice_details.length === 0)) && dbJ.invoice_details) {
+              j.invoice_details = dbJ.invoice_details;
+            }
+            if ((!j.description_details || (Array.isArray(j.description_details) && j.description_details.length === 0)) && dbJ.description_details) {
+              j.description_details = dbJ.description_details;
+            }
+            if (!j.freight && dbJ.freight) j.freight = dbJ.freight;
+            if (!j.insurance && dbJ.insurance) j.insurance = dbJ.insurance;
+            if (!j.other_charges && dbJ.other_charges) j.other_charges = dbJ.other_charges;
+            if (!j.etd && dbJ.etd) j.etd = dbJ.etd;
+            if (!j.etd_date && dbJ.etd_date) j.etd_date = dbJ.etd_date;
+            if (!j.etdDate && dbJ.etdDate) j.etdDate = dbJ.etdDate;
+            if (!j.checklist && dbJ.checklist) j.checklist = dbJ.checklist;
+            if (j.is_checklist_aprroved === undefined && dbJ.is_checklist_aprroved !== undefined) j.is_checklist_aprroved = dbJ.is_checklist_aprroved;
+            if (j.is_checklist_clicked === undefined && dbJ.is_checklist_clicked !== undefined) j.is_checklist_clicked = dbJ.is_checklist_clicked;
+            if (!j.is_checklist_aprroved_date && dbJ.is_checklist_aprroved_date) j.is_checklist_aprroved_date = dbJ.is_checklist_aprroved_date;
+            if (!j.remark_client && dbJ.remark_client) j.remark_client = dbJ.remark_client;
+            if ((!j.do_shipping_line_invoice || (Array.isArray(j.do_shipping_line_invoice) && j.do_shipping_line_invoice.length === 0)) && dbJ.do_shipping_line_invoice) {
+              j.do_shipping_line_invoice = dbJ.do_shipping_line_invoice;
+            }
+            if ((!j.charges || (Array.isArray(j.charges) && j.charges.length === 0)) && dbJ.charges) {
+              j.charges = dbJ.charges;
+            }
+            if ((!j.shipping_line_invoice_imgs || (Array.isArray(j.shipping_line_invoice_imgs) && j.shipping_line_invoice_imgs.length === 0)) && dbJ.shipping_line_invoice_imgs) {
+              j.shipping_line_invoice_imgs = dbJ.shipping_line_invoice_imgs;
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to enrich jobs with product_value/invoice_details from DB:", err.message);
+      }
+    }
+
     res.json({
       message: "Jobs fetched successfully",
       data: paginatedJobs,
@@ -352,6 +415,18 @@ export const updateJob = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    // Update in local MongoDB directly for instant reflect
+    try {
+      const jobsCol = mongoose.connection.db.collection("jobs");
+      const objectId = typeof id === "string" && id.length === 24 ? new mongoose.Types.ObjectId(id) : id;
+      await jobsCol.updateOne(
+        { $or: [{ _id: objectId }, { _id: id }, { job_no: id }] },
+        { $set: updateData }
+      );
+    } catch (e) {
+      console.warn("Local DB job update warning:", e.message);
+    }
 
     const response = await axios.patch(`${IMPORT_API_BASE_URL}/jobs/${id}`, updateData, {
       headers: {
