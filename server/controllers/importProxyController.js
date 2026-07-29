@@ -146,8 +146,9 @@ export const proxyImportListing = async (req, res) => {
 
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
     const ieCodeAssignments = dbUser.ie_code_assignments || [];
+    const shouldFilterByIE = ieCodeAssignments.length > 0;
 
-    if (!isAdmin && ieCodeAssignments.length === 0) {
+    if (!isAdmin && !shouldFilterByIE) {
       return res.json({
         message: "No importer assigned. Please contact your administrator.",
         data: [],
@@ -166,17 +167,8 @@ export const proxyImportListing = async (req, res) => {
       exporter,
     };
 
-    if (isAdmin) {
-      if (importer && importer.toLowerCase() !== "all") {
-        forwardParams.importer = importer;
-      }
-      const clientIeCodes = req.query.ieCodes || req.query.ie_codes;
-      if (clientIeCodes) {
-        forwardParams.ieCodes = clientIeCodes;
-        forwardParams.ie_codes = clientIeCodes;
-      }
-    } else {
-      // Non-admins: restrict to their assigned IE codes and importer names
+    if (shouldFilterByIE) {
+      // Restrict to assigned IE codes and importer names (for non-admins or admins with assignments)
       const assignedIECodes = ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()).filter(Boolean);
       const requestedIECodes = (req.query.ieCodes || req.query.ie_codes || "")
         .split(",")
@@ -208,6 +200,16 @@ export const proxyImportListing = async (req, res) => {
         } else {
           forwardParams.importer = "unauthorized_importer_placeholder";
         }
+      }
+    } else {
+      // Admins without explicit IE code assignments can view all
+      if (importer && importer.toLowerCase() !== "all") {
+        forwardParams.importer = importer;
+      }
+      const clientIeCodes = req.query.ieCodes || req.query.ie_codes;
+      if (clientIeCodes) {
+        forwardParams.ieCodes = clientIeCodes;
+        forwardParams.ie_codes = clientIeCodes;
       }
     }
 
@@ -257,8 +259,8 @@ export const proxyImportListing = async (req, res) => {
 
     let jobs = response.data?.data || [];
 
-    // Filter by assigned IE codes for regular users
-    if (!isAdmin) {
+    // Filter by assigned IE codes when assignments exist (for non-admins or admins with assigned IE codes)
+    if (shouldFilterByIE) {
       const allowedIECodes = new Set(ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()));
       const allowedImporterNames = new Set(
         ieCodeAssignments.map((a) => formatImporter(a.importer_name)).filter(Boolean)
@@ -927,19 +929,13 @@ export const getUserDashboardStats = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
 
     let targetImporters = null;
+    const assignments = dbUser.ie_code_assignments || [];
+    let assignedNames = assignments.map((a) => a.importer_name);
+    if (assignedNames.length === 0 && dbUser.assignedImporterName) {
+      assignedNames = [dbUser.assignedImporterName];
+    }
 
-    if (!isAdmin) {
-      const assignments = dbUser.ie_code_assignments || [];
-      let assignedNames = assignments.map((a) => a.importer_name);
-
-      if (assignedNames.length === 0 && dbUser.assignedImporterName) {
-        assignedNames = [dbUser.assignedImporterName];
-      }
-
-      if (assignedNames.length === 0) {
-        return res.json({ summary: {}, details: {} });
-      }
-
+    if (assignedNames.length > 0) {
       if (importer) {
         const requested = importer.split(",");
         targetImporters = requested.filter((name) => assignedNames.includes(name));
@@ -947,9 +943,11 @@ export const getUserDashboardStats = async (req, res) => {
         targetImporters = assignedNames;
       }
 
-      if (targetImporters.length === 0) {
+      if (targetImporters.length === 0 && !isAdmin) {
         return res.json({ summary: {}, details: {} });
       }
+    } else if (!isAdmin) {
+      return res.json({ summary: {}, details: {} });
     } else {
       if (importer) {
         targetImporters = importer.split(",");
@@ -994,32 +992,21 @@ export const getJobsOverview = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
 
     let targetImporters = null;
+    const overviewAssignments = dbUser.ie_code_assignments || [];
+    let overviewAssignedNames = overviewAssignments.map((a) => a.importer_name);
+    if (overviewAssignedNames.length === 0 && dbUser.assignedImporterName) {
+      overviewAssignedNames = [dbUser.assignedImporterName];
+    }
 
-    if (!isAdmin) {
-      const assignments = dbUser.ie_code_assignments || [];
-      let assignedNames = assignments.map((a) => a.importer_name);
-
-      if (assignedNames.length === 0 && dbUser.assignedImporterName) {
-        assignedNames = [dbUser.assignedImporterName];
-      }
-
-      if (assignedNames.length === 0) {
-        return res.json({
-          pendingJobs: 0,
-          completedJobs: 0,
-          cancelledJobs: 0,
-          totalJobs: 0,
-        });
-      }
-
+    if (overviewAssignedNames.length > 0) {
       if (importer) {
         const requested = importer.split(",");
-        targetImporters = requested.filter((name) => assignedNames.includes(name));
+        targetImporters = requested.filter((name) => overviewAssignedNames.includes(name));
       } else {
-        targetImporters = assignedNames;
+        targetImporters = overviewAssignedNames;
       }
 
-      if (targetImporters.length === 0) {
+      if (targetImporters.length === 0 && !isAdmin) {
         return res.json({
           pendingJobs: 0,
           completedJobs: 0,
@@ -1027,6 +1014,13 @@ export const getJobsOverview = async (req, res) => {
           totalJobs: 0,
         });
       }
+    } else if (!isAdmin) {
+      return res.json({
+        pendingJobs: 0,
+        completedJobs: 0,
+        cancelledJobs: 0,
+        totalJobs: 0,
+      });
     } else {
       if (importer) {
         targetImporters = importer.split(",");
