@@ -712,8 +712,8 @@ function CExportDSR() {
       const statA = clientQueriesStatus[a.job_no] || {};
       const statB = clientQueriesStatus[b.job_no] || {};
 
-      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : statA.hasQueries ? 1 : 0;
-      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : statB.hasQueries ? 1 : 0;
+      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : 0;
+      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : 0;
 
       return scoreB - scoreA;
     });
