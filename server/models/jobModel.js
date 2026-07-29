@@ -274,6 +274,8 @@ const jobSchema = new mongoose.Schema({
   containers_arrived_on_same_date: Boolean,
   // *******
   remarks: { type: String, trim: true },
+  reason_for_delay: { type: String, trim: true },
+  delay_reason: { type: String, trim: true },
   // *******
   free_time: { type: Number, trim: true },
   is_free_time_updated: { type: Boolean, default: false },

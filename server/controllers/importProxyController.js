@@ -345,7 +345,7 @@ export const proxyImportListing = async (req, res) => {
         const dbJobs = await jobsCol
           .find(
             { $or: [{ _id: { $in: objectIds } }, { _id: { $in: jobIds } }, { job_no: { $in: paginatedJobs.map((j) => j.job_no).filter(Boolean) } }] },
-            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1 } }
+            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1, po_no: 1, po_number: 1, po_date: 1, po_details: 1, reason_for_delay: 1, reasonForDelay: 1, delay_reason: 1, delayReason: 1, reason_of_delay: 1 } }
           )
           .toArray();
 
@@ -376,6 +376,15 @@ export const proxyImportListing = async (req, res) => {
             if (j.is_checklist_clicked === undefined && dbJ.is_checklist_clicked !== undefined) j.is_checklist_clicked = dbJ.is_checklist_clicked;
             if (!j.is_checklist_aprroved_date && dbJ.is_checklist_aprroved_date) j.is_checklist_aprroved_date = dbJ.is_checklist_aprroved_date;
             if (!j.remark_client && dbJ.remark_client) j.remark_client = dbJ.remark_client;
+            if (!j.po_no && dbJ.po_no) j.po_no = dbJ.po_no;
+            if (!j.po_number && dbJ.po_number) j.po_number = dbJ.po_number;
+            if (!j.po_date && dbJ.po_date) j.po_date = dbJ.po_date;
+            if (!j.po_details && dbJ.po_details) j.po_details = dbJ.po_details;
+            if (!j.reason_for_delay && dbJ.reason_for_delay) j.reason_for_delay = dbJ.reason_for_delay;
+            if (!j.reasonForDelay && dbJ.reasonForDelay) j.reasonForDelay = dbJ.reasonForDelay;
+            if (!j.delay_reason && dbJ.delay_reason) j.delay_reason = dbJ.delay_reason;
+            if (!j.delayReason && dbJ.delayReason) j.delayReason = dbJ.delayReason;
+            if (!j.reason_of_delay && dbJ.reason_of_delay) j.reason_of_delay = dbJ.reason_of_delay;
             if ((!j.do_shipping_line_invoice || (Array.isArray(j.do_shipping_line_invoice) && j.do_shipping_line_invoice.length === 0)) && dbJ.do_shipping_line_invoice) {
               j.do_shipping_line_invoice = dbJ.do_shipping_line_invoice;
             }

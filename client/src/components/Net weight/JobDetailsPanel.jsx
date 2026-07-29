@@ -858,6 +858,50 @@ const JobDetailsPanel = ({
                 })()}`}
               />
               <DetailField
+                label="PO Number"
+                value={(() => {
+                  const extractPo = (val, defaultDate) => {
+                    if (!val) return null;
+                    if (typeof val === "string" || typeof val === "number") {
+                      const s = String(val).trim();
+                      if (!s || s === "[object Object]") return null;
+                      return defaultDate ? `${s} (${defaultDate})` : s;
+                    }
+                    if (Array.isArray(val)) {
+                      const extracted = val.map(item => extractPo(item, defaultDate)).filter(Boolean);
+                      return extracted.length > 0 ? extracted.join(", ") : null;
+                    }
+                    if (typeof val === "object") {
+                      const num = val.po_no || val.po_number || val.po_num || val.poNo || val.poNumber || val.po || val.number;
+                      const dt = val.po_date || val.poDate || val.date || defaultDate;
+                      if (num) return extractPo(num, dt);
+                    }
+                    return null;
+                  };
+
+                  const pos = [];
+                  const topPo = extractPo(jobData?.po_details) || 
+                                extractPo(jobData?.po_no || jobData?.po_number || jobData?.po_num || jobData?.poNo || jobData?.poNumber || jobData?.po, jobData?.po_date || jobData?.poDate);
+                  if (topPo) pos.push(topPo);
+
+                  let invoices = jobData?.invoice_details;
+                  if (typeof invoices === "string") {
+                    try { invoices = JSON.parse(invoices); } catch (e) {}
+                  }
+                  if (Array.isArray(invoices)) {
+                    invoices.forEach(inv => {
+                      if (!inv) return;
+                      const invPo = extractPo(inv.po_details) || 
+                                    extractPo(inv.po_no || inv.po_number || inv.po_num || inv.poNo || inv.poNumber || inv.po, inv.po_date || inv.poDate);
+                      if (invPo) pos.push(invPo);
+                    });
+                  }
+
+                  const uniquePos = [...new Set(pos)].filter(p => p && p !== "[object Object]");
+                  return uniquePos.length > 0 ? uniquePos.join(", ") : "N/A";
+                })()}
+              />
+              <DetailField
                 label="Exchange Rate"
                 value={`₹ ${jobData.exrate || "0.00"}`}
               />

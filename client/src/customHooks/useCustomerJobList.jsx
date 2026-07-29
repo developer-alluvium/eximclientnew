@@ -334,8 +334,8 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
       const statA = clientQueriesStatus[a.job_no] || {};
       const statB = clientQueriesStatus[b.job_no] || {};
 
-      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : statA.hasQueries ? 1 : 0;
-      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : statB.hasQueries ? 1 : 0;
+      const scoreA = statA.hasUnseen ? 3 : statA.hasOpenQueries ? 2 : 0;
+      const scoreB = statB.hasUnseen ? 3 : statB.hasOpenQueries ? 2 : 0;
 
       return scoreB - scoreA;
     });
@@ -1059,7 +1059,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                     damageMap.set(headName, new Set());
                                   }
                                   const urlSet = damageMap.get(headName);
-                                  
+
                                   if (charge.revenue?.url && Array.isArray(charge.revenue.url)) {
                                     charge.revenue.url.forEach(u => u && urlSet.add(u));
                                   }
@@ -1068,7 +1068,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                   }
                                 }
                               });
-                              
+
                               damageMap.forEach((urlSet, headName) => {
                                 if (urlSet.size > 0) {
                                   damageInvoices.push({
@@ -1080,7 +1080,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                 }
                               });
                             }
-                            
+
                             const extraInvoices = [];
                             const { shipping_line_invoice_imgs = [] } = cell.row.original;
                             if (Array.isArray(shipping_line_invoice_imgs) && shipping_line_invoice_imgs.length > 0) {
@@ -1091,166 +1091,166 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                 is_final: false,
                               });
                             }
-                            
+
                             let allShippingInvoices = [...damageInvoices, ...do_shipping_line_invoice, ...extraInvoices];
-                            
+
                             // Deduplicate invoices with empty URLs if we injected the same name with actual URLs
-                            const hasValidShippingLine = allShippingInvoices.some(inv => 
+                            const hasValidShippingLine = allShippingInvoices.some(inv =>
                               inv.document_name === "Shipping Line Invoice" && Array.isArray(inv.url) && inv.url.length > 0
                             );
                             if (hasValidShippingLine) {
-                              allShippingInvoices = allShippingInvoices.filter(inv => 
+                              allShippingInvoices = allShippingInvoices.filter(inv =>
                                 !(inv.document_name === "Shipping Line Invoice" && (!Array.isArray(inv.url) || inv.url.length === 0))
                               );
                             }
 
                             return allShippingInvoices.map((invoice, index) => {
-                            const isDamage = (invoice.document_name || "").toLowerCase().includes("damage");
-                            const firstUrl = Array.isArray(invoice.url) && invoice.url.length > 0 ? invoice.url[0] : (typeof invoice.url === "string" ? invoice.url : null);
-                            return (
-                            <span
-                              key={index}
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "2px",
-                                borderBottom: "1px solid #f3f4f6",
-                                paddingBottom: "4px",
-                                ...(isDamage ? {
-                                  backgroundColor: "#fee2e2",
-                                  border: "1px solid #ef4444",
-                                  padding: "4px",
-                                  borderRadius: "4px",
-                                  marginTop: "2px"
-                                } : {})
-                              }}
-                            >
-                              {/* Top row */}
-                              <span
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "flex-start",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                }}
-                              >
-                                {firstUrl ? (
-                                  <a
-                                    href={firstUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    title={invoice.document_name}
-                                    style={{
-                                      fontWeight: 500,
-                                      color: isDamage ? "#b91c1c" : "#1d4ed8",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      maxWidth: "65%",
-                                      textDecoration: "underline",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    {invoice.document_name ||
-                                      `Invoice ${index + 1}`}
-                                  </a>
-                                ) : (
-                                  <span
-                                    title={invoice.document_name}
-                                    style={{
-                                      fontWeight: 500,
-                                      color: isDamage ? "#b91c1c" : "#1d4ed8",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      maxWidth: "65%",
-                                    }}
-                                  >
-                                    {invoice.document_name ||
-                                      `Invoice ${index + 1}`}
-                                  </span>
-                                )}
-
-                                {/* Status badges */}
-                                <span style={{ display: "flex", gap: "4px" }}>
-                                  {invoice.is_draft && (
-                                    <span style={badge("#fef9c3", "#854d0e")}>
-                                      Draft
-                                    </span>
-                                  )}
-                                  {invoice.is_final && (
-                                    <span
-                                      style={badge("#dcfce7", "#166534", true)}
-                                    >
-                                      Final
-                                    </span>
-                                  )}
-                                  {invoice.is_payment_made && (
-                                    <span style={badge("#dcfce7", "#166534")}>
-                                      Paid
-                                    </span>
-                                  )}
-                                  {invoice.is_payment_requested &&
-                                    !invoice.is_payment_made && (
-                                      <span style={badge("#cffafe", "#155e75")}>
-                                        Req
-                                      </span>
-                                    )}
-                                </span>
-                              </span>
-
-                              {/* Amount details */}
-                              {invoice.document_amount_details && (
+                              const isDamage = (invoice.document_name || "").toLowerCase().includes("damage");
+                              const firstUrl = Array.isArray(invoice.url) && invoice.url.length > 0 ? invoice.url[0] : (typeof invoice.url === "string" ? invoice.url : null);
+                              return (
                                 <span
+                                  key={index}
                                   style={{
-                                    color: "#545964ff",
-                                    fontSize: "10px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "2px",
+                                    borderBottom: "1px solid #f3f4f6",
+                                    paddingBottom: "4px",
+                                    ...(isDamage ? {
+                                      backgroundColor: "#fee2e2",
+                                      border: "1px solid #ef4444",
+                                      padding: "4px",
+                                      borderRadius: "4px",
+                                      marginTop: "2px"
+                                    } : {})
                                   }}
                                 >
-                                  Amount: {invoice.document_amount_details}
-                                </span>
-                              )}
-                              <span
-                                style={{
-                                  fontSize: "0.7rem",
-                                  color: "#666",
-                                }}
-                              >
-                                Mode: {invoice.payment_mode}
-                                {invoice.wire_transfer_method &&
-                                  ` (${invoice.wire_transfer_method})`}
-                              </span>
-
-                              {/* Document links */}
-                              {Array.isArray(invoice.url) &&
-                                invoice.url.length > 0 && (
+                                  {/* Top row */}
                                   <span
                                     style={{
                                       display: "flex",
+                                      justifyContent: "flex-start",
+                                      alignItems: "center",
                                       gap: "6px",
-                                      flexWrap: "wrap",
                                     }}
                                   >
-                                    {invoice.url.map((link, i) => (
+                                    {firstUrl ? (
                                       <a
-                                        key={i}
-                                        href={link}
+                                        href={firstUrl}
                                         target="_blank"
-                                        rel="noopener noreferrer"
+                                        rel="noreferrer"
+                                        title={invoice.document_name}
                                         style={{
-                                          color: "#3b82f6",
+                                          fontWeight: 500,
+                                          color: isDamage ? "#b91c1c" : "#1d4ed8",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          maxWidth: "65%",
                                           textDecoration: "underline",
-                                          fontSize: "10px",
+                                          cursor: "pointer",
                                         }}
                                       >
-                                        Doc {i + 1}
+                                        {invoice.document_name ||
+                                          `Invoice ${index + 1}`}
                                       </a>
-                                    ))}
+                                    ) : (
+                                      <span
+                                        title={invoice.document_name}
+                                        style={{
+                                          fontWeight: 500,
+                                          color: isDamage ? "#b91c1c" : "#1d4ed8",
+                                          whiteSpace: "nowrap",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          maxWidth: "65%",
+                                        }}
+                                      >
+                                        {invoice.document_name ||
+                                          `Invoice ${index + 1}`}
+                                      </span>
+                                    )}
+
+                                    {/* Status badges */}
+                                    <span style={{ display: "flex", gap: "4px" }}>
+                                      {invoice.is_draft && (
+                                        <span style={badge("#fef9c3", "#854d0e")}>
+                                          Draft
+                                        </span>
+                                      )}
+                                      {invoice.is_final && (
+                                        <span
+                                          style={badge("#dcfce7", "#166534", true)}
+                                        >
+                                          Final
+                                        </span>
+                                      )}
+                                      {invoice.is_payment_made && (
+                                        <span style={badge("#dcfce7", "#166534")}>
+                                          Paid
+                                        </span>
+                                      )}
+                                      {invoice.is_payment_requested &&
+                                        !invoice.is_payment_made && (
+                                          <span style={badge("#cffafe", "#155e75")}>
+                                            Req
+                                          </span>
+                                        )}
+                                    </span>
                                   </span>
-                                )}
-                            </span>
-                            );
-                          });
+
+                                  {/* Amount details */}
+                                  {invoice.document_amount_details && (
+                                    <span
+                                      style={{
+                                        color: "#545964ff",
+                                        fontSize: "10px",
+                                      }}
+                                    >
+                                      Amount: {invoice.document_amount_details}
+                                    </span>
+                                  )}
+                                  <span
+                                    style={{
+                                      fontSize: "0.7rem",
+                                      color: "#666",
+                                    }}
+                                  >
+                                    Mode: {invoice.payment_mode}
+                                    {invoice.wire_transfer_method &&
+                                      ` (${invoice.wire_transfer_method})`}
+                                  </span>
+
+                                  {/* Document links */}
+                                  {Array.isArray(invoice.url) &&
+                                    invoice.url.length > 0 && (
+                                      <span
+                                        style={{
+                                          display: "flex",
+                                          gap: "6px",
+                                          flexWrap: "wrap",
+                                        }}
+                                      >
+                                        {invoice.url.map((link, i) => (
+                                          <a
+                                            key={i}
+                                            href={link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                              color: "#3b82f6",
+                                              textDecoration: "underline",
+                                              fontSize: "10px",
+                                            }}
+                                          >
+                                            Doc {i + 1}
+                                          </a>
+                                        ))}
+                                      </span>
+                                    )}
+                                </span>
+                              );
+                            });
                           })()}
                         </span>
                       </div>
@@ -1297,7 +1297,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
 
           let invDetails = cell.row.original.invoice_details;
           if (typeof invDetails === "string") {
-            try { invDetails = JSON.parse(invDetails); } catch (e) {}
+            try { invDetails = JSON.parse(invDetails); } catch (e) { }
           }
           if (Array.isArray(invDetails) && invDetails.length > 0) {
             const validToiInv = invDetails.find(inv => inv.toi !== undefined && inv.toi !== null && inv.toi !== "");
@@ -1360,7 +1360,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
 
                 let descDetails = job.description_details;
                 if (typeof descDetails === "string") {
-                  try { descDetails = JSON.parse(descDetails); } catch (e) {}
+                  try { descDetails = JSON.parse(descDetails); } catch (e) { }
                 }
                 if (Array.isArray(descDetails) && descDetails.length > 0) {
                   const sumDesc = descDetails.reduce((sum, d) => {
@@ -1376,6 +1376,48 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
 
                 return job.product_value || "N/A";
               })()}{" "}{inv_currency || ""} <br />
+              <strong>PO No:</strong>{" "}{(() => {
+                const job = cell.row.original;
+                const extractPo = (val, defaultDate) => {
+                  if (!val) return null;
+                  if (typeof val === "string" || typeof val === "number") {
+                    const s = String(val).trim();
+                    if (!s || s === "[object Object]") return null;
+                    return defaultDate ? `${s} (${defaultDate})` : s;
+                  }
+                  if (Array.isArray(val)) {
+                    const extracted = val.map(item => extractPo(item, defaultDate)).filter(Boolean);
+                    return extracted.length > 0 ? extracted.join(", ") : null;
+                  }
+                  if (typeof val === "object") {
+                    const num = val.po_no || val.po_number || val.po_num || val.poNo || val.poNumber || val.po || val.number;
+                    const dt = val.po_date || val.poDate || val.date || defaultDate;
+                    if (num) return extractPo(num, dt);
+                  }
+                  return null;
+                };
+
+                const pos = [];
+                const topPo = extractPo(job.po_details) ||
+                  extractPo(job.po_no || job.po_number || job.po_num || job.poNo || job.poNumber || job.po, job.po_date || job.poDate);
+                if (topPo) pos.push(topPo);
+
+                let invoices = invDetails || job.invoice_details;
+                if (typeof invoices === "string") {
+                  try { invoices = JSON.parse(invoices); } catch (e) { }
+                }
+                if (Array.isArray(invoices)) {
+                  invoices.forEach(inv => {
+                    if (!inv) return;
+                    const invPo = extractPo(inv.po_details) ||
+                      extractPo(inv.po_no || inv.po_number || inv.po_num || inv.poNo || inv.poNumber || inv.po, inv.po_date || inv.poDate);
+                    if (invPo) pos.push(invPo);
+                  });
+                }
+
+                const uniquePos = [...new Set(pos)].filter(p => p && p !== "[object Object]");
+                return uniquePos.length > 0 ? uniquePos.join(", ") : "N/A";
+              })()} <br />
               <strong>TOI:</strong>{" "}{toiStr} <br />
               {freightStr !== "N/A" && (
                 <>
@@ -1396,11 +1438,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 : ""}{" "}
               <br />
               <strong>ICD Port:</strong>{" "}{custom_house || "N/A"} <br />
-              {consignment_type && (
-                <>
-                  <strong>Consignment Type:</strong>{" "}{consignment_type} <br />
-                </>
-              )}
+
             </div>
           );
         },
@@ -1441,6 +1479,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                     parseFloat(container.weight_shortage) || 0;
                   const containerColor = getShortageColor(weightShortage);
                   const tooltipText = getShortageText(weightShortage);
+                  const containerType = container.container_type || container.containerType || container.type || cell.row.original.container_type || cell.row.original.containerType || "";
 
                   return (
                     <div
@@ -1474,6 +1513,12 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                           {container.container_number}
                         </a>
                       </Tooltip>
+
+                      {containerType && (
+                        <span style={{ color: "#475569", fontSize: "12px", fontWeight: "600" }}>
+                          ({containerType})
+                        </span>
+                      )}
 
                       <span style={{ color: "#666" }}>
                         | "{container.size}"
@@ -1666,6 +1711,22 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   }}
                 >
                   {detentionVal || "N/A"}
+                </span>
+              </div>
+
+              <div>
+                <strong>Reason for Delay:</strong>
+                <span
+                  style={{
+                    marginLeft: "8px",
+                    color: (cell.row.original.reason_for_delay || cell.row.original.reasonForDelay || cell.row.original.delay_reason || cell.row.original.delayReason) ? "#b91c1c" : "inherit",
+                  }}
+                >
+                  {cell.row.original.reason_for_delay ||
+                    cell.row.original.reasonForDelay ||
+                    cell.row.original.delay_reason ||
+                    cell.row.original.delayReason ||
+                    "N/A"}
                 </span>
               </div>
             </div>
@@ -1927,6 +1988,28 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
       //     </div>
       //   ),
       // },
+
+      {
+        accessorKey: "reason_for_delay",
+        header: "Reason for Delay",
+        size: 220,
+        Cell: ({ cell }) => {
+          const val =
+            cell.row.original.reason_for_delay ||
+            cell.row.original.reasonForDelay ||
+            cell.row.original.delay_reason ||
+            cell.row.original.delayReason ||
+            cell.row.original.reason_of_delay;
+
+          return (
+            <div style={{ textAlign: "center", padding: "4px" }}>
+              <span style={{ color: val ? "#b91c1c" : "#6b7280", fontWeight: val ? "600" : "normal" }}>
+                {val || "N/A"}
+              </span>
+            </div>
+          );
+        },
+      },
     ],
 
     [
