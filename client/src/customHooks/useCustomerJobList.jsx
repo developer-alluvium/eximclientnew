@@ -1106,7 +1106,14 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
 
                             return allShippingInvoices.map((invoice, index) => {
                               const isDamage = (invoice.document_name || "").toLowerCase().includes("damage");
-                              const firstUrl = Array.isArray(invoice.url) && invoice.url.length > 0 ? invoice.url[0] : (typeof invoice.url === "string" ? invoice.url : null);
+                              const hasUrl = Array.isArray(invoice.url)
+                                ? invoice.url.some((u) => u && String(u).trim() !== "")
+                                : typeof invoice.url === "string" && invoice.url.trim() !== "";
+                              const firstUrl = hasUrl
+                                ? Array.isArray(invoice.url)
+                                  ? invoice.url.find((u) => u && String(u).trim() !== "")
+                                  : invoice.url
+                                : null;
                               return (
                                 <span
                                   key={index}
@@ -1159,7 +1166,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                                         title={invoice.document_name}
                                         style={{
                                           fontWeight: 500,
-                                          color: isDamage ? "#b91c1c" : "#1d4ed8",
+                                          color: isDamage ? "#b91c1c" : "#6b7280",
                                           whiteSpace: "nowrap",
                                           overflow: "hidden",
                                           textOverflow: "ellipsis",
