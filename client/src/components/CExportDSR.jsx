@@ -1614,40 +1614,50 @@ function CExportDSR() {
         return (
           <TableCell style={cellStyle} align="left">
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, alignItems: "flex-start" }}>
-              <Box sx={{ display: "flex", gap: 1, mt: 0.5, mb: 0.5, alignItems: "center" }}>
-                <IconButton
+              <Box sx={{ display: "flex", gap: 0.75, mt: 0.5, mb: 0.5, alignItems: "center", flexWrap: "wrap" }}>
+                <Button
                   size="small"
                   onClick={() => handleRedClick(job)}
                   sx={{
-                    width: 14,
-                    height: 14,
-                    p: 0,
-                    backgroundColor: "#ef4444",
-                    borderRadius: "50%",
-                    "&:hover": { backgroundColor: "#dc2626", transform: "scale(1.2)" },
-                    transition: "all 0.15s ease",
-                    border: "none",
+                    px: 1,
+                    py: 0.25,
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    color: "#dc2626",
+                    backgroundColor: "#fef2f2",
+                    border: "1px solid #fca5a5",
+                    borderRadius: "4px",
+                    textTransform: "none",
+                    minWidth: "auto",
+                    "&:hover": { backgroundColor: "#fee2e2" },
                   }}
                   title="Raise new query"
-                />
+                >
+                  + Query
+                </Button>
 
                 {queryStat.hasQueries && (
                   <Box sx={{ position: "relative", display: "inline-flex" }}>
-                    <IconButton
+                    <Button
                       size="small"
                       onClick={() => handleYellowClick(job)}
                       sx={{
-                        width: 14,
-                        height: 14,
-                        p: 0,
-                        backgroundColor: "#f59e0b",
-                        borderRadius: "50%",
-                        "&:hover": { backgroundColor: "#d97706", transform: "scale(1.2)" },
-                        transition: "all 0.15s ease",
-                        border: "none",
+                        px: 1,
+                        py: 0.25,
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        color: "#d97706",
+                        backgroundColor: "#fffbeb",
+                        border: "1px solid #fcd34d",
+                        borderRadius: "4px",
+                        textTransform: "none",
+                        minWidth: "auto",
+                        "&:hover": { backgroundColor: "#fef3c7" },
                       }}
                       title="View replies & reply back"
-                    />
+                    >
+                      View Query
+                    </Button>
                     {queryStat.hasUnseen && (
                       <Box
                         sx={{
@@ -1667,21 +1677,26 @@ function CExportDSR() {
                 )}
 
                 {queryStat.hasOpenQueries && (
-                  <IconButton
+                  <Button
                     size="small"
                     onClick={() => handleResolveOpenQuery(job)}
                     sx={{
-                      width: 14,
-                      height: 14,
-                      p: 0,
-                      backgroundColor: "#10b981",
-                      borderRadius: "50%",
-                      "&:hover": { backgroundColor: "#059669", transform: "scale(1.2)" },
-                      transition: "all 0.15s ease",
-                      border: "none",
+                      px: 1,
+                      py: 0.25,
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: "#059669",
+                      backgroundColor: "#ecfdf5",
+                      border: "1px solid #6ee7b7",
+                      borderRadius: "4px",
+                      textTransform: "none",
+                      minWidth: "auto",
+                      "&:hover": { backgroundColor: "#d1fae5" },
                     }}
                     title="Resolve open query"
-                  />
+                  >
+                    Resolve
+                  </Button>
                 )}
               </Box>
 

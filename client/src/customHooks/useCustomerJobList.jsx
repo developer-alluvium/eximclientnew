@@ -738,42 +738,50 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   };
                   return (
                     <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "4px", alignItems: "center" }}>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {/* Red Dot - Raise Query */}
+                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
+                        {/* Raise Query Button */}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleRedClick(cell.row.original); }}
                           style={{
-                            width: "14px",
-                            height: "14px",
-                            padding: 0,
-                            backgroundColor: "#ef4444",
-                            borderRadius: "50%",
-                            border: "none",
+                            padding: "2px 8px",
+                            fontSize: "10px",
+                            fontWeight: "600",
+                            color: "#dc2626",
+                            backgroundColor: "#fef2f2",
+                            border: "1px solid #fca5a5",
+                            borderRadius: "4px",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
+                            lineHeight: "1.2",
                           }}
                           title="Raise new query"
-                        />
+                        >
+                          + Query
+                        </button>
 
-                        {/* Yellow Dot - View & Reply Chat */}
+                        {/* View / Reply Query Button */}
                         {queryStat.hasQueries && (
                           <div style={{ position: "relative", display: "inline-flex" }}>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleYellowClick(cell.row.original); }}
                               style={{
-                                width: "14px",
-                                height: "14px",
-                                padding: 0,
-                                backgroundColor: "#f59e0b",
-                                borderRadius: "50%",
-                                border: "none",
+                                padding: "2px 8px",
+                                fontSize: "10px",
+                                fontWeight: "600",
+                                color: "#d97706",
+                                backgroundColor: "#fffbeb",
+                                border: "1px solid #fcd34d",
+                                borderRadius: "4px",
                                 cursor: "pointer",
                                 transition: "all 0.15s ease",
+                                lineHeight: "1.2",
                               }}
                               title="View replies & reply back"
-                            />
+                            >
+                              View Query
+                            </button>
                             {queryStat.hasUnseen && (
                               <span
                                 style={{
@@ -792,23 +800,27 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                           </div>
                         )}
 
-                        {/* Green Dot - Resolve Query */}
+                        {/* Resolve Query Button */}
                         {queryStat.hasOpenQueries && (
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleResolveOpenQuery(cell.row.original); }}
                             style={{
-                              width: "14px",
-                              height: "14px",
-                              padding: 0,
-                              backgroundColor: "#10b981",
-                              borderRadius: "50%",
-                              border: "none",
+                              padding: "2px 8px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              color: "#059669",
+                              backgroundColor: "#ecfdf5",
+                              border: "1px solid #6ee7b7",
+                              borderRadius: "4px",
                               cursor: "pointer",
                               transition: "all 0.15s ease",
+                              lineHeight: "1.2",
                             }}
                             title="Resolve open query"
-                          />
+                          >
+                            Resolve
+                          </button>
                         )}
                       </div>
 
