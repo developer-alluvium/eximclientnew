@@ -267,18 +267,113 @@ const EXPORT_DOC_CATEGORIES = [
   },
 ];
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "";
+const formatDate = (dateVal) => {
+  if (!dateVal) return "";
+  const str = String(dateVal).trim();
+  if (!str) return "";
+
+  // 1. Check if string matches DD-MM-YYYY or DD/MM/YYYY or DD-MM-YY or DD/MM/YY
+  const dmyMatch = str.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{2,4})/);
+  if (dmyMatch) {
+    const day = String(dmyMatch[1]).padStart(2, "0");
+    const month = String(dmyMatch[2]).padStart(2, "0");
+    let year = dmyMatch[3];
+    if (year.length === 4) {
+      year = year.slice(-2);
+    } else if (year.length === 1) {
+      year = year.padStart(2, "0");
+    }
+    return `${day}-${month}-${year}`;
+  }
+
+  // 2. Check YYYY-MM-DD format
+  const ymdMatch = str.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1].slice(-2);
+    const month = String(ymdMatch[2]).padStart(2, "0");
+    const day = String(ymdMatch[3]).padStart(2, "0");
+    return `${day}-${month}-${year}`;
+  }
+
+  // 3. Fallback to JS Date parsing
   try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
+    const date = new Date(str);
+    if (isNaN(date.getTime())) return str;
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = String(date.getFullYear()).slice(-2);
     return `${day}-${month}-${year}`;
   } catch (e) {
-    return dateStr;
+    return str;
   }
+};
+
+const getJobScrollAndEgmInfo = (job) => {
+  if (!job) return { dbkScrolls: [], rosctlScrolls: [], egmNo: "", egmDate: "" };
+  const dbkInfoList = [];
+  const rosctlInfoList = [];
+
+  // Direct fields on job object
+  if (job.dbk_scroll_no || job.drawback_scroll_no) {
+    const no = job.dbk_scroll_no || job.drawback_scroll_no;
+    const date = job.dbk_scroll_date || job.drawback_scroll_date;
+    if (no) dbkInfoList.push({ no, date });
+  }
+  if (job.rosctl_scroll_no) {
+    rosctlInfoList.push({ no: job.rosctl_scroll_no, date: job.rosctl_scroll_date });
+  }
+
+  // Invoices & products
+  if (Array.isArray(job.invoices)) {
+    job.invoices.forEach((inv) => {
+      if (inv.drawback_scroll_no || inv.dbk_scroll_no) {
+        const no = inv.drawback_scroll_no || inv.dbk_scroll_no;
+        const date = inv.drawback_scroll_date || inv.dbk_scroll_date;
+        if (no && !dbkInfoList.some((item) => item.no === no)) {
+          dbkInfoList.push({ no, date });
+        }
+      }
+      if (inv.rosctl_scroll_no) {
+        const no = inv.rosctl_scroll_no;
+        const date = inv.rosctl_scroll_date;
+        if (no && !rosctlInfoList.some((item) => item.no === no)) {
+          rosctlInfoList.push({ no, date });
+        }
+      }
+
+      if (Array.isArray(inv.products)) {
+        inv.products.forEach((prod) => {
+          if (Array.isArray(prod.drawbackDetails)) {
+            prod.drawbackDetails.forEach((dbk) => {
+              if (dbk.drawback_scroll_no) {
+                if (!dbkInfoList.some((item) => item.no === dbk.drawback_scroll_no)) {
+                  dbkInfoList.push({
+                    no: dbk.drawback_scroll_no,
+                    date: dbk.drawback_scroll_date,
+                  });
+                }
+              }
+              if (dbk.rosctl_scroll_no) {
+                if (!rosctlInfoList.some((item) => item.no === dbk.rosctl_scroll_no)) {
+                  rosctlInfoList.push({
+                    no: dbk.rosctl_scroll_no,
+                    date: dbk.rosctl_scroll_date,
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  return {
+    dbkScrolls: dbkInfoList,
+    rosctlScrolls: rosctlInfoList,
+    egmNo: job.egm_no,
+    egmDate: job.egm_date,
+  };
 };
 
 const STATUS_TABS = [
@@ -560,6 +655,7 @@ function CExportDSR() {
   const [excelDownloadLoading, setExcelDownloadLoading] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
   const [expandedContainers, setExpandedContainers] = React.useState({});
+  const [expandedInvoices, setExpandedInvoices] = React.useState({});
 
   const [clientQueriesStatus, setClientQueriesStatus] = React.useState({});
   const [queryChatOpen, setQueryChatOpen] = React.useState(false);
@@ -998,6 +1094,11 @@ function CExportDSR() {
     setExpandedContainers(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const toggleInvoices = (e, id) => {
+    e?.stopPropagation();
+    setExpandedInvoices(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const getUrlFileName = (url) => {
     if (!url || typeof url !== "string") return "Document";
     return decodeURIComponent(url.split("/").pop() || "Document");
@@ -1158,6 +1259,7 @@ function CExportDSR() {
 
     switch (columnId) {
       case "job_no": {
+        const { dbkScrolls, rosctlScrolls, egmNo, egmDate } = getJobScrollAndEgmInfo(job);
         const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
           ? job.detailedStatus[job.detailedStatus.length - 1]
           : job.detailedStatus || job.status || "Pending");
@@ -1192,7 +1294,59 @@ function CExportDSR() {
               </Typography>
             )}
 
-            {(job.egm_no || job.egm_date) && (
+            {dbkScrolls.map((dbk, dIdx) => (
+              <Box
+                key={`dbk-${dIdx}`}
+                sx={{
+                  marginTop: "4px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontSize: "9px",
+                  fontWeight: "700",
+                  color: "#0f766e",
+                  backgroundColor: "#f0fdfa",
+                  border: "1px solid #ccfbf1",
+                  display: "flex",
+                  alignItems: "center",
+                  width: "fit-content",
+                  gap: "3px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.02)",
+                  whiteSpace: "nowrap"
+                }}
+                title="Drawback Scroll No & Date"
+              >
+                <span style={{ fontSize: "10px" }}>💰</span>
+                <span>DBK: {dbk.no} {dbk.date ? `(${formatDate(dbk.date)})` : ""}</span>
+              </Box>
+            ))}
+
+            {rosctlScrolls.map((ros, rIdx) => (
+              <Box
+                key={`ros-${rIdx}`}
+                sx={{
+                  marginTop: "4px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontSize: "9px",
+                  fontWeight: "700",
+                  color: "#6d28d9",
+                  backgroundColor: "#f5f3ff",
+                  border: "1px solid #ede9fe",
+                  display: "flex",
+                  alignItems: "center",
+                  width: "fit-content",
+                  gap: "3px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.02)",
+                  whiteSpace: "nowrap"
+                }}
+                title="RoSCTL Scroll No & Date"
+              >
+                <span style={{ fontSize: "10px" }}>🏷️</span>
+                <span>RoSCTL: {ros.no} {ros.date ? `(${formatDate(ros.date)})` : ""}</span>
+              </Box>
+            ))}
+
+            {(egmNo || egmDate) && (
               <Box
                 sx={{
                   marginTop: "4px",
@@ -1213,7 +1367,7 @@ function CExportDSR() {
                 title="EGM No & Date"
               >
                 <span style={{ fontSize: "10px" }}>✈️</span>
-                <span>EGM: {job.egm_no || "N/A"} {job.egm_date ? `(${formatDate(job.egm_date)})` : ""}</span>
+                <span>EGM: {egmNo || "N/A"} {egmDate ? `(${formatDate(egmDate)})` : ""}</span>
               </Box>
             )}
 
@@ -1303,58 +1457,106 @@ function CExportDSR() {
         );
 
       case "invoice": {
-        const inv = job.invoices?.[0] || {};
+        const invoicesList = Array.isArray(job.invoices) && job.invoices.length > 0
+          ? job.invoices.filter((inv) => inv.invoiceNumber || inv.invoiceNo || inv.invoiceDate || inv.invoiceValue)
+          : (job.invoiceNumber || job.invoice_no)
+            ? [{ invoiceNumber: job.invoiceNumber || job.invoice_no, invoiceDate: job.invoiceDate || job.invoice_date, termsOfInvoice: job.termsOfInvoice, currency: job.currency, invoiceValue: job.invoiceValue, products: job.products }]
+            : [];
+
+        const key = job._id || job.job_no;
+        const isExpanded = !!expandedInvoices[key];
+        const visibleInvoices = isExpanded ? invoicesList : invoicesList.slice(0, 3);
+        const hiddenCount = invoicesList.length - visibleInvoices.length;
+
         return (
           <TableCell style={cellStyle}>
-            {inv.invoiceNumber ? (
-              <>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#0f172a" }}>
-                    {inv.invoiceNumber}
-                  </Typography>
-                  <IconButton size="small" onClick={(e) => handleCopyText(inv.invoiceNumber, e)} sx={{ p: 0.2 }}>
-                    <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
-                  </IconButton>
-                </Box>
-                <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
-                  {formatDate(inv.invoiceDate)}
-                </Typography>
-                <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.5 }}>
-                  <span style={{ color: "#64748b", fontWeight: 700 }}>{inv.termsOfInvoice}</span>{" "}
-                  <span style={{ fontWeight: 800 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
-                </Typography>
-                {(() => {
-                  const product = inv.products?.[0] || {};
-                  const drawback = product.drawbackDetails?.[0] || {};
-                  const scheme = product.eximCode || job.scheme || "";
-                  const drawback_scroll_no = drawback.drawback_scroll_no || inv.drawback_scroll_no || "";
-                  const drawback_scroll_date = drawback.drawback_scroll_date || inv.drawback_scroll_date || "";
-                  const rosctl_scroll_no = drawback.rosctl_scroll_no || inv.rosctl_scroll_no || "";
-                  const rosctl_scroll_date = drawback.rosctl_scroll_date || inv.rosctl_scroll_date || "";
+            {invoicesList.length > 0 ? (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {visibleInvoices.map((inv, invIdx) => (
+                  <Box
+                    key={invIdx}
+                    sx={{
+                      pb: invIdx < visibleInvoices.length - 1 ? 0.8 : 0,
+                      borderBottom: invIdx < visibleInvoices.length - 1 ? "1px dashed #cbd5e1" : "none"
+                    }}
+                  >
+                    {(inv.invoiceNumber || inv.invoiceNo) ? (
+                      <>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#0f172a" }}>
+                            {inv.invoiceNumber || inv.invoiceNo}
+                          </Typography>
+                          <IconButton size="small" onClick={(e) => handleCopyText(inv.invoiceNumber || inv.invoiceNo, e)} sx={{ p: 0.2 }}>
+                            <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                          </IconButton>
+                        </Box>
+                        {inv.invoiceDate && (
+                          <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
+                            {formatDate(inv.invoiceDate)}
+                          </Typography>
+                        )}
+                        {(inv.termsOfInvoice || inv.currency || inv.invoiceValue) && (
+                          <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.2 }}>
+                            {inv.termsOfInvoice && <span style={{ color: "#64748b", fontWeight: 700 }}>{inv.termsOfInvoice} </span>}
+                            <span style={{ fontWeight: 800 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
+                          </Typography>
+                        )}
+                        {(() => {
+                          const product = inv.products?.[0] || {};
+                          const drawback = product.drawbackDetails?.[0] || {};
+                          const scheme = product.eximCode || inv.eximCode || job.scheme || "";
+                          const { dbkScrolls, rosctlScrolls } = getJobScrollAndEgmInfo(job);
+                          const drawback_scroll_no = drawback.drawback_scroll_no || inv.drawback_scroll_no || (invIdx === 0 ? dbkScrolls[0]?.no : "") || "";
+                          const drawback_scroll_date = drawback.drawback_scroll_date || inv.drawback_scroll_date || (invIdx === 0 ? dbkScrolls[0]?.date : "") || "";
+                          const rosctl_scroll_no = drawback.rosctl_scroll_no || inv.rosctl_scroll_no || (invIdx === 0 ? rosctlScrolls[0]?.no : "") || "";
+                          const rosctl_scroll_date = drawback.rosctl_scroll_date || inv.rosctl_scroll_date || (invIdx === 0 ? rosctlScrolls[0]?.date : "") || "";
 
-                  return (
-                    <>
-                      {scheme && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.5 }}>
-                          Scheme: <span style={{ fontWeight: 600, color: "#0f172a" }}>{scheme}</span>
-                        </Typography>
-                      )}
-                      {drawback_scroll_no && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
-                          DBK Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{drawback_scroll_no}</span>
-                          {drawback_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(drawback_scroll_date)})</span>}
-                        </Typography>
-                      )}
-                      {rosctl_scroll_no && (
-                        <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
-                          RoSCTL Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{rosctl_scroll_no}</span>
-                          {rosctl_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(rosctl_scroll_date)})</span>}
-                        </Typography>
-                      )}
-                    </>
-                  );
-                })()}
-              </>
+                          return (
+                            <>
+                              {scheme && (
+                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.3 }}>
+                                  Scheme: <span style={{ fontWeight: 600, color: "#0f172a" }}>{scheme}</span>
+                                </Typography>
+                              )}
+                              {drawback_scroll_no && (
+                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                                  DBK Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{drawback_scroll_no}</span>
+                                  {drawback_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(drawback_scroll_date)})</span>}
+                                </Typography>
+                              )}
+                              {rosctl_scroll_no && (
+                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                                  RoSCTL Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{rosctl_scroll_no}</span>
+                                  {rosctl_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(rosctl_scroll_date)})</span>}
+                                </Typography>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </>
+                    ) : (
+                      <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
+                    )}
+                  </Box>
+                ))}
+
+                {hiddenCount > 0 && (
+                  <span
+                    onClick={(e) => toggleInvoices(e, key)}
+                    style={{ fontSize: "9px", color: "#b45309", fontWeight: 800, cursor: "pointer", textDecoration: "underline", marginTop: "2px" }}
+                  >
+                    Show {hiddenCount} more
+                  </span>
+                )}
+                {isExpanded && invoicesList.length > 3 && (
+                  <span
+                    onClick={(e) => toggleInvoices(e, key)}
+                    style={{ fontSize: "9px", color: "#475569", fontWeight: 800, cursor: "pointer", textDecoration: "underline", marginTop: "2px" }}
+                  >
+                    Show less
+                  </span>
+                )}
+              </Box>
             ) : (
               <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
             )}
@@ -1472,13 +1674,30 @@ function CExportDSR() {
                         </IconButton>
                       </Box>
                       {(() => {
-                        const size = container.container_size || container.containerSize || container.size || container.isoCode || job.container_size || "";
-                        const type = container.container_type || container.containerType || container.type || job.container_type || "";
-                        const text = [size, type].filter(Boolean).join(" ");
-                        if (!text) return null;
+                        const rawSize = (container.container_size || container.containerSize || container.size || job.container_size || "").toString();
+                        const rawType = (container.container_type || container.containerType || container.type || job.container_type || "").toString();
+
+                        const cleanSize = rawSize.replace(/\b\d{4}\b/g, "").trim();
+                        const cleanType = rawType.replace(/\b\d{4}\b/g, "").trim();
+
+                        let badgeText = "";
+                        if (cleanSize && cleanType) {
+                          if (cleanType.toUpperCase().includes(cleanSize.toUpperCase())) {
+                            badgeText = cleanType;
+                          } else if (cleanSize.toUpperCase().includes(cleanType.toUpperCase())) {
+                            badgeText = cleanSize;
+                          } else {
+                            badgeText = `${cleanSize} ${cleanType}`;
+                          }
+                        } else {
+                          badgeText = cleanSize || cleanType;
+                        }
+                        badgeText = badgeText.replace(/\s+/g, " ").trim();
+
+                        if (!badgeText) return null;
                         return (
                           <span style={{ fontSize: "8px", fontWeight: 900, backgroundColor: "#e2e8f0", padding: "0 6px", borderRadius: "2px" }}>
-                            {text.toUpperCase()}
+                            {badgeText.toUpperCase()}
                           </span>
                         );
                       })()}
@@ -1487,9 +1706,11 @@ function CExportDSR() {
                 ))
               ) : (
                 (() => {
-                  const size = job.container_size || job.containerSize || "";
-                  const type = job.container_type || job.containerType || "";
-                  const text = [size, type].filter(Boolean).join(" ");
+                  const rawSize = (job.container_size || job.containerSize || "").toString();
+                  const rawType = (job.container_type || job.containerType || "").toString();
+                  const cleanSize = rawSize.replace(/\b\d{4}\b/g, "").trim();
+                  const cleanType = rawType.replace(/\b\d{4}\b/g, "").trim();
+                  let text = [cleanSize, cleanType].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
                   if (text) {
                     return (
                       <span style={{ fontSize: "9px", fontWeight: 700, backgroundColor: "#f1f5f9", padding: "2px 6px", borderRadius: "3px", color: "#334155" }}>
@@ -1537,45 +1758,81 @@ function CExportDSR() {
 
       case "handover": {
         const opDetails = job.operations?.[0]?.statusDetails?.[0] || {};
+        const isLcl = job.consignmentType === "LCL";
+        const isAir = job.transportMode?.toUpperCase() === "AIR" || job.job_no?.toUpperCase().includes("/AIR/");
+        const showRailRoad = !isLcl && !isAir;
         const isRoad = opDetails.railRoad === "road";
-        const railOutVal = opDetails.handoverConcorTharSanganaRailRoadDate 
+        const outLbl = isRoad ? "ROAD OUT" : "RAIL OUT";
+        const reachedLbl = isRoad ? "ROAD RCH" : "RAIL RCH";
+
+        const railOutVal = opDetails.handoverConcorTharSanganaRailRoadDate
           || (opDetails.railOutReachedDate ? getPreviousDayDate(opDetails.railOutReachedDate) : null);
 
-        const milestoneItems = [
-          { label: "LEO", val: opDetails.leoDate ? formatDate(opDetails.leoDate) : null },
-          { label: "VGM", val: job.vgm_date ? formatDate(job.vgm_date) : null },
-          { label: "F-13", val: job.form13_date ? formatDate(job.form13_date) : null },
-          { label: "ESB", val: job.shipping_bill_done_date ? formatDate(job.shipping_bill_done_date) : null },
-          { label: "STUFFING", val: opDetails.stuffingDate ? formatDate(opDetails.stuffingDate) : null },
-          { label: "DHO", val: opDetails.handoverForwardingNoteDate ? formatDate(opDetails.handoverForwardingNoteDate) : null },
-          { label: isRoad ? "ROAD OUT" : "RAIL OUT", val: railOutVal ? formatDate(railOutVal) : null },
-          { label: isRoad ? "ROAD RCH" : "RAIL RCH", val: opDetails.railOutReachedDate ? formatDate(opDetails.railOutReachedDate) : null },
-        ];
+        const milestoneItems = [];
+
+        if (opDetails.leoDate) {
+          milestoneItems.push({ label: "LEO", val: formatDate(opDetails.leoDate) });
+        }
+        if (job.vgm_date) {
+          milestoneItems.push({ label: "VGM", val: formatDate(job.vgm_date) });
+        }
+        if (job.form13_date) {
+          milestoneItems.push({ label: "F-13", val: formatDate(job.form13_date) });
+        }
+        if (job.shipping_bill_done_date) {
+          milestoneItems.push({ label: "ESB", val: formatDate(job.shipping_bill_done_date) });
+        }
+        if (opDetails.stuffingDate) {
+          milestoneItems.push({ label: "STUFFING", val: formatDate(opDetails.stuffingDate) });
+        }
+        if (opDetails.handoverForwardingNoteDate) {
+          milestoneItems.push({ label: "DHO", val: formatDate(opDetails.handoverForwardingNoteDate) });
+        }
+        if (showRailRoad) {
+          if (railOutVal) {
+            milestoneItems.push({ label: outLbl, val: formatDate(railOutVal) });
+          }
+          if (opDetails.railOutReachedDate) {
+            milestoneItems.push({ label: reachedLbl, val: formatDate(opDetails.railOutReachedDate) });
+          }
+        }
+        if (opDetails.billing_details?.agency_bill_date) {
+          milestoneItems.push({ label: "BILL (A)", val: formatDate(opDetails.billing_details.agency_bill_date) });
+        }
+        if (opDetails.billing_details?.reimbursement_bill_date) {
+          milestoneItems.push({ label: "BILL (R)", val: formatDate(opDetails.billing_details.reimbursement_bill_date) });
+        }
+        if (!opDetails.billing_details?.agency_bill_date && !opDetails.billing_details?.reimbursement_bill_date && opDetails.billingDocsSentDt) {
+          milestoneItems.push({ label: "BILL", val: formatDate(opDetails.billingDocsSentDt) });
+        }
+
         return (
           <TableCell style={cellStyle}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.4 }}>
-              {milestoneItems.map((m, mIdx) => (
-                <Box
-                  key={mIdx}
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%",
-                    gap: "12px",
-                    fontFamily: "'Inter', sans-serif"
-                  }}
-                >
-                  <span style={{ fontSize: "9px", fontWeight: "800", color: m.val ? "#64748b" : "#94a3b8" }}>
-                    {m.label}
-                  </span>
-                  {m.val && (
+              {milestoneItems.length > 0 ? (
+                milestoneItems.map((m, mIdx) => (
+                  <Box
+                    key={mIdx}
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      width: "100%",
+                      gap: "12px",
+                      fontFamily: "'Inter', sans-serif"
+                    }}
+                  >
+                    <span style={{ fontSize: "9px", fontWeight: "800", color: "#64748b" }}>
+                      {m.label}
+                    </span>
                     <span style={{ fontSize: "10px", fontWeight: "800", color: "#1e293b", fontFamily: "'Inter', sans-serif" }}>
                       {m.val}
                     </span>
-                  )}
-                </Box>
-              ))}
+                  </Box>
+                ))
+              ) : (
+                <span style={{ color: "#94a3b8", fontSize: "10px" }}>-</span>
+              )}
             </Box>
           </TableCell>
         );
@@ -3087,18 +3344,18 @@ function CExportDSR() {
                               boxShadow: "0 1px 3px rgba(0,0,0,0.15)"
                             }}
                           >
-                          {queryChatSending ? (
-                            <CircularProgress size={16} color="inherit" />
-                          ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="22" y1="2" x2="11" y2="13"></line>
-                              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                          )}
-                        </button>
+                            {queryChatSending ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
+                    ) : (
                       <div style={{
                         backgroundColor: "#d1fae5",
                         color: "#065f46",
