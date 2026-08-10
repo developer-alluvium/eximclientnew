@@ -616,7 +616,10 @@ function EwayBillGenerate({
           }
           
           // Trigger the full external fetch with the details from PR
-          handleBoeFetch(docNo, docDate);
+          // Skip if boeData is already provided (Others E-Way Bill flow — data already parsed)
+          if (!boeData) {
+            handleBoeFetch(docNo, docDate);
+          }
         } else if (prefilledLrId && !boeOnly) {
           // Switch to LR tab (only when not BOE-only mode)
           setActiveTab('lr');
@@ -1430,7 +1433,8 @@ function EwayBillGenerate({
       // Prefill BOE number and date fields in UI
       const boeDetail = boeData.data || boeData;
       const invoiceDetails = boeDetail.InvoiceAndItemDetails || {};
-      const docNo = invoiceDetails.BE_NO || invoiceDetails.document_no || boeData.documentNumber || "";
+      const docNo = invoiceDetails.BE_NO || invoiceDetails.document_no || boeData.documentNumber
+        || boeDetail?.ImporterDetails?.['BE No'] || "";
       if (docNo) {
         setBoeNumber(docNo);
       }
