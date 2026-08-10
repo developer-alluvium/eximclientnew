@@ -269,6 +269,13 @@ export const proxyImportListing = async (req, res) => {
       jobs = jobs.filter((j) => {
         const jIec = (j.ie_code_no || "").toUpperCase().trim();
         if (jIec && allowedIECodes.has(jIec)) {
+          const assignment = ieCodeAssignments.find((a) => a.ie_code_no.toUpperCase().trim() === jIec);
+          if (assignment && assignment.exporter_filter) {
+            const filterKeyword = assignment.exporter_filter.toLowerCase().trim();
+            const jImporter = (j.importer || j.importer_name || "").toLowerCase();
+            const jAddress = (typeof j.importer_address === 'string' ? j.importer_address : JSON.stringify(j.importer_address || {})).toLowerCase();
+            return jImporter.includes(filterKeyword) || jAddress.includes(filterKeyword);
+          }
           return true;
         }
 

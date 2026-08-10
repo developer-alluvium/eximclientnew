@@ -236,6 +236,7 @@ const AdminManagement = ({ onRefresh }) => {
   // Remove mode: track which module to remove from ('import' | 'export' | 'both')
   const [removeModule, setRemoveModule] = useState('both'); // 'import' | 'export' | 'both'
   const [ieCodeReason, setIeCodeReason] = useState("");
+  const [exporterFilterInput, setExporterFilterInput] = useState("");
   const [ieCodeMode, setIeCodeMode] = useState("assign_import"); // 'assign_import', 'assign_export', 'remove'
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   // Export-specific IEC codes from the Export API directory
@@ -502,6 +503,7 @@ const AdminManagement = ({ onRefresh }) => {
           ieCodes: codes,
           module: isExport ? "export" : "import",
           reason: ieCodeReason,
+          exporterFilter: exporterFilterInput,
         }, config);
 
         if (response.data.success) {
@@ -514,6 +516,7 @@ const AdminManagement = ({ onRefresh }) => {
       setSelectedIeCodes([]);
       setSelectedExporterIeCodes([]);
       setIeCodeReason("");
+      setExporterFilterInput("");
       setIeCodeMode("assign_import");
     } catch (error) {
       console.error("Error assigning/removing IE code:", error);
@@ -1812,7 +1815,7 @@ const AdminManagement = ({ onRefresh }) => {
                         </Box>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, pl: 1.5 }}>
                           {actionsMenuUser.ie_code_assignments.map((a) => (
-                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" color="primary" sx={{ fontSize: "0.72rem", fontWeight: 500 }} />
+                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}${a.exporter_filter ? ` (Filter: ${a.exporter_filter})` : ""}`} size="small" variant="outlined" color="primary" sx={{ fontSize: "0.72rem", fontWeight: 500 }} />
                           ))}
                         </Box>
                       </Box>
@@ -1827,7 +1830,7 @@ const AdminManagement = ({ onRefresh }) => {
                         </Box>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, pl: 1.5 }}>
                           {actionsMenuUser.exporter_ie_code_assignments.map((a) => (
-                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}`} size="small" variant="outlined" sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669" }} />
+                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}${a.exporter_filter ? ` (Filter: ${a.exporter_filter})` : ""}`} size="small" variant="outlined" sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669" }} />
                           ))}
                         </Box>
                       </Box>
@@ -1982,6 +1985,15 @@ const AdminManagement = ({ onRefresh }) => {
                   </Box>
                 )}
                 
+                {ieCodeMode !== "remove" && (
+                  <Box>
+                    <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Sub-Branch / Exporter Filter <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional, e.g. TERRY TOWELS)</Typography>
+                    </Typography>
+                    <TextField fullWidth size="small" placeholder="Filter jobs by exporter name/address keyword..." value={exporterFilterInput} onChange={(e) => setExporterFilterInput(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                  </Box>
+                )}
+
                 <Box>
                   <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Reason <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</Typography>

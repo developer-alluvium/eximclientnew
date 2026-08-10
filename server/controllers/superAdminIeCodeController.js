@@ -9,7 +9,7 @@ import axios from "axios";
 export const assignAdditionalIeCode = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { ieCodes, reason, module: moduleType } = req.body;
+    const { ieCodes, reason, module: moduleType, exporterFilter } = req.body;
     // moduleType: 'import' (default) or 'export'
     const isExport = moduleType === 'export';
 
@@ -100,6 +100,7 @@ export const assignAdditionalIeCode = async (req, res) => {
       const newAssignment = {
         ie_code_no: ieCodeNo.toUpperCase(),
         importer_name: importerName,
+        exporter_filter: exporterFilter ? exporterFilter.trim() : null,
         assigned_at: new Date(),
         assigned_by: req.user._id,
         assigned_by_model: "SuperAdmin",
@@ -391,6 +392,69 @@ export const bulkAssignAdditionalIeCodes = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to bulk assign additional IE code.",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * PUT /api/superadmin/users/:userId/ie-codes/filter
+ * Updates the exporter_filter (sub-branch filter) on an assigned IE code for a user.
+ */
+export const updateIeCodeFilter = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { ieCode, exporterFilter, module: moduleType } = req.body;
+
+    if (!ieCode) {
+      return res.status(400).json({ success: false, message: "IE code is required." });
+    }
+
+    const user = await EximclientUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const targetCode = ieCode.trim().toUpperCase();
+    const isExport = moduleType === "export";
+    const assignmentField = isExport ? "exporter_ie_code_assignments" : "ie_code_assignments";
+
+    let assignment = (user[assignmentField] || []).find(
+      (a) => a.ie_code_no && a.ie_code_no.trim().toUpperCase() === targetCode
+    );
+
+    // If not found in specified array, fallback to check the other array
+    if (!assignment) {
+      const otherField = isExport ? "ie_code_assignments" : "exporter_ie_code_assignments";
+      assignment = (user[otherField] || []).find(
+        (a) => a.ie_code_no && a.ie_code_no.trim().toUpperCase() === targetCode
+      );
+    }
+
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        message: `IE Code ${targetCode} is not assigned to this user.`,
+      });
+    }
+
+    assignment.exporter_filter = exporterFilter ? exporterFilter.trim() : null;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: `Exporter filter updated for IE code ${targetCode}`,
+      data: {
+        ie_code_no: assignment.ie_code_no,
+        importer_name: assignment.importer_name,
+        exporter_filter: assignment.exporter_filter,
+      },
+    });
+  } catch (error) {
+    console.error("Update IE code filter error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update IE code filter.",
       error: error.message,
     });
   }

@@ -128,6 +128,19 @@ export const proxyExportListing = async (req, res) => {
       pendingQueries,
     };
 
+const getExporterFilterFromAssignments = (ieCodeAssignments, requestedIeCode, requestedExporter) => {
+  if (requestedExporter) return requestedExporter;
+  if (!ieCodeAssignments || ieCodeAssignments.length === 0) return "";
+  
+  if (requestedIeCode && requestedIeCode !== "all") {
+    const target = ieCodeAssignments.find((a) => a.ie_code_no === requestedIeCode);
+    return target?.exporter_filter || "";
+  }
+  
+  const filters = ieCodeAssignments.map((a) => a.exporter_filter).filter(Boolean);
+  return filters.length > 0 ? filters.join(",") : "";
+};
+
     // Check if the user has assigned exporters (both Admin and Client User roles can have assignments)
     if (ieCodeAssignments.length > 0) {
       const ieCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
@@ -137,6 +150,11 @@ export const proxyExportListing = async (req, res) => {
       } else {
         // Default: combined data of all assigned exporters
         forwardParams.ieCode = ieCodes.join(",");
+      }
+
+      const defaultExporterFilter = getExporterFilterFromAssignments(ieCodeAssignments, ieCode, exporter);
+      if (defaultExporterFilter) {
+        forwardParams.exporter = defaultExporterFilter;
       }
     } else {
       // Regular users with no IE code assignments get empty result immediately
@@ -265,6 +283,13 @@ export const proxyExportFilterOptions = async (req, res) => {
       });
     }
 
+    if (ieCodeAssignments.length > 0) {
+      const assignedExporterFilter = getExporterFilterFromAssignments(ieCodeAssignments, ieCode, "");
+      if (assignedExporterFilter) {
+        forwardParams.exporter = assignedExporterFilter;
+      }
+    }
+
     const exportFilterUrl = `${EXPORT_API_BASE_URL}/operation-jobs-filters`;
 
     const response = await axios.get(exportFilterUrl, {
@@ -359,6 +384,11 @@ export const proxyExportTabCounts = async (req, res) => {
         forwardParams.ieCode = ieCode;
       } else {
         forwardParams.ieCode = ieCodes.join(",");
+      }
+
+      const assignedExporterFilter = getExporterFilterFromAssignments(ieCodeAssignments, ieCode, exporter);
+      if (assignedExporterFilter) {
+        forwardParams.exporter = assignedExporterFilter;
       }
     } else if (!isAdmin) {
       return res.json({
