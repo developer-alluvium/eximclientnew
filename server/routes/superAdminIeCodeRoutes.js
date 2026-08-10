@@ -3,7 +3,8 @@ import {
   assignAdditionalIeCode,
   removeIeCodeFromUser,
   listUserIeCodes,
-  bulkAssignAdditionalIeCodes
+  bulkAssignAdditionalIeCodes,
+  updateIeCodeFilter
 } from '../controllers/superAdminIeCodeController.js';
 import {
   assignBranchAccess,
@@ -19,6 +20,7 @@ router.use(authorize('superadmin'));
 
 // Single user IE code management
 router.post('/users/:userId/ie-codes', assignAdditionalIeCode);
+router.put('/users/:userId/ie-codes/filter', updateIeCodeFilter);
 router.delete('/users/:userId/ie-codes/remove-ie-codes', removeIeCodeFromUser);
 router.get('/users/:userId/ie-codes', listUserIeCodes);
 router.post('/users/:userId/branch-access', assignBranchAccess);

@@ -14,6 +14,11 @@ const ieCodeAssignmentSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  exporter_filter: {
+    type: String,
+    trim: true,
+    default: null
+  },
   assigned_at: {
     type: Date,
     required: true,
