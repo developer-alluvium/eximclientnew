@@ -303,7 +303,7 @@ function EwayBillGenerate({
   const [selectedBoe, setSelectedBoe] = useState(null); // selected from autocomplete
   const [boeNumber, setBoeNumber] = useState('');
   const [boeDate, setBoeDate] = useState(new Date().toISOString().split('T')[0]);
-  const [boeLoading, setBoeLoading] = useState(!!prefilledDocNo);
+  const [boeLoading, setBoeLoading] = useState(!!prefilledDocNo && !boeData);
   const [boeLrLoading, setBoeLrLoading] = useState(false); // loading for internal LR lookup
   const [boeLrData, setBoeLrData] = useState(null); // internal LR data fetched on BOE select
   const [boeError, setBoeError] = useState('');
@@ -1429,6 +1429,7 @@ function EwayBillGenerate({
     if (boeData) {
       console.log("ℹ️ [Others EWB] Prefilling form from boeData prop:", boeData);
       populateFromBoe(boeData);
+      setBoeLoading(false); // boeData already parsed — no external fetch needed
       
       // Prefill BOE number and date fields in UI
       const boeDetail = boeData.data || boeData;
