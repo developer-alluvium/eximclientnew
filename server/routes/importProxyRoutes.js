@@ -29,7 +29,10 @@ import {
   getDgftRegisters,
   getAuthorizationsByIec,
   getAuthorizationByNo,
-  getLicenseUtilizationRecords
+  getLicenseUtilizationRecords,
+  getRodteps,
+  getRodtepsByIec,
+  getRodtepUtilizationProxy
 } from "../controllers/importProxyController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -105,5 +108,8 @@ router.get("/api/get-dgft-registers", authenticateUser, getDgftRegisters);
 router.get("/api/get-authorizations-by-iec", authenticateUser, getAuthorizationsByIec);
 router.get("/api/get-authorization-by-no", authenticateUser, getAuthorizationByNo);
 router.get("/api/license-utilization/records", authenticateUser, getLicenseUtilizationRecords);
+router.get("/api/get-rodteps", authenticateUser, getRodteps);
+router.get("/api/get-rodteps-by-iec", authenticateUser, getRodtepsByIec);
+router.get("/api/get-rodtep-utilization", authenticateUser, getRodtepUtilizationProxy);
 
 export default router;

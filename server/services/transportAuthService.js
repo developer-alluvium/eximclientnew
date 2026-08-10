@@ -21,16 +21,12 @@ class TransportAuthService {
 
                 if (isTransportApi) {
                     config.headers = config.headers || {};
+                    const apiKey = process.env.TRANSPORT_API_KEY || "1234567890";
 
-                    // Axios 1.x Hotfix: Use .set() if available, otherwise fallback
                     if (typeof config.headers.set === 'function') {
-                        config.headers.set("x-api-key", process.env.YOUR_SHARED_API_KEY_HERE);
-                        config.headers.delete("Authorization");
-                        config.headers.delete("authorization");
+                        config.headers.set("x-api-key", apiKey);
                     } else {
-                        config.headers["x-api-key"] = process.env.YOUR_SHARED_API_KEY_HERE;
-                        delete config.headers.Authorization;
-                        delete config.headers.authorization;
+                        config.headers["x-api-key"] = apiKey;
                     }
                 }
                 return config;

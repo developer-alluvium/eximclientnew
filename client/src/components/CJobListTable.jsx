@@ -29,6 +29,7 @@ const CJobListTable = ({
     'container_details': 220,
     'container_numbers': 220,
     'movement_timeline': 300,
+    'query': 140,
   };
 
   // Enhance columns with visibility and ordering logic

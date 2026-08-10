@@ -821,7 +821,85 @@ const JobDetailsPanel = ({
               />
               <DetailField
                 label="Total Invoice Value"
-                value={`$ ${jobData.total_inv_value || "0.00"}`}
+                value={`${jobData?.inv_currency || "$"} ${(() => {
+                  let invDetails = jobData?.invoice_details;
+                  if (typeof invDetails === "string") {
+                    try { invDetails = JSON.parse(invDetails); } catch (e) {}
+                  }
+                  if (Array.isArray(invDetails) && invDetails.length > 0) {
+                    const sumPV = invDetails.reduce((sum, r) => {
+                      const pv = parseFloat(r.product_value || r.amount);
+                      if (!isNaN(pv) && pv > 0) return sum + pv;
+                      return sum;
+                    }, 0);
+                    if (sumPV > 0) return sumPV.toFixed(2);
+                  }
+
+                  const topPV = parseFloat(jobData?.product_value);
+                  if (!isNaN(topPV) && topPV > 0) return topPV.toFixed(2);
+
+                  let descDetails = jobData?.description_details;
+                  if (typeof descDetails === "string") {
+                    try { descDetails = JSON.parse(descDetails); } catch (e) {}
+                  }
+                  if (Array.isArray(descDetails) && descDetails.length > 0) {
+                    const sumDesc = descDetails.reduce((sum, d) => {
+                      const amt = parseFloat(d.amount);
+                      if (!isNaN(amt) && amt > 0) return sum + amt;
+                      const up = parseFloat(d.unit_price);
+                      const qty = parseFloat(d.quantity);
+                      if (!isNaN(up) && up > 0 && !isNaN(qty) && qty > 0) return sum + (up * qty);
+                      return sum;
+                    }, 0);
+                    if (sumDesc > 0) return sumDesc.toFixed(2);
+                  }
+
+                  return jobData?.product_value || "0.00";
+                })()}`}
+              />
+              <DetailField
+                label="PO Number"
+                value={(() => {
+                  const extractPo = (val, defaultDate) => {
+                    if (!val) return null;
+                    if (typeof val === "string" || typeof val === "number") {
+                      const s = String(val).trim();
+                      if (!s || s === "[object Object]") return null;
+                      return defaultDate ? `${s} (${defaultDate})` : s;
+                    }
+                    if (Array.isArray(val)) {
+                      const extracted = val.map(item => extractPo(item, defaultDate)).filter(Boolean);
+                      return extracted.length > 0 ? extracted.join(", ") : null;
+                    }
+                    if (typeof val === "object") {
+                      const num = val.po_no || val.po_number || val.po_num || val.poNo || val.poNumber || val.po || val.number;
+                      const dt = val.po_date || val.poDate || val.date || defaultDate;
+                      if (num) return extractPo(num, dt);
+                    }
+                    return null;
+                  };
+
+                  const pos = [];
+                  const topPo = extractPo(jobData?.po_details) || 
+                                extractPo(jobData?.po_no || jobData?.po_number || jobData?.po_num || jobData?.poNo || jobData?.poNumber || jobData?.po, jobData?.po_date || jobData?.poDate);
+                  if (topPo) pos.push(topPo);
+
+                  let invoices = jobData?.invoice_details;
+                  if (typeof invoices === "string") {
+                    try { invoices = JSON.parse(invoices); } catch (e) {}
+                  }
+                  if (Array.isArray(invoices)) {
+                    invoices.forEach(inv => {
+                      if (!inv) return;
+                      const invPo = extractPo(inv.po_details) || 
+                                    extractPo(inv.po_no || inv.po_number || inv.po_num || inv.poNo || inv.poNumber || inv.po, inv.po_date || inv.poDate);
+                      if (invPo) pos.push(invPo);
+                    });
+                  }
+
+                  const uniquePos = [...new Set(pos)].filter(p => p && p !== "[object Object]");
+                  return uniquePos.length > 0 ? uniquePos.join(", ") : "N/A";
+                })()}
               />
               <DetailField
                 label="Exchange Rate"

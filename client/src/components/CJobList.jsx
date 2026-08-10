@@ -79,6 +79,9 @@ function CJobList(props) {
         selectedContainer,
         selectedJob,
         modalInitialTab,
+        renderQueryModals,
+        fetchQueryStatusForJobs,
+        sortJobsByQueryPriority,
     } = useCustomerJobList(detailedStatus, () => fetchJobsData(currentPage));
 
     // Premium status themes — inspired by ExportJobsTable
@@ -273,6 +276,14 @@ function CJobList(props) {
         getYears();
     }, []); // Run once
 
+    // Fetch client query statuses for loaded jobs
+    useEffect(() => {
+        if (rows && rows.length > 0) {
+            const jobNos = rows.map(r => r.job_no).filter(Boolean);
+            fetchQueryStatusForJobs(jobNos);
+        }
+    }, [rows, fetchQueryStatusForJobs]);
+
     // Handle column order change from table
     const handleColumnOrderChange = (newOrder) => {
         setColumnOrder(newOrder);
@@ -420,7 +431,7 @@ function CJobList(props) {
             {/* Table Content */}
             <div className="jobs-list-content">
                 <CJobListTable
-                    data={rows}
+                    data={sortJobsByQueryPriority(rows)}
                     columns={columns}
                     columnOrder={columnOrder}
                     setColumnOrder={handleColumnOrderChange}
@@ -443,6 +454,7 @@ function CJobList(props) {
             </div>
 
             {/* Render Modals returned by hook */}
+            {renderQueryModals && renderQueryModals()}
 
             <ContainerModal
                 open={containerModalOpen}

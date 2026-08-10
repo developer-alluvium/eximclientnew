@@ -146,8 +146,9 @@ export const proxyImportListing = async (req, res) => {
 
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
     const ieCodeAssignments = dbUser.ie_code_assignments || [];
+    const shouldFilterByIE = ieCodeAssignments.length > 0;
 
-    if (!isAdmin && ieCodeAssignments.length === 0) {
+    if (!isAdmin && !shouldFilterByIE) {
       return res.json({
         message: "No importer assigned. Please contact your administrator.",
         data: [],
@@ -166,17 +167,8 @@ export const proxyImportListing = async (req, res) => {
       exporter,
     };
 
-    if (isAdmin) {
-      if (importer && importer.toLowerCase() !== "all") {
-        forwardParams.importer = importer;
-      }
-      const clientIeCodes = req.query.ieCodes || req.query.ie_codes;
-      if (clientIeCodes) {
-        forwardParams.ieCodes = clientIeCodes;
-        forwardParams.ie_codes = clientIeCodes;
-      }
-    } else {
-      // Non-admins: restrict to their assigned IE codes and importer names
+    if (shouldFilterByIE) {
+      // Restrict to assigned IE codes and importer names (for non-admins or admins with assignments)
       const assignedIECodes = ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()).filter(Boolean);
       const requestedIECodes = (req.query.ieCodes || req.query.ie_codes || "")
         .split(",")
@@ -208,6 +200,16 @@ export const proxyImportListing = async (req, res) => {
         } else {
           forwardParams.importer = "unauthorized_importer_placeholder";
         }
+      }
+    } else {
+      // Admins without explicit IE code assignments can view all
+      if (importer && importer.toLowerCase() !== "all") {
+        forwardParams.importer = importer;
+      }
+      const clientIeCodes = req.query.ieCodes || req.query.ie_codes;
+      if (clientIeCodes) {
+        forwardParams.ieCodes = clientIeCodes;
+        forwardParams.ie_codes = clientIeCodes;
       }
     }
 
@@ -257,8 +259,8 @@ export const proxyImportListing = async (req, res) => {
 
     let jobs = response.data?.data || [];
 
-    // Filter by assigned IE codes for regular users
-    if (!isAdmin) {
+    // Filter by assigned IE codes when assignments exist (for non-admins or admins with assigned IE codes)
+    if (shouldFilterByIE) {
       const allowedIECodes = new Set(ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()));
       const allowedImporterNames = new Set(
         ieCodeAssignments.map((a) => formatImporter(a.importer_name)).filter(Boolean)
@@ -329,6 +331,78 @@ export const proxyImportListing = async (req, res) => {
     const startIndex = (currentPageNum - 1) * itemsPerPage;
     const paginatedJobs = jobs.slice(startIndex, startIndex + itemsPerPage);
 
+    // Enrich paginated jobs with product_value, invoice_details, and description_details from MongoDB if missing
+    if (paginatedJobs.length > 0) {
+      try {
+        const jobIds = paginatedJobs.map((j) => j._id).filter(Boolean);
+        const objectIds = jobIds.map((id) => {
+          try {
+            return typeof id === "string" && id.length === 24 ? new mongoose.Types.ObjectId(id) : id;
+          } catch (e) {
+            return id;
+          }
+        });
+
+        const jobsCol = mongoose.connection.db.collection("jobs");
+        const dbJobs = await jobsCol
+          .find(
+            { $or: [{ _id: { $in: objectIds } }, { _id: { $in: jobIds } }, { job_no: { $in: paginatedJobs.map((j) => j.job_no).filter(Boolean) } }] },
+            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1, po_no: 1, po_number: 1, po_date: 1, po_details: 1, reason_for_delay: 1, reasonForDelay: 1, delay_reason: 1, delayReason: 1, reason_of_delay: 1 } }
+          )
+          .toArray();
+
+        const dbJobMap = new Map();
+        dbJobs.forEach((dbJ) => {
+          if (dbJ._id) dbJobMap.set(dbJ._id.toString(), dbJ);
+          if (dbJ.job_no) dbJobMap.set(dbJ.job_no.toString(), dbJ);
+        });
+
+        paginatedJobs.forEach((j) => {
+          const dbJ = dbJobMap.get(j._id?.toString()) || dbJobMap.get(j.job_no?.toString());
+          if (dbJ) {
+            if (!j.product_value && dbJ.product_value) j.product_value = dbJ.product_value;
+            if ((!j.invoice_details || (Array.isArray(j.invoice_details) && j.invoice_details.length === 0)) && dbJ.invoice_details) {
+              j.invoice_details = dbJ.invoice_details;
+            }
+            if ((!j.description_details || (Array.isArray(j.description_details) && j.description_details.length === 0)) && dbJ.description_details) {
+              j.description_details = dbJ.description_details;
+            }
+            if (!j.freight && dbJ.freight) j.freight = dbJ.freight;
+            if (!j.insurance && dbJ.insurance) j.insurance = dbJ.insurance;
+            if (!j.other_charges && dbJ.other_charges) j.other_charges = dbJ.other_charges;
+            if (!j.etd && dbJ.etd) j.etd = dbJ.etd;
+            if (!j.etd_date && dbJ.etd_date) j.etd_date = dbJ.etd_date;
+            if (!j.etdDate && dbJ.etdDate) j.etdDate = dbJ.etdDate;
+            if (!j.checklist && dbJ.checklist) j.checklist = dbJ.checklist;
+            if (j.is_checklist_aprroved === undefined && dbJ.is_checklist_aprroved !== undefined) j.is_checklist_aprroved = dbJ.is_checklist_aprroved;
+            if (j.is_checklist_clicked === undefined && dbJ.is_checklist_clicked !== undefined) j.is_checklist_clicked = dbJ.is_checklist_clicked;
+            if (!j.is_checklist_aprroved_date && dbJ.is_checklist_aprroved_date) j.is_checklist_aprroved_date = dbJ.is_checklist_aprroved_date;
+            if (!j.remark_client && dbJ.remark_client) j.remark_client = dbJ.remark_client;
+            if (!j.po_no && dbJ.po_no) j.po_no = dbJ.po_no;
+            if (!j.po_number && dbJ.po_number) j.po_number = dbJ.po_number;
+            if (!j.po_date && dbJ.po_date) j.po_date = dbJ.po_date;
+            if (!j.po_details && dbJ.po_details) j.po_details = dbJ.po_details;
+            if (!j.reason_for_delay && dbJ.reason_for_delay) j.reason_for_delay = dbJ.reason_for_delay;
+            if (!j.reasonForDelay && dbJ.reasonForDelay) j.reasonForDelay = dbJ.reasonForDelay;
+            if (!j.delay_reason && dbJ.delay_reason) j.delay_reason = dbJ.delay_reason;
+            if (!j.delayReason && dbJ.delayReason) j.delayReason = dbJ.delayReason;
+            if (!j.reason_of_delay && dbJ.reason_of_delay) j.reason_of_delay = dbJ.reason_of_delay;
+            if ((!j.do_shipping_line_invoice || (Array.isArray(j.do_shipping_line_invoice) && j.do_shipping_line_invoice.length === 0)) && dbJ.do_shipping_line_invoice) {
+              j.do_shipping_line_invoice = dbJ.do_shipping_line_invoice;
+            }
+            if ((!j.charges || (Array.isArray(j.charges) && j.charges.length === 0)) && dbJ.charges) {
+              j.charges = dbJ.charges;
+            }
+            if ((!j.shipping_line_invoice_imgs || (Array.isArray(j.shipping_line_invoice_imgs) && j.shipping_line_invoice_imgs.length === 0)) && dbJ.shipping_line_invoice_imgs) {
+              j.shipping_line_invoice_imgs = dbJ.shipping_line_invoice_imgs;
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to enrich jobs with product_value/invoice_details from DB:", err.message);
+      }
+    }
+
     res.json({
       message: "Jobs fetched successfully",
       data: paginatedJobs,
@@ -352,6 +426,18 @@ export const updateJob = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    // Update in local MongoDB directly for instant reflect
+    try {
+      const jobsCol = mongoose.connection.db.collection("jobs");
+      const objectId = typeof id === "string" && id.length === 24 ? new mongoose.Types.ObjectId(id) : id;
+      await jobsCol.updateOne(
+        { $or: [{ _id: objectId }, { _id: id }, { job_no: id }] },
+        { $set: updateData }
+      );
+    } catch (e) {
+      console.warn("Local DB job update warning:", e.message);
+    }
 
     const response = await axios.patch(`${IMPORT_API_BASE_URL}/jobs/${id}`, updateData, {
       headers: {
@@ -843,19 +929,13 @@ export const getUserDashboardStats = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
 
     let targetImporters = null;
+    const assignments = dbUser.ie_code_assignments || [];
+    let assignedNames = assignments.map((a) => a.importer_name);
+    if (assignedNames.length === 0 && dbUser.assignedImporterName) {
+      assignedNames = [dbUser.assignedImporterName];
+    }
 
-    if (!isAdmin) {
-      const assignments = dbUser.ie_code_assignments || [];
-      let assignedNames = assignments.map((a) => a.importer_name);
-
-      if (assignedNames.length === 0 && dbUser.assignedImporterName) {
-        assignedNames = [dbUser.assignedImporterName];
-      }
-
-      if (assignedNames.length === 0) {
-        return res.json({ summary: {}, details: {} });
-      }
-
+    if (assignedNames.length > 0) {
       if (importer) {
         const requested = importer.split(",");
         targetImporters = requested.filter((name) => assignedNames.includes(name));
@@ -863,9 +943,11 @@ export const getUserDashboardStats = async (req, res) => {
         targetImporters = assignedNames;
       }
 
-      if (targetImporters.length === 0) {
+      if (targetImporters.length === 0 && !isAdmin) {
         return res.json({ summary: {}, details: {} });
       }
+    } else if (!isAdmin) {
+      return res.json({ summary: {}, details: {} });
     } else {
       if (importer) {
         targetImporters = importer.split(",");
@@ -910,32 +992,21 @@ export const getJobsOverview = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
 
     let targetImporters = null;
+    const overviewAssignments = dbUser.ie_code_assignments || [];
+    let overviewAssignedNames = overviewAssignments.map((a) => a.importer_name);
+    if (overviewAssignedNames.length === 0 && dbUser.assignedImporterName) {
+      overviewAssignedNames = [dbUser.assignedImporterName];
+    }
 
-    if (!isAdmin) {
-      const assignments = dbUser.ie_code_assignments || [];
-      let assignedNames = assignments.map((a) => a.importer_name);
-
-      if (assignedNames.length === 0 && dbUser.assignedImporterName) {
-        assignedNames = [dbUser.assignedImporterName];
-      }
-
-      if (assignedNames.length === 0) {
-        return res.json({
-          pendingJobs: 0,
-          completedJobs: 0,
-          cancelledJobs: 0,
-          totalJobs: 0,
-        });
-      }
-
+    if (overviewAssignedNames.length > 0) {
       if (importer) {
         const requested = importer.split(",");
-        targetImporters = requested.filter((name) => assignedNames.includes(name));
+        targetImporters = requested.filter((name) => overviewAssignedNames.includes(name));
       } else {
-        targetImporters = assignedNames;
+        targetImporters = overviewAssignedNames;
       }
 
-      if (targetImporters.length === 0) {
+      if (targetImporters.length === 0 && !isAdmin) {
         return res.json({
           pendingJobs: 0,
           completedJobs: 0,
@@ -943,6 +1014,13 @@ export const getJobsOverview = async (req, res) => {
           totalJobs: 0,
         });
       }
+    } else if (!isAdmin) {
+      return res.json({
+        pendingJobs: 0,
+        completedJobs: 0,
+        cancelledJobs: 0,
+        totalJobs: 0,
+      });
     } else {
       if (importer) {
         targetImporters = importer.split(",");
@@ -1163,4 +1241,57 @@ export const getLicenseUtilizationRecords = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch license utilization records." });
   }
 };
+
+/**
+ * GET /api/get-rodteps
+ */
+export const getRodteps = async (req, res) => {
+  try {
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps`, {
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodteps error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP records." });
+  }
+};
+
+/**
+ * GET /api/get-rodteps-by-iec
+ */
+export const getRodtepsByIec = async (req, res) => {
+  try {
+    const { iec_no } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps-by-iec`, {
+      params: { iec_no },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodtepsByIec error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP records by IEC." });
+  }
+};
+
+/**
+ * GET /api/get-rodtep-utilization
+ */
+export const getRodtepUtilizationProxy = async (req, res) => {
+  try {
+    const { rodtep } = req.query;
+    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodtep-utilization`, {
+      params: { rodtep },
+      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+      timeout: 15000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Proxy getRodtepUtilization error:", error.message);
+    res.status(500).json({ error: "Failed to fetch RODTEP utilization records." });
+  }
+};
+
 

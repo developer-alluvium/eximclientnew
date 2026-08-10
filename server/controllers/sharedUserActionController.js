@@ -379,6 +379,7 @@ export const getAvailableColumns = async (req, res) => {
       { id: "esanchit_documents", name: "eSanchit Documents" },
       { id: "doPlanning", name: "DO Planning" },
       { id: "delivery_planning", name: "Delivery Planning" },
+      { id: "query", name: "Query" },
     ];
 
     res.status(200).json({

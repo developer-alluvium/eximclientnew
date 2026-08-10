@@ -174,7 +174,8 @@ class ElockApiService {
 
             console.log("📡 Backend: Calling third-party API to fetch all records");
 
-            const apiKey = process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET || "3c7c6bab80b4ca6f1980fe6c99ca20e6265ea2ed27b83fc355ab30bee18030ad";
+            const apiKey = process.env.TRANSPORT_API_KEY || "1234567890";
+            const serviceToken = await transportAuthService.getServiceToken();
 
             // Fetch from both endpoints in parallel
             const [response, othersResponse] = await Promise.all([
@@ -191,7 +192,10 @@ class ElockApiService {
                             ...(authToken && { Authorization: `Bearer ${authToken}` }),
                         },
                     }
-                ),
+                ).catch(err => {
+                    console.warn("⚠️ Backend: Failed to fetch client-elock-assign data:", err.message);
+                    return { data: { jobs: [] } };
+                }),
                 axios.get(
                     `${this.thirdPartyBaseURL}/elock/assign-others`,
                     {
@@ -297,7 +301,7 @@ class ElockApiService {
                     `🔍 Backend: Filtering by IE Code: "${ieCodeNo}"${filterType ? ` (filterType: ${filterType})` : ""
                     }`
                 );
-                
+
                 const beforeCount = jobs.length;
                 jobs = jobs.filter((item) => {
                     const consignorIeCode = item.consignor?.ieCodeNo;
@@ -649,7 +653,7 @@ class ElockApiService {
                     FTokenID: this.fTokenID,
                     FAction: "QueryLBSMonitorListByFGUIDs",
                     FGUIDs: assetId,
-                    FType: type, 
+                    FType: type,
                 },
                 {
                     headers: {

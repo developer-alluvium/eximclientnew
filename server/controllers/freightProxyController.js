@@ -38,11 +38,12 @@ const enquiryMatchesOrgs = (enquiry, orgNames) => {
   );
 };
 
+const isConverted = (e) => e.status === "Converted" || !!e.source_job_no || !!e.success_no;
+
 const getPipelineStage = (e) => {
-  if (e.status !== "Converted") {
-    if (e.status === "Open") return "Enquiry";
+  if (!isConverted(e)) {
     if (e.status === "Rejected") return "Rejected";
-    return "";
+    return "Enquiry";
   }
   const draftApproved = e.draft_bl_approved === true;
   if (!draftApproved) return "Draft BL";
