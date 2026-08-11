@@ -52,6 +52,15 @@ export const assignAdditionalIeCode = async (req, res) => {
       );
 
       if (existingAssignment) {
+        if (isExport && exporterFilter !== undefined) {
+          existingAssignment.exporter_filter = exporterFilter ? exporterFilter.trim() : null;
+          results.success.push({
+            ieCode: ieCodeNo,
+            importerName: existingAssignment.importer_name,
+            message: "Updated exporter sub-branch filter"
+          });
+          continue;
+        }
         results.failed.push({
           ieCode: ieCodeNo,
           reason: `IE code already assigned to the user in ${isExport ? 'exporter' : 'importer'} module`,

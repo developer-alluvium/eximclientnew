@@ -54,6 +54,19 @@ export const getAvailableExporters = async (req, res) => {
   }
 };
 
+const getExporterFilterFromAssignments = (ieCodeAssignments, requestedIeCode, requestedExporter) => {
+  if (requestedExporter) return requestedExporter;
+  if (!ieCodeAssignments || ieCodeAssignments.length === 0) return "";
+  
+  if (requestedIeCode && requestedIeCode !== "all") {
+    const target = ieCodeAssignments.find((a) => a.ie_code_no === requestedIeCode);
+    return target?.exporter_filter || "";
+  }
+  
+  const filters = ieCodeAssignments.map((a) => a.exporter_filter).filter(Boolean);
+  return filters.length > 0 ? filters.join(",") : "";
+};
+
 /**
  * GET /api/exports/:status
  * Proxies the export listing request to the Exim-Export server.
@@ -127,19 +140,6 @@ export const proxyExportListing = async (req, res) => {
       goods_stuffed_at,
       pendingQueries,
     };
-
-const getExporterFilterFromAssignments = (ieCodeAssignments, requestedIeCode, requestedExporter) => {
-  if (requestedExporter) return requestedExporter;
-  if (!ieCodeAssignments || ieCodeAssignments.length === 0) return "";
-  
-  if (requestedIeCode && requestedIeCode !== "all") {
-    const target = ieCodeAssignments.find((a) => a.ie_code_no === requestedIeCode);
-    return target?.exporter_filter || "";
-  }
-  
-  const filters = ieCodeAssignments.map((a) => a.exporter_filter).filter(Boolean);
-  return filters.length > 0 ? filters.join(",") : "";
-};
 
     // Check if the user has assigned exporters (both Admin and Client User roles can have assignments)
     if (ieCodeAssignments.length > 0) {

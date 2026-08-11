@@ -369,6 +369,7 @@ const AdminManagement = ({ onRefresh }) => {
           .map((e) => ({
             iecNo: e.iecNo,
             importerName: e.exporterName || e.alias || e.iecNo,
+            exporterName: e.exporterName || e.alias || e.iecNo,
             status: e.approvalStatus || "Approved",
             _source: "export",
           }));
@@ -1056,7 +1057,7 @@ const AdminManagement = ({ onRefresh }) => {
     return availableExporterIeCodes.filter((ieCode) => {
       return (
         ieCode.iecNo?.toLowerCase().includes(searchTerm) ||
-        (ieCode.exporterName || "").toLowerCase().includes(searchTerm)
+        (ieCode.exporterName || ieCode.importerName || "").toLowerCase().includes(searchTerm)
       );
     });
   }, [availableExporterIeCodes, ieCodeSearch.value]);
