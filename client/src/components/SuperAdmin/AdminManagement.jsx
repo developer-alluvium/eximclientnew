@@ -527,6 +527,51 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
+  const handleUpdateExporterFilter = async (ieCode, currentFilter) => {
+    const newFilter = window.prompt(`Enter Sub-Branch / Exporter Filter for IE Code ${ieCode}:`, currentFilter || "");
+    if (newFilter === null) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          Authorization: `Bearer ${superadminToken}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      const targetId = actionsMenuUser?._id || selectedEntity?._id;
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_STRING}/superadmin/users/${targetId}/ie-codes/filter`,
+        {
+          ieCode,
+          exporterFilter: newFilter,
+          module: "export"
+        },
+        config
+      );
+
+      if (response.data.success) {
+        setSuccess(`Updated filter for ${ieCode} to "${newFilter.trim() || "none"}"`);
+        fetchData();
+        setActionsMenuUser((prev) => {
+          if (!prev) return prev;
+          const updated = (prev.exporter_ie_code_assignments || []).map((a) =>
+            a.ie_code_no === ieCode ? { ...a, exporter_filter: newFilter.trim() || null } : a
+          );
+          return { ...prev, exporter_ie_code_assignments: updated };
+        });
+      }
+    } catch (err) {
+      console.error("Error updating exporter filter:", err);
+      setError(err.response?.data?.message || "Failed to update exporter filter");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBranchAssignment = async (isRemoval = false) => {
     if (!selectedEntity) return;
 
@@ -1831,7 +1876,17 @@ const AdminManagement = ({ onRefresh }) => {
                         </Box>
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.6, pl: 1.5 }}>
                           {actionsMenuUser.exporter_ie_code_assignments.map((a) => (
-                            <Chip key={a.ie_code_no} label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}${a.exporter_filter ? ` (Filter: ${a.exporter_filter})` : ""}`} size="small" variant="outlined" sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669" }} />
+                            <Tooltip key={a.ie_code_no} title="Click to edit sub-branch filter">
+                              <Chip
+                                label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}${a.exporter_filter ? ` (Filter: ${a.exporter_filter})` : " (No Filter)"}`}
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleUpdateExporterFilter(a.ie_code_no, a.exporter_filter)}
+                                onDelete={() => handleUpdateExporterFilter(a.ie_code_no, a.exporter_filter)}
+                                deleteIcon={<Edit sx={{ fontSize: "14px !important", color: "#059669 !important" }} />}
+                                sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669", cursor: "pointer", "&:hover": { bgcolor: "#f0fdf4" } }}
+                              />
+                            </Tooltip>
                           ))}
                         </Box>
                       </Box>

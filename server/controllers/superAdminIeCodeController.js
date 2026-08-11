@@ -52,8 +52,8 @@ export const assignAdditionalIeCode = async (req, res) => {
       );
 
       if (existingAssignment) {
-        if (isExport && exporterFilter !== undefined) {
-          existingAssignment.exporter_filter = exporterFilter ? exporterFilter.trim() : null;
+        if (isExport && exporterFilter !== undefined && exporterFilter !== null && exporterFilter.trim() !== "") {
+          existingAssignment.exporter_filter = exporterFilter.trim();
           results.success.push({
             ieCode: ieCodeNo,
             importerName: existingAssignment.importer_name,
