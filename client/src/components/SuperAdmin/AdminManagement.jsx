@@ -32,6 +32,8 @@ import {
   InputAdornment,
   Checkbox,
   Divider,
+  Autocomplete,
+  CircularProgress,
 } from "@mui/material";
 import {
   AdminPanelSettings,
@@ -62,7 +64,6 @@ import {
 } from "@mui/icons-material";
 import axios from "axios";
 import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
-import { Autocomplete } from "@mui/material";
 import IeCodeDialog from "./IeCodeDialog";
 
 // Available modules for assignment (unchanged)
@@ -241,6 +242,10 @@ const AdminManagement = ({ onRefresh }) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   // Export-specific IEC codes from the Export API directory
   const [availableExporterIeCodes, setAvailableExporterIeCodes] = useState([]);
+  const [availableSubBranches, setAvailableSubBranches] = useState([]);
+  const [subBranchLoading, setSubBranchLoading] = useState(false);
+  const [editFilterDialogOpen, setEditFilterDialogOpen] = useState(false);
+  const [editFilterTarget, setEditFilterTarget] = useState({ ieCode: "", currentFilter: "", selectedFilters: [], options: [], loading: false });
 
   // Enterprise Actions Modal state
   const [actionsMenuUser, setActionsMenuUser] = useState(null);
@@ -297,6 +302,25 @@ const AdminManagement = ({ onRefresh }) => {
       document.body.style.userSelect = 'auto';
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedExporterIeCodes.length > 0) {
+      setSubBranchLoading(true);
+      const superadminToken = getCookie("superadmin_token");
+      axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/exporter-branches?ieCode=${selectedExporterIeCodes.join(",")}`, {
+        headers: { Authorization: `Bearer ${superadminToken}` }
+      })
+      .then(res => {
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setAvailableSubBranches(res.data.data);
+        }
+      })
+      .catch(err => console.error("Failed to fetch sub-branches:", err))
+      .finally(() => setSubBranchLoading(false));
+    } else {
+      setAvailableSubBranches([]);
+    }
+  }, [selectedExporterIeCodes]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -527,10 +551,35 @@ const AdminManagement = ({ onRefresh }) => {
     }
   };
 
-  const handleUpdateExporterFilter = async (ieCode, currentFilter) => {
-    const newFilter = window.prompt(`Enter Sub-Branch / Exporter Filter for IE Code ${ieCode}:`, currentFilter || "");
-    if (newFilter === null) return;
+  const handleOpenEditFilterDialog = async (ieCode, currentFilter) => {
+    const selected = currentFilter ? currentFilter.split(",").map(s => s.trim()).filter(Boolean) : [];
+    setEditFilterTarget({
+      ieCode,
+      currentFilter: currentFilter || "",
+      selectedFilters: selected,
+      options: [],
+      loading: true
+    });
+    setEditFilterDialogOpen(true);
 
+    try {
+      const superadminToken = getCookie("superadmin_token");
+      const res = await axios.get(`${process.env.REACT_APP_API_STRING}/superadmin/exporter-branches?ieCode=${ieCode}`, {
+        headers: { Authorization: `Bearer ${superadminToken}` }
+      });
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setEditFilterTarget(prev => ({ ...prev, options: res.data.data, loading: false }));
+      } else {
+        setEditFilterTarget(prev => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      console.error("Error fetching branches for edit dialog:", err);
+      setEditFilterTarget(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const handleSaveFilterDialog = async () => {
+    const newFilterString = editFilterTarget.selectedFilters.join(", ");
     try {
       setLoading(true);
       setError(null);
@@ -546,26 +595,27 @@ const AdminManagement = ({ onRefresh }) => {
       const response = await axios.put(
         `${process.env.REACT_APP_API_STRING}/superadmin/users/${targetId}/ie-codes/filter`,
         {
-          ieCode,
-          exporterFilter: newFilter,
+          ieCode: editFilterTarget.ieCode,
+          exporterFilter: newFilterString,
           module: "export"
         },
         config
       );
 
       if (response.data.success) {
-        setSuccess(`Updated filter for ${ieCode} to "${newFilter.trim() || "none"}"`);
+        setSuccess(`Updated sub-branch filter for ${editFilterTarget.ieCode} to "${newFilterString || "All Sub-Branches"}"`);
         fetchData();
         setActionsMenuUser((prev) => {
           if (!prev) return prev;
           const updated = (prev.exporter_ie_code_assignments || []).map((a) =>
-            a.ie_code_no === ieCode ? { ...a, exporter_filter: newFilter.trim() || null } : a
+            a.ie_code_no === editFilterTarget.ieCode ? { ...a, exporter_filter: newFilterString.trim() || null } : a
           );
           return { ...prev, exporter_ie_code_assignments: updated };
         });
+        setEditFilterDialogOpen(false);
       }
     } catch (err) {
-      console.error("Error updating exporter filter:", err);
+      console.error("Error saving exporter filter:", err);
       setError(err.response?.data?.message || "Failed to update exporter filter");
     } finally {
       setLoading(false);
@@ -1881,8 +1931,8 @@ const AdminManagement = ({ onRefresh }) => {
                                 label={`${a.ie_code_no}${a.importer_name ? ` · ${a.importer_name}` : ""}${a.exporter_filter ? ` (Filter: ${a.exporter_filter})` : " (No Filter)"}`}
                                 size="small"
                                 variant="outlined"
-                                onClick={() => handleUpdateExporterFilter(a.ie_code_no, a.exporter_filter)}
-                                onDelete={() => handleUpdateExporterFilter(a.ie_code_no, a.exporter_filter)}
+                                onClick={() => handleOpenEditFilterDialog(a.ie_code_no, a.exporter_filter)}
+                                onDelete={() => handleOpenEditFilterDialog(a.ie_code_no, a.exporter_filter)}
                                 deleteIcon={<Edit sx={{ fontSize: "14px !important", color: "#059669 !important" }} />}
                                 sx={{ fontSize: "0.72rem", fontWeight: 500, borderColor: "#10b981", color: "#059669", cursor: "pointer", "&:hover": { bgcolor: "#f0fdf4" } }}
                               />
@@ -2044,9 +2094,42 @@ const AdminManagement = ({ onRefresh }) => {
                 {ieCodeMode !== "remove" && (
                   <Box>
                     <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", mb: 1, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      Sub-Branch / Exporter Filter <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional, e.g. TERRY TOWELS)</Typography>
+                      Sub-Branch / Exporter Filter <Typography component="span" sx={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(select from dropdown or type custom branch/address)</Typography>
                     </Typography>
-                    <TextField fullWidth size="small" placeholder="Filter jobs by exporter name/address keyword..." value={exporterFilterInput} onChange={(e) => setExporterFilterInput(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      options={availableSubBranches}
+                      value={exporterFilterInput ? exporterFilterInput.split(",").map(s => s.trim()).filter(Boolean) : []}
+                      onChange={(_, newVal) => {
+                        const stringVal = newVal.map(v => typeof v === 'string' ? v.trim() : (v.label || v)).filter(Boolean).join(", ");
+                        setExporterFilterInput(stringVal);
+                      }}
+                      loading={subBranchLoading}
+                      renderTags={(tagValue, getTagProps) =>
+                        tagValue.map((option, index) => (
+                          <Chip size="small" variant="outlined" color="success" label={option} {...getTagProps({ index })} key={index} sx={{ fontSize: "0.72rem" }} />
+                        ))
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder={availableSubBranches.length > 0 ? "Click to select sub-branch(es)..." : "Filter jobs by exporter name/address keyword..."}
+                          size="small"
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {subBranchLoading ? <CircularProgress color="inherit" size={18} /> : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                        />
+                      )}
+                      noOptionsText="No sub-branches found. Type custom filter keyword."
+                    />
                   </Box>
                 )}
 
@@ -3044,6 +3127,85 @@ const AdminManagement = ({ onRefresh }) => {
           >
             Assign to {bulkSelectedUsers.length} Users
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Sub-Branch Filter Editor Dialog ── */}
+      <Dialog
+        open={editFilterDialogOpen}
+        onClose={() => setEditFilterDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "#0f172a", pb: 1 }}>
+          Edit Sub-Branch Access: {editFilterTarget.ieCode}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
+            Select one or multiple sub-branches from the dropdown to grant job access to this user. Typing custom branch or address keywords is also supported.
+          </Typography>
+          <Autocomplete
+            multiple
+            freeSolo
+            options={editFilterTarget.options}
+            value={editFilterTarget.selectedFilters}
+            onChange={(_, newVal) => {
+              setEditFilterTarget(prev => ({
+                ...prev,
+                selectedFilters: newVal.map(v => typeof v === 'string' ? v.trim() : (v.label || v)).filter(Boolean)
+              }));
+            }}
+            loading={editFilterTarget.loading}
+            renderTags={(tagValue, getTagProps) =>
+              tagValue.map((option, index) => (
+                <Chip size="small" variant="outlined" color="success" label={option} {...getTagProps({ index })} key={index} sx={{ fontSize: "0.75rem", fontWeight: 600 }} />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Sub-Branches / Exporter Filters"
+                placeholder={editFilterTarget.options.length > 0 ? "Select sub-branch(es)..." : "Enter branch/address keyword..."}
+                size="small"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {editFilterTarget.loading ? <CircularProgress color="inherit" size={18} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+                sx={{ mt: 1, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              />
+            )}
+            noOptionsText="No sub-branches found. Type custom filter keyword."
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, display: "flex", justifyContent: "space-between" }}>
+          <Button
+            onClick={() => {
+              setEditFilterTarget(prev => ({ ...prev, selectedFilters: [] }));
+            }}
+            color="warning"
+            sx={{ textTransform: "none", fontSize: "0.78rem" }}
+          >
+            Clear Filters (Allow All Jobs)
+          </Button>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button onClick={() => setEditFilterDialogOpen(false)} sx={{ textTransform: "none", color: "#64748b" }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveFilterDialog}
+              variant="contained"
+              disabled={loading}
+              sx={{ textTransform: "none", fontWeight: 700, bgcolor: "#1e293b", "&:hover": { bgcolor: "#0f172a" } }}
+            >
+              {loading ? "Saving..." : "Save Sub-Branch Access"}
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
     </Box>

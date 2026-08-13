@@ -451,3 +451,35 @@ export const proxyExportTabCounts = async (req, res) => {
     });
   }
 };
+
+/**
+ * GET /api/superadmin/exporter-branches
+ * Fetches distinct sub-branch / exporter names from Exim-Export for given ieCode query param.
+ */
+export const proxyExporterBranches = async (req, res) => {
+  try {
+    const { ieCode = "" } = req.query;
+    const response = await axios.get(`${EXPORT_API_BASE_URL}/operation-jobs-exporter-names`, {
+      params: { ieCode },
+      timeout: 10000,
+    });
+    return res.json(response.data);
+  } catch (error) {
+    console.error("Fetch exporter branches proxy error:", error);
+    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      return res.status(503).json({
+        success: false,
+        message: "Export API is currently unavailable.",
+        error: error.message,
+      });
+    }
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch exporter sub-branches.",
+      error: error.message,
+    });
+  }
+};

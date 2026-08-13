@@ -70,7 +70,31 @@ router.get("/assignments", async (req, res) => {
         }
 
         // Pass query parameters to the service method
-        const result = await elockApiService.getElockAssignments(queryParams, authToken);
+        let result = await elockApiService.getElockAssignments(queryParams, authToken);
+
+        // Fallback to local ElockDetail if no records returned from external API
+        if ((!result.data || result.data.length === 0) && ieCodeNo) {
+            const ElockDetail = (await import("../models/ElockDetail.js")).default;
+            const localElocks = await ElockDetail.find({ ie_code: ieCodeNo }).lean();
+            if (localElocks.length > 0) {
+                result = {
+                    success: true,
+                    data: localElocks.map(item => ({
+                        _id: item._id,
+                        tr_no: item.elock_number || "TR-DEMO-01",
+                        elock_no: item.elock_number,
+                        container_number: item.vehicle_number || "HAMU1769376",
+                        vehicle_no: item.vehicle_number,
+                        driver_name: item.driver_name,
+                        driver_phone: item.driver_phone,
+                        elock_assign_status: item.status || "ASSIGNED",
+                        consignor: { name: item.consignor, ieCodeNo: item.ie_code },
+                        consignee: { name: item.consignee, ieCodeNo: item.ie_code }
+                    })),
+                    pagination: { totalCount: localElocks.length, page: 1, totalPages: 1 }
+                };
+            }
+        }
 
         // Always return 200 — the success/error status is in the response body
         console.log(

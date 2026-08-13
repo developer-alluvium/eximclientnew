@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import { getAvailableExporters, proxyExportListing, proxyExportFilterOptions, proxyExportTabCounts } from "../controllers/exportProxyController.js";
+import { getAvailableExporters, proxyExportListing, proxyExportFilterOptions, proxyExportTabCounts, proxyExporterBranches } from "../controllers/exportProxyController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -14,6 +14,7 @@ const EXPORT_API_BASE_URL = process.env.EXPORT_API_BASE_URL || "http://localhost
  * SuperAdmin-only — used in Admin Management to populate the exporter dropdown.
  */
 router.get("/api/superadmin/available-exporters", protectSuperAdmin, getAvailableExporters);
+router.get("/api/superadmin/exporter-branches", protectSuperAdmin, proxyExporterBranches);
 
 /**
  * GET /api/exports/:status
