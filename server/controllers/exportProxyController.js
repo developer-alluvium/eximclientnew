@@ -1,5 +1,8 @@
 import axios from "axios";
+import mongoose from "mongoose";
 import EximclientUser from "../models/eximclientUserModel.js";
+
+const ExJobModel = mongoose.models.ExJob || mongoose.model("ExJob", new mongoose.Schema({}, { strict: false }), "ex_jobs");
 
 const EXPORT_API_BASE_URL = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
 
@@ -191,18 +194,60 @@ export const proxyExportListing = async (req, res) => {
       forwardParams.exporter = exporter;
     }
 
-    const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
+    let responseData = null;
+    try {
+      const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
+      const response = await axios.get(exportApiUrl, {
+        params: forwardParams,
+        headers: {
+          username: "Admin",
+          "x-username": "Admin"
+        },
+        timeout: 30000,
+      });
+      responseData = response.data;
+    } catch (apiErr) {
+      console.warn("Remote export API listing error, attempting local DB fallback:", apiErr.message);
+    }
 
-    const response = await axios.get(exportApiUrl, {
-      params: forwardParams,
-      headers: {
-        username: "Admin",
-        "x-username": "Admin"
-      },
-      timeout: 30000,
+    const remoteJobs = responseData?.data?.jobs || [];
+    if (remoteJobs.length > 0) {
+      return res.json(responseData);
+    }
+
+    // Local MongoDB fallback (e.g. for demo client or offline server)
+    const targetIeCodes = (forwardParams.ieCode || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+    const localQuery = {};
+    if (targetIeCodes.length > 0) {
+      localQuery.$or = [
+        { ieCode: { $in: targetIeCodes } },
+        { exporter_ie_code: { $in: targetIeCodes } }
+      ];
+    }
+    if (forwardParams.exporter) {
+      const expRegex = new RegExp(forwardParams.exporter.replace(/,/g, "|"), "i");
+      localQuery.$or = localQuery.$or || [];
+      localQuery.$or.push({ exporter: expRegex }, { exporter_name: expRegex });
+    }
+    if (status && status.toLowerCase() !== "all") {
+      localQuery.status = new RegExp(`^${status}$`, "i");
+    }
+
+    const localJobs = await ExJobModel.find(localQuery).lean();
+
+    return res.json({
+      success: true,
+      data: {
+        jobs: localJobs,
+        pagination: {
+          currentPage: Number(page),
+          totalPages: 1,
+          totalCount: localJobs.length,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      }
     });
-
-    return res.json(response.data);
   } catch (error) {
     console.error("Export proxy listing error:", error);
 
@@ -410,22 +455,46 @@ export const proxyExportTabCounts = async (req, res) => {
 
     const statuses = ["pending", "booking pending", "handover pending", "billing pending", "completed", "cancelled"];
     
-    // Call main backend in parallel
-    const requests = statuses.map(status => {
-      const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
-      return axios.get(exportApiUrl, {
-        params: forwardParams,
-        headers: { username: "Admin", "x-username": "Admin" },
-        timeout: 10000,
+    let results = [];
+    try {
+      const requests = statuses.map(status => {
+        const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
+        return axios.get(exportApiUrl, {
+          params: forwardParams,
+          headers: { username: "Admin", "x-username": "Admin" },
+          timeout: 10000,
+        });
       });
-    });
+      results = await Promise.all(requests);
+    } catch (apiErr) {
+      console.warn("Remote export tab counts error, attempting local DB fallback:", apiErr.message);
+    }
 
-    const results = await Promise.all(requests);
     const counts = {};
     statuses.forEach((status, idx) => {
-      const resData = results[idx].data;
-      counts[status] = resData.data?.pagination?.totalCount || 0;
+      const resData = results[idx]?.data;
+      counts[status] = resData?.data?.pagination?.totalCount || 0;
     });
+
+    const totalRemoteCount = Object.values(counts).reduce((a, b) => a + b, 0);
+
+    if (totalRemoteCount === 0) {
+      const targetIeCodes = (forwardParams.ieCode || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+      const localQuery = {};
+      if (targetIeCodes.length > 0) {
+        localQuery.$or = [
+          { ieCode: { $in: targetIeCodes } },
+          { exporter_ie_code: { $in: targetIeCodes } }
+        ];
+      }
+      const localJobs = await ExJobModel.find(localQuery).lean();
+      if (localJobs.length > 0) {
+        statuses.forEach((s) => {
+          const matchCount = localJobs.filter(j => (j.status || "pending").toLowerCase() === s.toLowerCase()).length;
+          counts[s] = matchCount;
+        });
+      }
+    }
 
     return res.json({
       success: true,

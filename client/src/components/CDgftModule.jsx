@@ -131,11 +131,23 @@ function CDgftModule() {
             fetchedRodteps = rodtepRes.flat();
           }
 
-          if (fetchedRodteps.length === 0) {
-            const allRodtepRes = await axios.get(`${process.env.REACT_APP_API_STRING}/get-rodteps`);
-            if (allRodtepRes.data && Array.isArray(allRodtepRes.data)) {
-              fetchedRodteps = allRodtepRes.data;
-            }
+          const assignedIecSet = new Set(iecList.map(i => (i.iec_no || "").toUpperCase().trim()));
+
+          if (fetchedRodteps.length === 0 && iecList.length > 0) {
+            try {
+              const allRodtepRes = await axios.get(`${process.env.REACT_APP_API_STRING}/get-rodteps`);
+              if (allRodtepRes.data && Array.isArray(allRodtepRes.data)) {
+                fetchedRodteps = allRodtepRes.data.filter(r => {
+                  const rIec = (r.iec_code || r.iec_no || "").toUpperCase().trim();
+                  return assignedIecSet.has(rIec);
+                });
+              }
+            } catch (e) {}
+          } else {
+            fetchedRodteps = fetchedRodteps.filter(r => {
+              const rIec = (r.iec_code || r.iec_no || "").toUpperCase().trim();
+              return !rIec || assignedIecSet.has(rIec);
+            });
           }
 
           const seenRodtep = new Set();
@@ -278,12 +290,16 @@ function CDgftModule() {
     }
   };
 
+  const assignedIecSet = new Set(assignedIecList.map((a) => (a.iec_no || "").toUpperCase().trim()));
+
   // Filter authorizations by selected IEC Code and Search Query
   const filteredAuthorizations = authorizations.filter((item) => {
     // 1. Filter by IEC
+    const itemIec = (item.iec_no || "").toUpperCase().trim();
     if (selectedIec !== "ALL") {
-      const itemIec = (item.iec_no || "").toUpperCase().trim();
       if (itemIec !== selectedIec) return false;
+    } else {
+      if (assignedIecSet.size > 0 && itemIec && !assignedIecSet.has(itemIec)) return false;
     }
     // 2. Filter by search query
     if (searchQuery.trim()) {
@@ -313,14 +329,16 @@ function CDgftModule() {
 
   // Filter RoDTEPs by selected IEC Code and Search Query
   const filteredRodteps = rodtepList.filter((item) => {
+    const itemIec = (item.iec_code || item.iec_no || "").toUpperCase().trim();
     if (selectedIec !== "ALL") {
-      const itemIec = (item.iec_code || "").toUpperCase().trim();
       if (itemIec !== selectedIec) return false;
+    } else {
+      if (assignedIecSet.size > 0 && !assignedIecSet.has(itemIec)) return false;
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const rodtepNo = String(item.rodtep || "").toLowerCase();
-      const iecCode = String(item.iec_code || "").toLowerCase();
+      const iecCode = String(item.iec_code || item.iec_no || "").toLowerCase();
       const portCode = String(item.port_code || "").toLowerCase();
       return (
         rodtepNo.includes(q) ||

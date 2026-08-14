@@ -529,6 +529,75 @@ const run = async () => {
     await OpenPointModel.insertMany(fakeOpenPoints);
     console.log(`✅ Inserted ${fakeOpenPoints.length} fake open points.`);
 
+    // ----------------------------------------------------
+    // 6. SEED FAKE FREIGHT ENQUIRIES (freight_enquiries collection)
+    // ----------------------------------------------------
+    const FreightModel = mongoose.model("FreightEnquiry", new mongoose.Schema({}, { strict: false }), "freight_enquiries");
+
+    console.log(`\nClearing existing fake Freight Enquiries for company ${fakeCompanyName}...`);
+    await FreightModel.deleteMany({
+      $or: [
+        { organization_name: fakeCompanyName },
+        { consignee_name: fakeCompanyName },
+        { shipper_name: fakeCompanyName }
+      ]
+    });
+
+    const fakeFreightEnquiries = [
+      {
+        job_no: "FF/2026/001",
+        enquiry_no: "ENQ-NOV-001",
+        organization_name: fakeCompanyName,
+        shipper_name: "ORCHID METAL SCRAP TRADING LLC",
+        consignee_name: fakeCompanyName,
+        origin_port: "Shuwaikh",
+        destination_port: "Mundra",
+        shipment_type: "Import-Sea",
+        status: "Converted",
+        draft_bl_approved: false,
+        pol: "Shuwaikh, Kuwait",
+        pod: "Mundra, India",
+        container_details: "1 x 40' FCL",
+        bl_details: { consignee: fakeCompanyName, consignor: "ORCHID METAL SCRAP TRADING LLC" }
+      },
+      {
+        job_no: "FF/2026/002",
+        enquiry_no: "ENQ-NOV-002",
+        organization_name: fakeCompanyName,
+        shipper_name: fakeCompanyName,
+        consignee_name: "GULF METALS TRADING FZE",
+        origin_port: "Mundra",
+        destination_port: "Jebel Ali",
+        shipment_type: "Export-Sea",
+        status: "Converted",
+        draft_bl_approved: true,
+        sailing_date: "2026-08-05",
+        arrival_date: "2026-08-15",
+        pol: "Mundra, India",
+        pod: "Jebel Ali, UAE",
+        container_details: "2 x 40' FCL",
+        bl_details: { consignee: "GULF METALS TRADING FZE", consignor: fakeCompanyName }
+      },
+      {
+        job_no: "FF/2026/003",
+        enquiry_no: "ENQ-NOV-003",
+        organization_name: fakeCompanyName,
+        shipper_name: "PEGASUS METALLURGY S.A.",
+        consignee_name: fakeCompanyName,
+        origin_port: "Thessaloniki",
+        destination_port: "Khodiyar",
+        shipment_type: "Import-Sea",
+        status: "Enquiry",
+        pol: "Thessaloniki, Greece",
+        pod: "ICD Khodiyar, India",
+        container_details: "1 x 40' FCL",
+        bl_details: { consignee: fakeCompanyName, consignor: "PEGASUS METALLURGY S.A." }
+      }
+    ];
+
+    await FreightModel.insertMany(fakeFreightEnquiries);
+    console.log(`✅ Inserted ${fakeFreightEnquiries.length} fake freight enquiries.`);
+
     console.log("\n==========================================");
     console.log("🎉 NOVUSHA DEMO CLIENT FULLY SETUP WITH ALL MODULES & FAKE DATA!");
     console.log(`   User Email: ${email}`);

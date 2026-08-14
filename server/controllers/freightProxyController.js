@@ -1,5 +1,8 @@
 import axios from "axios";
+import mongoose from "mongoose";
 import EximclientUser from "../models/eximclientUserModel.js";
+
+const FreightModel = mongoose.models.FreightEnquiry || mongoose.model("FreightEnquiry", new mongoose.Schema({}, { strict: false }), "freight_enquiries");
 
 const EXPORT_API_BASE_URL = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
 
@@ -115,12 +118,16 @@ export const proxyFreightEnquiries = async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    const response = await axios.get(`${EXPORT_API_BASE_URL}/freight-enquiries`, {
-      params: isAdmin ? { tab: req.query.tab } : {}, // Fetch all if not admin to calculate counts properly
-      timeout: 30000,
-    });
-
-    const all = Array.isArray(response.data?.data) ? response.data.data : [];
+    let all = [];
+    try {
+      const response = await axios.get(`${EXPORT_API_BASE_URL}/freight-enquiries`, {
+        params: isAdmin ? { tab: req.query.tab } : {}, // Fetch all if not admin to calculate counts properly
+        timeout: 30000,
+      });
+      all = Array.isArray(response.data?.data) ? response.data.data : [];
+    } catch (apiErr) {
+      console.warn("Remote freight enquiries fetch error, fallback to local DB:", apiErr.message);
+    }
     
     // Ensure all items have computedTab (legacy remote backend might not provide it)
     all.forEach(e => {
@@ -130,13 +137,27 @@ export const proxyFreightEnquiries = async (req, res) => {
     });
 
     let data = [];
-    let counts = response.data?.counts || {};
+    let counts = {};
 
     if (isAdmin) {
       data = all;
     } else {
       // Filter all jobs by user's assigned orgs
-      const orgFilteredData = all.filter((e) => enquiryMatchesOrgs(e, orgNames));
+      let orgFilteredData = all.filter((e) => enquiryMatchesOrgs(e, orgNames));
+
+      if (orgFilteredData.length === 0) {
+        try {
+          const localEnquiries = await FreightModel.find({}).lean();
+          orgFilteredData = localEnquiries.filter((e) => enquiryMatchesOrgs(e, orgNames));
+          orgFilteredData.forEach(e => {
+            if (!e.computedTab) {
+              e.computedTab = getPipelineStage(e);
+            }
+          });
+        } catch (dbErr) {
+          console.error("Local freight enquiries fallback error:", dbErr.message);
+        }
+      }
 
       // Re-tally counts based on org-filtered data
       const PRE_ETA = new Set(["Draft BL", "SBO", "Billing"]);

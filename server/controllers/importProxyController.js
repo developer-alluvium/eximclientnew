@@ -251,13 +251,31 @@ export const proxyImportListing = async (req, res) => {
 
     console.log(`[Import Proxy] Calling target listing: ${targetUrl}`);
 
-    const response = await axios.get(targetUrl, {
-      params: forwardParams,
-      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
-      timeout: 30000,
-    });
+    let jobs = [];
+    try {
+      const response = await axios.get(targetUrl, {
+        params: forwardParams,
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 30000,
+      });
+      jobs = response.data?.data || [];
+    } catch (apiErr) {
+      console.warn("Remote import listing error, fallback to local DB:", apiErr.message);
+    }
 
-    let jobs = response.data?.data || [];
+    if (jobs.length === 0 && shouldFilterByIE) {
+      try {
+        const assignedIECodes = ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()).filter(Boolean);
+        const localJobs = await JobModel.find({
+          ie_code_no: { $in: assignedIECodes }
+        }).lean();
+        if (localJobs.length > 0) {
+          jobs = localJobs;
+        }
+      } catch (localErr) {
+        console.error("Local import jobs fallback error:", localErr.message);
+      }
+    }
 
     // Filter by assigned IE codes when assignments exist (for non-admins or admins with assigned IE codes)
     if (shouldFilterByIE) {
@@ -1201,12 +1219,29 @@ export const getDgftRegisters = async (req, res) => {
 export const getAuthorizationsByIec = async (req, res) => {
   try {
     const { iec_no } = req.query;
-    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorizations-by-iec`, {
-      params: { iec_no },
-      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
-      timeout: 15000,
-    });
-    res.json(response.data);
+    let auths = [];
+    try {
+      const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorizations-by-iec`, {
+        params: { iec_no },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 15000,
+      });
+      auths = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    } catch (e) {
+      console.warn("Remote getAuthorizationsByIec failed, checking local DB:", e.message);
+    }
+
+    if (!auths || auths.length === 0) {
+      const AuthModel = mongoose.models.authorizationregistration || mongoose.model("authorizationregistration", new mongoose.Schema({}, { strict: false }), "authorizationregistrations");
+      auths = await AuthModel.find({
+        $or: [
+          { iec_no: new RegExp(`^${iec_no}$`, "i") },
+          { iec_code: new RegExp(`^${iec_no}$`, "i") }
+        ]
+      }).lean();
+    }
+
+    res.json(auths);
   } catch (error) {
     console.error("Proxy getAuthorizationsByIec error:", error.message);
     res.status(500).json({ error: "Failed to fetch authorizations by IEC." });
@@ -1219,12 +1254,29 @@ export const getAuthorizationsByIec = async (req, res) => {
 export const getAuthorizationByNo = async (req, res) => {
   try {
     const { authorization_no } = req.query;
-    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorization-by-no`, {
-      params: { authorization_no },
-      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
-      timeout: 15000,
-    });
-    res.json(response.data);
+    let auth = null;
+    try {
+      const response = await axios.get(`${IMPORT_API_BASE_URL}/get-authorization-by-no`, {
+        params: { authorization_no },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 15000,
+      });
+      auth = response.data;
+    } catch (e) {}
+
+    if (!auth || Object.keys(auth).length === 0) {
+      const AuthModel = mongoose.models.authorizationregistration || mongoose.model("authorizationregistration", new mongoose.Schema({}, { strict: false }), "authorizationregistrations");
+      auth = await AuthModel.findOne({
+        $or: [
+          { authorization_no },
+          { licence_no: authorization_no },
+          { registration_no: authorization_no },
+          { job_no: authorization_no }
+        ]
+      }).lean();
+    }
+
+    res.json(auth || {});
   } catch (error) {
     console.error("Proxy getAuthorizationByNo error:", error.message);
     res.status(500).json({ error: "Failed to fetch authorization by number." });
@@ -1254,11 +1306,21 @@ export const getLicenseUtilizationRecords = async (req, res) => {
  */
 export const getRodteps = async (req, res) => {
   try {
-    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps`, {
-      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
-      timeout: 15000,
-    });
-    res.json(response.data);
+    let rodteps = [];
+    try {
+      const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps`, {
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 15000,
+      });
+      rodteps = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    } catch (e) {}
+
+    if (!rodteps || rodteps.length === 0) {
+      const RodtepModel = mongoose.models.rodtep || mongoose.model("rodtep", new mongoose.Schema({}, { strict: false }), "rodteps");
+      rodteps = await RodtepModel.find({}).lean();
+    }
+
+    res.json(rodteps);
   } catch (error) {
     console.error("Proxy getRodteps error:", error.message);
     res.status(500).json({ error: "Failed to fetch RODTEP records." });
@@ -1271,12 +1333,32 @@ export const getRodteps = async (req, res) => {
 export const getRodtepsByIec = async (req, res) => {
   try {
     const { iec_no } = req.query;
-    const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps-by-iec`, {
-      params: { iec_no },
-      headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
-      timeout: 15000,
-    });
-    res.json(response.data);
+    const cleanIec = String(iec_no || "").trim();
+    if (!cleanIec) {
+      return res.json([]);
+    }
+    let rodteps = [];
+    try {
+      const response = await axios.get(`${IMPORT_API_BASE_URL}/get-rodteps-by-iec`, {
+        params: { iec_no: cleanIec },
+        headers: { username: "Admin", "x-api-key": process.env.EXIM_API_KEY || process.env.JWT_ACCESS_SECRET },
+        timeout: 15000,
+      });
+      rodteps = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    } catch (e) {}
+
+    if (!rodteps || rodteps.length === 0) {
+      const RodtepModel = mongoose.models.rodtep || mongoose.model("rodtep", new mongoose.Schema({}, { strict: false }), "rodteps");
+      const escapedIec = cleanIec.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      rodteps = await RodtepModel.find({
+        $or: [
+          { iec_code: new RegExp(`^${escapedIec}$`, "i") },
+          { iec_no: new RegExp(`^${escapedIec}$`, "i") }
+        ]
+      }).lean();
+    }
+
+    res.json(rodteps);
   } catch (error) {
     console.error("Proxy getRodtepsByIec error:", error.message);
     res.status(500).json({ error: "Failed to fetch RODTEP records by IEC." });
