@@ -266,15 +266,72 @@ export const proxyImportListing = async (req, res) => {
     if (jobs.length === 0 && shouldFilterByIE) {
       try {
         const assignedIECodes = ieCodeAssignments.map((a) => a.ie_code_no.toUpperCase().trim()).filter(Boolean);
-        const localJobs = await JobModel.find({
+        const localQuery = {
           ie_code_no: { $in: assignedIECodes }
-        }).lean();
+        };
+        if (year && year.toLowerCase() !== "all") {
+          const escapedYear = escapeRegex(year);
+          localQuery.$or = [
+            { year: year },
+            { job_no: new RegExp(`/${escapedYear}$`, "i") }
+          ];
+        }
+        if (customHouse && customHouse.toLowerCase() !== "all") {
+          localQuery.custom_house = new RegExp(`^${escapeRegex(customHouse)}$`, "i");
+        }
+        if (status && status.toLowerCase() !== "all") {
+          if (status.toLowerCase() === "pending") {
+            localQuery.status = new RegExp("^pending$", "i");
+          } else if (status.toLowerCase() === "completed") {
+            localQuery.status = new RegExp("^completed$", "i");
+          } else if (status.toLowerCase() === "cancelled") {
+            localQuery.status = new RegExp("^cancelled$", "i");
+          }
+        }
+        const localJobs = await JobModel.find(localQuery).lean();
         if (localJobs.length > 0) {
           jobs = localJobs;
         }
       } catch (localErr) {
         console.error("Local import jobs fallback error:", localErr.message);
       }
+    }
+
+    // Filter by requested year in-memory safeguard
+    if (year && year.toLowerCase() !== "all") {
+      const yearLower = year.toLowerCase();
+      jobs = jobs.filter((j) => {
+        if (!j) return false;
+        const jYear = j.year ? String(j.year).trim().toLowerCase() : "";
+        const jJobNo = j.job_no ? String(j.job_no).trim().toLowerCase() : "";
+        if (jYear) {
+          return jYear === yearLower;
+        }
+        if (jJobNo) {
+          return jJobNo.endsWith(`/${yearLower}`);
+        }
+        return true;
+      });
+    }
+
+    // Filter by requested custom house / ICD port in-memory safeguard
+    if (customHouse && customHouse.toLowerCase() !== "all") {
+      const targetCh = customHouse.trim().toLowerCase();
+      jobs = jobs.filter((j) => {
+        if (!j) return false;
+        const ch = String(j.custom_house || j.customHouse || j.icd_port || j.icdPort || "").trim().toLowerCase();
+        return ch === targetCh;
+      });
+    }
+
+    // Filter by status in-memory safeguard
+    if (status && status.toLowerCase() !== "all") {
+      const targetStatus = status.trim().toLowerCase();
+      jobs = jobs.filter((j) => {
+        if (!j) return false;
+        const s = String(j.status || "").trim().toLowerCase();
+        return s === targetStatus;
+      });
     }
 
     // Filter by assigned IE codes when assignments exist (for non-admins or admins with assigned IE codes)
@@ -372,7 +429,7 @@ export const proxyImportListing = async (req, res) => {
         const dbJobs = await jobsCol
           .find(
             { $or: [{ _id: { $in: objectIds } }, { _id: { $in: jobIds } }, { job_no: { $in: paginatedJobs.map((j) => j.job_no).filter(Boolean) } }] },
-            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1, po_no: 1, po_number: 1, po_date: 1, po_details: 1, reason_for_delay: 1, reasonForDelay: 1, delay_reason: 1, delayReason: 1, reason_of_delay: 1 } }
+            { projection: { _id: 1, job_no: 1, product_value: 1, invoice_details: 1, invoices: 1, buyerThirdPartyInfo: 1, buyer_details: 1, third_party_info: 1, description_details: 1, freight: 1, insurance: 1, other_charges: 1, etd: 1, etd_date: 1, etdDate: 1, checklist: 1, is_checklist_aprroved: 1, is_checklist_clicked: 1, is_checklist_aprroved_date: 1, remark_client: 1, do_shipping_line_invoice: 1, charges: 1, shipping_line_invoice_imgs: 1, po_no: 1, po_number: 1, po_date: 1, po_details: 1, reason_for_delay: 1, reasonForDelay: 1, delay_reason: 1, delayReason: 1, reason_of_delay: 1 } }
           )
           .toArray();
 
@@ -389,6 +446,12 @@ export const proxyImportListing = async (req, res) => {
             if ((!j.invoice_details || (Array.isArray(j.invoice_details) && j.invoice_details.length === 0)) && dbJ.invoice_details) {
               j.invoice_details = dbJ.invoice_details;
             }
+            if ((!j.invoices || (Array.isArray(j.invoices) && j.invoices.length === 0)) && dbJ.invoices) {
+              j.invoices = dbJ.invoices;
+            }
+            if (!j.buyerThirdPartyInfo && dbJ.buyerThirdPartyInfo) j.buyerThirdPartyInfo = dbJ.buyerThirdPartyInfo;
+            if (!j.buyer_details && dbJ.buyer_details) j.buyer_details = dbJ.buyer_details;
+            if (!j.third_party_info && dbJ.third_party_info) j.third_party_info = dbJ.third_party_info;
             if ((!j.description_details || (Array.isArray(j.description_details) && j.description_details.length === 0)) && dbJ.description_details) {
               j.description_details = dbJ.description_details;
             }

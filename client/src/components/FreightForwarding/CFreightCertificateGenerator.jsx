@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import jsPDF from "jspdf";
 import axios from "axios";
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
-import logo from "../../assets/images/suraj_group_logo.png";
+import logo from "../../assets/images/surajCompanyLogo.jpeg";
 import { imageToBase64 } from "../../utils/imageUtils";
 
 const CFreightCertificateGenerator = ({ jobNo, children }) => {

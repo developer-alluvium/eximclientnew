@@ -155,6 +155,12 @@ const statusThemes = {
   "Billing Pending": { bg: "#fff7ed", border: "#f59e0b", text: "#b45309", light: "#ffedd5" },
   "Billing Done": { bg: "#f0fdfa", border: "#14b8a6", text: "#0f766e", light: "#ccfbf1" },
   "Completed": { bg: "#f1f5f9", border: "#64748b", text: "#334155", light: "#e2e8f0" },
+  "EGM Pending": { bg: "#fff7ed", border: "#f97316", text: "#c2410c", light: "#ffedd5" },
+  "EGM Completed": { bg: "#f0fdf4", border: "#16a34a", text: "#15803d", light: "#dcfce7" },
+  "Drawback Scroll Pending": { bg: "#fef2f2", border: "#ef4444", text: "#b91c1c", light: "#fee2e2" },
+  "Drawback Scroll Completed": { bg: "#ecfdf5", border: "#10b981", text: "#047857", light: "#d1fae5" },
+  "RoSCTL Scroll Pending": { bg: "#fffbeb", border: "#eab308", text: "#a16207", light: "#fef3c7" },
+  "RoSCTL Scroll Completed": { bg: "#f0fdfa", border: "#14b8a6", text: "#0f766e", light: "#ccfbf1" },
   "default": { bg: "#ffffff", border: "#e5e7eb", text: "#374151", light: "#f9fafb" }
 };
 
@@ -376,6 +382,80 @@ const getJobScrollAndEgmInfo = (job) => {
   };
 };
 
+const isDrawbackJob = (job) => {
+  if (!job) return false;
+  const info = getJobScrollAndEgmInfo(job);
+  if (info.dbkScrolls && info.dbkScrolls.length > 0) return true;
+
+  const textFields = [
+    job.scheme,
+    job.scheme_code,
+    job.reward_scheme,
+    job.type_of_export,
+    ...(Array.isArray(job.invoices) ? job.invoices.map(inv => `${inv.scheme_code || ''} ${inv.scheme || ''}`) : [])
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return textFields.includes("drawback") || textFields.includes("dbk");
+};
+
+const isRosctlJob = (job) => {
+  if (!job) return false;
+  const info = getJobScrollAndEgmInfo(job);
+  if (info.rosctlScrolls && info.rosctlScrolls.length > 0) return true;
+
+  const textFields = [
+    job.scheme,
+    job.scheme_code,
+    job.reward_scheme,
+    job.type_of_export,
+    ...(Array.isArray(job.invoices) ? job.invoices.map(inv => `${inv.scheme_code || ''} ${inv.scheme || ''}`) : [])
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return textFields.includes("rosctl");
+};
+
+const isEgmCompleted = (job) => {
+  if (!job) return false;
+  const info = getJobScrollAndEgmInfo(job);
+  return Boolean(
+    (info.egmNo && String(info.egmNo).trim() !== "" && String(info.egmNo).trim() !== "-") ||
+    (info.egmDate && String(info.egmDate).trim() !== "" && String(info.egmDate).trim() !== "-") ||
+    (job.egm_status || "").toLowerCase() === "completed"
+  );
+};
+
+const checkJobDetailedStatusMatch = (job, statusName) => {
+  if (!job || !statusName) return false;
+  const info = getJobScrollAndEgmInfo(job);
+  const sLower = statusName.toLowerCase();
+
+  if (sLower === "egm pending") {
+    return !isEgmCompleted(job);
+  }
+  if (sLower === "egm completed") {
+    return isEgmCompleted(job);
+  }
+
+  if (sLower === "drawback scroll pending" || sLower === "drawback pending") {
+    return isDrawbackJob(job) && info.dbkScrolls.length === 0;
+  }
+  if (sLower === "drawback scroll completed" || sLower === "drawback completed") {
+    return isDrawbackJob(job) && info.dbkScrolls.length > 0;
+  }
+
+  if (sLower === "rosctl scroll pending" || sLower === "rosctl pending") {
+    return isRosctlJob(job) && info.rosctlScrolls.length === 0;
+  }
+  if (sLower === "rosctl scroll completed" || sLower === "rosctl completed") {
+    return isRosctlJob(job) && info.rosctlScrolls.length > 0;
+  }
+
+  const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
+    ? job.detailedStatus[job.detailedStatus.length - 1]
+    : job.detailedStatus || job.status || "Pending");
+  return (currentStatus || "").toLowerCase() === sLower;
+};
+
 const STATUS_TABS = [
   { label: "Pending", value: "Pending" },
   { label: "Booking Pending", value: "Booking Pending" },
@@ -571,7 +651,7 @@ function CExportDSR() {
   }, [filterOptions.exporters, ieCodeAssignments]);
 
   const displayDetailedStatuses = React.useMemo(() => {
-    const ALL_STATUSES = [
+    return [
       "Pending",
       "SB Filed",
       "L.E.O",
@@ -581,10 +661,14 @@ function CExportDSR() {
       "Departure",
       "Billing Pending",
       "Billing Done",
+      "EGM Pending",
+      "EGM Completed",
+      "Drawback Scroll Pending",
+      "Drawback Scroll Completed",
+      "RoSCTL Scroll Pending",
+      "RoSCTL Scroll Completed",
     ];
-    const available = new Set((filterOptions.detailedStatuses || []).map(s => (s || "").toLowerCase().trim()));
-    return ALL_STATUSES.filter(s => available.has(s.toLowerCase()));
-  }, [filterOptions.detailedStatuses]);
+  }, []);
 
   // Dynamically calculate the exporter name to display in the top header
   const displayExporterName = React.useMemo(() => {
@@ -801,10 +885,36 @@ function CExportDSR() {
     }
   };
 
-  // Sort export jobs with query priority at TOP
+  // Calculate live counts for each detailed status option
+  const detailedStatusCounts = React.useMemo(() => {
+    const counts = {};
+    if (!jobs || jobs.length === 0) return counts;
+
+    displayDetailedStatuses.forEach((statusName) => {
+      let count = 0;
+      jobs.forEach((job) => {
+        if (checkJobDetailedStatusMatch(job, statusName)) {
+          count++;
+        }
+      });
+      counts[statusName] = count;
+    });
+
+    return counts;
+  }, [jobs, displayDetailedStatuses]);
+
+  // Sort export jobs with query priority at TOP and apply detailed status filter
   const sortedExportJobs = React.useMemo(() => {
     if (!jobs || jobs.length === 0) return [];
-    return [...jobs].sort((a, b) => {
+
+    let filtered = jobs;
+    if (detailedStatus && detailedStatus.length > 0) {
+      filtered = jobs.filter((job) =>
+        detailedStatus.some((selectedStatus) => checkJobDetailedStatusMatch(job, selectedStatus))
+      );
+    }
+
+    return [...filtered].sort((a, b) => {
       const statA = clientQueriesStatus[a.job_no] || {};
       const statB = clientQueriesStatus[b.job_no] || {};
 
@@ -813,7 +923,7 @@ function CExportDSR() {
 
       return scoreB - scoreA;
     });
-  }, [jobs, clientQueriesStatus]);
+  }, [jobs, detailedStatus, clientQueriesStatus]);
 
   // Dynamically populated filters from returned jobs
   const jobOwnersList = React.useMemo(() => {
@@ -1460,7 +1570,7 @@ function CExportDSR() {
         const invoicesList = Array.isArray(job.invoices) && job.invoices.length > 0
           ? job.invoices.filter((inv) => inv.invoiceNumber || inv.invoiceNo || inv.invoiceDate || inv.invoiceValue)
           : (job.invoiceNumber || job.invoice_no)
-            ? [{ invoiceNumber: job.invoiceNumber || job.invoice_no, invoiceDate: job.invoiceDate || job.invoice_date, termsOfInvoice: job.termsOfInvoice, currency: job.currency, invoiceValue: job.invoiceValue, products: job.products }]
+            ? [{ invoiceNumber: job.invoiceNumber || job.invoice_no, invoiceDate: job.invoiceDate || job.invoice_date, termsOfInvoice: job.termsOfInvoice, currency: job.currency, invoiceValue: job.invoiceValue, products: job.products, freightInsuranceCharges: job.freightInsuranceCharges, buyerThirdPartyInfo: job.buyerThirdPartyInfo }]
             : [];
 
         const key = job._id || job.job_no;
@@ -1468,77 +1578,194 @@ function CExportDSR() {
         const visibleInvoices = isExpanded ? invoicesList : invoicesList.slice(0, 3);
         const hiddenCount = invoicesList.length - visibleInvoices.length;
 
+        const jobBuyerName = job.buyerThirdPartyInfo?.buyer?.name || job.buyer_name || job.buyerName || "";
+        const jobThirdPartyName = job.buyerThirdPartyInfo?.thirdParty?.name || job.third_party_name || job.thirdPartyName || "";
+
         return (
           <TableCell style={cellStyle}>
             {invoicesList.length > 0 ? (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {visibleInvoices.map((inv, invIdx) => (
-                  <Box
-                    key={invIdx}
-                    sx={{
-                      pb: invIdx < visibleInvoices.length - 1 ? 0.8 : 0,
-                      borderBottom: invIdx < visibleInvoices.length - 1 ? "1px dashed #cbd5e1" : "none"
-                    }}
-                  >
-                    {(inv.invoiceNumber || inv.invoiceNo) ? (
-                      <>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                          <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#0f172a" }}>
-                            {inv.invoiceNumber || inv.invoiceNo}
-                          </Typography>
-                          <IconButton size="small" onClick={(e) => handleCopyText(inv.invoiceNumber || inv.invoiceNo, e)} sx={{ p: 0.2 }}>
-                            <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
-                          </IconButton>
-                        </Box>
-                        {inv.invoiceDate && (
-                          <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
-                            {formatDate(inv.invoiceDate)}
-                          </Typography>
-                        )}
-                        {(inv.termsOfInvoice || inv.currency || inv.invoiceValue) && (
-                          <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.2 }}>
-                            {inv.termsOfInvoice && <span style={{ color: "#64748b", fontWeight: 700 }}>{inv.termsOfInvoice} </span>}
-                            <span style={{ fontWeight: 800 }}>{inv.currency} {inv.invoiceValue?.toLocaleString()}</span>
-                          </Typography>
-                        )}
-                        {(() => {
-                          const product = inv.products?.[0] || {};
-                          const drawback = product.drawbackDetails?.[0] || {};
-                          const scheme = product.eximCode || inv.eximCode || job.scheme || "";
-                          const { dbkScrolls, rosctlScrolls } = getJobScrollAndEgmInfo(job);
-                          const drawback_scroll_no = drawback.drawback_scroll_no || inv.drawback_scroll_no || (invIdx === 0 ? dbkScrolls[0]?.no : "") || "";
-                          const drawback_scroll_date = drawback.drawback_scroll_date || inv.drawback_scroll_date || (invIdx === 0 ? dbkScrolls[0]?.date : "") || "";
-                          const rosctl_scroll_no = drawback.rosctl_scroll_no || inv.rosctl_scroll_no || (invIdx === 0 ? rosctlScrolls[0]?.no : "") || "";
-                          const rosctl_scroll_date = drawback.rosctl_scroll_date || inv.rosctl_scroll_date || (invIdx === 0 ? rosctlScrolls[0]?.date : "") || "";
+                {visibleInvoices.map((inv, invIdx) => {
+                  const invNo = inv.invoiceNumber || inv.invoiceNo || inv.invoice_no;
+                  const invDate = inv.invoiceDate || inv.invoice_date || inv.date;
+                  const toi = inv.termsOfInvoice || inv.terms_of_invoice || inv.toi || job.termsOfInvoice || job.toi || "";
+                  const curr = inv.currency || job.currency || "USD";
+                  const exRate = inv.exchangeRate ?? inv.exchange_rate ?? inv.ex_rate ?? inv.exRate ?? (invIdx === 0 ? (job.exchangeRate || job.exchange_rate || job.ex_rate) : null);
 
-                          return (
-                            <>
-                              {scheme && (
-                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.3 }}>
-                                  Scheme: <span style={{ fontWeight: 600, color: "#0f172a" }}>{scheme}</span>
-                                </Typography>
-                              )}
-                              {drawback_scroll_no && (
-                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
-                                  DBK Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{drawback_scroll_no}</span>
-                                  {drawback_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(drawback_scroll_date)})</span>}
-                                </Typography>
-                              )}
-                              {rosctl_scroll_no && (
-                                <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
-                                  RoSCTL Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{rosctl_scroll_no}</span>
-                                  {rosctl_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(rosctl_scroll_date)})</span>}
-                                </Typography>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </>
-                    ) : (
-                      <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
-                    )}
-                  </Box>
-                ))}
+                  const invVal = inv.invoiceValue ?? inv.invoice_value ?? inv.invoice_val ?? (invIdx === 0 ? (job.invoiceValue || job.invoice_value) : null);
+                  const prodVal = inv.productValue ?? inv.product_value ?? inv.product_val ?? (invIdx === 0 ? job.product_value : null);
+                  const fobVal = inv.fobValue ?? inv.fob_value ?? inv.fob_val ?? (invIdx === 0 ? job.fob_value : null);
+
+                  const freightAmt = inv.freightInsuranceCharges?.freight?.amount ?? inv.freight_amount ?? inv.freight ?? (invIdx === 0 ? (job.freight_amount || job.freight) : null);
+                  const freightCurr = inv.freightInsuranceCharges?.freight?.currency || curr;
+
+                  const insuranceAmt = inv.freightInsuranceCharges?.insurance?.amount ?? inv.insurance_amount ?? inv.insurance ?? (invIdx === 0 ? (job.insurance_amount || job.insurance) : null);
+                  const insuranceCurr = inv.freightInsuranceCharges?.insurance?.currency || curr;
+
+                  const discountAmt = inv.freightInsuranceCharges?.discount?.amount ?? inv.discount_amount ?? inv.discount ?? (invIdx === 0 ? job.discount : null);
+                  const discountCurr = inv.freightInsuranceCharges?.discount?.currency || curr;
+
+                  const deductionAmt = inv.freightInsuranceCharges?.otherDeduction?.amount ?? inv.other_deduction ?? inv.otherDeduction ?? (invIdx === 0 ? job.other_deduction : null);
+                  const deductionCurr = inv.freightInsuranceCharges?.otherDeduction?.currency || curr;
+
+                  const commissionAmt = inv.freightInsuranceCharges?.commission?.amount ?? inv.commission ?? inv.commission_amount ?? (invIdx === 0 ? job.commission : null);
+                  const commissionCurr = inv.freightInsuranceCharges?.commission?.currency || curr;
+
+                  const packingChargesAmt = inv.packingCharges ?? inv.packing_charges ?? (invIdx === 0 ? job.packing_charges : null);
+
+                  const buyerName = inv.buyerThirdPartyInfo?.buyer?.name || inv.buyerName || inv.buyer_name || jobBuyerName;
+                  const thirdPartyName = inv.buyerThirdPartyInfo?.thirdParty?.name || inv.thirdPartyName || inv.third_party_name || jobThirdPartyName;
+
+                  return (
+                    <Box
+                      key={invIdx}
+                      sx={{
+                        pb: invIdx < visibleInvoices.length - 1 ? 0.8 : 0,
+                        borderBottom: invIdx < visibleInvoices.length - 1 ? "1px dashed #cbd5e1" : "none"
+                      }}
+                    >
+                      {invNo ? (
+                        <>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: "11px", color: "#0f172a" }}>
+                              {invNo}
+                            </Typography>
+                            <IconButton size="small" onClick={(e) => handleCopyText(invNo, e)} sx={{ p: 0.2 }}>
+                              <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
+                            </IconButton>
+                          </Box>
+
+                          {/* Date & Exchange Rate badge */}
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap", mt: 0.2 }}>
+                            {invDate && (
+                              <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
+                                {formatDate(invDate)}
+                              </Typography>
+                            )}
+                            {exRate !== undefined && exRate !== null && exRate !== "" && Number(exRate) > 0 && (
+                              <Typography sx={{ fontSize: "9px", color: "#0284c7", fontWeight: 700, bgcolor: "#e0f2fe", px: 0.5, py: 0.1, borderRadius: "3px", border: "1px solid #bae6fd" }}>
+                                Ex Rate: {Number(exRate).toFixed(2)}
+                              </Typography>
+                            )}
+                          </Box>
+
+                          {/* TOI & Invoice Value */}
+                          {(toi || curr || invVal !== null) && (
+                            <Typography sx={{ fontSize: "10px", color: "#0f172a", mt: 0.2 }}>
+                              {toi && <span style={{ color: "#64748b", fontWeight: 700 }}>{toi} </span>}
+                              <span style={{ fontWeight: 800 }}>
+                                {curr || ""} {invVal !== undefined && invVal !== null && invVal !== "" ? Number(invVal).toLocaleString() : ""}
+                              </span>
+                            </Typography>
+                          )}
+
+                          {/* Product Value if available and different from Invoice Value */}
+                          {prodVal !== null && prodVal !== undefined && prodVal !== "" && Number(prodVal) > 0 && Number(prodVal) !== Number(invVal) && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#475569", mt: 0.1 }}>
+                              Product Val: <span style={{ fontWeight: 800, color: "#0f172a" }}>{curr} {Number(prodVal).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* FOB Value if available and different */}
+                          {fobVal !== null && fobVal !== undefined && fobVal !== "" && Number(fobVal) > 0 && Number(fobVal) !== Number(invVal) && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#475569", mt: 0.1 }}>
+                              FOB Val: <span style={{ fontWeight: 800, color: "#0f172a" }}>{curr} {Number(fobVal).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Freight Value */}
+                          {freightAmt !== null && freightAmt !== undefined && freightAmt !== "" && Number(freightAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#2563eb", mt: 0.1 }}>
+                              Freight: <span style={{ fontWeight: 800 }}>{freightCurr} {Number(freightAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Insurance Value */}
+                          {insuranceAmt !== null && insuranceAmt !== undefined && insuranceAmt !== "" && Number(insuranceAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#7c3aed", mt: 0.1 }}>
+                              Insurance: <span style={{ fontWeight: 800 }}>{insuranceCurr} {Number(insuranceAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Discount Value */}
+                          {discountAmt !== null && discountAmt !== undefined && discountAmt !== "" && Number(discountAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#dc2626", mt: 0.1 }}>
+                              Discount: <span style={{ fontWeight: 800 }}>{discountCurr} {Number(discountAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Other Deduction */}
+                          {deductionAmt !== null && deductionAmt !== undefined && deductionAmt !== "" && Number(deductionAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#ea580c", mt: 0.1 }}>
+                              Deduction: <span style={{ fontWeight: 800 }}>{deductionCurr} {Number(deductionAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Commission */}
+                          {commissionAmt !== null && commissionAmt !== undefined && commissionAmt !== "" && Number(commissionAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#4b5563", mt: 0.1 }}>
+                              Commission: <span style={{ fontWeight: 800 }}>{commissionCurr} {Number(commissionAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Packing Charges */}
+                          {packingChargesAmt !== null && packingChargesAmt !== undefined && packingChargesAmt !== "" && Number(packingChargesAmt) > 0 && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#475569", mt: 0.1 }}>
+                              Packing Chg: <span style={{ fontWeight: 800 }}>{curr} {Number(packingChargesAmt).toLocaleString()}</span>
+                            </Typography>
+                          )}
+
+                          {/* Buyer Info */}
+                          {buyerName && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#059669", mt: 0.2 }}>
+                              Buyer: <span style={{ fontWeight: 600, color: "#0f172a" }}>{buyerName}</span>
+                            </Typography>
+                          )}
+                          {thirdPartyName && (
+                            <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#d97706", mt: 0.1 }}>
+                              3rd Party: <span style={{ fontWeight: 600, color: "#0f172a" }}>{thirdPartyName}</span>
+                            </Typography>
+                          )}
+
+                          {(() => {
+                            const product = inv.products?.[0] || {};
+                            const drawback = product.drawbackDetails?.[0] || {};
+                            const scheme = product.eximCode || inv.eximCode || job.scheme || "";
+                            const { dbkScrolls, rosctlScrolls } = getJobScrollAndEgmInfo(job);
+                            const drawback_scroll_no = drawback.drawback_scroll_no || inv.drawback_scroll_no || (invIdx === 0 ? dbkScrolls[0]?.no : "") || "";
+                            const drawback_scroll_date = drawback.drawback_scroll_date || inv.drawback_scroll_date || (invIdx === 0 ? dbkScrolls[0]?.date : "") || "";
+                            const rosctl_scroll_no = drawback.rosctl_scroll_no || inv.rosctl_scroll_no || (invIdx === 0 ? rosctlScrolls[0]?.no : "") || "";
+                            const rosctl_scroll_date = drawback.rosctl_scroll_date || inv.rosctl_scroll_date || (invIdx === 0 ? rosctlScrolls[0]?.date : "") || "";
+
+                            return (
+                              <>
+                                {scheme && (
+                                  <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.3 }}>
+                                    Scheme: <span style={{ fontWeight: 600, color: "#0f172a" }}>{scheme}</span>
+                                  </Typography>
+                                )}
+                                {drawback_scroll_no && (
+                                  <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                                    DBK Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{drawback_scroll_no}</span>
+                                    {drawback_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(drawback_scroll_date)})</span>}
+                                  </Typography>
+                                )}
+                                {rosctl_scroll_no && (
+                                  <Typography sx={{ fontSize: "9px", fontWeight: 700, color: "#475569", mt: 0.2 }}>
+                                    RoSCTL Scroll: <span style={{ fontWeight: 600, color: "#0f172a" }}>{rosctl_scroll_no}</span>
+                                    {rosctl_scroll_date && <span style={{ color: "#64748b", fontWeight: 600 }}> ({formatDate(rosctl_scroll_date)})</span>}
+                                  </Typography>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      ) : (
+                        <Typography sx={{ fontSize: "10px", color: "#cbd5e1" }}>-</Typography>
+                      )}
+                    </Box>
+                  );
+                })}
 
                 {hiddenCount > 0 && (
                   <span
@@ -2615,20 +2842,37 @@ function CExportDSR() {
                   }
                 }}
               >
-                {displayDetailedStatuses.map((status) => (
-                  <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px" }}>
-                    <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
-                    <span style={{
-                      display: "inline-block",
-                      width: 10, height: 10,
-                      borderRadius: "50%",
-                      backgroundColor: getStatusColor(status),
-                      border: "1px solid #94a3b8",
-                      marginRight: 8
-                    }} />
-                    <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
-                  </MenuItem>
-                ))}
+                {displayDetailedStatuses.map((status) => {
+                  const count = detailedStatusCounts[status] !== undefined ? detailedStatusCounts[status] : 0;
+                  return (
+                    <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
+                        <span style={{
+                          display: "inline-block",
+                          width: 10, height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: getStatusColor(status),
+                          border: "1px solid #94a3b8",
+                          marginRight: 8
+                        }} />
+                        <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
+                      </Box>
+                      <span style={{
+                        fontSize: "11px",
+                        backgroundColor: "#f1f5f9",
+                        color: "#334155",
+                        padding: "1px 7px",
+                        borderRadius: "10px",
+                        fontWeight: "700",
+                        marginLeft: "12px",
+                        border: "1px solid #cbd5e1"
+                      }}>
+                        {count}
+                      </span>
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           )}

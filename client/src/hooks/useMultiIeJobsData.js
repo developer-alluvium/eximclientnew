@@ -76,7 +76,15 @@ function useMultiIeJobsData(
         }
 
         if (detailedStatus && detailedStatus !== 'all') {
-          queryParams.append('detailedStatus', detailedStatus);
+          if (Array.isArray(detailedStatus)) {
+            if (detailedStatus.length > 0) {
+              detailedStatus.forEach(s => {
+                if (s && String(s).trim() !== '') queryParams.append('detailedStatus', s);
+              });
+            }
+          } else if (typeof detailedStatus === 'string' && detailedStatus.trim() !== '') {
+            queryParams.append('detailedStatus', detailedStatus);
+          }
         }
 
         return axios.get(`${apiUrl}?${queryParams}`);

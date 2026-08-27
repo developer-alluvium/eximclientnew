@@ -232,8 +232,29 @@ export const proxyExportListing = async (req, res) => {
     if (status && status.toLowerCase() !== "all") {
       localQuery.status = new RegExp(`^${status}$`, "i");
     }
+    if (year && year.toLowerCase() !== "all") {
+      const escapedYear = year.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      localQuery.$and = localQuery.$and || [];
+      localQuery.$and.push({
+        $or: [
+          { year: year },
+          { job_no: new RegExp(`/${escapedYear}$`, "i") }
+        ]
+      });
+    }
 
-    const localJobs = await ExJobModel.find(localQuery).lean();
+    let localJobs = await ExJobModel.find(localQuery).lean();
+    if (year && year.toLowerCase() !== "all") {
+      const yearLower = year.toLowerCase();
+      localJobs = localJobs.filter((j) => {
+        if (!j) return false;
+        const jYear = j.year ? String(j.year).trim().toLowerCase() : "";
+        const jJobNo = j.job_no ? String(j.job_no).trim().toLowerCase() : "";
+        if (jYear) return jYear === yearLower;
+        if (jJobNo) return jJobNo.endsWith(`/${yearLower}`);
+        return true;
+      });
+    }
 
     return res.json({
       success: true,

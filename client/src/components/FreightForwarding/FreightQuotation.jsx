@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import surajCompanyLogo from "../../assets/images/suraj_group_logo.png";
+import surajCompanyLogo from "../../assets/images/surajCompanyLogo.jpeg";
 
 const THEME = {
   blue: "#16408f",

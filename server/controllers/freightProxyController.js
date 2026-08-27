@@ -51,7 +51,7 @@ const getPipelineStage = (e) => {
   const draftApproved = e.draft_bl_approved === true;
   if (!draftApproved) return "Draft BL";
   const sboDate = !!(e.sailing_date);
-  if (!sboDate) return "SBO";
+  if (!sboDate) return "SOB";
   const hasBillingDetails = !!(
     e.billing_details?.agency_bill_no &&
     e.billing_details?.agency_bill_date &&
@@ -128,7 +128,7 @@ export const proxyFreightEnquiries = async (req, res) => {
     } catch (apiErr) {
       console.warn("Remote freight enquiries fetch error, fallback to local DB:", apiErr.message);
     }
-    
+
     // Ensure all items have computedTab (legacy remote backend might not provide it)
     all.forEach(e => {
       if (!e.computedTab) {
@@ -160,10 +160,10 @@ export const proxyFreightEnquiries = async (req, res) => {
       }
 
       // Re-tally counts based on org-filtered data
-      const PRE_ETA = new Set(["Draft BL", "SBO", "Billing"]);
+      const PRE_ETA = new Set(["Draft BL", "SOB", "Billing"]);
       const recounted = {
         Enquiry: 0, Rejected: 0, Pending: 0,
-        "Draft BL": 0, SBO: 0, Billing: 0,
+        "Draft BL": 0, SOB: 0, Billing: 0,
         "ETA Pending": 0, Delivery: 0, Completed: 0
       };
       orgFilteredData.forEach(e => {
@@ -171,7 +171,7 @@ export const proxyFreightEnquiries = async (req, res) => {
         if (ct === "Enquiry") recounted.Enquiry++;
         else if (ct === "Rejected") recounted.Rejected++;
         else if (ct === "Draft BL") { recounted["Draft BL"]++; recounted.Pending++; }
-        else if (ct === "SBO") { recounted.SBO++; recounted.Pending++; }
+        else if (ct === "SOB") { recounted.SOB++; recounted.Pending++; }
         else if (ct === "Billing") { recounted.Billing++; recounted.Pending++; }
         else if (ct === "ETA Pending") recounted["ETA Pending"]++;
         else if (ct === "Delivery") recounted.Delivery++;

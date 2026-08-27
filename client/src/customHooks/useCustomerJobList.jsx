@@ -1314,20 +1314,32 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
           let freightStr = (freight !== undefined && freight !== null && freight !== "") ? freight : "N/A";
           let insuranceStr = (insurance !== undefined && insurance !== null && insurance !== "") ? insurance : "N/A";
 
-          let invDetails = cell.row.original.invoice_details;
+          let invDetails = cell.row.original.invoice_details || cell.row.original.invoices;
           if (typeof invDetails === "string") {
             try { invDetails = JSON.parse(invDetails); } catch (e) { }
           }
           if (Array.isArray(invDetails) && invDetails.length > 0) {
-            const validToiInv = invDetails.find(inv => inv.toi !== undefined && inv.toi !== null && inv.toi !== "");
-            if (validToiInv) toiStr = validToiInv.toi;
+            const validToiInv = invDetails.find(inv => inv.toi !== undefined && inv.toi !== null && inv.toi !== "" || inv.termsOfInvoice);
+            if (validToiInv) toiStr = validToiInv.toi || validToiInv.termsOfInvoice;
 
-            const validFreightInv = invDetails.find(inv => inv.freight !== undefined && inv.freight !== null && inv.freight !== "");
-            if (validFreightInv) freightStr = `${validFreightInv.freight} ${validFreightInv.freight_currency || ""}`.trim();
+            const validFreightInv = invDetails.find(inv => (inv.freight !== undefined && inv.freight !== null && inv.freight !== "") || (inv.freightInsuranceCharges?.freight?.amount));
+            if (validFreightInv) {
+              const amt = validFreightInv.freightInsuranceCharges?.freight?.amount ?? validFreightInv.freight;
+              const curr = validFreightInv.freightInsuranceCharges?.freight?.currency || validFreightInv.freight_currency || inv_currency || "";
+              freightStr = `${amt} ${curr}`.trim();
+            }
 
-            const validInsuranceInv = invDetails.find(inv => inv.insurance !== undefined && inv.insurance !== null && inv.insurance !== "");
-            if (validInsuranceInv) insuranceStr = `${validInsuranceInv.insurance} ${validInsuranceInv.insurance_currency || ""}`.trim();
+            const validInsuranceInv = invDetails.find(inv => (inv.insurance !== undefined && inv.insurance !== null && inv.insurance !== "") || (inv.freightInsuranceCharges?.insurance?.amount));
+            if (validInsuranceInv) {
+              const amt = validInsuranceInv.freightInsuranceCharges?.insurance?.amount ?? validInsuranceInv.insurance;
+              const curr = validInsuranceInv.freightInsuranceCharges?.insurance?.currency || validInsuranceInv.insurance_currency || inv_currency || "";
+              insuranceStr = `${amt} ${curr}`.trim();
+            }
           }
+
+          const jobObj = cell.row.original;
+          const buyerStr = jobObj.buyerThirdPartyInfo?.buyer?.name || jobObj.buyer_name || jobObj.buyerName || jobObj.buyer_details?.name || "";
+          const thirdPartyStr = jobObj.buyerThirdPartyInfo?.thirdParty?.name || jobObj.third_party_name || jobObj.thirdPartyName || jobObj.third_party_info?.name || "";
 
           return (
             <div style={{ alignItems: "center" }}>
@@ -1367,14 +1379,14 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                 const job = cell.row.original;
                 if (Array.isArray(invDetails) && invDetails.length > 0) {
                   const sumPV = invDetails.reduce((sum, r) => {
-                    const pv = parseFloat(r.product_value || r.amount);
+                    const pv = parseFloat(r.product_value || r.amount || r.invoiceValue);
                     if (!isNaN(pv) && pv > 0) return sum + pv;
                     return sum;
                   }, 0);
                   if (sumPV > 0) return sumPV.toFixed(2);
                 }
 
-                const topPV = parseFloat(job.product_value);
+                const topPV = parseFloat(job.product_value || job.invoiceValue);
                 if (!isNaN(topPV) && topPV > 0) return topPV.toFixed(2);
 
                 let descDetails = job.description_details;
@@ -1393,7 +1405,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   if (sumDesc > 0) return sumDesc.toFixed(2);
                 }
 
-                return job.product_value || "N/A";
+                return job.product_value || job.invoiceValue || "N/A";
               })()}{" "}{inv_currency || ""} <br />
               <strong>PO No:</strong>{" "}{(() => {
                 const job = cell.row.original;
@@ -1421,7 +1433,7 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   extractPo(job.po_no || job.po_number || job.po_num || job.poNo || job.poNumber || job.po, job.po_date || job.poDate);
                 if (topPo) pos.push(topPo);
 
-                let invoices = invDetails || job.invoice_details;
+                let invoices = invDetails || job.invoice_details || job.invoices;
                 if (typeof invoices === "string") {
                   try { invoices = JSON.parse(invoices); } catch (e) { }
                 }
@@ -1446,6 +1458,16 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
               {insuranceStr !== "N/A" && (
                 <>
                   <strong>Insurance:</strong>{" "}{insuranceStr} <br />
+                </>
+              )}
+              {buyerStr && (
+                <>
+                  <strong>Buyer:</strong>{" "}{buyerStr} <br />
+                </>
+              )}
+              {thirdPartyStr && (
+                <>
+                  <strong>3rd Party:</strong>{" "}{thirdPartyStr} <br />
                 </>
               )}
               <strong>POL:</strong>{" "}

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Alert } from "@mui/material";
 import { ContentCopy as CopyIcon } from "@mui/icons-material";
 import html2pdf from "html2pdf.js";
-import logo from "../../assets/images/suraj_group_logo.png";
+import logo from "../../assets/images/surajCompanyLogo.jpeg";
 import CFreightCertificateGenerator from "./CFreightCertificateGenerator";
 
 const LEGAL_TEXT_1 =
@@ -179,19 +179,27 @@ const generateBLTemplate = (enquiry, mode = 'draft') => {
             <td style="width: 47%; padding: 0; vertical-align: top;">
                <table style="width: 100%; border-collapse: collapse;">
                   <tr>
-                    <td style="padding: 2px 10px 0px; ${bb2}; height: 32px; box-sizing: border-box;">
-                       <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: ${isOriginal ? '10px' : '0px'};">
-                          <span style="font-weight: 900; font-size: 10px; white-space: nowrap; color: ${isOriginal ? 'transparent' : '#000'};">MTD. No.</span>
-                          <span style="${b18} padding: 0px 10px; flex: 1; text-align: center; font-weight: 700; height: 22px; line-height: 18px; box-sizing: border-box; display: inline-block; font-size: 13px; position: relative; top: ${isOriginal ? '-10px' : '-2px'};">${enquiry?.hbl_no || ""}</span>
-                       </div>
+                    <td style="padding: ${isOriginal ? '2px 10px 0px' : '4px 10px'}; ${bb2}; height: 32px; box-sizing: border-box; vertical-align: middle;">
+                       <table style="width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: ${isOriginal ? '10px' : '0px'};">
+                         <tr>
+                           <td style="width: 60px; font-weight: 900; font-size: 10px; white-space: nowrap; color: ${isOriginal ? 'transparent' : '#000'}; vertical-align: middle;">MTD. No.</td>
+                           <td style="padding-left: 6px; vertical-align: middle;">
+                             <div style="${b18} height: 20px; line-height: 14px; text-align: center; font-weight: 700; font-size: 11.5px; box-sizing: border-box; overflow: hidden; position: relative; top: ${isOriginal ? '-10px' : '-3px'};">${enquiry?.hbl_no || ""}</div>
+                           </td>
+                         </tr>
+                       </table>
                     </td>
                   </tr>
                   <tr>
-                    <td style="padding: ${isOriginal ? '6px 10px' : '2px 10px 0px'}; height: 32px; box-sizing: border-box;">
-                       <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                          <span style="font-weight: 900; font-size: 10px; white-space: nowrap; color: ${isOriginal ? 'transparent' : '#000'};">Shipment Ref. No.</span>
-                          <span style="${b18} padding: 0px 10px; flex: 1; text-align: center; font-weight: 700; height: 22px; line-height: 18px; box-sizing: border-box; display: inline-block; font-size: 13px; position: relative; top: ${isOriginal ? '0px' : '-2px'};">${bl.shipment_ref_no || ""}</span>
-                       </div>
+                    <td style="padding: ${isOriginal ? '6px 10px' : '4px 10px'}; height: 32px; box-sizing: border-box; vertical-align: middle;">
+                       <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+                         <tr>
+                           <td style="width: 105px; font-weight: 900; font-size: 10px; white-space: nowrap; color: ${isOriginal ? 'transparent' : '#000'}; vertical-align: middle;">Shipment Ref. No.</td>
+                           <td style="padding-left: 6px; vertical-align: middle;">
+                             <div style="${b18} height: 20px; line-height: 14px; text-align: center; font-weight: 700; font-size: 11.5px; box-sizing: border-box; overflow: hidden; position: relative; top: ${isOriginal ? '0px' : '-3px'};">${""}</div>
+                           </td>
+                         </tr>
+                       </table>
                     </td>
                   </tr>
                </table>
@@ -363,14 +371,14 @@ const generateBLTemplate = (enquiry, mode = 'draft') => {
         <!-- OTHER PARTICULARS & SIGNATORY -->
         <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
           <tr>
-            <td style="width: 58%; padding: 10px 12px 10px ${isOriginal ? '0px' : '8px'}; vertical-align: top; ${br22}">
-               <div style="font-weight: 900; margin-top: 18px; margin-bottom: 6px; font-size: 10px; color: ${isOriginal ? 'transparent' : '#000'};">Other Particulars (If any)</div>
-               <div style="white-space: pre-wrap; font-size: 11px; font-weight: 700; margin-bottom: 8px; position: relative; top: ${isOriginal ? '40px' : '0'};">${bl.other_particulars || ""}</div>
-               <div style="margin-top: 30px; font-size: 9px; font-weight: 900; text-align: center; letter-spacing: 0.1px; color: ${isOriginal ? 'transparent' : '#000'};">Weight & Measurement of container not to be Included.</div>
+            <td style="width: 58%; padding: ${isOriginal ? '10px 12px 10px 0px' : '6px 12px 10px 8px'}; vertical-align: top; ${br22}">
+               <div style="font-weight: 900; margin-top: ${isOriginal ? '18px' : '4px'}; margin-bottom: 4px; font-size: 10px; color: ${isOriginal ? 'transparent' : '#000'};">Other Particulars (If any)</div>
+               <div style="white-space: pre-wrap; font-size: 11px; font-weight: 700; margin-bottom: 4px; position: relative; top: ${isOriginal ? '40px' : '0'};">${bl.other_particulars || ""}</div>
+               <div style="margin-top: ${isOriginal ? '30px' : '10px'}; font-size: 9px; font-weight: 900; text-align: center; letter-spacing: 0.1px; color: ${isOriginal ? 'transparent' : '#000'};">Weight & Measurement of container not to be Included.</div>
                <div style="font-size: 9px; font-weight: 900; text-align: center; color: ${isOriginal ? 'transparent' : '#000'};">(TERMS CONTINUED ON BACK HERE OF)</div>
             </td>
             <td style="width: 42%; padding: 10px 15px; vertical-align: top; text-align: center;">
-               <div style="font-weight: 900; font-size: 14.5px; margin-bottom: 65px; text-transform: uppercase; color: ${isOriginal ? 'transparent' : '#000'};">FOR SURAJ FORWARDERS PVT. LTD.</div>
+               <div style="font-weight: 900; font-size: 14.5px; margin-bottom: ${isOriginal ? '65px' : '45px'}; text-transform: uppercase; color: ${isOriginal ? 'transparent' : '#000'};">FOR SURAJ FORWARDERS PVT. LTD.</div>
                <div style="font-weight: 900; font-size: 12.5px; color: ${isOriginal ? 'transparent' : '#000'};">(Authorised Signatory)</div>
             </td>
           </tr>

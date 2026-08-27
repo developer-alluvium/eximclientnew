@@ -906,6 +906,32 @@ const JobDetailsPanel = ({
                 value={`₹ ${jobData.exrate || "0.00"}`}
               />
               <DetailField
+                label="Freight Value"
+                value={(() => {
+                  const inv = Array.isArray(jobData?.invoices) ? jobData.invoices[0] : (Array.isArray(jobData?.invoice_details) ? jobData.invoice_details[0] : null);
+                  const amt = inv?.freightInsuranceCharges?.freight?.amount ?? inv?.freight ?? jobData?.freight;
+                  const curr = inv?.freightInsuranceCharges?.freight?.currency || inv?.freight_currency || jobData?.inv_currency || "";
+                  return amt ? `${amt} ${curr}`.trim() : "N/A";
+                })()}
+              />
+              <DetailField
+                label="Insurance Value"
+                value={(() => {
+                  const inv = Array.isArray(jobData?.invoices) ? jobData.invoices[0] : (Array.isArray(jobData?.invoice_details) ? jobData.invoice_details[0] : null);
+                  const amt = inv?.freightInsuranceCharges?.insurance?.amount ?? inv?.insurance ?? jobData?.insurance;
+                  const curr = inv?.freightInsuranceCharges?.insurance?.currency || inv?.insurance_currency || jobData?.inv_currency || "";
+                  return amt ? `${amt} ${curr}`.trim() : "N/A";
+                })()}
+              />
+              <DetailField
+                label="Buyer Info"
+                value={jobData?.buyerThirdPartyInfo?.buyer?.name || jobData?.buyer_name || jobData?.buyerName || jobData?.buyer_details?.name || "N/A"}
+              />
+              <DetailField
+                label="3rd Party Info"
+                value={jobData?.buyerThirdPartyInfo?.thirdParty?.name || jobData?.third_party_name || jobData?.thirdPartyName || jobData?.third_party_info?.name || "N/A"}
+              />
+              <DetailField
                 label="Assessable Value"
                 value={`₹ ${getFinalAssessableValue(jobData)}`}
               />
