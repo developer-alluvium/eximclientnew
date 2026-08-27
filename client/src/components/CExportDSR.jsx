@@ -390,9 +390,11 @@ const isDrawbackJob = (job) => {
   const textFields = [
     job.scheme,
     job.scheme_code,
+    job.exim_scheme,
+    job.eximCode,
     job.reward_scheme,
     job.type_of_export,
-    ...(Array.isArray(job.invoices) ? job.invoices.map(inv => `${inv.scheme_code || ''} ${inv.scheme || ''}`) : [])
+    ...(Array.isArray(job.invoices) ? job.invoices.flatMap(inv => [inv.scheme_code, inv.scheme, inv.eximCode, inv.exim_scheme, inv.reward_scheme]) : [])
   ].filter(Boolean).join(" ").toLowerCase();
 
   return textFields.includes("drawback") || textFields.includes("dbk");
@@ -406,9 +408,11 @@ const isRosctlJob = (job) => {
   const textFields = [
     job.scheme,
     job.scheme_code,
+    job.exim_scheme,
+    job.eximCode,
     job.reward_scheme,
     job.type_of_export,
-    ...(Array.isArray(job.invoices) ? job.invoices.map(inv => `${inv.scheme_code || ''} ${inv.scheme || ''}`) : [])
+    ...(Array.isArray(job.invoices) ? job.invoices.flatMap(inv => [inv.scheme_code, inv.scheme, inv.eximCode, inv.exim_scheme, inv.reward_scheme]) : [])
   ].filter(Boolean).join(" ").toLowerCase();
 
   return textFields.includes("rosctl");
@@ -427,8 +431,9 @@ const isEgmCompleted = (job) => {
 const checkJobDetailedStatusMatch = (job, statusName) => {
   if (!job || !statusName) return false;
   const info = getJobScrollAndEgmInfo(job);
-  const sLower = statusName.toLowerCase();
+  const sLower = statusName.toLowerCase().trim();
 
+  // 1. EGM Pending / Completed (All jobs will receive EGM)
   if (sLower === "egm pending") {
     return !isEgmCompleted(job);
   }
@@ -436,6 +441,7 @@ const checkJobDetailedStatusMatch = (job, statusName) => {
     return isEgmCompleted(job);
   }
 
+  // 2. Drawback Scroll Pending / Completed (Only for jobs containing Drawback in exim scheme)
   if (sLower === "drawback scroll pending" || sLower === "drawback pending") {
     return isDrawbackJob(job) && info.dbkScrolls.length === 0;
   }
@@ -443,6 +449,7 @@ const checkJobDetailedStatusMatch = (job, statusName) => {
     return isDrawbackJob(job) && info.dbkScrolls.length > 0;
   }
 
+  // 3. RoSCTL Scroll Pending / Completed (Only for jobs containing RoSCTL in exim scheme)
   if (sLower === "rosctl scroll pending" || sLower === "rosctl pending") {
     return isRosctlJob(job) && info.rosctlScrolls.length === 0;
   }
@@ -450,10 +457,13 @@ const checkJobDetailedStatusMatch = (job, statusName) => {
     return isRosctlJob(job) && info.rosctlScrolls.length > 0;
   }
 
+  // 4. Standard Pipeline Statuses
   const currentStatus = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
     ? job.detailedStatus[job.detailedStatus.length - 1]
     : job.detailedStatus || job.status || "Pending");
-  return (currentStatus || "").toLowerCase() === sLower;
+  const cLower = (currentStatus || "").toLowerCase().trim();
+
+  return cLower === sLower;
 };
 
 const STATUS_TABS = [
@@ -953,10 +963,6 @@ function CExportDSR() {
         params.ieCode = selectedExporter;
       }
 
-      if (detailedStatus && detailedStatus.length > 0) {
-        params.detailedStatus = detailedStatus.join(",");
-      }
-
       const response = await axios.get(`${process.env.REACT_APP_API_STRING}/exports/tab-counts`, {
         params,
         withCredentials: true
@@ -991,10 +997,6 @@ function CExportDSR() {
 
       if (selectedExporter !== "all") {
         params.ieCode = selectedExporter;
-      }
-
-      if (detailedStatus && detailedStatus.length > 0) {
-        params.detailedStatus = detailedStatus.join(",");
       }
 
       const response = await axios.get(`${process.env.REACT_APP_API_STRING}/exports/${status}`, {
@@ -2844,19 +2846,21 @@ function CExportDSR() {
               >
                 {displayDetailedStatuses.map((status) => {
                   const count = detailedStatusCounts[status] !== undefined ? detailedStatusCounts[status] : 0;
+                  const theme = getStatusTheme(status);
                   return (
                     <MenuItem key={status} value={status} sx={{ py: 0.5, fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Box sx={{ display: "flex", alignItems: "center" }}>
                         <Checkbox size="small" checked={detailedStatus.indexOf(status) > -1} sx={{ p: 0.5 }} />
                         <span style={{
                           display: "inline-block",
-                          width: 10, height: 10,
-                          borderRadius: "50%",
-                          backgroundColor: getStatusColor(status),
-                          border: "1px solid #94a3b8",
-                          marginRight: 8
+                          width: 8,
+                          height: 8,
+                          borderRadius: "2px",
+                          backgroundColor: theme.border || "#3b82f6",
+                          marginRight: 8,
+                          marginLeft: 2
                         }} />
-                        <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px" }} />
+                        <ListItemText primary={status} primaryTypographyProps={{ fontSize: "12px", fontWeight: 500 }} />
                       </Box>
                       <span style={{
                         fontSize: "11px",
@@ -3031,7 +3035,7 @@ function CExportDSR() {
             }}
           >
             <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-              Showing {jobs.length} of {totalCount} Records
+              Showing {sortedExportJobs.length} of {jobs.length || totalCount} Records
             </Typography>
 
             <Box sx={{ display: "flex", gap: 1 }}>
