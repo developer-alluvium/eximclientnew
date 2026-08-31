@@ -288,6 +288,18 @@ export const proxyImportListing = async (req, res) => {
             localQuery.status = new RegExp("^cancelled$", "i");
           }
         }
+        if (exporter && exporter.toLowerCase() !== "all" && exporter.toLowerCase() !== "all exporters") {
+          const expRegex = new RegExp(escapeRegex(decodeURIComponent(exporter)), "i");
+          localQuery.$and = localQuery.$and || [];
+          localQuery.$and.push({
+            $or: [
+              { supplier_exporter: expRegex },
+              { exporter: expRegex },
+              { supplier_exporter_name: expRegex },
+              { exporter_name: expRegex }
+            ]
+          });
+        }
         const localJobs = await JobModel.find(localQuery).lean();
         if (localJobs.length > 0) {
           jobs = localJobs;
@@ -403,6 +415,18 @@ export const proxyImportListing = async (req, res) => {
     if (importer && importer.toLowerCase() !== "all") {
       const cleanImporter = formatImporter(importer);
       jobs = jobs.filter((j) => formatImporter(j.importer) === cleanImporter);
+    }
+
+    // Specific exporter filter from query param
+    if (exporter && exporter.toLowerCase() !== "all" && exporter.toLowerCase() !== "all exporters") {
+      const targetExp = decodeURIComponent(exporter).trim().toLowerCase();
+      jobs = jobs.filter((j) => {
+        if (!j) return false;
+        const exp1 = String(j.supplier_exporter || j.exporter || j.supplier_exporter_name || j.exporter_name || "").trim().toLowerCase();
+        const exp2 = Array.isArray(j.invoices) ? j.invoices.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+        const exp3 = Array.isArray(j.invoice_details) ? j.invoice_details.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+        return exp1.includes(targetExp) || exp2.includes(targetExp) || exp3.includes(targetExp);
+      });
     }
 
     // Paginate in memory

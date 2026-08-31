@@ -225,9 +225,16 @@ export const proxyExportListing = async (req, res) => {
       ];
     }
     if (forwardParams.exporter) {
-      const expRegex = new RegExp(forwardParams.exporter.replace(/,/g, "|"), "i");
-      localQuery.$or = localQuery.$or || [];
-      localQuery.$or.push({ exporter: expRegex }, { exporter_name: expRegex });
+      const expEscaped = forwardParams.exporter.replace(/,/g, "|").replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+      const expRegex = new RegExp(expEscaped, "i");
+      localQuery.$and = localQuery.$and || [];
+      localQuery.$and.push({
+        $or: [
+          { exporter: expRegex },
+          { exporter_name: expRegex },
+          { exporter_filter: expRegex }
+        ]
+      });
     }
     if (status && status.toLowerCase() !== "all") {
       localQuery.status = new RegExp(`^${status}$`, "i");

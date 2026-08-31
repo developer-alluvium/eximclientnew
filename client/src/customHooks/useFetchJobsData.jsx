@@ -182,6 +182,17 @@ function useFetchJobsData(
           });
         }
 
+        if (selectedExporter && selectedExporter !== "all" && selectedExporter !== "All Exporters") {
+          const targetExp = selectedExporter.trim().toLowerCase();
+          fetchedRows = fetchedRows.filter((row) => {
+            if (!row) return false;
+            const exp1 = String(row.supplier_exporter || row.exporter || row.supplier_exporter_name || row.exporter_name || "").trim().toLowerCase();
+            const exp2 = Array.isArray(row.invoices) ? row.invoices.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+            const exp3 = Array.isArray(row.invoice_details) ? row.invoice_details.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+            return exp1.includes(targetExp) || exp2.includes(targetExp) || exp3.includes(targetExp);
+          });
+        }
+
         setRows(fetchedRows);
         setTotal(total || 0);
         setTotalPages(totalPages || 1);
@@ -256,7 +267,18 @@ function useFetchJobsData(
         });
       }
 
-      setRows(fetchedRows);
+        if (selectedExporter && selectedExporter !== "all" && selectedExporter !== "All Exporters") {
+          const targetExp = selectedExporter.trim().toLowerCase();
+          fetchedRows = fetchedRows.filter((row) => {
+            if (!row) return false;
+            const exp1 = String(row.supplier_exporter || row.exporter || row.supplier_exporter_name || row.exporter_name || "").trim().toLowerCase();
+            const exp2 = Array.isArray(row.invoices) ? row.invoices.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+            const exp3 = Array.isArray(row.invoice_details) ? row.invoice_details.map(inv => String(inv.supplier_exporter || inv.exporter || "").trim().toLowerCase()).join(" ") : "";
+            return exp1.includes(targetExp) || exp2.includes(targetExp) || exp3.includes(targetExp);
+          });
+        }
+
+        setRows(fetchedRows);
       setTotal(total || 0);
       setTotalPages(totalPages || 1);
       setCurrentPage(currentPage || 1);
