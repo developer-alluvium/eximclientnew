@@ -288,6 +288,18 @@ export const proxyImportListing = async (req, res) => {
             localQuery.status = new RegExp("^cancelled$", "i");
           }
         }
+        if (exporter && exporter.toLowerCase() !== "all" && exporter.toLowerCase() !== "all exporters") {
+          const expRegex = new RegExp(escapeRegex(decodeURIComponent(exporter)), "i");
+          localQuery.$and = localQuery.$and || [];
+          localQuery.$and.push({
+            $or: [
+              { supplier_exporter: expRegex },
+              { exporter: expRegex },
+              { supplier_exporter_name: expRegex },
+              { exporter_name: expRegex }
+            ]
+          });
+        }
         const localJobs = await JobModel.find(localQuery).lean();
         if (localJobs.length > 0) {
           jobs = localJobs;

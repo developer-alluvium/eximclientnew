@@ -918,8 +918,17 @@ function CExportDSR() {
     if (!jobs || jobs.length === 0) return [];
 
     let filtered = jobs;
+    if (selectedExporter && selectedExporter !== "all") {
+      filtered = filtered.filter((job) => {
+        const jIe = (job.ieCode || job.exporter_ie_code || job.ie_code_no || "").trim();
+        const jExp = (job.exporter || job.exporter_name || "").trim().toLowerCase();
+        const sel = selectedExporter.trim().toLowerCase();
+        return jIe === selectedExporter || jExp.includes(sel);
+      });
+    }
+
     if (detailedStatus && detailedStatus.length > 0) {
-      filtered = jobs.filter((job) =>
+      filtered = filtered.filter((job) =>
         detailedStatus.some((selectedStatus) => checkJobDetailedStatusMatch(job, selectedStatus))
       );
     }
