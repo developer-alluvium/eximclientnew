@@ -70,6 +70,47 @@ const getExporterFilterFromAssignments = (ieCodeAssignments, requestedIeCode, re
   return filters.length > 0 ? filters.join(",") : "";
 };
 
+export const jobMatchesExporterAssignment = (job, assignments) => {
+  if (!assignments || assignments.length === 0) return true;
+
+  const jobIec = (job.ieCode || job.exporter_ie_code || job.ie_code_no || "").trim().toUpperCase();
+  const jobExporter = (job.exporter || job.exporter_name || job.importer || job.importer_name || "").trim().toUpperCase();
+
+  return assignments.some((assignment) => {
+    const assignIec = (assignment.ie_code_no || "").trim().toUpperCase();
+    if (assignIec && jobIec && jobIec !== assignIec) {
+      return false;
+    }
+
+    const filter = (assignment.exporter_filter || "").trim().toUpperCase();
+    const assignedName = (assignment.importer_name || "").trim().toUpperCase();
+
+    if (filter) {
+      const filterTokens = filter.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+      return filterTokens.some((token) => {
+        if (token === "MODERN INSULATORS LIMITED") {
+          return jobExporter.includes("MODERN INSULATORS LIMITED") && !jobExporter.includes("TERRY TOWELS");
+        }
+        if (token === "MODERN INSULATORS LIMITED(TERRY TOWELS)" || token === "TERRY TOWELS") {
+          return jobExporter.includes("TERRY TOWELS");
+        }
+        return jobExporter.includes(token);
+      });
+    }
+
+    // Default for IEC 1388003881 when no explicit exporter_filter is set
+    if (assignIec === "1388003881" || jobIec === "1388003881") {
+      if (assignedName.includes("TERRY TOWELS")) {
+        return jobExporter.includes("TERRY TOWELS");
+      } else {
+        return !jobExporter.includes("TERRY TOWELS");
+      }
+    }
+
+    return true;
+  });
+};
+
 /**
  * GET /api/exports/:status
  * Proxies the export listing request to the Exim-Export server.
@@ -129,8 +170,8 @@ export const proxyExportListing = async (req, res) => {
     } = req.query;
 
     const forwardParams = {
-      page,
-      limit,
+      page: 1,
+      limit: ieCodeAssignments.length > 0 ? 1000 : limit,
       search,
       country,
       consignmentType,
@@ -179,6 +220,8 @@ export const proxyExportListing = async (req, res) => {
         });
       } else {
         if (ieCode) forwardParams.ieCode = ieCode;
+        forwardParams.page = page;
+        forwardParams.limit = limit;
       }
     }
 
@@ -212,6 +255,36 @@ export const proxyExportListing = async (req, res) => {
 
     const remoteJobs = responseData?.data?.jobs || [];
     if (remoteJobs.length > 0) {
+      if (ieCodeAssignments.length > 0) {
+        let filteredJobs = remoteJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+        if (exporter && exporter.toLowerCase() !== "all") {
+          const expLower = exporter.toLowerCase().trim();
+          filteredJobs = filteredJobs.filter((j) => {
+            const jExp = (j.exporter || j.exporter_name || "").toLowerCase().trim();
+            return jExp.includes(expLower);
+          });
+        }
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 10;
+        const totalCount = filteredJobs.length;
+        const totalPages = Math.ceil(totalCount / limitNum) || 1;
+        const paginatedJobs = filteredJobs.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+        return res.json({
+          success: true,
+          data: {
+            jobs: paginatedJobs,
+            pagination: {
+              currentPage: pageNum,
+              totalPages: totalPages,
+              totalCount: totalCount,
+              hasNextPage: pageNum < totalPages,
+              hasPrevPage: pageNum > 1,
+            },
+            total: totalCount,
+          },
+        });
+      }
       return res.json(responseData);
     }
 
@@ -251,6 +324,9 @@ export const proxyExportListing = async (req, res) => {
     }
 
     let localJobs = await ExJobModel.find(localQuery).lean();
+    if (ieCodeAssignments.length > 0) {
+      localJobs = localJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+    }
     if (year && year.toLowerCase() !== "all") {
       const yearLower = year.toLowerCase();
       localJobs = localJobs.filter((j) => {
@@ -263,17 +339,24 @@ export const proxyExportListing = async (req, res) => {
       });
     }
 
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 10;
+    const totalCount = localJobs.length;
+    const totalPages = Math.ceil(totalCount / limitNum) || 1;
+    const paginatedJobs = localJobs.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
     return res.json({
       success: true,
       data: {
-        jobs: localJobs,
+        jobs: paginatedJobs,
         pagination: {
-          currentPage: Number(page),
-          totalPages: 1,
-          totalCount: localJobs.length,
-          hasNextPage: false,
-          hasPrevPage: false
-        }
+          currentPage: pageNum,
+          totalPages: totalPages,
+          totalCount: totalCount,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1,
+        },
+        total: totalCount,
       }
     });
   } catch (error) {
@@ -374,6 +457,15 @@ export const proxyExportFilterOptions = async (req, res) => {
       timeout: 30000,
     });
 
+    if (response.data?.success && response.data?.data && ieCodeAssignments.length > 0) {
+      if (Array.isArray(response.data.data.exporters)) {
+        response.data.data.exporters = response.data.data.exporters.filter((exp) => {
+          const pseudoJob = { ieCode: exp.ieCode, exporter: exp.name, exporter_name: exp.name };
+          return jobMatchesExporterAssignment(pseudoJob, ieCodeAssignments);
+        });
+      }
+    }
+
     return res.json(response.data);
   } catch (error) {
     console.error("Export proxy filter options error:", error);
@@ -437,7 +529,7 @@ export const proxyExportTabCounts = async (req, res) => {
     } = req.query;
 
     const forwardParams = {
-      limit: 1,
+      limit: ieCodeAssignments.length > 0 ? 1000 : 1,
       search,
       country,
       consignmentType,
@@ -490,7 +582,7 @@ export const proxyExportTabCounts = async (req, res) => {
         return axios.get(exportApiUrl, {
           params: forwardParams,
           headers: { username: "Admin", "x-username": "Admin" },
-          timeout: 10000,
+          timeout: 15000,
         });
       });
       results = await Promise.all(requests);
@@ -501,7 +593,20 @@ export const proxyExportTabCounts = async (req, res) => {
     const counts = {};
     statuses.forEach((status, idx) => {
       const resData = results[idx]?.data;
-      counts[status] = resData?.data?.pagination?.totalCount || 0;
+      const rawJobs = resData?.data?.jobs || [];
+      if (rawJobs.length > 0 && ieCodeAssignments.length > 0) {
+        let matchedJobs = rawJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+        if (exporter && exporter.toLowerCase() !== "all") {
+          const expLower = exporter.toLowerCase().trim();
+          matchedJobs = matchedJobs.filter((j) => {
+            const jExp = (j.exporter || j.exporter_name || "").toLowerCase().trim();
+            return jExp.includes(expLower);
+          });
+        }
+        counts[status] = matchedJobs.length;
+      } else {
+        counts[status] = resData?.data?.pagination?.totalCount || 0;
+      }
     });
 
     const totalRemoteCount = Object.values(counts).reduce((a, b) => a + b, 0);

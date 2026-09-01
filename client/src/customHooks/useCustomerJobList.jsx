@@ -1754,22 +1754,6 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                   {detentionVal || "N/A"}
                 </span>
               </div>
-
-              <div>
-                <strong>Reason for Delay:</strong>
-                <span
-                  style={{
-                    marginLeft: "8px",
-                    color: (cell.row.original.reason_for_delay || cell.row.original.reasonForDelay || cell.row.original.delay_reason || cell.row.original.delayReason) ? "#b91c1c" : "inherit",
-                  }}
-                >
-                  {cell.row.original.reason_for_delay ||
-                    cell.row.original.reasonForDelay ||
-                    cell.row.original.delay_reason ||
-                    cell.row.original.delayReason ||
-                    "N/A"}
-                </span>
-              </div>
             </div>
           );
         },

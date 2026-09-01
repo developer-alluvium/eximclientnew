@@ -23,22 +23,41 @@ const collectOrgNames = (dbUser) => {
   return [...names];
 };
 
-const enquiryMatchesOrgs = (enquiry, orgNames) => {
-  if (!orgNames.length) return false;
-  const normalizedOrgs = orgNames.map(normalizeOrg).filter(Boolean);
-  const candidates = [
+const enquiryMatchesOrgs = (enquiry, dbUser) => {
+  const importerAssignments = dbUser.ie_code_assignments || [];
+  const exporterAssignments = dbUser.exporter_ie_code_assignments || [];
+  const allAssignments = [...importerAssignments, ...exporterAssignments];
+
+  if (!allAssignments.length) return false;
+
+  const rawCandidates = [
     enquiry.organization_name,
     enquiry.shipper_name,
     enquiry.consignee_name,
     enquiry.bl_details?.consignee,
     enquiry.bl_details?.consignor,
-  ]
-    .filter(Boolean)
-    .map(normalizeOrg);
+  ].filter(Boolean);
 
-  return candidates.some((c) =>
-    normalizedOrgs.some((org) => c.includes(org) || org.includes(c))
-  );
+  if (!rawCandidates.length) return false;
+
+  return allAssignments.some((a) => {
+    const org = (a.importer_name || "").toUpperCase();
+    const filter = (a.exporter_filter || "").toUpperCase();
+    const assignIec = (a.ie_code_no || "").toUpperCase();
+
+    return rawCandidates.some((candidateStr) => {
+      const cand = candidateStr.toUpperCase();
+      if (filter === "MODERN INSULATORS LIMITED" || (assignIec === "1388003881" && !filter.includes("TERRY TOWELS") && !org.includes("TERRY TOWELS"))) {
+        return cand.includes("MODERN INSULATORS") && !cand.includes("TERRY TOWELS");
+      }
+      if (filter.includes("TERRY TOWELS") || org.includes("TERRY TOWELS")) {
+        return cand.includes("TERRY TOWELS");
+      }
+      const normOrg = normalizeOrg(org);
+      const normCand = normalizeOrg(cand);
+      return normOrg && normCand && (normCand.includes(normOrg) || normOrg.includes(normCand));
+    });
+  });
 };
 
 const isConverted = (e) => e.status === "Converted" || !!e.source_job_no || !!e.success_no;
@@ -112,9 +131,9 @@ export const proxyFreightEnquiries = async (req, res) => {
       dbUser.role === "super_admin" ||
       dbUser.role === "superadmin";
 
-    const orgNames = collectOrgNames(dbUser);
+    const hasAssignments = (dbUser.ie_code_assignments?.length > 0) || (dbUser.exporter_ie_code_assignments?.length > 0);
 
-    if (!isAdmin && orgNames.length === 0) {
+    if (!isAdmin && !hasAssignments) {
       return res.json({ success: true, data: [] });
     }
 
@@ -143,7 +162,7 @@ export const proxyFreightEnquiries = async (req, res) => {
       data = all;
     } else {
       // Filter all jobs by user's assigned orgs
-      let orgFilteredData = all.filter((e) => enquiryMatchesOrgs(e, orgNames));
+      let orgFilteredData = all.filter((e) => enquiryMatchesOrgs(e, dbUser));
 
       if (orgFilteredData.length === 0) {
         try {

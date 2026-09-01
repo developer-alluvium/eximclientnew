@@ -361,8 +361,27 @@ export const proxyImportListing = async (req, res) => {
             const filterKeyword = assignment.exporter_filter.toLowerCase().trim();
             const jImporter = (j.importer || j.importer_name || "").toLowerCase();
             const jAddress = (typeof j.importer_address === 'string' ? j.importer_address : JSON.stringify(j.importer_address || {})).toLowerCase();
+            if (filterKeyword === "modern insulators limited") {
+              return (jImporter.includes("modern insulators limited") || jAddress.includes("modern insulators limited")) &&
+                     !jImporter.includes("terry towels") && !jAddress.includes("terry towels");
+            }
+            if (filterKeyword === "terry towels" || filterKeyword === "modern insulators limited(terry towels)") {
+              return jImporter.includes("terry towels") || jAddress.includes("terry towels");
+            }
             return jImporter.includes(filterKeyword) || jAddress.includes(filterKeyword);
           }
+
+          if (jIec === "1388003881") {
+            const jImporter = (j.importer || j.importer_name || "").toLowerCase();
+            const jAddress = (typeof j.importer_address === 'string' ? j.importer_address : JSON.stringify(j.importer_address || {})).toLowerCase();
+            const assignedName = (assignment?.importer_name || "").toLowerCase();
+            if (assignedName.includes("terry towels")) {
+              return jImporter.includes("terry towels") || jAddress.includes("terry towels");
+            } else {
+              return !jImporter.includes("terry towels") && !jAddress.includes("terry towels");
+            }
+          }
+
           return true;
         }
 
