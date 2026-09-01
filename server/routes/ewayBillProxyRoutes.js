@@ -248,7 +248,12 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     // ── STEP 1: Parse the PDF first (before any S3 upload) ────────────────
     const BOE_API_BASE = process.env.BOE_API_BASE_URL || "http://3.108.244.38:8002/api/v1";
     const form = new FormData();
+    // Append both 'files' and 'file' so that any parser API parameter signature (List[UploadFile] or UploadFile) matches
     form.append("files", file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype,
+    });
+    form.append("file", file.buffer, {
       filename: file.originalname,
       contentType: file.mimetype,
     });
@@ -257,14 +262,20 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     const parserResponse = await axios.post(`${BOE_API_BASE}/upload`, form, {
       headers: { ...form.getHeaders() },
       timeout: 60000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
     });
 
     const parsedData = parserResponse.data;
 
     let records = [];
-    if (parsedData.status === "success" && parsedData.data && typeof parsedData.data === "object" && !Array.isArray(parsedData.data)) {
-      records = Object.values(parsedData.data);
-    } else {
+    if (parsedData && parsedData.status === "success" && parsedData.data && typeof parsedData.data === "object" && !Array.isArray(parsedData.data)) {
+      if (!parsedData.data.ImporterDetails && !parsedData.data.InvoiceAndItemDetails && !parsedData.data["BE No"] && !parsedData.data.BE_NO) {
+        records = Object.values(parsedData.data);
+      } else {
+        records = [parsedData.data];
+      }
+    } else if (parsedData) {
       records = Array.isArray(parsedData) ? parsedData : (parsedData.records || parsedData.data || [parsedData]);
     }
 
@@ -276,7 +287,14 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
     const boeNumber = importerDetails["BE No"] || importerDetails["BE_NO"] || invoiceDetails.BE_NO || invoiceDetails.document_no || boeRecord.documentNumber || "";
     const rawBoeDate = importerDetails["BE Date"] || importerDetails["BE_DATE"] || invoiceDetails.BE_DATE || invoiceDetails.document_date || "";
 
-    const normalizedBoeNumber = boeNumber.trim();
+    const normalizedBoeNumber = (boeNumber || "").toString().trim();
+    if (!normalizedBoeNumber) {
+      return res.status(422).json({
+        success: false,
+        message: "Could not extract a valid Bill of Entry Number (BE No) from the provided PDF document. Please verify the file is a readable Bill of Entry.",
+      });
+    }
+
     const effectiveClientId = (req.user.adminId?._id || req.user.adminId || req.user._id)?.toString();
 
     console.log(`📋 [Others Upload] Parsed — boeNumber: "${normalizedBoeNumber}", clientId: ${effectiveClientId}`);
@@ -400,7 +418,39 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
         message: `Bill of Entry ${boe} has already been uploaded and is active. Please generate the E-Way Bill from the existing entry in the list.`,
       });
     }
-    res.status(500).json({ success: false, message: error.message || "Failed to process BOE upload" });
+
+    // Extract detailed error message from upstream parser (FastAPI / axios)
+    let errorMessage = "Failed to process BOE upload";
+    const status = error.response?.status || 500;
+
+    if (error.response?.data) {
+      const data = error.response.data;
+      if (typeof data === "string") {
+        errorMessage = data;
+      } else if (data.detail) {
+        if (typeof data.detail === "string") {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map(d => d.msg || `${d.loc ? d.loc.slice(1).join('.') + ': ' : ''}${d.msg || JSON.stringify(d)}`).join(", ");
+        } else {
+          errorMessage = JSON.stringify(data.detail);
+        }
+      } else if (data.message) {
+        errorMessage = data.message;
+      } else if (data.error) {
+        errorMessage = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+      } else if (data.results?.message) {
+        errorMessage = data.results.message;
+      }
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    res.status(status >= 400 && status < 600 ? status : 500).json({
+      success: false,
+      message: errorMessage,
+      ...(process.env.NODE_ENV === "development" && { stack: error.stack })
+    });
   }
 });
 

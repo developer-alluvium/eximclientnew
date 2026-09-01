@@ -9,7 +9,7 @@ import OpenPointProjectModel from "./models/openPoints/openPointProjectModel.js"
 dotenv.config();
 
 const run = async () => {
-  const mongoURI = process.env.PROD_MONGODB_URI || process.env.MONGODB_URI || "mongodb+srv://exim:I9y5bcMUHkGHpgq2@exim.xya3qh0.mongodb.net/exim";
+  const mongoURI = process.env.PROD_MONGODB_URI || process.env.MONGODB_URI;
   console.log("Connecting to MongoDB database...");
 
   try {
@@ -65,7 +65,7 @@ const run = async () => {
       user.assignedModules = modules;
       user.ie_code_assignments = [ieCodeAssignment];
       user.exporter_ie_code_assignments = [ieCodeAssignment];
-      
+
       await user.save();
       console.log(`✅ User ${email} updated successfully!`);
     } else {
