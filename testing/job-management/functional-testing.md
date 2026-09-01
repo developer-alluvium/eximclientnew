@@ -56,4 +56,3 @@
 - **Actual Result:** The Exporter filter selection fails to filter the dataset, displaying jobs for all exporters.
 - **Additional Notes:** Screenshot captured on 2026-08-26 showing `All Exporters` dropdown filter control. Frontend state change listener or backend query binding for exporter filtering should be inspected.
 
-
