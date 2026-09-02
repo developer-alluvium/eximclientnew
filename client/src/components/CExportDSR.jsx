@@ -704,13 +704,13 @@ function CExportDSR() {
   const exportColumnDefinitions = React.useMemo(() => [
     { id: "job_no", label: "JOB NO", width: "14%" },
     { id: "exporter", label: "CONSIGNEE", width: "17%" },
-    { id: "invoice", label: "INVOICE", width: "9%" },
+    { id: "invoice", label: "INVOICE", width: "13%" },
     { id: "sb_no", label: "SB NO", width: "8%" },
     { id: "port", label: "PORT", width: "13%" },
     { id: "container", label: "CONTAINER", width: "11%" },
     { id: "handover", label: "HANDOVER", width: "10%" },
     { id: "docs", label: "DOCS", width: "9%" },
-    { id: "query", label: "QUERY", width: "9%" },
+    { id: "query", label: "QUERY", width: "5%" },
   ], []);
 
   const [columnOrder, setColumnOrder] = React.useState(exportColumnDefinitions.map((col) => col.id));
@@ -1574,6 +1574,84 @@ function CExportDSR() {
                 </IconButton>
               </Box>
             )}
+
+            {/* Quick View Docs: LEO, Gate Pass, Booking Copy */}
+            {(() => {
+              const ops = job.operations && job.operations[0];
+              const status = ops ? (ops.statusDetails && ops.statusDetails[0]) || {} : {};
+              const getFirstUrl = (val) => {
+                if (Array.isArray(val) && val.length > 0) {
+                  const valid = val.find((v) => typeof v === "string" && v.trim());
+                  if (valid) return valid.trim();
+                }
+                if (typeof val === "string" && val.trim()) return val.trim();
+                return null;
+              };
+
+              const leoUrl = getFirstUrl(status.leoUpload) || getFirstUrl(job.leoUpload) || getFirstUrl(job.leo_copy);
+              const gatePassUrl = getFirstUrl(status.eGatePassUpload) || getFirstUrl(job.eGatePassUpload) || getFirstUrl(job.gate_pass_copy);
+              const bookingCopyUrl = getFirstUrl(job.booking_copy) || getFirstUrl(status.booking_copy) || getFirstUrl(status.bookingUpload) || getFirstUrl(job.bookingCopy);
+
+              const docItems = [
+                { label: "LEO", url: leoUrl, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+                { label: "GATE PASS", url: gatePassUrl, color: "#0d9488", bg: "#ccfbf1", border: "#99f6e4" },
+                { label: "BOOKING", url: bookingCopyUrl, color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+              ];
+
+              return (
+                <Box sx={{ mt: 0.8, pt: 0.5, borderTop: "1px dashed #e2e8f0" }}>
+                  <Typography sx={{ fontSize: "8.5px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.3px", mb: 0.3 }}>
+                    Quick View Docs:
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                    {docItems.map((item, dIdx) => (
+                      <Box
+                        key={dIdx}
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "2px",
+                          px: "4px",
+                          py: "1px",
+                          borderRadius: "3px",
+                          fontSize: "8.5px",
+                          fontWeight: 700,
+                          backgroundColor: item.url ? item.bg : "#f1f5f9",
+                          color: item.url ? item.color : "#94a3b8",
+                          border: `1px solid ${item.url ? item.border : "#e2e8f0"}`,
+                          cursor: item.url ? "pointer" : "default",
+                          transition: "all 0.15s ease",
+                          "&:hover": item.url ? { opacity: 0.85, transform: "translateY(-1px)" } : {},
+                        }}
+                        title={item.url ? `View ${item.label} document` : `${item.label} not uploaded`}
+                        onClick={(e) => {
+                          if (item.url) {
+                            e.stopPropagation();
+                            window.open(item.url, "_blank");
+                          }
+                        }}
+                      >
+                        <PictureAsPdf sx={{ fontSize: 10, color: item.url ? item.color : "#cbd5e1" }} />
+                        <span>{item.label}</span>
+                        {item.url && (
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyText(item.url, e);
+                            }}
+                            sx={{ p: 0.1, ml: 0.2 }}
+                            title={`Copy ${item.label} URL`}
+                          >
+                            <ContentCopy sx={{ fontSize: 8, color: item.color }} />
+                          </IconButton>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
           </TableCell>
         );
 
