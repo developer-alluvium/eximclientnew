@@ -59,10 +59,44 @@ if (config.nodeEnv === "production" || process.env.TRUST_PROXY === "1") {
   app.set("trust proxy", 1);
 }
 
+// 1. Path normalization middleware (strips /clientapi prefix if Nginx forwards it without stripping)
+app.use((req, res, next) => {
+  if (req.url.startsWith("/clientapi")) {
+    req.url = req.url.replace(/^\/clientapi/, "");
+    if (!req.url.startsWith("/")) {
+      req.url = "/" + req.url;
+    }
+  }
+  next();
+});
+
+// 2. Custom CORS Headers Middleware (Guarantees Access-Control headers for all requests & preflights)
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "https://client.alvision.in";
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Cache-Control, user-id, user-role, x-username, username, X-Requested-With, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Access-Control-Allow-Methods"
+  );
+
+  // Handle preflight OPTIONS request immediately with 200 OK
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
 // Enable Helmet for security headers
-app.use(helmet({
-  contentSecurityPolicy: false,
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
 
 // Rate Limiting
 const apiLimiter = rateLimit({
@@ -77,60 +111,10 @@ const apiLimiter = rateLimit({
 });
 app.use("/api", apiLimiter);
 
-// Middleware
+// Body Parsing & Cookies
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-
-// CORS configuration
-// Build allowed origins list using configured client URLs (env) and common dev hosts
-const defaultOrigins = [
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:3000",
-  "http://client.exim.alvision.in.s3-website.ap-south-1.amazonaws.com",
-  "https://client.alvision.in",
-  "https://eximbot.alvision.in",
-  "http://192.168.2.47:3001",
-  "http://3.108.244.38:8002",
-  "http://localhost:9003/api"
-
-];
-
-const allowedOrigins = [
-  config.client.development,
-  config.client.server,
-  config.client.production,
-  ...defaultOrigins,
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cache-Control",
-      "user-id",
-      "user-role",
-      "x-username",
-      "username",
-      "X-Requested-With",
-      "Access-Control-Allow-Origin",
-    ],
-  })
-);
-
-// app.use(
-//   cors({
-//     origin: "*", // Allow all origins
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//   })
-// );
 
 // Connect to MongoDB
 connectDB()

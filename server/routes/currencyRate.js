@@ -77,8 +77,8 @@ router.get('/api/currency-rates', async (req, res) => {
   }
 });
 
-// Get currency rate for a specific date via Export API
-router.get('/api/currency-rates/by-date/:date?', async (req, res) => {
+// Get currency rate for a specific date via Export API (Express 5 compatible)
+const getCurrencyRateByDate = async (req, res) => {
   try {
     const { date } = req.params;
     const url = date && date !== 'undefined' && date !== 'null'
@@ -142,7 +142,10 @@ router.get('/api/currency-rates/by-date/:date?', async (req, res) => {
       error: error.message,
     });
   }
-});
+};
+
+router.get('/api/currency-rates/by-date/:date', getCurrencyRateByDate);
+router.get('/api/currency-rates/by-date', getCurrencyRateByDate);
 
 // Get latest currency rates via Export API
 router.get('/api/currency-rates/latest', async (req, res) => {

@@ -10,25 +10,20 @@ dotenv.config();
  */
 const connectDB = async () => {
   try {
-    // Determine which MongoDB URI to use based on NODE_ENV
+    // Determine which MongoDB URI to use based on NODE_ENV with fallback
     const env = process.env.NODE_ENV || "development";
-    let mongoURI;
-
-    switch (env) {
-      case "production":
-        mongoURI = process.env.PROD_MONGODB_URI;
-        break;
-      case "server":
-        mongoURI = process.env.SERVER_MONGODB_URI;
-        break;
-      case "development":
-      default:
-        mongoURI = process.env.DEV_MONGODB_URI;
-        break;
-    }
+    let mongoURI =
+      (env === "production" && process.env.PROD_MONGODB_URI) ||
+      (env === "server" && process.env.SERVER_MONGODB_URI) ||
+      (env === "development" && process.env.DEV_MONGODB_URI) ||
+      process.env.PROD_MONGODB_URI ||
+      process.env.SERVER_MONGODB_URI ||
+      process.env.DEV_MONGODB_URI ||
+      "mongodb+srv://exim:I9y5bcMUHkGHpgq2@exim.xya3qh0.mongodb.net/exim";
 
     if (!mongoURI) {
-      throw new Error(`MongoDB URI not defined for environment: ${env}`);
+      console.warn(`[MongoDB Warning] No URI found for environment: ${env}`);
+      return null;
     }
 
     // Connection options (can be tuned via environment variables)
@@ -58,7 +53,7 @@ const connectDB = async () => {
     return conn;
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);
-    process.exit(1);
+    return null;
   }
 };
 

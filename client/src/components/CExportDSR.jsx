@@ -1026,7 +1026,12 @@ function CExportDSR() {
         });
         setJobs(flattenedJobs);
         const serverTotal = response.data.data.total || response.data.data.pagination?.totalCount || 0;
-        setTotalCount(Math.max(serverTotal, flattenedJobs.length));
+        const finalCount = Math.max(serverTotal, flattenedJobs.length);
+        setTotalCount(finalCount);
+        setTabCounts(prev => ({
+          ...prev,
+          [status.toLowerCase()]: finalCount
+        }));
 
         // Fetch client query status map
         const jobNos = flattenedJobs.map(j => j.job_no).filter(Boolean);
