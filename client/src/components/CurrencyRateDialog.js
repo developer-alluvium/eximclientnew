@@ -33,6 +33,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import axios from 'axios';
 
+const EXPORT_API_BASE_URL = "https://eximbot.alvision.in/export/api";
+
 const CurrencyRateDialog = ({ open, onClose }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currencyData, setCurrencyData] = useState(null);
@@ -62,7 +64,7 @@ const CurrencyRateDialog = ({ open, onClose }) => {
       const formattedDate = `${day}-${month}-${year}`;
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_STRING}/currency-rates/by-date/${formattedDate}`
+        `${EXPORT_API_BASE_URL}/currency-rates/by-date/${formattedDate}`
       );
 
       if (response.data.success) {
@@ -96,6 +98,28 @@ const CurrencyRateDialog = ({ open, onClose }) => {
       rate.currency_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.currency_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleManualScrape = async () => {
+  try {
+    setError('');
+    setLoading(true);
+
+    await axios.post(
+      `${EXPORT_API_BASE_URL}/currency-rates/scrape`
+    );
+
+    // After scrape completes, re-fetch for the selected date
+    await handleDateChange(selectedDate);
+  } catch (err) {
+    console.error('Error scraping currency rates:', err);
+    setError(
+      err.response?.data?.message ||
+      'Failed to manually refresh currency rates'
+    );
+    setLoading(false); // handleDateChange won't run if scrape fails
+  }
+};
+
 
   return (
     <Dialog
@@ -400,30 +424,48 @@ const CurrencyRateDialog = ({ open, onClose }) => {
       </DialogContent>
 
       {/* Footer */}
-      <Box
-        sx={{
-          px: 3,
-          py: 1.5,
-          bgcolor: '#fafafa',
-          borderTop: '1px solid #e0e0e0',
-          display: 'flex',
-          justifyContent: 'flex-end'
-        }}
-      >
-        <Button
-          onClick={onClose}
-          variant="outlined"
-          size="small"
-          color="primary"
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 3
-          }}
-        >
-          Close
-        </Button>
-      </Box>
+{/* Footer */}
+<Box
+  sx={{
+    px: 3,
+    py: 1.5,
+    bgcolor: '#fafafa',
+    borderTop: '1px solid #e0e0e0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 1
+  }}
+>
+  <Button
+    onClick={handleManualScrape}
+    variant="contained"
+    size="small"
+    color="primary"
+    disabled={loading}
+    sx={{
+      textTransform: 'none',
+      fontWeight: 600,
+      px: 2
+    }}
+  >
+    {loading ? 'Refreshing…' : 'Refresh Rates'}
+  </Button>
+
+  <Button
+    onClick={onClose}
+    variant="outlined"
+    size="small"
+    color="primary"
+    sx={{
+      textTransform: 'none',
+      fontWeight: 600,
+      px: 3
+    }}
+  >
+    Close
+  </Button>
+</Box>
+
     </Dialog>
   );
 };

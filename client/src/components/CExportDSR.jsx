@@ -1015,11 +1015,21 @@ function CExportDSR() {
 
       if (response.data.success) {
         const loadedJobs = response.data.data.jobs || [];
-        setJobs(loadedJobs);
-        setTotalCount(response.data.data.total || response.data.data.pagination?.totalCount || 0);
+        const flattenedJobs = [];
+        loadedJobs.forEach(job => {
+          flattenedJobs.push(job);
+          if (job.subRows && Array.isArray(job.subRows) && job.subRows.length > 0) {
+            job.subRows.forEach(sub => {
+              flattenedJobs.push({ ...sub, isSubRow: true });
+            });
+          }
+        });
+        setJobs(flattenedJobs);
+        const serverTotal = response.data.data.total || response.data.data.pagination?.totalCount || 0;
+        setTotalCount(Math.max(serverTotal, flattenedJobs.length));
 
         // Fetch client query status map
-        const jobNos = loadedJobs.map(j => j.job_no).filter(Boolean);
+        const jobNos = flattenedJobs.map(j => j.job_no).filter(Boolean);
         if (jobNos.length > 0) {
           axios.post(`${process.env.REACT_APP_API_STRING}/client-queries/jobs-status`, {
             jobNos,
@@ -1404,6 +1414,22 @@ function CExportDSR() {
                 <ContentCopy sx={{ fontSize: 13, color: "#334155", "&:hover": { color: "#0f172a" } }} />
               </IconButton>
             </Box>
+
+            {(job.is_club_job_parent || job.parent_club_job || job.isSubRow) && (
+              <Chip
+                label="CLUB"
+                size="small"
+                sx={{
+                  height: "16px",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  bgcolor: "#dbeafe",
+                  color: "#1e40af",
+                  borderRadius: "3px",
+                  mt: 0.3,
+                }}
+              />
+            )}
 
             <Typography sx={{ fontSize: "10px", color: "#64748b", fontWeight: 500, mt: 0.5 }}>
               {formatDate(job.job_date)}

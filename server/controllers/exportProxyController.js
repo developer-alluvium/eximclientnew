@@ -4,7 +4,129 @@ import EximclientUser from "../models/eximclientUserModel.js";
 
 const ExJobModel = mongoose.models.ExJob || mongoose.model("ExJob", new mongoose.Schema({}, { strict: false }), "ex_jobs");
 
-const EXPORT_API_BASE_URL = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
+const getCandidateUrls = () => {
+  const primary = process.env.EXPORT_API_BASE_URL || "https://eximbot.alvision.in/export/api";
+  const candidates = [
+    primary,
+    "https://eximbot.alvision.in/export/api",
+    "https://export.alvision.in/api",
+    "http://127.0.0.1:9002/api",
+    "http://localhost:9002/api"
+  ];
+  return Array.from(new Set(candidates.filter(Boolean)));
+};
+
+const axiosGetWithFallback = async (endpointPath, config = {}) => {
+  const candidateUrls = getCandidateUrls();
+  let lastError = null;
+
+  for (const baseUrl of candidateUrls) {
+    try {
+      const cleanBase = baseUrl.replace(/\/+$/, "");
+      const cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+      const url = `${cleanBase}${cleanPath}`;
+
+      const response = await axios.get(url, {
+        ...config,
+        headers: {
+          username: "Admin",
+          "x-username": "Admin",
+          ...(config.headers || {}),
+        },
+        timeout: config.timeout || 15000,
+      });
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND" || err.code === "ETIMEDOUT") {
+        console.warn(`Export API attempt to ${baseUrl} failed (${err.code}), trying next candidate...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+};
+
+const buildLocalFilterOptions = async (ieCodeAssignments, isAdmin) => {
+  const localQuery = {};
+  if (ieCodeAssignments.length > 0) {
+    const targetIeCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
+    if (targetIeCodes.length > 0) {
+      localQuery.$or = [
+        { ieCode: { $in: targetIeCodes } },
+        { exporter_ie_code: { $in: targetIeCodes } }
+      ];
+    }
+  }
+
+  const jobs = await ExJobModel.find(localQuery)
+    .select("custom_house customHouse branch_code branch consignmentType goods_stuffed_at stuffed_at year job_no exporter exporter_name detailedStatus createdAt ieCode exporter_ie_code")
+    .lean();
+
+  let matchedJobs = jobs;
+  if (ieCodeAssignments.length > 0) {
+    matchedJobs = jobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+  }
+
+  const customHousesSet = new Set();
+  const branchesSet = new Set();
+  const consignmentTypesSet = new Set();
+  const goodsStuffedAtSet = new Set();
+  const yearsSet = new Set();
+  const exportersMap = new Map();
+  const detailedStatusesSet = new Set();
+  const monthsSet = new Set();
+
+  matchedJobs.forEach((job) => {
+    const ch = job.custom_house || job.customHouse;
+    if (ch) customHousesSet.add(ch.trim());
+
+    const br = job.branch_code || job.branch;
+    if (br) branchesSet.add(br.trim());
+
+    const ct = job.consignmentType;
+    if (ct) consignmentTypesSet.add(ct.trim());
+
+    const sa = job.goods_stuffed_at || job.stuffed_at;
+    if (sa) goodsStuffedAtSet.add(sa.trim());
+
+    let yr = job.year;
+    if (!yr && job.job_no) {
+      const parts = String(job.job_no).split("/");
+      if (parts.length > 1) yr = parts[parts.length - 1];
+    }
+    if (yr) yearsSet.add(yr.trim());
+
+    const expName = job.exporter || job.exporter_name;
+    const iec = job.ieCode || job.exporter_ie_code;
+    if (expName) {
+      exportersMap.set(expName.trim(), { name: expName.trim(), ieCode: iec ? iec.trim() : "" });
+    }
+
+    if (Array.isArray(job.detailedStatus)) {
+      job.detailedStatus.forEach((ds) => { if (ds) detailedStatusesSet.add(String(ds).trim()); });
+    } else if (job.detailedStatus) {
+      detailedStatusesSet.add(String(job.detailedStatus).trim());
+    }
+
+    if (job.createdAt) {
+      const m = new Date(job.createdAt).getMonth() + 1;
+      if (!isNaN(m)) monthsSet.add(m);
+    }
+  });
+
+  return {
+    branches: Array.from(branchesSet).sort(),
+    customHouses: Array.from(customHousesSet).sort(),
+    consignmentTypes: Array.from(consignmentTypesSet).sort(),
+    goodsStuffedAt: Array.from(goodsStuffedAtSet).sort(),
+    years: Array.from(yearsSet).sort(),
+    exporters: Array.from(exportersMap.values()),
+    detailedStatuses: Array.from(detailedStatusesSet).sort(),
+    months: Array.from(monthsSet).sort((a, b) => a - b),
+  };
+};
 
 /**
  * GET /api/superadmin/available-exporters
@@ -20,39 +142,47 @@ export const getAvailableExporters = async (req, res) => {
     if (search) params.search = search;
     if (status) params.status = status;
 
-    const response = await axios.get(`${EXPORT_API_BASE_URL}/directory/iec-codes`, {
-      params,
-      timeout: 10000,
-    });
+    let responseData = null;
+    try {
+      const response = await axiosGetWithFallback("/directory/iec-codes", {
+        params,
+        timeout: 10000,
+      });
+      responseData = response.data;
+    } catch (err) {
+      console.warn("Get available exporters API error, using local DB fallback:", err.message);
+    }
 
-    if (response.data && response.data.success) {
+    if (responseData && responseData.success) {
       return res.json({
         success: true,
-        data: response.data.data || [],
-        message: response.data.message || `Found ${(response.data.data || []).length} exporter(s)`,
+        data: responseData.data || [],
+        message: responseData.message || `Found ${(responseData.data || []).length} exporter(s)`,
       });
     }
 
+    // Local DB fallback for exporters
+    const jobs = await ExJobModel.find({}).select("exporter exporter_name ieCode exporter_ie_code").lean();
+    const map = new Map();
+    jobs.forEach(j => {
+      const iec = j.ieCode || j.exporter_ie_code;
+      const name = j.exporter || j.exporter_name;
+      if (iec && name && !map.has(iec)) {
+        map.set(iec, { iecNo: iec, exporterName: name, approvalStatus: "APPROVED" });
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: Array.from(map.values()),
+      message: `Found ${map.size} exporter(s) (local fallback)`,
+    });
+  } catch (error) {
+    console.error("Get available exporters error:", error);
     res.json({
       success: true,
       data: [],
       message: "No exporters found",
-    });
-  } catch (error) {
-    console.error("Get available exporters (Export API) error:", error);
-
-    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-      return res.status(503).json({
-        success: false,
-        message: "Export API is currently unavailable. Please ensure the Export server is running.",
-        error: error.message,
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch available exporters from Export API.",
-      error: error.message,
     });
   }
 };
@@ -114,21 +244,10 @@ export const jobMatchesExporterAssignment = (job, assignments) => {
 /**
  * GET /api/exports/:status
  * Proxies the export listing request to the Exim-Export server.
- *
- * Business rules:
- *  - If the requesting user has ie_code_assignments, the `ieCode` query param
- *    is automatically populated (overriding whatever the client sent).
- *  - If the user has NO ie_code_assignments → return empty result (no access).
- *  - Admins can freely filter by any ieCode.
- *
- * Supported query params: page, limit, search, exporter, country,
- *   consignmentType, branch, status, year, detailedStatus, jobOwner, month
  */
 export const proxyExportListing = async (req, res) => {
   try {
     const { status = "all" } = req.params;
-
-    // The authenticated user (set by authenticateUser middleware)
     const user = req.user;
 
     if (!user) {
@@ -138,7 +257,6 @@ export const proxyExportListing = async (req, res) => {
       });
     }
 
-    // Fetch fresh user data to get IE code assignments
     const dbUser = await EximclientUser.findById(user.id || user._id)
       .select("exporter_ie_code_assignments role name email selected_branches")
       .lean();
@@ -150,7 +268,6 @@ export const proxyExportListing = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
     const ieCodeAssignments = dbUser.exporter_ie_code_assignments || [];
 
-    // Build query params to forward to the Export API
     const {
       page = 1,
       limit = 10,
@@ -185,14 +302,11 @@ export const proxyExportListing = async (req, res) => {
       pendingQueries,
     };
 
-    // Check if the user has assigned exporters (both Admin and Client User roles can have assignments)
     if (ieCodeAssignments.length > 0) {
       const ieCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
       if (ieCode && ieCodes.includes(ieCode)) {
-        // Safe: they are filtering by a specific ieCode that is assigned to them
         forwardParams.ieCode = ieCode;
       } else {
-        // Default: combined data of all assigned exporters
         forwardParams.ieCode = ieCodes.join(",");
       }
 
@@ -201,7 +315,6 @@ export const proxyExportListing = async (req, res) => {
         forwardParams.exporter = defaultExporterFilter;
       }
     } else {
-      // Regular users with no IE code assignments get empty result immediately
       if (!isAdmin) {
         return res.json({
           success: true,
@@ -225,7 +338,6 @@ export const proxyExportListing = async (req, res) => {
       }
     }
 
-    // Branch restrictions for admins
     if (isAdmin) {
       const branchRestrictions = dbUser.selected_branches || [];
       if (branchRestrictions.length > 0) {
@@ -239,14 +351,9 @@ export const proxyExportListing = async (req, res) => {
 
     let responseData = null;
     try {
-      const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
-      const response = await axios.get(exportApiUrl, {
+      const response = await axiosGetWithFallback(`/operation-jobs/${encodeURIComponent(status)}`, {
         params: forwardParams,
-        headers: {
-          username: "Admin",
-          "x-username": "Admin"
-        },
-        timeout: 30000,
+        timeout: 20000,
       });
       responseData = response.data;
     } catch (apiErr) {
@@ -288,7 +395,7 @@ export const proxyExportListing = async (req, res) => {
       return res.json(responseData);
     }
 
-    // Local MongoDB fallback (e.g. for demo client or offline server)
+    // Local MongoDB fallback
     const targetIeCodes = (forwardParams.ieCode || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
     const localQuery = {};
     if (targetIeCodes.length > 0) {
@@ -312,31 +419,10 @@ export const proxyExportListing = async (req, res) => {
     if (status && status.toLowerCase() !== "all") {
       localQuery.status = new RegExp(`^${status}$`, "i");
     }
-    if (year && year.toLowerCase() !== "all") {
-      const escapedYear = year.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-      localQuery.$and = localQuery.$and || [];
-      localQuery.$and.push({
-        $or: [
-          { year: year },
-          { job_no: new RegExp(`/${escapedYear}$`, "i") }
-        ]
-      });
-    }
 
     let localJobs = await ExJobModel.find(localQuery).lean();
     if (ieCodeAssignments.length > 0) {
       localJobs = localJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
-    }
-    if (year && year.toLowerCase() !== "all") {
-      const yearLower = year.toLowerCase();
-      localJobs = localJobs.filter((j) => {
-        if (!j) return false;
-        const jYear = j.year ? String(j.year).trim().toLowerCase() : "";
-        const jJobNo = j.job_no ? String(j.job_no).trim().toLowerCase() : "";
-        if (jYear) return jYear === yearLower;
-        if (jJobNo) return jJobNo.endsWith(`/${yearLower}`);
-        return true;
-      });
     }
 
     const pageNum = Number(page) || 1;
@@ -357,27 +443,17 @@ export const proxyExportListing = async (req, res) => {
           hasPrevPage: pageNum > 1,
         },
         total: totalCount,
-      }
+      },
     });
   } catch (error) {
     console.error("Export proxy listing error:", error);
-
-    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-      return res.status(503).json({
-        success: false,
-        message: "Export API is currently unavailable. Please ensure the Export server is running.",
-        error: error.message,
-      });
-    }
-
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch export jobs.",
-      error: error.message,
+    return res.json({
+      success: true,
+      data: {
+        jobs: [],
+        pagination: { currentPage: 1, totalPages: 0, totalCount: 0, hasNextPage: false, hasPrevPage: false },
+        total: 0,
+      },
     });
   }
 };
@@ -397,7 +473,6 @@ export const proxyExportFilterOptions = async (req, res) => {
       });
     }
 
-    // Fetch fresh user data to get IE code assignments
     const dbUser = await EximclientUser.findById(user.id || user._id)
       .select("exporter_ie_code_assignments role")
       .lean();
@@ -423,7 +498,6 @@ export const proxyExportFilterOptions = async (req, res) => {
       const assignedCodes = ieCodeAssignments.map((a) => a.ie_code_no).filter(Boolean);
       forwardParams.ieCode = assignedCodes.join(",");
     } else if (!isAdmin) {
-      // Non-admins with no assignments get empty filters list
       return res.json({
         success: true,
         data: {
@@ -446,46 +520,40 @@ export const proxyExportFilterOptions = async (req, res) => {
       }
     }
 
-    const exportFilterUrl = `${EXPORT_API_BASE_URL}/operation-jobs-filters`;
+    try {
+      const response = await axiosGetWithFallback("/operation-jobs-filters", {
+        params: forwardParams,
+        timeout: 15000,
+      });
 
-    const response = await axios.get(exportFilterUrl, {
-      params: forwardParams,
-      headers: {
-        username: "Admin",
-        "x-username": "Admin"
-      },
-      timeout: 30000,
-    });
-
-    if (response.data?.success && response.data?.data && ieCodeAssignments.length > 0) {
-      if (Array.isArray(response.data.data.exporters)) {
-        response.data.data.exporters = response.data.data.exporters.filter((exp) => {
-          const pseudoJob = { ieCode: exp.ieCode, exporter: exp.name, exporter_name: exp.name };
-          return jobMatchesExporterAssignment(pseudoJob, ieCodeAssignments);
-        });
+      if (response.data?.success && response.data?.data && ieCodeAssignments.length > 0) {
+        if (Array.isArray(response.data.data.exporters)) {
+          response.data.data.exporters = response.data.data.exporters.filter((exp) => {
+            const pseudoJob = { ieCode: exp.ieCode, exporter: exp.name, exporter_name: exp.name };
+            return jobMatchesExporterAssignment(pseudoJob, ieCodeAssignments);
+          });
+        }
       }
-    }
 
-    return res.json(response.data);
-  } catch (error) {
-    console.error("Export proxy filter options error:", error);
-
-    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-      return res.status(503).json({
-        success: false,
-        message: "Export API is currently unavailable. Please ensure the Export server is running.",
-        error: error.message,
+      return res.json(response.data);
+    } catch (apiErr) {
+      console.warn("Remote export filter options error, falling back to local DB:", apiErr.message);
+      const localFilterData = await buildLocalFilterOptions(ieCodeAssignments, isAdmin);
+      return res.json({
+        success: true,
+        data: localFilterData,
+        message: "Loaded filter options from local database fallback.",
       });
     }
+  } catch (error) {
+    console.error("Export proxy filter options error:", error);
+    const localFilterData = await buildLocalFilterOptions([], true).catch(() => ({
+      branches: [], customHouses: [], consignmentTypes: [], goodsStuffedAt: [], years: [], exporters: [], detailedStatuses: [], months: []
+    }));
 
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch export filter options.",
-      error: error.message,
+    return res.json({
+      success: true,
+      data: localFilterData,
     });
   }
 };
@@ -578,10 +646,8 @@ export const proxyExportTabCounts = async (req, res) => {
     let results = [];
     try {
       const requests = statuses.map(status => {
-        const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
-        return axios.get(exportApiUrl, {
+        return axiosGetWithFallback(`/operation-jobs/${encodeURIComponent(status)}`, {
           params: forwardParams,
-          headers: { username: "Admin", "x-username": "Admin" },
           timeout: 15000,
         });
       });
@@ -636,20 +702,9 @@ export const proxyExportTabCounts = async (req, res) => {
 
   } catch (error) {
     console.error("Export proxy tab counts error:", error);
-    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-      return res.status(503).json({
-        success: false,
-        message: "Export API is currently unavailable. Please ensure the Export server is running.",
-        error: error.message,
-      });
-    }
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch export tab counts.",
-      error: error.message,
+    return res.json({
+      success: true,
+      data: { pending: 0, "booking pending": 0, "handover pending": 0, "billing pending": 0, completed: 0, cancelled: 0 }
     });
   }
 };
@@ -661,27 +716,34 @@ export const proxyExportTabCounts = async (req, res) => {
 export const proxyExporterBranches = async (req, res) => {
   try {
     const { ieCode = "" } = req.query;
-    const response = await axios.get(`${EXPORT_API_BASE_URL}/operation-jobs-exporter-names`, {
-      params: { ieCode },
-      timeout: 10000,
-    });
-    return res.json(response.data);
-  } catch (error) {
-    console.error("Fetch exporter branches proxy error:", error);
-    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
-      return res.status(503).json({
-        success: false,
-        message: "Export API is currently unavailable.",
-        error: error.message,
+    let responseData = null;
+    try {
+      const response = await axiosGetWithFallback("/operation-jobs-exporter-names", {
+        params: { ieCode },
+        timeout: 10000,
       });
+      responseData = response.data;
+    } catch (err) {
+      console.warn("Fetch exporter branches proxy error, attempting local DB fallback:", err.message);
     }
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
+
+    if (responseData) {
+      return res.json(responseData);
     }
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch exporter sub-branches.",
-      error: error.message,
+
+    const localQuery = ieCode ? { $or: [{ ieCode }, { exporter_ie_code: ieCode }] } : {};
+    const jobs = await ExJobModel.find(localQuery).select("exporter exporter_name").lean();
+    const uniqueExporters = Array.from(new Set(jobs.map(j => (j.exporter || j.exporter_name || "").trim()).filter(Boolean))).sort();
+
+    return res.json({
+      success: true,
+      data: uniqueExporters,
+    });
+  } catch (error) {
+    console.error("Fetch exporter branches error:", error);
+    return res.json({
+      success: true,
+      data: [],
     });
   }
 };
