@@ -19,6 +19,15 @@ import { useImportersContext } from "../context/importersContext";
 import { useNavigate } from "react-router-dom";
 import ContainerModal from "./ContainerModal";
 import ColumnSettingsModal from './Transport/ColumnSettingsModal';
+import {
+    FormControl,
+    Select as MuiSelect,
+    MenuItem,
+    Checkbox,
+    ListItemText,
+    Box
+} from "@mui/material";
+import { downloadAllReport } from "../utils/downloadAllReport.jsx";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -26,12 +35,14 @@ const { Title, Text } = Typography;
 function CJobList(props) {
     const [years, setYears] = useState([]);
     const [selectedYear, setSelectedYear] = useState("");
-    const [detailedStatus, setDetailedStatus] = useState("all");
+    const [selectedDetailedStatus, setSelectedDetailedStatus] = useState([]);
+    const detailedStatus = "all";
     const [custom_house, setCustomHouse] = useState("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
     const [selectedExporter, setSelectedExporter] = useState("all");
     const [exporters, setExporters] = useState([]);
+    const [downloadLoading, setDownloadLoading] = useState(false);
 
     const { importers, selectedImporter, setSelectedImporter } = useImportersContext();
     const [username, setUsername] = useState(null);
@@ -106,6 +117,68 @@ function CJobList(props) {
 
     // Keep a simple bg-only helper for the status dot in the select
     const getStatusColor = (statusValue) => getStatusTheme(statusValue).bg;
+
+    // Calculate job counts for each detailed status stage
+    const detailedStatusCounts = React.useMemo(() => {
+        if (!rows || rows.length === 0) return {};
+        const counts = {};
+        detailedStatusOptions.forEach(opt => {
+            if (opt.value !== "all") counts[opt.value] = 0;
+        });
+        rows.forEach(row => {
+            const st = (row.detailed_status || row.status || "").trim();
+            detailedStatusOptions.forEach(opt => {
+                if (opt.value === "all") return;
+                const matches =
+                    st === opt.value ||
+                    st.toLowerCase() === opt.name.toLowerCase() ||
+                    st.toLowerCase() === opt.value.toLowerCase() ||
+                    (opt.value === "Custom Clearance Completed" && (st.includes("Clearance Completed") || st.includes("Custom Clearance")));
+                if (matches) {
+                    counts[opt.value] = (counts[opt.value] || 0) + 1;
+                }
+            });
+        });
+        return counts;
+    }, [rows]);
+
+    // Filter rows based on selected multi-select detailed statuses
+    const filteredDisplayRows = React.useMemo(() => {
+        if (!rows) return [];
+        if (!selectedDetailedStatus || selectedDetailedStatus.length === 0 || selectedDetailedStatus.includes("all")) {
+            return rows;
+        }
+        return rows.filter(row => {
+            const st = (row.detailed_status || row.status || "").trim();
+            return selectedDetailedStatus.some(selVal =>
+                st === selVal ||
+                st.toLowerCase() === selVal.toLowerCase() ||
+                (selVal === "Custom Clearance Completed" && (st.includes("Clearance Completed") || st.includes("Custom Clearance")))
+            );
+        });
+    }, [rows, selectedDetailedStatus]);
+
+    // Download DSR Report in Excel format using ExcelJS helper
+    const handleDownloadDSRReport = async () => {
+        if (!filteredDisplayRows || filteredDisplayRows.length === 0) {
+            message.warning("No jobs available to export");
+            return;
+        }
+        setDownloadLoading(true);
+        try {
+            const statusLabel = props.status || "Pending";
+            const stageLabel = selectedDetailedStatus.length > 0 && !selectedDetailedStatus.includes("all")
+                ? selectedDetailedStatus.join(", ")
+                : "All Stages";
+            await downloadAllReport(filteredDisplayRows, statusLabel, stageLabel);
+            message.success("Excel report downloaded successfully!");
+        } catch (err) {
+            console.error("Error downloading DSR report:", err);
+            message.error("Failed to download DSR report");
+        } finally {
+            setDownloadLoading(false);
+        }
+    };
 
     // Initialize User from Cookie
     useEffect(() => {
@@ -321,6 +394,23 @@ function CJobList(props) {
                         </Select>
                     )}
 
+                    {/* Download DSR Report Button */}
+                    <Button
+                        icon={<DownloadOutlined />}
+                        loading={downloadLoading}
+                        onClick={handleDownloadDSRReport}
+                        size="small"
+                        style={{
+                            borderRadius: "6px",
+                            borderColor: "#cbd5e1",
+                            color: "#475569",
+                            fontWeight: 600,
+                            fontSize: "12px"
+                        }}
+                    >
+                        {downloadLoading ? "Downloading..." : "Download DSR Report"}
+                    </Button>
+
                     {/* Columns and Save Layout Buttons */}
                     <Button
                         icon={<SettingOutlined />}
@@ -372,33 +462,79 @@ function CJobList(props) {
                         {icdCodeOptions.map(p => <Option key={p} value={p}>{p}</Option>)}
                     </Select>
 
-                    {/* Status Select */}
-                    <Select
-                        value={detailedStatus}
-                        onChange={setDetailedStatus}
-                        style={{ width: 180 }}
-                        size="small"
-                    >
-                        {detailedStatusOptions.map((opt, idx) => (
-                            <Option key={idx} value={opt.value}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    {opt.value !== 'all' && (
-                                        <span
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                border: '1px solid #718096',
-                                                backgroundColor: getStatusColor(opt.value) || 'transparent',
-                                                display: 'inline-block'
-                                            }}
-                                        />
-                                    )}
-                                    {opt.name}
-                                </div>
-                            </Option>
-                        ))}
-                    </Select>
+                    {/* Detailed Status Select (Multi-Select Stage Dropdown with Checkboxes and Counts) */}
+                    <FormControl size="small" sx={{ width: 180, minWidth: 160 }}>
+                        <MuiSelect
+                            multiple
+                            value={selectedDetailedStatus}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setSelectedDetailedStatus(typeof value === 'string' ? value.split(',') : value);
+                            }}
+                            displayEmpty
+                            renderValue={(selected) => {
+                                if (!selected || selected.length === 0 || selected.includes("all")) {
+                                    return <em style={{ fontSize: "12px", color: "#64748b", fontStyle: "normal" }}>All Detailed Status</em>;
+                                }
+                                return <span style={{ fontSize: "12px", fontWeight: 600 }}>{selected.join(", ")}</span>;
+                            }}
+                            sx={{
+                                height: 28,
+                                bgcolor: selectedDetailedStatus.length > 0 && !selectedDetailedStatus.includes("all") ? "#eff6ff" : "#fff",
+                                fontSize: "12px",
+                                borderRadius: "6px",
+                                "& .MuiSelect-select": {
+                                    py: 0.5,
+                                    px: 1,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    color: selectedDetailedStatus.length > 0 && !selectedDetailedStatus.includes("all") ? "#1d4ed8" : "#1e293b"
+                                },
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                    borderColor: selectedDetailedStatus.length > 0 && !selectedDetailedStatus.includes("all") ? "#3b82f6" : "#cbd5e1"
+                                }
+                            }}
+                        >
+                            {detailedStatusOptions.map((opt) => {
+                                if (opt.value === "all") return null;
+                                const statusValue = opt.value;
+                                const statusName = opt.name;
+                                const count = detailedStatusCounts[statusValue] !== undefined ? detailedStatusCounts[statusValue] : 0;
+                                const theme = getStatusTheme(statusValue);
+                                const isChecked = selectedDetailedStatus.indexOf(statusValue) > -1;
+
+                                return (
+                                    <MenuItem key={statusValue} value={statusValue} sx={{ py: 0.5, fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                                            <Checkbox size="small" checked={isChecked} sx={{ p: 0.5 }} />
+                                            <span style={{
+                                                display: "inline-block",
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: "50%",
+                                                backgroundColor: theme.border || "#3b82f6",
+                                                marginRight: 8,
+                                                marginLeft: 2
+                                            }} />
+                                            <ListItemText primary={statusName} primaryTypographyProps={{ fontSize: "12px", fontWeight: 500 }} />
+                                        </Box>
+                                        <span style={{
+                                            fontSize: "11px",
+                                            backgroundColor: "#f1f5f9",
+                                            color: "#334155",
+                                            padding: "1px 7px",
+                                            borderRadius: "10px",
+                                            fontWeight: "700",
+                                            marginLeft: "12px",
+                                            border: "1px solid #cbd5e1"
+                                        }}>
+                                            {count}
+                                        </span>
+                                    </MenuItem>
+                                );
+                            })}
+                        </MuiSelect>
+                    </FormControl>
 
                     {/* Exporter Select */}
                     <Select
@@ -431,7 +567,7 @@ function CJobList(props) {
             {/* Table Content */}
             <div className="jobs-list-content">
                 <CJobListTable
-                    data={sortJobsByQueryPriority(rows)}
+                    data={sortJobsByQueryPriority(filteredDisplayRows)}
                     columns={columns}
                     columnOrder={columnOrder}
                     setColumnOrder={handleColumnOrderChange}

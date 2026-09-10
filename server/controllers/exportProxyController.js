@@ -660,8 +660,11 @@ export const proxyExportTabCounts = async (req, res) => {
     statuses.forEach((status, idx) => {
       const resData = results[idx]?.data;
       const rawJobs = resData?.data?.jobs || [];
-      if (rawJobs.length > 0 && ieCodeAssignments.length > 0) {
-        let matchedJobs = rawJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+      if (rawJobs.length > 0) {
+        let matchedJobs = rawJobs;
+        if (ieCodeAssignments.length > 0) {
+          matchedJobs = rawJobs.filter((j) => jobMatchesExporterAssignment(j, ieCodeAssignments));
+        }
         if (exporter && exporter.toLowerCase() !== "all") {
           const expLower = exporter.toLowerCase().trim();
           matchedJobs = matchedJobs.filter((j) => {
@@ -669,7 +672,19 @@ export const proxyExportTabCounts = async (req, res) => {
             return jExp.includes(expLower);
           });
         }
-        counts[status] = matchedJobs.length;
+
+        // Unpack subRows to count child club jobs accurately for ALL tabs
+        const flattenedMatched = [];
+        matchedJobs.forEach(job => {
+          flattenedMatched.push(job);
+          if (job.subRows && Array.isArray(job.subRows) && job.subRows.length > 0) {
+            job.subRows.forEach(sub => {
+              flattenedMatched.push(sub);
+            });
+          }
+        });
+
+        counts[status] = flattenedMatched.length;
       } else {
         counts[status] = resData?.data?.pagination?.totalCount || 0;
       }

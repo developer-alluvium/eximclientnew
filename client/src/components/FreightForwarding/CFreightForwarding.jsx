@@ -95,8 +95,6 @@ function DocsViewCell({ row }) {
           { label: "GATE PASS", field: "gate_pass" },
           { label: "HBL", field: "hbl_copy" },
           { label: "MBL", field: "mbl_copy" },
-          { label: "AGENT INVOICE", field: "agent_invoice" },
-          { label: "OTHER", field: "other_copy" },
         ];
       case "Export-Air":
         return [
@@ -106,8 +104,6 @@ function DocsViewCell({ row }) {
           { label: "LEO", field: "leo_copy" },
           { label: "HAWB", field: "hawb_copy" },
           { label: "MAWB", field: "mawb_copy" },
-          { label: "AGENT INVOICE", field: "agent_invoice" },
-          { label: "OTHER", field: "other_copy" },
         ];
       case "Import-Sea":
         return [
@@ -116,8 +112,6 @@ function DocsViewCell({ row }) {
           { label: "HBL", field: "hbl_copy" },
           { label: "MBL", field: "mbl_copy" },
           { label: "DO", field: "do_copy" },
-          { label: "AGENT INVOICE", field: "agent_invoice" },
-          { label: "OTHER", field: "other_copy" },
         ];
       case "Import-Air":
         return [
@@ -126,8 +120,6 @@ function DocsViewCell({ row }) {
           { label: "HAWB", field: "hawb_copy" },
           { label: "MAWB", field: "mawb_copy" },
           { label: "DO", field: "do_copy" },
-          { label: "AGENT INVOICE", field: "agent_invoice" },
-          { label: "OTHER", field: "other_copy" },
         ];
       default:
         return [

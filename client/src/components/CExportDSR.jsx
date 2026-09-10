@@ -228,6 +228,33 @@ const buildShippingLineUrls = (num, containerFirst = "") => ({
   UNIFEEDER: num ? `https://www.unifeeder.cargoes.com/tracking?ID=${num.slice(0, 3)}%2F${num.slice(3, 6)}%2F${num.slice(6, 8)}%2F${num.slice(8)}` : "#",
 });
 
+const getCleanContainerSize = (cntr) => {
+  if (!cntr) return "";
+  let raw = "";
+  if (typeof cntr === "string") {
+    raw = cntr;
+  } else {
+    raw = cntr.containerSize || cntr.type || "";
+  }
+  if (!raw) return "";
+
+  // Remove leading 4-digit ISO code e.g. "4510 40 HC" -> "40 HC"
+  let cleaned = raw.replace(/^\d{4}\s+/, "").replace(/\s+\d{4}$/, "").trim();
+
+  // If cleaned is still just 4 digits or empty, match standard sizes
+  if (/^\d{4}$/.test(cleaned) || !cleaned) {
+    const match = raw.match(/(?:20|40|45)\s*(?:HC|DV|FT|FEET)?/i);
+    if (match) return match[0].toUpperCase();
+    if (/^\d{4}$/.test(cleaned)) {
+      if (cleaned.startsWith("2")) return "20";
+      if (cleaned.startsWith("4")) return "40";
+    }
+    return "";
+  }
+
+  return cleaned.toUpperCase();
+};
+
 const getContainerSizeLabel = (value) => {
   const raw = (value || "").toString().toUpperCase().trim();
   const sizeMatch = raw.match(/\b(20|40|45)\b/);
@@ -272,6 +299,39 @@ const EXPORT_DOC_CATEGORIES = [
     ],
   },
 ];
+
+const formatDateStr = (dateVal) => {
+  if (!dateVal) return "";
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return "";
+    const day = String(dateVal.getDate()).padStart(2, "0");
+    const month = String(dateVal.getMonth() + 1).padStart(2, "0");
+    const year = dateVal.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  const trimmed = String(dateVal).trim();
+  if (!trimmed) return "";
+
+  if (/^\d{2}-\d{2}-\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^\d{2}-\d{2}-\d{2}$/.test(trimmed)) {
+    const parts = trimmed.split("-");
+    return `${parts[0]}-${parts[1]}-20${parts[2]}`;
+  }
+
+  if (trimmed.includes("T") || trimmed.includes("-") || trimmed.includes("/")) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+  }
+
+  return trimmed;
+};
 
 const formatDate = (dateVal) => {
   if (!dateVal) return "";
@@ -374,11 +434,23 @@ const getJobScrollAndEgmInfo = (job) => {
     });
   }
 
+  const thirdPartyName =
+    job.buyerThirdPartyInfo?.thirdParty?.name ||
+    job.buyerThirdPartyInfo?.buyer?.name ||
+    (typeof job.buyerThirdPartyInfo === "string" ? job.buyerThirdPartyInfo : "") ||
+    job.third_party_name ||
+    job.third_party ||
+    "";
+
   return {
     dbkScrolls: dbkInfoList,
     rosctlScrolls: rosctlInfoList,
     egmNo: job.egm_no,
     egmDate: job.egm_date,
+    thirdPartyName,
+    fwdrName: job.forwarder || (job.operations?.[0]?.statusDetails?.[0]?.forwarderName) || "",
+    bookingNo: job.booking_no || "",
+    shippingLine: job.shipping_line_airline || "",
   };
 };
 
@@ -387,17 +459,68 @@ const isDrawbackJob = (job) => {
   const info = getJobScrollAndEgmInfo(job);
   if (info.dbkScrolls && info.dbkScrolls.length > 0) return true;
 
-  const textFields = [
+  // Direct fields on job object
+  const topText = [
     job.scheme,
     job.scheme_code,
     job.exim_scheme,
     job.eximCode,
     job.reward_scheme,
     job.type_of_export,
-    ...(Array.isArray(job.invoices) ? job.invoices.flatMap(inv => [inv.scheme_code, inv.scheme, inv.eximCode, inv.exim_scheme, inv.reward_scheme]) : [])
+    job.sb_type,
   ].filter(Boolean).join(" ").toLowerCase();
 
-  return textFields.includes("drawback") || textFields.includes("dbk");
+  if (topText.includes("drawback") || topText.includes("dbk")) return true;
+
+  // Invoices & Products
+  if (Array.isArray(job.invoices)) {
+    for (const inv of job.invoices) {
+      if (inv.drawback_scroll_no || inv.dbk_scroll_no) return true;
+
+      const invText = [
+        inv.scheme,
+        inv.scheme_code,
+        inv.exim_scheme,
+        inv.eximCode,
+        inv.reward_scheme,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (invText.includes("drawback") || invText.includes("dbk")) return true;
+
+      if (Array.isArray(inv.products)) {
+        for (const prod of inv.products) {
+          const prodText = [
+            prod.eximCode,
+            prod.scheme,
+            prod.scheme_code,
+            prod.schemeCode,
+            prod.dbkType,
+          ].filter(Boolean).join(" ").toLowerCase();
+
+          if (prodText.includes("drawback") || prodText.includes("dbk")) return true;
+
+          // Numeric scheme codes for Drawback: 19, 43, 60, 61
+          const rawCode = String(prod.eximCode || "").trim();
+          if (/^(19|43|60|61)(\D|$)/.test(rawCode)) return true;
+
+          if (Array.isArray(prod.drawbackDetails) && prod.drawbackDetails.length > 0) {
+            for (const dbk of prod.drawbackDetails) {
+              if (
+                dbk.drawback_scroll_no ||
+                dbk.dbkitem === true ||
+                Number(dbk.dbkAmount) > 0 ||
+                dbk.dbkSrNo ||
+                (dbk.dbkRate && Number(dbk.dbkRate) > 0)
+              ) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return false;
 };
 
 const isRosctlJob = (job) => {
@@ -405,17 +528,78 @@ const isRosctlJob = (job) => {
   const info = getJobScrollAndEgmInfo(job);
   if (info.rosctlScrolls && info.rosctlScrolls.length > 0) return true;
 
-  const textFields = [
+  // Direct fields on job object
+  const topText = [
     job.scheme,
     job.scheme_code,
     job.exim_scheme,
     job.eximCode,
     job.reward_scheme,
     job.type_of_export,
-    ...(Array.isArray(job.invoices) ? job.invoices.flatMap(inv => [inv.scheme_code, inv.scheme, inv.eximCode, inv.exim_scheme, inv.reward_scheme]) : [])
+    job.sb_type,
   ].filter(Boolean).join(" ").toLowerCase();
 
-  return textFields.includes("rosctl");
+  if (topText.includes("rosctl")) return true;
+
+  // Invoices & Products
+  if (Array.isArray(job.invoices)) {
+    for (const inv of job.invoices) {
+      if (inv.rosctl_scroll_no) return true;
+
+      const invText = [
+        inv.scheme,
+        inv.scheme_code,
+        inv.exim_scheme,
+        inv.eximCode,
+        inv.reward_scheme,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (invText.includes("rosctl")) return true;
+
+      if (Array.isArray(inv.products)) {
+        for (const prod of inv.products) {
+          const prodText = [
+            prod.eximCode,
+            prod.scheme,
+            prod.scheme_code,
+            prod.schemeCode,
+          ].filter(Boolean).join(" ").toLowerCase();
+
+          if (prodText.includes("rosctl")) return true;
+
+          // Numeric scheme codes for RoSCTL: 60, 61
+          const rawCode = String(prod.eximCode || "").trim();
+          if (/^(60|61)(\D|$)/.test(rawCode)) return true;
+
+          if (prod.rosctlInfo) {
+            if (
+              String(prod.rosctlInfo.claim || "").toLowerCase() === "yes" ||
+              Number(prod.rosctlInfo.amountINR) > 0 ||
+              Number(prod.rosctlInfo.slRate) > 0 ||
+              Number(prod.rosctlInfo.ctlRate) > 0
+            ) {
+              return true;
+            }
+          }
+
+          if (Array.isArray(prod.drawbackDetails) && prod.drawbackDetails.length > 0) {
+            for (const dbk of prod.drawbackDetails) {
+              if (
+                dbk.rosctl_scroll_no ||
+                dbk.showRosctl === true ||
+                Number(dbk.rosctlAmount) > 0 ||
+                (dbk.slRate && Number(dbk.slRate) > 0) ||
+                (dbk.ctlRate && Number(dbk.ctlRate) > 0)
+              ) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return false;
 };
 
 const isEgmCompleted = (job) => {
@@ -747,6 +931,8 @@ function CExportDSR() {
   // Dialog and Menu states
   const [createJobDialogOpen, setCreateJobDialogOpen] = React.useState(false);
   const [excelDownloadLoading, setExcelDownloadLoading] = React.useState(false);
+  const [downloadMenuAnchor, setDownloadMenuAnchor] = React.useState(null);
+  const [downloadSelectedStages, setDownloadSelectedStages] = React.useState([]);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
   const [expandedContainers, setExpandedContainers] = React.useState({});
   const [expandedInvoices, setExpandedInvoices] = React.useState({});
@@ -900,9 +1086,19 @@ function CExportDSR() {
     const counts = {};
     if (!jobs || jobs.length === 0) return counts;
 
+    let baseJobs = jobs;
+    if (selectedExporter && selectedExporter !== "all") {
+      baseJobs = baseJobs.filter((job) => {
+        const jIe = (job.ieCode || job.exporter_ie_code || job.ie_code_no || "").trim();
+        const jExp = (job.exporter || job.exporter_name || "").trim().toLowerCase();
+        const sel = selectedExporter.trim().toLowerCase();
+        return jIe === selectedExporter || jExp.includes(sel);
+      });
+    }
+
     displayDetailedStatuses.forEach((statusName) => {
       let count = 0;
-      jobs.forEach((job) => {
+      baseJobs.forEach((job) => {
         if (checkJobDetailedStatusMatch(job, statusName)) {
           count++;
         }
@@ -911,7 +1107,7 @@ function CExportDSR() {
     });
 
     return counts;
-  }, [jobs, displayDetailedStatuses]);
+  }, [jobs, displayDetailedStatuses, selectedExporter]);
 
   // Sort export jobs with query priority at TOP and apply detailed status filter
   const sortedExportJobs = React.useMemo(() => {
@@ -1096,119 +1292,219 @@ function CExportDSR() {
   };
 
   // Excel DSR Export using ExcelJS
-  const handleDownloadDSR = async () => {
-    if (jobs.length === 0) {
-      setSnackbar({ open: true, message: "No jobs available to export", severity: "warning" });
+  const handleDownloadDSR = async (stagesToFilter = null) => {
+    let targetJobs = sortedExportJobs;
+    if (stagesToFilter && Array.isArray(stagesToFilter) && stagesToFilter.length > 0) {
+      targetJobs = jobs.filter((job) =>
+        stagesToFilter.some((selectedStatus) => checkJobDetailedStatusMatch(job, selectedStatus))
+      );
+    }
+
+    if (!targetJobs || targetJobs.length === 0) {
+      setSnackbar({ open: true, message: "No jobs available to export for the selected stages", severity: "warning" });
       return;
     }
 
     setExcelDownloadLoading(true);
     try {
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Export DSR");
+      const worksheet = workbook.addWorksheet("Table DSR");
 
-      // Set columns
+      // Define 9 columns matching Table DSR in Exim-Export
       worksheet.columns = [
-        { header: "Job No", key: "job_no", width: 25 },
-        { header: "Job Date", key: "job_date", width: 15 },
+        { header: "Job No", key: "job_no", width: 28 },
         { header: "Exporter", key: "exporter", width: 35 },
-        { header: "Consignee", key: "consignee", width: 30 },
-        { header: "Invoice No", key: "invoice_no", width: 20 },
-        { header: "Invoice Value", key: "invoice_val", width: 18 },
-        { header: "SB No", key: "sb_no", width: 15 },
-        { header: "SB Date", key: "sb_date", width: 15 },
-        { header: "Destination Port", key: "dest_port", width: 25 },
-        { header: "Container(s)", key: "containers", width: 30 },
-        { header: "Milestones", key: "milestones", width: 25 },
-        { header: "Status", key: "status", width: 20 }
+        { header: "Consignee Name", key: "consignee_name", width: 30 },
+        { header: "Invoice", key: "invoice", width: 35 },
+        { header: "SB / Date", key: "sb_date", width: 25 },
+        { header: "Port", key: "port", width: 32 },
+        { header: "Container", key: "container", width: 32 },
+        { header: "Handover", key: "handover", width: 22 },
+        { header: "Status", key: "status", width: 18 },
       ];
 
-      // Format Header
-      worksheet.getRow(1).eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      // Add rows
+      targetJobs.forEach((job) => {
+        const statusObj = job.operations?.[0]?.statusDetails?.[0] || {};
+        const scrollAndEgm = getJobScrollAndEgmInfo(job);
+
+        // 1. Job No column
+        const jobNoLines = [];
+        if (job.job_no || job.job_number) jobNoLines.push(job.job_no || job.job_number);
+        if (job.exporter_ref_no) jobNoLines.push(`Ref: ${job.exporter_ref_no}`);
+        if (job.custom_house) jobNoLines.push(job.custom_house);
+        if (job.consignmentType) jobNoLines.push(job.consignmentType);
+        if (scrollAndEgm.egmNo) {
+          jobNoLines.push(`EGM: ${scrollAndEgm.egmNo}${scrollAndEgm.egmDate ? " (" + formatDateStr(scrollAndEgm.egmDate) + ")" : ""}`);
+        }
+
+        // 2. Exporter column
+        const exporterLines = [];
+        if (job.exporter) exporterLines.push(job.exporter + (job.exporter_branch_name ? ` (${job.exporter_branch_name})` : ""));
+        if (scrollAndEgm.fwdrName) exporterLines.push(`FWDR: ${scrollAndEgm.fwdrName}`);
+        if (scrollAndEgm.thirdPartyName) exporterLines.push(`3rd PARTY: ${scrollAndEgm.thirdPartyName}`);
+        if (scrollAndEgm.bookingNo) exporterLines.push(`Bk No: ${scrollAndEgm.bookingNo}`);
+        if (scrollAndEgm.shippingLine) exporterLines.push(`S/L: ${scrollAndEgm.shippingLine}`);
+
+        // 3. Consignee Name column
+        const consigneeName = job.consignee_name || (job.consignees && job.consignees[0] && job.consignees[0].consignee_name) || "-";
+
+        // 4. Invoice column
+        const invoiceLines = [];
+        if (job.invoices && job.invoices.length > 0) {
+          job.invoices.forEach((inv) => {
+            const parts = [];
+            const invNum = inv.invoiceNumber || inv.invoiceNo || "";
+            if (invNum) parts.push(invNum);
+            if (inv.invoiceDate || inv.invoice_date) parts.push(formatDateStr(inv.invoiceDate || inv.invoice_date));
+            const invVal = inv.invoiceValue ?? inv.amount ?? inv.invValue ?? inv.invoice_value;
+            if (invVal !== undefined && invVal !== null && invVal !== "") {
+              const term = inv.termsOfInvoice || inv.terms_of_invoice ? (inv.termsOfInvoice || inv.terms_of_invoice) + " " : "";
+              const curr = inv.currency || job.currency || "USD";
+              parts.push(`${term}${curr} ${invVal}`);
+            }
+            if (parts.length > 0) invoiceLines.push(parts.join(" / "));
+          });
+        }
+        if (invoiceLines.length === 0 && (job.invoice_number || job.invoice_no)) {
+          const parts = [];
+          const invNum = job.invoice_number || job.invoice_no || "";
+          if (invNum) parts.push(invNum);
+          if (job.invoice_date) parts.push(formatDateStr(job.invoice_date));
+          if (job.invoice_value) parts.push(`${job.currency || "USD"} ${job.invoice_value}`);
+          if (parts.length > 0) invoiceLines.push(parts.join(" / "));
+        }
+
+        // 5. SB / Date column
+        const sbLines = [];
+        if (job.sb_no) sbLines.push(job.sb_no);
+        if (job.sb_date) sbLines.push(formatDateStr(job.sb_date));
+        if (scrollAndEgm.dbkScrolls && scrollAndEgm.dbkScrolls.length > 0) {
+          scrollAndEgm.dbkScrolls.forEach((d) => {
+            sbLines.push(`DBK Scroll: ${d.no}${d.date ? " (" + formatDateStr(d.date) + ")" : ""}`);
+          });
+        }
+        if (scrollAndEgm.rosctlScrolls && scrollAndEgm.rosctlScrolls.length > 0) {
+          scrollAndEgm.rosctlScrolls.forEach((r) => {
+            sbLines.push(`RoSCTL Scroll: ${r.no}${r.date ? " (" + formatDateStr(r.date) + ")" : ""}`);
+          });
+        }
+
+        // 6. Port column
+        const portLines = [];
+        if (job.destination_port || job.destination_country) {
+          portLines.push(`Dest: ${job.destination_port || ""} ${job.destination_country ? "(" + job.destination_country + ")" : ""}`.trim());
+        }
+        if (job.discharge_port || job.discharge_country) {
+          portLines.push(`Discharge: ${job.discharge_port || ""} ${job.discharge_country ? "(" + job.discharge_country + ")" : ""}`.trim());
+        }
+        if (job.port_of_loading) {
+          portLines.push(`POL: ${job.port_of_loading}`);
+        }
+
+        // 7. Container column
+        const cntrLines = [];
+        const pkgs = job.total_no_of_pkgs || job.no_of_packages || job.no_of_pkgs;
+        if (pkgs) cntrLines.push(`Pkgs: ${pkgs} ${job.package_unit || "PKG"}`.trim());
+        const gross = job.gross_weight_kg || job.gross_weight;
+        if (gross) cntrLines.push(`G: ${gross} kg`);
+        const net = job.net_weight_kg || job.net_weight;
+        if (net) cntrLines.push(`N: ${net} kg`);
+
+        if (job.containers && job.containers.length > 0) {
+          job.containers.forEach((c) => {
+            const cntrNo = c.containerNo || c.container_number;
+            if (cntrNo) cntrLines.push(`Cont: ${cntrNo}`);
+            const cleanSize = getCleanContainerSize(c);
+            if (cleanSize) cntrLines.push(`Size/Type: ${cleanSize}`);
+          });
+        }
+
+        // 8. Handover column
+        const handoverLines = [];
+        const vgmDate = job.vgm_date || statusObj.vgmDate || (job.vgm_done ? formatDateStr(job.updatedAt) : "");
+        if (vgmDate) handoverLines.push(`VGM: ${formatDateStr(vgmDate)}`);
+
+        const form13Date = job.form13_date || statusObj.form13Date || (job.form13_done ? formatDateStr(job.updatedAt) : "");
+        if (form13Date) handoverLines.push(`F13: ${formatDateStr(form13Date)}`);
+
+        const esabDate = job.esanchit_completed_date_time || job.esab_date || job.eSanchitDate || statusObj.esanchitDate;
+        if (esabDate) handoverLines.push(`ESAB: ${formatDateStr(esabDate)}`);
+
+        const handoverDate = statusObj.handoverForwardingNoteDate || statusObj.handoverConcorTharSanganaRailRoadDate || job.handover_date;
+        if (handoverDate) handoverLines.push(`Handover: ${formatDateStr(handoverDate)}`);
+
+        // 9. Status column
+        const statusText = (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
+          ? job.detailedStatus[job.detailedStatus.length - 1]
+          : job.detailedStatus || job.status || "Pending");
+
+        worksheet.addRow({
+          job_no: jobNoLines.join("\n"),
+          exporter: exporterLines.join("\n"),
+          consignee_name: consigneeName,
+          invoice: invoiceLines.join("\n\n"),
+          sb_date: sbLines.join("\n"),
+          port: portLines.join("\n"),
+          container: cntrLines.join("\n"),
+          handover: handoverLines.join("\n"),
+          status: statusText,
+        });
+      });
+
+      // Style Header Row (Dark Navy Blue background, white bold text)
+      const headerRow = worksheet.getRow(1);
+      headerRow.height = 32;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 11, color: { argb: "FFFFFF" } };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF1E3A8A" }, // Navy blue
+          fgColor: { argb: "1F4E78" },
         };
-        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = {
+          top: { style: "thin", color: { argb: "000000" } },
+          left: { style: "thin", color: { argb: "FFFFFF" } },
+          bottom: { style: "medium", color: { argb: "000000" } },
+          right: { style: "thin", color: { argb: "FFFFFF" } },
+        };
       });
 
-      // Add rows
-      jobs.forEach((job) => {
-        // Map Container info
-        const containerStrs = (job.containers || []).map(c =>
-          `${c.containerNo || ""}${c.type ? ` (${getContainerSizeLabel(c.type)})` : ""}`
-        ).join("\n");
+      // Style Data Rows
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const isEven = rowNumber % 2 === 0;
+        const bgColor = isEven ? "FFFFFF" : "F8FAFD";
 
-        // Map Handover Milestones
-        const opDetails = job.operations?.[0]?.statusDetails?.[0] || {};
-        const milestones = [];
-        if (opDetails.leoDate) milestones.push(`LEO: ${formatDate(opDetails.leoDate)}`);
-        if (opDetails.handoverForwardingNoteDate) milestones.push(`DHo: ${formatDate(opDetails.handoverForwardingNoteDate)}`);
-        if (opDetails.handoverConcorTharSanganaRailRoadDate) {
-          const outLbl = opDetails.railRoad === "road" ? "Road Out" : "Rail Out";
-          milestones.push(`${outLbl}: ${formatDate(opDetails.handoverConcorTharSanganaRailRoadDate)}`);
-        }
-        if (opDetails.railOutReachedDate) {
-          const reachedLbl = opDetails.railRoad === "road" ? "Road Rch" : "Rail Rch";
-          milestones.push(`${reachedLbl}: ${formatDate(opDetails.railOutReachedDate)}`);
-        }
-        if (opDetails.billingDocsSentDt) milestones.push(`Bill: ${formatDate(opDetails.billingDocsSentDt)}`);
-        const milestoneStr = milestones.join("\n");
-
-        // Map invoice
-        const inv = job.invoices?.[0] || {};
-        const invValStr = inv.invoiceValue ? `${inv.termsOfInvoice || ""} ${inv.currency || ""} ${inv.invoiceValue.toLocaleString()}` : "";
-
-        const rowData = {
-          job_no: job.job_no,
-          job_date: formatDate(job.job_date),
-          exporter: job.exporter + (job.exporter_branch_name ? ` (${job.exporter_branch_name})` : ""),
-          consignee: job.consignees?.[0]?.consignee_name || "-",
-          invoice_no: inv.invoiceNumber || "-",
-          invoice_val: invValStr,
-          sb_no: job.sb_no || "-",
-          sb_date: formatDate(job.sb_date),
-          dest_port: job.destination_port || "-",
-          containers: containerStrs || "-",
-          milestones: milestoneStr || "-",
-          status: (Array.isArray(job.detailedStatus) && job.detailedStatus.length > 0
-            ? job.detailedStatus[job.detailedStatus.length - 1]
-            : job.detailedStatus || job.status || "Pending")
-        };
-
-        const newRow = worksheet.addRow(rowData);
-
-        // Apply alignment & cell styling
-        newRow.eachCell({ includeEmpty: true }, (cell) => {
-          cell.alignment = { vertical: "top", horizontal: "left", wrapText: true };
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: bgColor },
+          };
           cell.border = {
-            top: { style: "thin", color: { argb: "FFE2E8F0" } },
-            left: { style: "thin", color: { argb: "FFE2E8F0" } },
-            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
-            right: { style: "thin", color: { argb: "FFE2E8F0" } }
+            top: { style: "thin", color: { argb: "D0D7DE" } },
+            left: { style: "thin", color: { argb: "D0D7DE" } },
+            bottom: { style: "thin", color: { argb: "D0D7DE" } },
+            right: { style: "thin", color: { argb: "D0D7DE" } },
           };
 
-          // Color coding status column
-          if (cell.col === 12) {
-            const statusTheme = getStatusTheme(rowData.status);
-            const cleanHex = statusTheme.bg.replace("#", "");
-            if (cleanHex !== "transparent" && cleanHex.length === 6) {
-              cell.fill = {
-                type: "pattern",
-                pattern: "solid",
-                fgColor: { argb: "FF" + cleanHex }
-              };
-            }
+          if (colNumber === 9) { // Status column
+            cell.font = { bold: true, size: 10, color: { argb: "1F4E78" } };
+            cell.alignment = { vertical: "top", horizontal: "center", wrapText: true };
+          } else {
+            cell.font = { size: 10, color: { argb: "1E293B" } };
+            cell.alignment = { vertical: "top", horizontal: "left", wrapText: true };
           }
         });
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const today = new Date().toISOString().split("T")[0];
-      saveAs(new Blob([buffer]), `Export_DSR_Report_${today}.xlsx`);
-      setSnackbar({ open: true, message: "Excel report downloaded successfully", severity: "success" });
+      const filenameSuffix = stagesToFilter && stagesToFilter.length === 1 ? `_${stagesToFilter[0].replace(/\s+/g, "_")}` : "";
+      saveAs(new Blob([buffer]), `Table_DSR_Report${filenameSuffix}_${today}.xlsx`);
+      setSnackbar({ open: true, message: `Table DSR report downloaded successfully (${targetJobs.length} jobs)`, severity: "success" });
     } catch (e) {
       console.error(e);
       setSnackbar({ open: true, message: "Error downloading Excel report", severity: "error" });
@@ -2333,69 +2629,58 @@ function CExportDSR() {
     }
   };
 
-  // Doc lists resolver - returns only PDF files
+  // Doc lists resolver - counts all uploaded files across EXPORT_DOC_CATEGORIES (matches eSanchit modal exactly)
   const getJobFilesList = (job) => {
+    if (!job) return [];
     const files = [];
-    const isPdf = (url) => {
-      if (typeof url !== "string") return false;
-      return url.toLowerCase().split(/[?#]/)[0].endsWith(".pdf");
-    };
 
-    const addFiles = (fieldVal, displayName) => {
-      if (!fieldVal) return;
-      if (Array.isArray(fieldVal)) {
-        fieldVal.forEach((url, idx) => {
-          if (isPdf(url)) {
-            files.push({
-              name: fieldVal.length > 1 ? `${displayName} ${idx + 1}` : displayName,
-              url,
+    EXPORT_DOC_CATEGORIES.forEach((category) => {
+      category.files.forEach((fileDef) => {
+        if (fileDef.source === "container") {
+          const containers = Array.isArray(job.containers) ? job.containers : [];
+          if (containers.length === 0) {
+            const urls = getJobDocumentUrls(job, fileDef, 0);
+            if (urls && urls.length > 0) {
+              files.push({ name: fileDef.title, url: urls[0] });
+            }
+          } else {
+            containers.forEach((container, cIdx) => {
+              const urls = getJobDocumentUrls(job, fileDef, cIdx);
+              if (urls && urls.length > 0) {
+                const containerNo = container.containerNo || container.container_no || `#${cIdx + 1}`;
+                const label = containers.length > 1 ? `${fileDef.title} (${containerNo})` : fileDef.title;
+                files.push({ name: label, url: urls[0] });
+              }
             });
           }
-        });
-      } else if (isPdf(fieldVal)) {
-        files.push({ name: displayName, url: fieldVal });
-      }
-    };
-
-    addFiles(job.booking_copy, "Booking Copy");
-    addFiles(job.shipping_bill_copy, "Shipping Bill Copy");
-    addFiles(job.gate_in_copy, "Gate In Copy");
-    addFiles(job.leo_copy, "LEO Copy");
-    addFiles(job.bill_of_lading_copy, "Bill of Lading Copy");
-    addFiles(job.billing_copy, "Billing Copy");
-
-    // Handover documents from status Details
-    if (
-      job.operations &&
-      job.operations.length > 0 &&
-      job.operations[0].statusDetails &&
-      job.operations[0].statusDetails.length > 0
-    ) {
-      const handoverVal = job.operations[0].statusDetails[0].handoverImageUpload;
-      addFiles(handoverVal, "Handover Copy");
-    }
-
-    if (job.other_documents && Array.isArray(job.other_documents)) {
-      job.other_documents.forEach((doc, idx) => {
-        if (doc) {
-          addFiles(doc, `Other Document ${idx + 1}`);
-        }
-      });
-    }
-
-    if (job.documents && Array.isArray(job.documents)) {
-      job.documents.forEach((doc, idx) => {
-        if (!doc || !doc.url) return;
-        const displayName = doc.document_name || `Document ${idx + 1}`;
-        if (Array.isArray(doc.url)) {
-          doc.url.forEach((url, urlIdx) => {
-            addFiles(url, doc.url.length > 1 ? `${displayName} ${urlIdx + 1}` : displayName);
-          });
+        } else if (fileDef.source === "section") {
+          const ops = job.operations?.[0] || {};
+          const section = Array.isArray(ops[fileDef.field]) ? ops[fileDef.field] : [];
+          if (section.length === 0) {
+            const urls = getJobDocumentUrls(job, fileDef, 0);
+            if (urls && urls.length > 0) {
+              files.push({ name: fileDef.title, url: urls[0] });
+            }
+          } else {
+            section.forEach((sectionItem, sIdx) => {
+              const urls = getJobDocumentUrls(job, fileDef, sIdx);
+              if (urls && urls.length > 0) {
+                const label = sectionItem?.title
+                  ? `${fileDef.title} (${sectionItem.title})`
+                  : `${fileDef.title} ${sIdx + 1}`;
+                files.push({ name: label, url: urls[0] });
+              }
+            });
+          }
         } else {
-          addFiles(doc.url, displayName);
+          const urls = getJobDocumentUrls(job, fileDef, 0);
+          if (urls && urls.length > 0) {
+            files.push({ name: fileDef.title, url: urls[0] });
+          }
         }
       });
-    }
+    });
+
     return files;
   };
 
@@ -2722,9 +3007,17 @@ function CExportDSR() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <Button
               variant="outlined"
-              onClick={handleDownloadDSR}
+              onClick={(e) => {
+                setDownloadMenuAnchor(e.currentTarget);
+                if (detailedStatus && detailedStatus.length > 0) {
+                  setDownloadSelectedStages(detailedStatus);
+                } else {
+                  setDownloadSelectedStages([...displayDetailedStatuses]);
+                }
+              }}
               disabled={excelDownloadLoading}
               startIcon={excelDownloadLoading ? <CircularProgress size={16} color="inherit" /> : <FileDownload />}
+              endIcon={<ArrowDropDown />}
               sx={{
                 textTransform: "none",
                 fontWeight: 600,
@@ -2739,6 +3032,147 @@ function CExportDSR() {
             >
               {excelDownloadLoading ? "Downloading..." : "Download DSR Report"}
             </Button>
+
+            {/* Stages Download Menu Dropdown */}
+            <Menu
+              anchorEl={downloadMenuAnchor}
+              open={Boolean(downloadMenuAnchor)}
+              onClose={() => setDownloadMenuAnchor(null)}
+              PaperProps={{
+                sx: {
+                  width: 320,
+                  p: 1.5,
+                  borderRadius: "8px",
+                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)"
+                }
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1, borderBottom: "1px solid #e2e8f0" }}>
+                <Typography sx={{ fontWeight: 700, fontSize: "13px", color: "#0f172a" }}>
+                  Select Stages to Download
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <Typography
+                    variant="caption"
+                    onClick={() => setDownloadSelectedStages([...displayDetailedStatuses])}
+                    sx={{ color: "#2563eb", cursor: "pointer", fontWeight: 700, "&:hover": { textDecoration: "underline" } }}
+                  >
+                    All
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#cbd5e1" }}>|</Typography>
+                  <Typography
+                    variant="caption"
+                    onClick={() => setDownloadSelectedStages([])}
+                    sx={{ color: "#64748b", cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}
+                  >
+                    Clear
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box sx={{ maxHeight: 320, overflowY: "auto", my: 1, pr: 0.5 }}>
+                {displayDetailedStatuses.map((status) => {
+                  const count = detailedStatusCounts[status] !== undefined ? detailedStatusCounts[status] : 0;
+                  const theme = getStatusTheme(status);
+                  const isChecked = downloadSelectedStages.includes(status);
+
+                  return (
+                    <Box
+                      key={status}
+                      onClick={() => {
+                        setDownloadSelectedStages((prev) =>
+                          prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+                        );
+                      }}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        py: 0.6,
+                        px: 1,
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        "&:hover": { bgcolor: "#f8fafc" },
+                        bgcolor: isChecked ? "#eff6ff" : "transparent"
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Checkbox
+                          size="small"
+                          checked={isChecked}
+                          sx={{ p: 0 }}
+                        />
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "2px",
+                          backgroundColor: theme.border || "#3b82f6",
+                          display: "inline-block"
+                        }} />
+                        <Typography sx={{ fontSize: "12px", fontWeight: isChecked ? 600 : 500, color: isChecked ? "#1d4ed8" : "#1e293b" }}>
+                          {status}
+                        </Typography>
+                      </Box>
+                      <span style={{
+                        fontSize: "11px",
+                        backgroundColor: isChecked ? "#dbeafe" : "#f1f5f9",
+                        color: isChecked ? "#1e40af" : "#334155",
+                        padding: "1px 7px",
+                        borderRadius: "10px",
+                        fontWeight: "700",
+                        border: "1px solid #cbd5e1"
+                      }}>
+                        {count}
+                      </span>
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              <Box sx={{ pt: 1, borderTop: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 0.75 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  size="small"
+                  disabled={excelDownloadLoading || downloadSelectedStages.length === 0}
+                  onClick={() => {
+                    handleDownloadDSR(downloadSelectedStages);
+                    setDownloadMenuAnchor(null);
+                  }}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 700,
+                    fontSize: "12px",
+                    bgcolor: "#1e3a8a",
+                    "&:hover": { bgcolor: "#1e40af" }
+                  }}
+                >
+                  Download Selected ({downloadSelectedStages.length > 0
+                    ? jobs.filter((j) => downloadSelectedStages.some((st) => checkJobDetailedStatusMatch(j, st))).length
+                    : 0} Jobs)
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  size="small"
+                  disabled={excelDownloadLoading}
+                  onClick={() => {
+                    handleDownloadDSR(null);
+                    setDownloadMenuAnchor(null);
+                  }}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontSize: "11px",
+                    color: "#475569",
+                    borderColor: "#cbd5e1"
+                  }}
+                >
+                  Download All Stages ({jobs.length} Jobs)
+                </Button>
+              </Box>
+            </Menu>
 
             <Button
               variant="outlined"
@@ -3060,7 +3494,12 @@ function CExportDSR() {
             border: "1px solid #cbd5e1",
             boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
             overflowX: "auto",
-            width: "100%"
+            overflowY: "auto",
+            maxHeight: "calc(100vh - 230px)",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative"
           }}
         >
           <Table size="small" stickyHeader sx={{ minWidth: 900, tableLayout: "auto", width: "100%" }}>
@@ -3081,7 +3520,7 @@ function CExportDSR() {
                       key={columnId}
                       style={{
                         ...tableHeaderStyle,
-                        borderRight: isLast ? "none" : "1px solid #e2e8f0",
+                        borderRight: isLast ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
                         width: definition?.width || "auto",
                       }}
                     >
@@ -3149,7 +3588,11 @@ function CExportDSR() {
               justifyContent: "space-between",
               p: 1.5,
               bgcolor: "#f8fafc",
-              borderTop: "1px solid #cbd5e1"
+              borderTop: "1px solid #cbd5e1",
+              position: "sticky",
+              bottom: 0,
+              zIndex: 10,
+              marginTop: "auto"
             }}
           >
             <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>

@@ -23,14 +23,15 @@ export const downloadAllReport = async (rows, status, detailedStatus) => {
   const rowsWithoutBillNo = rows.filter(
     (row) => row.bill_no === "" || row.bill_no === undefined
   );
+  const targetRows = rowsWithoutBillNo.length > 0 ? rowsWithoutBillNo : rows;
 
-  if (rowsWithoutBillNo.length === 0) {
+  if (targetRows.length === 0) {
     alert("No Data to export");
     return;
   }
   const uniqueDetailedStatuses = [
     ...new Set(
-      rowsWithoutBillNo
+      targetRows
         .map((row) => row.detailed_status)
         .filter((status) => status !== undefined && status !== null)
     ),
@@ -67,7 +68,7 @@ export const downloadAllReport = async (rows, status, detailedStatus) => {
   ];
 
   // Row headers
-  const dataWithHeaders = rowsWithoutBillNo.map((item) => {
+  const dataWithHeaders = targetRows.map((item) => {
     const jobNoAndDate = `${item.job_no} | ${formatDate(item.job_date)} | ${
       item.custom_house
     } | ${item.type_of_b_e}`;

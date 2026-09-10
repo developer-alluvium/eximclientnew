@@ -88,7 +88,13 @@ const CJobListTable = ({
                         return (
                             <th 
                                 key={colId} 
-                                style={{ width: col.size, minWidth: minWidth }}
+                                style={{ 
+                                    width: col.size, 
+                                    minWidth: minWidth,
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 10
+                                }}
                             >
                                 {col.header}
                             </th>
