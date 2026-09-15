@@ -46,10 +46,12 @@ import OpenPointsHome from "./components/open-points/OpenPointsHome";
 import MyOpenPoints from "./components/open-points/MyOpenPoints";
 import ProjectWorkspace from "./components/open-points/ProjectWorkspace";
 import EwayBillForm from "./components/ewaybill/EwayBillForm";
+import { useActivityTracker } from "./hooks/useActivityTracker";
 
 // Layout wrapper component to conditionally show header
 const LayoutWrapper = ({ children }) => {
   const location = useLocation();
+  useActivityTracker();
 
   // Pages that should not show the header
   const noHeaderPages = [

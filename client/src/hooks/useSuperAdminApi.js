@@ -133,6 +133,33 @@ export const useSuperAdminApi = () => {
     [apiCall]
   );
 
+  // Monitoring activity methods
+  const getMonitoringAnalytics = useCallback(
+    (timeRange = "7d") => apiCall(`/superadmin/monitoring/analytics?timeRange=${timeRange}`),
+    [apiCall]
+  );
+
+  const getUserMonitoringSummary = useCallback(
+    (search = "", dateRange = "30d", page = 1, limit = 20) =>
+      apiCall(
+        `/superadmin/monitoring/users?search=${encodeURIComponent(search)}&dateRange=${dateRange}&page=${page}&limit=${limit}`
+      ),
+    [apiCall]
+  );
+
+  const getUserDetailedTimeline = useCallback(
+    (userId) => apiCall(`/superadmin/monitoring/user/${userId}/timeline`),
+    [apiCall]
+  );
+
+  const getLiveClickStream = useCallback(
+    (userId = "", eventType = "", search = "", limit = 50) =>
+      apiCall(
+        `/superadmin/monitoring/events?userId=${userId}&eventType=${eventType}&search=${encodeURIComponent(search)}&limit=${limit}`
+      ),
+    [apiCall]
+  );
+
   return {
     loading,
     error,
@@ -146,6 +173,10 @@ export const useSuperAdminApi = () => {
     updateCustomerModuleAssignments,
     getAllCustomersWithModules,
     bulkAssignModules,
+    getMonitoringAnalytics,
+    getUserMonitoringSummary,
+    getUserDetailedTimeline,
+    getLiveClickStream,
     apiCall,
   };
 };

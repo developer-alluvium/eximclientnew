@@ -40,6 +40,7 @@ import freightProxyRoutes from "./routes/freightProxyRoutes.js"; // Freight Forw
 import openPointsRoutes from "./routes/openPointsRoutes.js";
 import transportAuthService from "./services/transportAuthService.js";
 import ewayBillProxyRoutes from "./routes/ewayBillProxyRoutes.js";
+import userActivityRoutes from "./routes/userActivityRoutes.js";
 import { updateContainerEwayBill } from "./controllers/importProxyController.js";
 import { authenticateUser } from "./middlewares/authMiddleware.js";
 import helmet from "helmet";
@@ -153,6 +154,7 @@ app.use(freightProxyRoutes); // Freight Forwarding proxy routes
 app.use(analytics);
 app.use(openPointsRoutes); // Open Points routes
 app.use("/api/eway-bill", ewayBillProxyRoutes);
+app.use(userActivityRoutes);
 
 app.use("/api/elock", elockRoutes);
 app.use("/api/elock-details", elockDetailsRoutes);

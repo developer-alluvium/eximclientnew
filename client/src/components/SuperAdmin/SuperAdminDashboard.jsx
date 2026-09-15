@@ -40,17 +40,17 @@ const SuperAdminDashboard = () => {
   // Tab configuration
   const tabs = [
     { label: "Overview", icon: "dashboard", component: "overview" },
-  
+    {
+      label: "User Activity Monitoring",
+      icon: "timeline",
+      component: "activity",
+    },
     {
       label: "Admin Management",
       icon: "admin_panel_settings",
       component: "admin",
     },
     { label: "Module Management", icon: "settings", component: "modules" },
-    // { label: 'Column Permissions', icon: 'visibility', component: 'columns' },
-    // { label: 'System Analytics', icon: 'analytics', component: 'analytics' },
-    // { label: 'User Activity', icon: 'timeline', component: 'activity' },
-    // { label: 'Session Manager', icon: 'security', component: 'sessions' }
   ];
 
   // Handle logout
