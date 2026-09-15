@@ -59,23 +59,25 @@ const SuperAdminLayout = () => {
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
-      const [analyticsData, activityData, engagementData, jobsData] = await Promise.all([
+      const results = await Promise.allSettled([
         getDashboardAnalytics(),
         getUserActivity("active", 5),
         getClientEngagement(),
         getJobsBreakdown(),
       ]);
 
-      setDashboardData(analyticsData.data);
-      setUserActivity(activityData.data);
-      setClientEngagement(engagementData.data || []);
-      setJobsBreakdown(jobsData.data || []);
+      const [analyticsRes, activityRes, engagementRes, jobsRes] = results;
+
+      if (analyticsRes.status === "fulfilled") setDashboardData(analyticsRes.value?.data);
+      if (activityRes.status === "fulfilled") setUserActivity(activityRes.value?.data);
+      if (engagementRes.status === "fulfilled") setClientEngagement(engagementRes.value?.data || []);
+      if (jobsRes.status === "fulfilled") setJobsBreakdown(jobsRes.value?.data || []);
+
+      setError(null);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         navigate("/login");
-      } else {
-        setError("Failed to load dashboard data");
       }
     }
   };
@@ -122,6 +124,7 @@ const SuperAdminLayout = () => {
   // Handle tab changes
   const handleTabChange = (tabIndex) => {
     setActiveTab(tabIndex);
+    setError(null);
 
     // Navigate to appropriate route
     switch (tabIndex) {
