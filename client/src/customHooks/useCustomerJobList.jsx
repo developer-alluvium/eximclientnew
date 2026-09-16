@@ -1565,6 +1565,34 @@ function useCustomerJobList(detailedStatus, onEwayBillSuccess) {
                         | "{container.size}"
                       </span>
 
+                      {(() => {
+                        const customSeal = (container.seal_no || container.sealNo || container.custom_seal || container.customSeal || container.customSealNo || "").toString().trim();
+                        const lineOrSelf = (container.line_seal || container.lineSeal || container.shipping_line_seal || container.shippingLineSealNo || container.self_seal || container.selfSeal || "").toString().trim();
+                        if (!customSeal && !lineOrSelf) return null;
+
+                        if (customSeal && lineOrSelf) {
+                          if (customSeal.toUpperCase() === lineOrSelf.toUpperCase()) {
+                            return (
+                              <span style={{ fontSize: "11px", color: "#475569", backgroundColor: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "2px", padding: "1px 4px" }}>
+                                Seal: <strong style={{ color: "#0f172a" }}>{customSeal}</strong>
+                              </span>
+                            );
+                          }
+                          return (
+                            <span style={{ fontSize: "11px", color: "#475569", backgroundColor: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "2px", padding: "1px 4px" }}>
+                              C.Seal: <strong style={{ color: "#0f172a" }}>{customSeal}</strong> | L.Seal: <strong style={{ color: "#0f172a" }}>{lineOrSelf}</strong>
+                            </span>
+                          );
+                        }
+
+                        const single = customSeal || lineOrSelf;
+                        return (
+                          <span style={{ fontSize: "11px", color: "#475569", backgroundColor: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "2px", padding: "1px 4px" }}>
+                            Seal: <strong style={{ color: "#0f172a" }}>{single}</strong>
+                          </span>
+                        );
+                      })()}
+
                       <span
                         style={{
                           display: "inline-flex",

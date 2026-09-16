@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import { getAvailableExporters, proxyExportListing, proxyExportFilterOptions, proxyExportTabCounts, proxyExporterBranches } from "../controllers/exportProxyController.js";
+import { getAvailableExporters, proxyExportListing, proxyExportFilterOptions, proxyExportTabCounts, proxyExporterBranches, createClientExportJob } from "../controllers/exportProxyController.js";
 import { protectSuperAdmin } from "../controllers/superAdminController.js";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
 
@@ -25,6 +25,7 @@ router.get("/api/superadmin/exporter-branches", protectSuperAdmin, proxyExporter
 router.get("/api/exports/filter-options", authenticateUser, proxyExportFilterOptions);
 router.get("/api/exports/tab-counts", authenticateUser, proxyExportTabCounts);
 router.get("/api/exports/:status", authenticateUser, proxyExportListing);
+router.post("/api/exports/create-client-job", authenticateUser, createClientExportJob);
 
 /**
  * POST /api/client-queries

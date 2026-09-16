@@ -48,6 +48,38 @@ const axiosGetWithFallback = async (endpointPath, config = {}) => {
   throw lastError;
 };
 
+const axiosPostWithFallback = async (endpointPath, data = {}, config = {}) => {
+  const candidateUrls = getCandidateUrls();
+  let lastError = null;
+
+  for (const baseUrl of candidateUrls) {
+    try {
+      const cleanBase = baseUrl.replace(/\/+$/, "");
+      const cleanPath = endpointPath.startsWith("/") ? endpointPath : `/${endpointPath}`;
+      const url = `${cleanBase}${cleanPath}`;
+
+      const response = await axios.post(url, data, {
+        ...config,
+        headers: {
+          username: "Admin",
+          "x-username": "Admin",
+          ...(config.headers || {}),
+        },
+        timeout: config.timeout || 15000,
+      });
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND" || err.code === "ETIMEDOUT") {
+        console.warn(`Export API POST attempt to ${baseUrl} failed (${err.code}), trying next candidate...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+};
+
 const buildLocalFilterOptions = async (ieCodeAssignments, isAdmin) => {
   const localQuery = {};
   if (ieCodeAssignments.length > 0) {
@@ -759,6 +791,98 @@ export const proxyExporterBranches = async (req, res) => {
     return res.json({
       success: true,
       data: [],
+    });
+  }
+};
+
+
+/**
+ * POST /api/exports/create-client-job
+ * Allows authenticated client users to create an Export Job.
+ * Bound to the user's assigned organization/IE code, calculates Financial Year,
+ * omits Job Owner, and sets is_client_job: true.
+ */
+export const createClientExportJob = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const {
+      branch_code = "AMD",
+      exporter,
+      ieCode,
+      consignees,
+      consignmentType = "FCL",
+      transportMode = "SEA",
+      goods_stuffed_at,
+      port_of_loading,
+      custom_house,
+      exporter_ref_no,
+      job_date,
+    } = req.body;
+
+    const assignments = user.exporter_ie_code_assignments || user.ie_code_assignments || [];
+    let verifiedExporter = (exporter || "").trim();
+    let verifiedIeCode = (ieCode || "").trim();
+
+    if (assignments.length > 0) {
+      const matched = assignments.find(
+        (a) =>
+          (a.ie_code_no && verifiedIeCode && a.ie_code_no.trim().toUpperCase() === verifiedIeCode.toUpperCase()) ||
+          (a.importer_name && verifiedExporter && a.importer_name.trim().toLowerCase() === verifiedExporter.toLowerCase())
+      );
+      if (matched) {
+        verifiedExporter = matched.importer_name || verifiedExporter;
+        verifiedIeCode = matched.ie_code_no || verifiedIeCode;
+      } else {
+        verifiedExporter = assignments[0].importer_name || verifiedExporter;
+        verifiedIeCode = verifiedIeCode || assignments[0].ie_code_no || "";
+      }
+    }
+
+    // Indian Financial Year: 1 April to 31 March (e.g. 2026-04-01 to 2027-03-31 -> 26-27)
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const startYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+    const finYear = `${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`;
+
+    const payload = {
+      branch_code: branch_code || "AMD",
+      exporter: verifiedExporter,
+      ieCode: verifiedIeCode,
+      year: finYear,
+      job_date: job_date || new Date().toISOString().split("T")[0],
+      job_owner: "", // Omitted per explicit requirement
+      consignmentType: consignmentType || "FCL",
+      transportMode: (consignmentType === "AIR") ? "AIR" : (transportMode || "SEA"),
+      goods_stuffed_at: goods_stuffed_at || "",
+      port_of_loading: port_of_loading || "",
+      custom_house: custom_house || "",
+      exporter_ref_no: exporter_ref_no || "",
+      consignees: Array.isArray(consignees) && consignees.length > 0 ? consignees : [{
+        consignee_name: "",
+        consignee_address: "",
+        consignee_country: ""
+      }],
+      status: "Pending",
+      is_client_job: true,
+      created_by_client: true,
+      createdBy: user.email || user.name || "Client",
+    };
+
+    const response = await axiosPostWithFallback("/jobs/add-job-exp-man", payload);
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error("Create client export job error:", error);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create export job from client module",
     });
   }
 };

@@ -49,8 +49,10 @@ import {
   ChevronRight,
   PictureAsPdf,
   CloudUpload,
-  Delete
+  Delete,
+  Add
 } from "@mui/icons-material";
+import CreateClientExportJobDialog from "./CreateClientExportJobDialog";
 import axios from "axios";
 import { getJsonCookie, getCookie } from "../utils/cookies";
 import BackButton from "./BackButton";
@@ -1417,6 +1419,18 @@ function CExportDSR() {
             if (cntrNo) cntrLines.push(`Cont: ${cntrNo}`);
             const cleanSize = getCleanContainerSize(c);
             if (cleanSize) cntrLines.push(`Size/Type: ${cleanSize}`);
+
+            const customSeal = (c.sealNo || c.customSealNo || c.custom_seal || "").trim();
+            const lineOrSelf = (c.shippingLineSealNo || c.lineSeal || c.line_seal || c.selfSealNo || c.selfSeal || "").trim();
+            if (customSeal && lineOrSelf) {
+              if (customSeal.toUpperCase() === lineOrSelf.toUpperCase()) {
+                cntrLines.push(`Seal: ${customSeal}`);
+              } else {
+                cntrLines.push(`C.Seal: ${customSeal} | L.Seal: ${lineOrSelf}`);
+              }
+            } else if (customSeal || lineOrSelf) {
+              cntrLines.push(`Seal: ${customSeal || lineOrSelf}`);
+            }
           });
         }
 
@@ -2345,6 +2359,50 @@ function CExportDSR() {
                         );
                       })()}
                     </Box>
+                    {(() => {
+                      const customSeal = (container.sealNo || container.customSealNo || container.custom_seal || "").trim();
+                      const lineOrSelf = (container.shippingLineSealNo || container.lineSeal || container.line_seal || container.selfSealNo || container.selfSeal || "").trim();
+                      if (!customSeal && !lineOrSelf) return null;
+
+                      if (customSeal && lineOrSelf) {
+                        if (customSeal.toUpperCase() === lineOrSelf.toUpperCase()) {
+                          return (
+                            <Box sx={{ fontSize: "8.5px", color: "#475569", mt: 0.2, display: "flex", alignItems: "center", gap: 0.5 }}>
+                              <span>Seal: <strong style={{ color: "#0f172a" }}>{customSeal}</strong></span>
+                              <IconButton size="small" onClick={(e) => handleCopyText(customSeal, e)} sx={{ p: 0.1 }}>
+                                <ContentCopy sx={{ fontSize: 9, color: "#64748b" }} />
+                              </IconButton>
+                            </Box>
+                          );
+                        }
+                        return (
+                          <Box sx={{ fontSize: "8.5px", color: "#475569", mt: 0.2, display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                              <span>C.Seal: <strong style={{ color: "#0f172a" }}>{customSeal}</strong></span>
+                              <IconButton size="small" onClick={(e) => handleCopyText(customSeal, e)} sx={{ p: 0.1 }}>
+                                <ContentCopy sx={{ fontSize: 9, color: "#64748b" }} />
+                              </IconButton>
+                            </Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                              <span>L.Seal: <strong style={{ color: "#0f172a" }}>{lineOrSelf}</strong></span>
+                              <IconButton size="small" onClick={(e) => handleCopyText(lineOrSelf, e)} sx={{ p: 0.1 }}>
+                                <ContentCopy sx={{ fontSize: 9, color: "#64748b" }} />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                        );
+                      }
+
+                      const single = customSeal || lineOrSelf;
+                      return (
+                        <Box sx={{ fontSize: "8.5px", color: "#475569", mt: 0.2, display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <span>Seal: <strong style={{ color: "#0f172a" }}>{single}</strong></span>
+                          <IconButton size="small" onClick={(e) => handleCopyText(single, e)} sx={{ p: 0.1 }}>
+                            <ContentCopy sx={{ fontSize: 9, color: "#64748b" }} />
+                          </IconButton>
+                        </Box>
+                      );
+                    })()}
                   </Box>
                 ))
               ) : (
@@ -3193,7 +3251,27 @@ function CExportDSR() {
               Columns
             </Button>
 
-            {/* Create Job button removed as requested */}
+            {/* Create Job Button */}
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Add sx={{ fontSize: 16 }} />}
+              onClick={() => setCreateJobDialogOpen(true)}
+              sx={{
+                textTransform: "none",
+                fontSize: "12px",
+                fontWeight: 700,
+                backgroundColor: "#2563eb",
+                color: "#fff",
+                borderRadius: "6px",
+                height: "32px",
+                px: 1.8,
+                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.25)",
+                "&:hover": { backgroundColor: "#1d4ed8" }
+              }}
+            >
+              Create Job
+            </Button>
           </Box>
         </Box>
 
@@ -3625,26 +3703,20 @@ function CExportDSR() {
 
 
 
-      {/* Create Job Informative Dialog */}
-      <Dialog
+      {/* Create Client Export Job Dialog */}
+      <CreateClientExportJobDialog
         open={createJobDialogOpen}
         onClose={() => setCreateJobDialogOpen(false)}
-      >
-        <DialogTitle sx={{ fontWeight: 800 }}>Create New Export Job</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: "#475569", mb: 2 }}>
-            Creating and configuring new Export Jobs is done internally by the Operations and Custom House Agents team within the core Exim-Export Application.
-          </Typography>
-          <Typography variant="body2" sx={{ color: "#475569" }}>
-            If you need a new export shipment job registered, please forward the booking copy and invoice details to your designated Alluvium operations manager.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateJobDialogOpen(false)} sx={{ fontWeight: 600 }}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        user={user}
+        onJobCreated={(newJob) => {
+          setSnackbar({
+            open: true,
+            message: `Export Job created successfully! Job No: ${newJob?.job_no || ""}`,
+            severity: "success"
+          });
+          fetchJobs();
+        }}
+      />
 
       <ColumnSettingsModal
         open={columnSettingsOpen}

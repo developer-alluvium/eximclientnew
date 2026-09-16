@@ -1310,16 +1310,43 @@ function CFreightForwarding() {
                                   <span style={{ fontWeight: "800", color: "#1e40af", fontFamily: "monospace", backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", padding: "1px 5px", borderRadius: "3px" }}>
                                     {c.container_number || "CNTR"}
                                   </span>
-                                  {c.custom_seal && (
-                                    <span style={{ color: "#64748b", fontSize: "9px" }}>
-                                      Seal: <strong style={{ color: "#334155" }}>{c.custom_seal}</strong>
+                                  {(c.container_size || c.type) && (
+                                    <span style={{ fontSize: "8.5px", fontWeight: "800", color: "#0369a1", backgroundColor: "#e0f2fe", border: "1px solid #bae6fd", padding: "1px 4px", borderRadius: "3px" }}>
+                                      {c.container_size || c.type}
                                     </span>
                                   )}
-                                  {c.line_seal && (
-                                    <span style={{ color: "#64748b", fontSize: "9px" }}>
-                                      L.Seal: <strong style={{ color: "#334155" }}>{c.line_seal}</strong>
-                                    </span>
-                                  )}
+                                  {(() => {
+                                    const customSeal = (c.custom_seal || c.customSealNo || "").trim();
+                                    const lineSeal = (c.line_seal || c.shippingLineSealNo || "").trim();
+                                    if (!customSeal && !lineSeal) return null;
+
+                                    if (customSeal && lineSeal) {
+                                      if (customSeal.toUpperCase() === lineSeal.toUpperCase()) {
+                                        return (
+                                          <span style={{ color: "#64748b", fontSize: "9px" }}>
+                                            Seal: <strong style={{ color: "#334155" }}>{customSeal}</strong>
+                                          </span>
+                                        );
+                                      }
+                                      return (
+                                        <span style={{ color: "#64748b", fontSize: "9px", display: "inline-flex", gap: "4px", alignItems: "center" }}>
+                                          <span>
+                                            Seal: <strong style={{ color: "#334155" }}>{customSeal}</strong>
+                                          </span>
+                                          <span>
+                                            L.Seal: <strong style={{ color: "#334155" }}>{lineSeal}</strong>
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+
+                                    const single = customSeal || lineSeal;
+                                    return (
+                                      <span style={{ color: "#64748b", fontSize: "9px" }}>
+                                        Seal: <strong style={{ color: "#334155" }}>{single}</strong>
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                               {row.containers.length > 2 && (
