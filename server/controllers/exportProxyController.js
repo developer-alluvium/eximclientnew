@@ -483,3 +483,51 @@ export const proxyExporterBranches = async (req, res) => {
     });
   }
 };
+
+/**
+ * POST /api/exports/create-client-job
+ * Proxies the request to create a client export job to Exim-Export server.
+ */
+export const createClientExportJob = async (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Authentication required." });
+    }
+
+    const payload = req.body;
+
+    const exportApiUrl = `${EXPORT_API_BASE_URL}/jobs/add-job-exp-man`;
+
+    const response = await axios.post(exportApiUrl, payload, {
+      headers: {
+        username: user.name || "Client",
+        "x-username": user.name || "Client"
+      },
+      timeout: 30000,
+    });
+
+    return res.json(response.data);
+  } catch (error) {
+    console.error("Create client export job proxy error:", error);
+
+    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      return res.status(503).json({
+        success: false,
+        message: "Export API is currently unavailable. Please ensure the Export server is running.",
+        error: error.message,
+      });
+    }
+
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to create export job.",
+      error: error.message,
+    });
+  }
+};
+
