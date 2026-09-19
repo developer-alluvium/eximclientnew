@@ -39,9 +39,10 @@
 
     table.transport-table {
       width: 100%;
-      min-width: 1800px; // Ensure enough width for columns
+      min-width: 1200px; // Optimal width for 10 combined columns
       border-collapse: collapse;
       table-layout: auto;
+      -webkit-overflow-scrolling: touch;
 
       thead {
         position: sticky;
@@ -49,26 +50,30 @@
         z-index: 10;
         
         th {
-          // background-color: #1e3a8a; // Navy Blue
           background-color: #1E293B;
           color: #ffffff;
-          padding: 12px 16px;
+          padding: 10px 14px;
           text-align: left;
           font-weight: 600;
-          font-size: 0.75rem;
+          font-size: 0.74rem;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           white-space: nowrap;
-          border-bottom: 2px solid  #1E293B;
-          
-          /* Sort indicator space if needed */
+          border-bottom: 2px solid #1E293B;
           position: relative;
+
+          &:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 15;
+            background-color: #1E293B;
+          }
         }
       }
 
       tbody {
         tr {
-          border-bottom: 1px solid #f1f5f9; // Default light border between sub-rows
+          border-bottom: 1px solid #f1f5f9;
           transition: background-color 0.1s ease-in-out;
 
           &:hover {
@@ -77,51 +82,57 @@
 
           /* Strong separator between Document Groups */
           &.group-last-row {
-            border-bottom: 2px solid #cbd5e1; // Stronger grey border
+            border-bottom: 2px solid #cbd5e1;
           }
 
           td {
-            padding: 12px 16px;
-            font-size: 0.85rem;
+            padding: 10px 14px;
+            font-size: 0.82rem;
             color: #334155;
             vertical-align: top;
-            // Removed border-bottom from td so tr border takes precedence/works better with rowspan
             border-bottom: none; 
-            line-height: 1.5;
+            line-height: 1.45;
+
+            &:first-child {
+              position: sticky;
+              left: 0;
+              z-index: 5;
+              background-color: inherit;
+              box-shadow: 1px 0 2px rgba(0,0,0,0.03);
+            }
             
             &.grouped-cell {
                vertical-align: top;
-               background-color: inherit; // Allow conditional row coloring to show through
-               border-right: 1px solid #f1f5f9; // Optional separation
+               background-color: inherit;
+               border-right: 1px solid #f1f5f9;
             }
 
             /* Cell Content Helpers */
             .t-cell {
               display: flex;
               flex-direction: column;
-              gap: 4px;
+              gap: 3px;
               
               .t-main {
                 font-weight: 600;
                 color: #1e293b;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                white-space: normal;
+                word-break: break-word;
               }
               
               .t-sub {
-                font-size: 0.75rem;
+                font-size: 0.74rem;
                 color: #64748b;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                white-space: normal;
+                word-break: break-word;
                 display: flex;
                 align-items: center;
                 gap: 4px;
+                flex-wrap: wrap;
               }
 
               .t-link {
-                color:"#1E293B";
+                color: #1E293B;
                 font-weight: 500;
               }
 
@@ -150,10 +161,269 @@
 
   /* Pagination */
   .transport-pagination {
-    padding: 12px 16px;
+    padding: 10px 16px;
     border-top: 1px solid #e2e8f0;
     display: flex;
     justify-content: flex-end;
     background: #fff;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Mobile Adjustments & Cards */
+@media (max-width: 768px) {
+  .transport-module-wrapper {
+    border-radius: 6px;
+    border: none;
+    height: auto !important;
+    overflow: visible !important;
+
+    .transport-table-container {
+      overflow: visible !important;
+      height: auto !important;
+      max-height: none !important;
+    }
+
+    .transport-pagination {
+      padding: 12px 10px;
+      justify-content: center;
+
+      .ant-pagination {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        font-size: 0.8rem;
+      }
+    }
+  }
+}
+
+/* Mobile Transport Cards (Native Phone App Style) */
+.transport-mobile-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px;
+  width: 100%;
+
+  .mobile-transport-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    transition: all 0.2s ease;
+
+    .card-header {
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid #edf2f7;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+
+      .card-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+
+        .card-sr-badge {
+          background: #e2e8f0;
+          color: #334155;
+          font-weight: 700;
+          font-size: 0.72rem;
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+
+        .card-container-no {
+          font-weight: 700;
+          color: #0f172a;
+          font-size: 0.88rem;
+        }
+      }
+
+      .card-status-tag {
+        margin: 0;
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 4px;
+      }
+    }
+
+    .card-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+
+      .card-info-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+
+        .info-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.82rem;
+
+          .info-label {
+            color: #64748b;
+            font-size: 0.75rem;
+          }
+
+          .info-val {
+            color: #1e293b;
+          }
+        }
+      }
+
+      .toll-booth-btn {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        color: #15803d;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+
+        &:active {
+          background: #dcfce7;
+        }
+      }
+
+      .driver-call-btn {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #16a34a;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+
+        &:active {
+          background: #dcfce7;
+        }
+      }
+
+      .card-route-row {
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+
+        .route-arrow {
+          color: #94a3b8;
+          font-size: 0.72rem;
+        }
+      }
+
+      .card-status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-top: 1px dashed #f1f5f9;
+        padding-top: 8px;
+
+        .status-time {
+          font-size: 0.72rem;
+          color: #64748b;
+        }
+
+        .history-btn {
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          color: #2563eb;
+          font-size: 0.7rem;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 4px;
+          cursor: pointer;
+
+          &:active {
+            background: #dbeafe;
+          }
+        }
+      }
+    }
+
+    .card-expanded-content {
+      padding: 12px;
+      background: #fafafa;
+      border-top: 1px solid #edf2f7;
+
+      .expanded-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px 12px;
+
+        .expanded-field {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+
+          &.full-width {
+            grid-column: span 2;
+          }
+
+          .exp-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-weight: 600;
+          }
+
+          .exp-val {
+            font-size: 0.8rem;
+            color: #0f172a;
+            word-break: break-word;
+          }
+        }
+      }
+    }
+
+    .card-expand-toggle {
+      padding: 9px 14px;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      text-align: center;
+      cursor: pointer;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #2563eb;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+
+      &:active {
+        background: #f1f5f9;
+      }
+    }
   }
 }

@@ -92,18 +92,52 @@ const MainLayout = ({ children }) => {
 
   return (
     <Layout style={{ height: "100vh", overflow: "hidden", background: "#f5f7fa" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .header-datetime-box {
+            display: none !important;
+          }
+          .header-user-text {
+            display: none !important;
+          }
+          .header-divider-mobile {
+            display: none !important;
+          }
+          .main-layout-header {
+            padding: 0 12px !important;
+            height: 56px !important;
+          }
+          .main-layout-content-inner {
+            padding: 8px 8px !important;
+            height: calc(100vh - 56px) !important;
+          }
+          .header-logo-img {
+            height: 42px !important;
+            width: 110px !important;
+          }
+        }
+        @media (min-width: 769px) {
+          .main-layout-header {
+            padding: 0 32px !important;
+            height: 64px !important;
+          }
+          .main-layout-content-inner {
+            padding: 24px 32px !important;
+            height: calc(100vh - 64px) !important;
+          }
+        }
+      `}</style>
       <Header
+        className="main-layout-header"
         style={{
           background: "#ffffff",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 32px",
           boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
           zIndex: 100,
           position: "sticky",
           top: 0,
-          height: 64,
         }}
       >
         {/* Left Section - Logo */}
@@ -121,6 +155,7 @@ const MainLayout = ({ children }) => {
           <img
             src={require("../assets/images/logo.webp")}
             alt="EXIM User Portal"
+            className="header-logo-img"
             style={{
               height: 55,
               width: 140,
@@ -133,6 +168,7 @@ const MainLayout = ({ children }) => {
         <Space size={16} align="center">
           {/* DateTime - Compact inline format */}
           <div
+            className="header-datetime-box"
             style={{
               display: "flex",
               alignItems: "center",
@@ -163,6 +199,7 @@ const MainLayout = ({ children }) => {
           {/* Divider */}
           <Divider
             type="vertical"
+            className="header-divider-mobile"
             style={{ height: 24, borderColor: "rgba(0, 0, 0, 0.1)" }}
           />
 
@@ -178,7 +215,7 @@ const MainLayout = ({ children }) => {
             >
               {userInitial}
             </Avatar>
-            <div style={{ lineHeight: 1.3 }}>
+            <div className="header-user-text" style={{ lineHeight: 1.3 }}>
               <Text
                 strong
                 style={{ fontSize: 13, color: "#1e293b", display: "block" }}
@@ -233,11 +270,10 @@ const MainLayout = ({ children }) => {
 
       <Content style={{ background: "#f5f7fa" }}>
         <div
+          className="main-layout-content-inner"
           style={{
-            padding: "24px 32px",
             maxWidth: "100%",
             margin: "0 auto",
-            height: "calc(100vh - 64px)",
             overflow: "auto",
           }}
         >
