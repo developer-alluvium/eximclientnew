@@ -13,6 +13,9 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const getTargetUrl = () => {
+  if (process.env.TRANSPORT_API_BASE_URL) {
+    return `${process.env.TRANSPORT_API_BASE_URL.replace(/\/+$/, '')}/eway-bill`;
+  }
   return process.env.NODE_ENV === "development"
     ? "http://localhost:9007/api/eway-bill"
     : "https://eximbot.alvision.in/transport/api/eway-bill";

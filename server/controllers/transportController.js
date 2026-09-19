@@ -17,10 +17,13 @@ export const getClientTransportData = async (req, res) => {
     }
 
     const serviceToken = await transportAuthService.getServiceToken();
+    const apiKey = process.env.TRANSPORT_API_KEY || "1234567890";
 
-    const targetBaseUrl = process.env.NODE_ENV === "development"
+    const targetBaseUrl = process.env.TRANSPORT_API_BASE_URL || (
+      process.env.NODE_ENV === "development"
         ? "http://localhost:9007/api"
-        : "https://eximbot.alvision.in/transport/api";
+        : "https://eximbot.alvision.in/transport/api"
+    );
 
     // Call external API
     try {
@@ -31,14 +34,25 @@ export const getClientTransportData = async (req, res) => {
           ...(filter && { filter })
         },
         headers: {
+          "x-api-key": apiKey,
           ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
-        }
+        },
+        timeout: 15000
       });
 
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      // Handle response formats from eximtransport server:
+      // eximtransport returns: { success: true, count: N, organisation: {...}, data: [...] }
+      // or directly an array: [...]
+      const transportList = Array.isArray(response.data)
+        ? response.data
+        : (Array.isArray(response.data?.data) ? response.data.data : null);
+
+      if (transportList !== null) {
         return res.status(200).json({
           success: true,
-          data: response.data
+          count: transportList.length,
+          organisation: response.data?.organisation || null,
+          data: transportList
         });
       }
     } catch (apiErr) {
@@ -109,16 +123,20 @@ export const getBoeExtract = async (req, res) => {
     }
 
     const serviceToken = await transportAuthService.getServiceToken();
+    const apiKey = process.env.TRANSPORT_API_KEY || "1234567890";
 
-    const targetBaseUrl = process.env.NODE_ENV === "development"
+    const targetBaseUrl = process.env.TRANSPORT_API_BASE_URL || (
+      process.env.NODE_ENV === "development"
         ? "http://localhost:9007/api"
-        : "https://eximbot.alvision.in/transport/api";
+        : "https://eximbot.alvision.in/transport/api"
+    );
 
     // Call external API
     const response = await axios.get(
       `${targetBaseUrl}/eway-bill/boe-extract`, {
       params: { be_no, be_date },
       headers: {
+        "x-api-key": apiKey,
         ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
       },
       validateStatus: () => true
