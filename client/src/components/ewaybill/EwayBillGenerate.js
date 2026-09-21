@@ -3,6 +3,7 @@ import axios from "../../utils/axiosConfig";
 import Swal from "sweetalert2";
 import { Autocomplete, TextField } from "@mui/material";
 import "../../styles/ewaybill.scss";
+import { useWallet } from "../../context/WalletContext";
 import {
   runClientSideValidations,
   isSezGstin,
@@ -270,6 +271,8 @@ function EwayBillGenerate({
   partAOnlyDefault = false,
   jobId = null
 }) {
+  const { openRechargeModal, refreshBalance } = useWallet();
+
   // ---- Tab & Mode State ----
   // For BOE-only mode we always start in BOE tab and don't display the LR path.
   const [activeTab, setActiveTab] = useState('boe'); // default to BOE
@@ -2467,6 +2470,7 @@ function EwayBillGenerate({
           confirmButtonText: "OK",
           allowOutsideClick: false
         }).then(() => {
+          refreshBalance();
           if (onSuccess) {
             onSuccess(response.data.data);
           }
@@ -2477,6 +2481,33 @@ function EwayBillGenerate({
       }
     } catch (error) {
       console.error("Error generating E-Way Bill:", error);
+
+      // ── SaaS Billing: Insufficient Credits Interception ─────────────────
+      if (
+        error.response?.status === 402 ||
+        error.response?.data?.code === "INSUFFICIENT_CREDITS"
+      ) {
+        Swal.fire({
+          icon: "warning",
+          title: "Insufficient Credits",
+          text:
+            error.response?.data?.message ||
+            "You do not have enough credits to generate this E-Way Bill. Please recharge your wallet to proceed.",
+          showCancelButton: true,
+          confirmButtonText: "Top Up Credits",
+          cancelButtonText: "Cancel",
+          confirmButtonColor: "#2563eb",
+          cancelButtonColor: "#64748b",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            openRechargeModal(
+              error.response?.data?.message ||
+                "Your credit balance is insufficient to generate this E-Way Bill."
+            );
+          }
+        });
+        return;
+      }
 
       if (error.response?.data?.validationErrors && error.response.data.validationErrors.length > 0) {
         const errors = {};

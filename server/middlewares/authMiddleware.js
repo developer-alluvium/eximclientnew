@@ -186,6 +186,8 @@ export const authenticate = async (req, res, next) => {
     } else if (req.cookies) {
       token =
         req.cookies.access_token ||
+        req.cookies.superadmin_token ||
+        req.cookies.superadmin_access_token ||
         req.cookies.customer_admin_access_token ||
         req.cookies.user_access_token;
     }

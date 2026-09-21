@@ -4,6 +4,7 @@ import EximclientUser from "../models/eximclientUserModel.js";
 import CustomerModel from "../models/customerModel.js";
 import JobModel from "../models/jobModel.js";
 import Notification from "../models/notificationModel.js";
+import ClientWallet from "../models/ClientWallet.js";
 import { sendUserAuthResponse } from "../middlewares/authMiddleware.js";
 import axios from "axios";
 
@@ -1224,6 +1225,29 @@ export const updateUserStatus = async (req, res) => {
     user.isActive = isActive;
     user.status = isActive ? "active" : "inactive";
     await user.save();
+
+    // If activating client, provide 3 months of initial/renewed activation validity
+    if (isActive) {
+      try {
+        let wallet = await ClientWallet.findOne({ clientId: user._id });
+        if (!wallet) {
+          wallet = new ClientWallet({
+            clientId: user._id,
+            availableCredits: 0,
+            blockedCredits: 0,
+            activationDate: new Date(),
+            validUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 months initial activation
+          });
+          await wallet.save();
+        } else if (!wallet.validUntil || new Date(wallet.validUntil) < new Date()) {
+          wallet.validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+          wallet.activationDate = wallet.activationDate || new Date();
+          await wallet.save();
+        }
+      } catch (walletErr) {
+        console.warn("Could not ensure wallet activation validity:", walletErr.message);
+      }
+    }
 
     // Create notification for user
     const notificationMessage = isActive

@@ -700,6 +700,19 @@ function UserDashboard() {
 
   const modules = useMemo(() => {
     const filteredModules = filterModulesByAccess(allModules);
+
+    // Add Wallet & Billing module for all users
+    filteredModules.push({
+      name: "Wallet & Billing",
+      description: "Monitor E-Way Bill credit balance and complete transaction ledger statement",
+      path: "/wallet",
+      categoryLabel: "BILLING & LEDGER",
+      category: "core",
+      hasAccess: true,
+      isLocked: false,
+    });
+
+
     if (dashboardData?.user?.role === "admin") {
       filteredModules.push({
         name: "Admin Panel",
@@ -713,7 +726,7 @@ function UserDashboard() {
       });
     }
     return filteredModules;
-  }, [dashboardData?.user?.role]);
+  }, [dashboardData?.user?.role, dashboardData?.user?.email]);
 
   const fetchDashboardData = async () => {
     try {

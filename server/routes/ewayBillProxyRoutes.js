@@ -8,6 +8,23 @@ import OtherEwayBill from "../models/otherEwayBillModel.js";
 import Job from "../models/jobModel.js";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authenticateUser } from "../middlewares/authMiddleware.js";
+import {
+  checkAndBlockCredits,
+  finalizeDebit,
+  rollbackBlockedCredits,
+  addRewardCredits,
+  approvePayment,
+  adminAdjustCredits,
+  setWalletValidity,
+  getPricingRule,
+  getOrCreateWallet,
+  InsufficientCreditsError,
+  WalletExpiredError,
+} from "../services/walletService.js";
+import ClientWallet from "../models/ClientWallet.js";
+import CreditLedger from "../models/CreditLedger.js";
+import PaymentRequest from "../models/PaymentRequest.js";
+import EximclientUser from "../models/eximclientUserModel.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -134,8 +151,21 @@ const proxyRequest = async (req, res) => {
 const multipartHandler = (req, res, next) => {
   const contentType = req.headers["content-type"] || "";
   if (contentType.includes("multipart/form-data")) {
-    if (req.path === "/boe-upload" || req.path === "/others/upload-boe") {
-      return upload.single("file")(req, res, next);
+    if (
+      req.path === "/boe-upload" ||
+      req.path === "/others/upload-boe" ||
+      req.path === "/wallet/payment-request" ||
+      req.path === "/wallet/topup"
+    ) {
+      return upload.any()(req, res, (err) => {
+        if (err) return next(err);
+        if (Array.isArray(req.files) && req.files.length > 0) {
+          req.file =
+            req.files.find((f) => f.fieldname === "slipFile" || f.fieldname === "file") ||
+            req.files[0];
+        }
+        next();
+      });
     }
     return upload.none()(req, res, next);
   }
@@ -717,6 +747,922 @@ router.delete("/others/:id", authenticateUser, async (req, res) => {
     res.status(500).json({ success: false, message: error.message || "Failed to delete record" });
   }
 });
+
+// ============================================================================
+// PHASE 2: E-WAY BILL GENERATION INTERCEPTION (CREDIT-BASED SAAS MODEL)
+// ============================================================================
+
+/**
+ * POST /api/eway-bill/generate
+ * Intercepts E-Way Bill generation to enforce credit checking, blocking, 
+ * atomic execution, and finalization/rollback.
+ * 
+ * Pattern: Block Credits -> Execute Downstream API -> Finalize / Rollback
+ */
+router.post("/generate", authenticateUser, async (req, res) => {
+  const clientId = (
+    req.user.adminId?._id ||
+    req.user.adminId ||
+    req.user._id
+  )?.toString();
+
+  const refId = (
+    req.body?.formData?.documentNumber ||
+    req.body?.formData?.docNo ||
+    req.body?.containerId ||
+    req.body?.lrId ||
+    req.body?.formData?.boeNumber ||
+    `REF_${Date.now()}`
+  )
+    .toString()
+    .trim();
+
+  console.log(`💳 [EWB SaaS Billing] Generation initiated for Client: ${clientId}, RefId: ${refId}`);
+
+  let blockedAmount = 0;
+  let pricing = { debit: 1, reward: 0, reason: "Standard Tier" };
+
+  try {
+    // ── 1. IDEMPOTENCY CHECK ──────────────────────────────────────────────────
+    // Check if this document or container already has an active E-Way Bill generated.
+    // If already generated and recorded, return cached success without debiting again.
+    const boeNo = req.body?.formData?.documentNumber || req.body?.formData?.docNo;
+    const containerId = req.body?.containerId;
+
+    if (boeNo) {
+      const existingDoc = await OtherEwayBill.findOne({ boeNumber: boeNo }).lean();
+      if (existingDoc) {
+        if (containerId) {
+          const matchingCont = (existingDoc.containers || []).find(
+            (c) =>
+              c.containerNumber?.toUpperCase() === containerId?.toUpperCase() &&
+              c.ewayBillStatus === "Generated" &&
+              c.ewayBillNo
+          );
+          if (matchingCont) {
+            console.log(`⚡ [Idempotency] E-Way bill already exists for container ${containerId}. Returning cached response.`);
+            return res.status(200).json({
+              success: true,
+              message: `E-Way Bill ${matchingCont.ewayBillNo} already generated for container ${containerId}. No credits deducted.`,
+              data: {
+                ewbNo: matchingCont.ewayBillNo,
+                ewbDate: matchingCont.ewayBillDate,
+                url: matchingCont.ewayBillUrl,
+                status: "success",
+                alreadyGenerated: true,
+                idempotentReplay: true,
+              },
+            });
+          }
+        } else if (existingDoc.ewayBillStatus === "Generated" && existingDoc.ewayBillNo) {
+          console.log(`⚡ [Idempotency] E-Way bill already exists for BOE ${boeNo}. Returning cached response.`);
+          return res.status(200).json({
+            success: true,
+            message: `E-Way Bill ${existingDoc.ewayBillNo} already generated for Bill of Entry ${boeNo}. No credits deducted.`,
+            data: {
+              ewbNo: existingDoc.ewayBillNo,
+              ewbDate: existingDoc.ewayBillDate,
+              url: existingDoc.ewayBillUrl,
+              status: "success",
+              alreadyGenerated: true,
+              idempotentReplay: true,
+            },
+          });
+        }
+      }
+    }
+
+    // ── 2. DYNAMIC PRICING EVALUATION ─────────────────────────────────────────
+    pricing = await getPricingRule(req.user, req.body);
+    console.log(`🏷️ [EWB SaaS Billing] Pricing tier resolved:`, pricing);
+
+    // ── 2.5 ACCOUNT VALIDITY & EXPIRY CHECK ────────────────────────────────────
+    const clientWallet = await getOrCreateWallet(clientId);
+    if (clientWallet.validUntil && new Date() > new Date(clientWallet.validUntil)) {
+      const expDateStr = new Date(clientWallet.validUntil).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+      return res.status(403).json({
+        success: false,
+        code: "WALLET_EXPIRED",
+        message: `Your E-Way Bill service validity expired on ${expDateStr}. Please top up your account or contact support to renew your subscription.`,
+        validUntil: clientWallet.validUntil,
+      });
+    }
+
+    // ── 3. BLOCK CREDITS (SELECT FOR UPDATE PATTERN) ───────────────────────────
+    if (pricing.debit > 0) {
+      await checkAndBlockCredits(clientId, pricing.debit, refId);
+      blockedAmount = pricing.debit;
+      console.log(`🔒 [EWB SaaS Billing] Blocked ${blockedAmount} credit(s) for client ${clientId}`);
+    }
+
+    // ── 4. EXECUTE DOWNSTREAM PROXY REQUEST ────────────────────────────────────
+    const targetBase = getTargetUrl();
+    const targetUrl = `${targetBase}/generate`;
+    const serviceToken = await transportAuthService.getServiceToken();
+
+    const headers = { ...req.headers };
+    delete headers.host;
+    delete headers.connection;
+    if (serviceToken) {
+      headers.Authorization = `Bearer ${serviceToken}`;
+    }
+
+    console.log(`📡 [EWB SaaS Billing] Proxying generate request to Transport API: ${targetUrl}`);
+    const downstreamRes = await axios.post(targetUrl, req.body, {
+      headers,
+      params: req.query,
+      timeout: 60000,
+      validateStatus: () => true, // capture all status codes cleanly
+    });
+
+    const isSuccess =
+      downstreamRes.status >= 200 &&
+      downstreamRes.status < 300 &&
+      downstreamRes.data?.success !== false;
+
+    // ── 5. FINALIZE DEBIT (ON SUCCESS) ────────────────────────────────────────
+    if (isSuccess) {
+      const ewbNo = downstreamRes.data?.data?.ewbNo || refId;
+      console.log(`✅ [EWB SaaS Billing] Downstream E-Way Bill success (${ewbNo}). Finalizing transaction...`);
+
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      try {
+        if (pricing.debit > 0) {
+          await finalizeDebit(
+            clientId,
+            pricing.debit,
+            refId,
+            `E-Way Bill Generated (${ewbNo})`,
+            session
+          );
+          blockedAmount = 0; // successfully finalized
+        }
+
+        if (pricing.reward > 0) {
+          await addRewardCredits(
+            clientId,
+            pricing.reward,
+            refId,
+            `Incentive Reward: ${pricing.reason} (${ewbNo})`,
+            session
+          );
+          console.log(`🎁 [EWB SaaS Billing] Awarded ${pricing.reward} reward credit(s) to client ${clientId}`);
+        }
+
+        await session.commitTransaction();
+      } catch (commitErr) {
+        await session.abortTransaction();
+        console.error("❌ Critical error committing financial transaction:", commitErr);
+      } finally {
+        session.endSession();
+      }
+
+      return res.status(downstreamRes.status).json(downstreamRes.data);
+    }
+
+    // ── 6. ROLLBACK BLOCKED CREDITS (ON DOWNSTREAM FAILURE) ────────────────────
+    console.warn(`⚠️ [EWB SaaS Billing] Downstream API returned non-success (${downstreamRes.status}). Rolling back blocked credits...`);
+    if (blockedAmount > 0) {
+      await rollbackBlockedCredits(
+        clientId,
+        blockedAmount,
+        refId,
+        `Rollback: Downstream EWB generation returned status ${downstreamRes.status}`
+      );
+      blockedAmount = 0;
+    }
+
+    return res.status(downstreamRes.status).json(downstreamRes.data);
+  } catch (error) {
+    console.error("❌ [EWB SaaS Billing] Error in /generate interception:", error);
+
+    // Roll back any blocked credits on unexpected exception
+    if (blockedAmount > 0) {
+      try {
+        await rollbackBlockedCredits(
+          clientId,
+          blockedAmount,
+          refId,
+          `Rollback on server exception: ${error.message}`
+        );
+        console.log(`↩️ [EWB SaaS Billing] Successfully rolled back ${blockedAmount} blocked credit(s).`);
+      } catch (rollbackErr) {
+        console.error("❌ Critical failure during emergency rollback:", rollbackErr);
+      }
+    }
+
+    // Handle Wallet Expired specifically
+    if (error instanceof WalletExpiredError || error.code === "WALLET_EXPIRED") {
+      return res.status(403).json({
+        success: false,
+        code: "WALLET_EXPIRED",
+        message: error.message,
+        validUntil: error.validUntil,
+      });
+    }
+
+    // Handle Insufficient Credits specifically
+    if (error instanceof InsufficientCreditsError || error.code === "INSUFFICIENT_CREDITS") {
+      return res.status(402).json({
+        success: false,
+        code: "INSUFFICIENT_CREDITS",
+        message: error.message,
+        availableCredits: error.available,
+        requiredCredits: error.required,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process E-Way Bill generation",
+    });
+  }
+});
+
+// ============================================================================
+// WALLET & PAYMENT API ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/eway-bill/wallet/balance
+ * Returns the current credit balance (available, blocked, effective).
+ */
+router.get("/wallet/balance", authenticateUser, async (req, res) => {
+  try {
+    const clientId = (
+      req.user.adminId?._id ||
+      req.user.adminId ||
+      req.user._id
+    )?.toString();
+
+    const wallet = await getOrCreateWallet(clientId);
+    const pricing = await getPricingRule(req.user, {});
+
+    res.status(200).json({
+      success: true,
+      data: {
+        availableCredits: wallet.availableCredits,
+        blockedCredits: wallet.blockedCredits,
+        effectiveBalance: wallet.getEffectiveBalance(),
+        activationDate: wallet.activationDate,
+        validUntil: wallet.validUntil,
+        isExpired: wallet.validUntil ? new Date() > new Date(wallet.validUntil) : false,
+        daysRemaining: wallet.validUntil ? Math.ceil((new Date(wallet.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null,
+        currencyRate: "1 Credit = ₹9",
+        pricingTier: pricing.tier,
+        pricingReason: pricing.reason,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching wallet balance:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch wallet balance" });
+  }
+});
+
+/**
+ * GET /api/eway-bill/wallet/ledger
+ * Returns the immutable credit ledger statement for the client.
+ */
+router.get("/wallet/ledger", authenticateUser, async (req, res) => {
+  try {
+    const clientId = (
+      req.user.adminId?._id ||
+      req.user.adminId ||
+      req.user._id
+    )?.toString();
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const skip = (page - 1) * limit;
+
+    const filter = { clientId };
+    if (req.query.type && req.query.type !== "ALL") {
+      filter.transactionType = req.query.type;
+    }
+    if (req.query.search && req.query.search.trim()) {
+      const searchRegex = new RegExp(req.query.search.trim(), "i");
+      filter.$or = [
+        { remarks: searchRegex },
+        { referenceModel: searchRegex },
+      ];
+    }
+
+    const [transactions, total] = await Promise.all([
+      CreditLedger.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      CreditLedger.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        transactions,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching credit ledger:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch credit ledger" });
+  }
+});
+
+/**
+ * GET /api/eway-bill/wallet/payment-requests
+ * Returns all payment slip top-up requests submitted by this client.
+ */
+router.get("/wallet/payment-requests", authenticateUser, async (req, res) => {
+  try {
+    const clientId = (
+      req.user.adminId?._id ||
+      req.user.adminId ||
+      req.user._id
+    )?.toString();
+
+    const filter = { clientId };
+    if (req.query.status && req.query.status !== "ALL") {
+      filter.status = req.query.status;
+    }
+
+    const requests = await PaymentRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: requests,
+    });
+  } catch (err) {
+    console.error("Error fetching payment requests:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch payment requests" });
+  }
+});
+
+/**
+ * GET /api/eway-bill/wallet/stats
+ * Summary stats: total deposited, total debited, rewards, pending approval count.
+ */
+router.get("/wallet/stats", authenticateUser, async (req, res) => {
+  try {
+    const clientId = (
+      req.user.adminId?._id ||
+      req.user.adminId ||
+      req.user._id
+    )?.toString();
+
+    const [wallet, ledgerSummary, pendingCount] = await Promise.all([
+      getOrCreateWallet(clientId),
+      CreditLedger.aggregate([
+        { $match: { clientId: new mongoose.Types.ObjectId(clientId) } },
+        {
+          $group: {
+            _id: "$transactionType",
+            totalCredits: { $sum: "$credits" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      PaymentRequest.countDocuments({ clientId, status: "PENDING" }),
+    ]);
+
+    const stats = {
+      availableCredits: wallet.availableCredits,
+      blockedCredits: wallet.blockedCredits,
+      effectiveBalance: wallet.getEffectiveBalance(),
+      totalDeposited: 0,
+      totalDebited: 0,
+      totalRewarded: 0,
+      pendingRequestsCount: pendingCount,
+    };
+
+    ledgerSummary.forEach((item) => {
+      if (item._id === "PAYMENT_CREDIT" || item._id === "ADMIN_ADJUSTMENT") {
+        if (item.totalCredits > 0) stats.totalDeposited += item.totalCredits;
+      } else if (item._id === "EWAYBILL_DEBIT") {
+        stats.totalDebited += Math.abs(item.totalCredits);
+      } else if (item._id === "EWAYBILL_REWARD") {
+        stats.totalRewarded += item.totalCredits;
+      }
+    });
+
+    res.status(200).json({ success: true, data: stats });
+  } catch (err) {
+    console.error("Error fetching wallet stats:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch wallet stats" });
+  }
+});
+
+/**
+ * POST /api/eway-bill/wallet/payment-request & /api/eway-bill/wallet/topup
+ * Submit a manual bank transfer payment slip for admin approval.
+ */
+const handleTopupPaymentRequest = async (req, res) => {
+    try {
+      const clientId = (
+        req.user.adminId?._id ||
+        req.user.adminId ||
+        req.user._id
+      )?.toString();
+
+      const { amountInr, utrNumber } = req.body;
+
+      if (!amountInr || Number(amountInr) <= 0) {
+        return res.status(400).json({ success: false, message: "A valid amount in INR is required" });
+      }
+      if (!utrNumber || !utrNumber.trim()) {
+        return res.status(400).json({ success: false, message: "UTR / Reference Number is required" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: "Payment slip file (Image/PDF) is required" });
+      }
+
+      // Check duplicate UTR
+      const normalizedUtr = utrNumber.trim().toUpperCase();
+      const existingUtr = await PaymentRequest.findOne({ utrNumber: normalizedUtr });
+      if (existingUtr) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment request with UTR ${normalizedUtr} has already been submitted.`,
+        });
+      }
+
+      // Upload slip to S3
+      const file = req.file;
+      const timestamp = Date.now();
+      const extension = file.originalname.substring(file.originalname.lastIndexOf("."));
+      const uniqueKey = `payment-slips/${clientId}/${timestamp}-${normalizedUtr}${extension}`;
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.REACT_APP_S3_BUCKET,
+          Key: uniqueKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        })
+      );
+
+      const slipUrl = `https://${process.env.REACT_APP_S3_BUCKET}.s3.${process.env.REACT_APP_AWS_REGION}.amazonaws.com/${uniqueKey}`;
+
+      // 1 Credit = ₹9
+      const parsedAmount = Number(amountInr);
+      const creditsRequested = Math.floor(parsedAmount / 9);
+
+      if (creditsRequested < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Amount must be at least ₹9 (1 Credit = ₹9)",
+        });
+      }
+
+      const paymentRequest = new PaymentRequest({
+        clientId,
+        amountInr: parsedAmount,
+        creditsRequested,
+        utrNumber: normalizedUtr,
+        slipFileUrl: slipUrl,
+        slipFileKey: uniqueKey,
+        status: "PENDING",
+      });
+
+      await paymentRequest.save();
+
+      res.status(201).json({
+        success: true,
+        message: `Payment request submitted successfully for ${creditsRequested} credit(s). Pending admin verification.`,
+        data: paymentRequest,
+      });
+    } catch (err) {
+      console.error("Error creating payment request:", err);
+      res.status(500).json({ success: false, message: err.message || "Failed to submit payment request" });
+    }
+};
+
+router.post("/wallet/payment-request", authenticateUser, handleTopupPaymentRequest);
+router.post("/wallet/topup", authenticateUser, handleTopupPaymentRequest);
+
+/**
+ * Middleware: Verify request is from punit@alluvium.in or an admin/superadmin.
+ */
+const checkAdminOrPunit = (req, res, next) => {
+  const email = (req.user?.email || "").toLowerCase();
+  const role = (req.user?.role || "").toLowerCase();
+  const isPunit = email === "punit@alluvium.in";
+  const isSuperAdminEmail = email === "superadmin@exim.com";
+  const isAdmin = role === "admin" || role === "superadmin" || role === "super_admin" || Boolean(req.user?.isAdmin);
+  if (isPunit || isSuperAdminEmail || isAdmin) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    message: "Access denied. Only superadmin@exim.com, punit@alluvium.in or system administrators can access this control page.",
+  });
+};
+
+/**
+ * GET /api/eway-bill/admin/wallet/clients
+ * Returns all clients with their credit balances, blocked credits, and usage stats.
+ */
+router.get("/admin/wallet/clients", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const search = req.query.search ? req.query.search.trim() : "";
+    const userQuery = {};
+    if (search) {
+      userQuery.$or = [
+        { name: new RegExp(search, "i") },
+        { email: new RegExp(search, "i") },
+        { ie_code_no: new RegExp(search, "i") },
+      ];
+    }
+
+    const users = await EximclientUser.find(userQuery)
+      .select("_id name email role status ie_code_no createdAt")
+      .sort({ name: 1 })
+      .lean();
+
+    const userIds = users.map((u) => u._id);
+
+    // Fetch all wallets for these users
+    const wallets = await ClientWallet.find({ clientId: { $in: userIds } }).lean();
+    const walletMap = new Map();
+    wallets.forEach((w) => walletMap.set(w.clientId.toString(), w));
+
+    // Fetch aggregation of ledger stats for each user
+    const ledgerAgg = await CreditLedger.aggregate([
+      { $match: { clientId: { $in: userIds } } },
+      {
+        $group: {
+          _id: { clientId: "$clientId", type: "$transactionType" },
+          totalCredits: { $sum: "$credits" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const statsMap = new Map();
+    ledgerAgg.forEach((item) => {
+      const cId = item._id.clientId.toString();
+      if (!statsMap.has(cId)) {
+        statsMap.set(cId, { totalDebited: 0, totalDeposited: 0, totalRewarded: 0 });
+      }
+      const clientStats = statsMap.get(cId);
+      if (item._id.type === "EWAYBILL_DEBIT") {
+        clientStats.totalDebited += Math.abs(item.totalCredits);
+      } else if (item._id.type === "PAYMENT_CREDIT" || item._id.type === "ADMIN_ADJUSTMENT") {
+        if (item.totalCredits > 0) clientStats.totalDeposited += item.totalCredits;
+      } else if (item._id.type === "EWAYBILL_REWARD") {
+        clientStats.totalRewarded += item.totalCredits;
+      }
+    });
+
+    let totalCirculatingCredits = 0;
+    let totalLifetimeDebited = 0;
+    let totalLifetimeDeposited = 0;
+
+    const clientsWithWallets = users.map((u) => {
+      const w = walletMap.get(u._id.toString()) || { availableCredits: 0, blockedCredits: 0 };
+      const s = statsMap.get(u._id.toString()) || { totalDebited: 0, totalDeposited: 0, totalRewarded: 0 };
+
+      totalCirculatingCredits += w.availableCredits || 0;
+      totalLifetimeDebited += s.totalDebited;
+      totalLifetimeDeposited += s.totalDeposited;
+
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        ie_code_no: u.ie_code_no,
+        availableCredits: w.availableCredits || 0,
+        blockedCredits: w.blockedCredits || 0,
+        effectiveBalance: Math.max(0, (w.availableCredits || 0) - (w.blockedCredits || 0)),
+        totalDebited: s.totalDebited,
+        totalDeposited: s.totalDeposited,
+        totalRewarded: s.totalRewarded,
+        createdAt: u.createdAt,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        clients: clientsWithWallets,
+        summary: {
+          totalClients: users.length,
+          totalCirculatingCredits,
+          totalLifetimeDebited,
+          totalLifetimeDeposited,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching admin client wallets:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch client wallets list" });
+  }
+});
+
+/**
+ * POST /api/eway-bill/admin/wallet/adjust-credits
+ * Credit or debit a specific client's wallet with remarks.
+ */
+router.post("/admin/wallet/adjust-credits", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const { clientId, creditsDelta, remarks, extendDays, newValidUntil } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+    const delta = Number(creditsDelta);
+    if (!delta || isNaN(delta)) {
+      return res.status(400).json({ success: false, message: "A valid non-zero credits adjustment amount is required" });
+    }
+
+    const adminEmail = req.user.email || "Admin";
+    const customRemarks = remarks?.trim()
+      ? `${remarks.trim()} (Authorized by ${adminEmail})`
+      : `Admin balance adjustment of ${delta > 0 ? "+" : ""}${delta} credits by ${adminEmail}`;
+
+    const result = await adminAdjustCredits(clientId, delta, customRemarks, req.user._id, extendDays, newValidUntil);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully ${delta > 0 ? "added" : "deducted"} ${Math.abs(delta)} credit(s). New balance: ${result.wallet.availableCredits}`,
+      data: {
+        wallet: {
+          availableCredits: result.wallet.availableCredits,
+          blockedCredits: result.wallet.blockedCredits,
+          effectiveBalance: Math.max(0, result.wallet.availableCredits - result.wallet.blockedCredits),
+          activationDate: result.wallet.activationDate,
+          validUntil: result.wallet.validUntil,
+          isExpired: result.wallet.validUntil ? new Date() > new Date(result.wallet.validUntil) : false,
+          daysRemaining: result.wallet.validUntil ? Math.ceil((new Date(result.wallet.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null,
+        },
+        ledger: result.ledger,
+      },
+    });
+  } catch (err) {
+    console.error("Error adjusting client credits:", err);
+    res.status(500).json({ success: false, message: err.message || "Failed to adjust credits" });
+  }
+});
+
+/**
+ * GET /api/eway-bill/admin/wallet/client-ledger/:clientId
+ * Returns full transaction audit ledger for any specific client.
+ */
+router.get("/admin/wallet/client-ledger/:clientId", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const skip = (page - 1) * limit;
+
+    const filter = { clientId };
+    if (req.query.type && req.query.type !== "ALL") {
+      filter.transactionType = req.query.type;
+    }
+
+    const [transactions, total, client, wallet] = await Promise.all([
+      CreditLedger.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      CreditLedger.countDocuments(filter),
+      EximclientUser.findById(clientId).select("name email ie_code_no role").lean(),
+      ClientWallet.findOne({ clientId }).lean(),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        client,
+        wallet: wallet || { availableCredits: 0, blockedCredits: 0 },
+        transactions,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching client ledger for admin:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch client ledger" });
+  }
+});
+
+/**
+ * GET /api/eway-bill/admin/wallet/client-details/:clientId
+ * Returns client details, wallet balance, summary stats, partner status, and recent ledger entries.
+ */
+router.get("/admin/wallet/client-details/:clientId", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const [client, wallet, transactions, statsAgg] = await Promise.all([
+      EximclientUser.findById(clientId).select("name email role status isSfplClient ie_code_no").lean(),
+      getOrCreateWallet(clientId),
+      CreditLedger.find({ clientId }).sort({ createdAt: -1 }).limit(20).lean(),
+      CreditLedger.aggregate([
+        { $match: { clientId: new mongoose.Types.ObjectId(clientId) } },
+        {
+          $group: {
+            _id: "$transactionType",
+            totalCredits: { $sum: "$credits" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client user not found" });
+    }
+
+    const stats = {
+      totalDebited: 0,
+      totalDeposited: 0,
+      totalRewarded: 0,
+    };
+
+    statsAgg.forEach((item) => {
+      if (item._id === "EWAYBILL_DEBIT") {
+        stats.totalDebited += Math.abs(item.totalCredits);
+      } else if (item._id === "PAYMENT_CREDIT" || item._id === "ADMIN_ADJUSTMENT") {
+        if (item.totalCredits > 0) stats.totalDeposited += item.totalCredits;
+      } else if (item._id === "EWAYBILL_REWARD") {
+        stats.totalRewarded += item.totalCredits;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        client,
+        wallet: {
+          availableCredits: wallet.availableCredits,
+          blockedCredits: wallet.blockedCredits,
+          effectiveBalance: Math.max(0, wallet.availableCredits - wallet.blockedCredits),
+          activationDate: wallet.activationDate,
+          validUntil: wallet.validUntil,
+          isExpired: wallet.validUntil ? new Date() > new Date(wallet.validUntil) : false,
+          daysRemaining: wallet.validUntil ? Math.ceil((new Date(wallet.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null,
+        },
+        stats,
+        isSfplClient: Boolean(client.isSfplClient),
+        recentTransactions: transactions,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching client details for admin:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch client details" });
+  }
+});
+
+/**
+ * POST /api/eway-bill/admin/wallet/set-partner-tier
+ * Sets SFPL+SRCC partner tier for a client.
+ */
+router.post("/admin/wallet/set-partner-tier", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const { clientId, isSfplClient } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+
+    const client = await EximclientUser.findByIdAndUpdate(
+      clientId,
+      { $set: { isSfplClient: Boolean(isSfplClient) } },
+      { new: true }
+    ).select("name email isSfplClient");
+
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Partner tier updated for ${client.name}. SFPL+SRCC Partner: ${client.isSfplClient ? "ENABLED" : "DISABLED"}`,
+      data: client,
+    });
+  } catch (err) {
+    console.error("Error updating partner tier:", err);
+    res.status(500).json({ success: false, message: "Failed to update partner tier" });
+  }
+});
+
+/**
+ * POST /api/eway-bill/admin/wallet/set-validity
+ * SuperAdmin endpoint: update or extend the service validity date.
+ */
+router.post("/admin/wallet/set-validity", authenticateUser, checkAdminOrPunit, async (req, res) => {
+  try {
+    const { clientId, validUntil, extendDays, remarks } = req.body;
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+
+    let targetDate = validUntil ? new Date(validUntil) : null;
+    if (!targetDate && extendDays) {
+      const current = await getOrCreateWallet(clientId);
+      const days = Number(extendDays);
+      if (!current.validUntil || new Date() > new Date(current.validUntil)) {
+        targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      } else {
+        targetDate = new Date(new Date(current.validUntil).getTime() + days * 24 * 60 * 60 * 1000);
+      }
+    }
+
+    if (!targetDate || isNaN(targetDate.getTime())) {
+      return res.status(400).json({ success: false, message: "A valid validity date or extendDays is required" });
+    }
+
+    const wallet = await setWalletValidity(clientId, targetDate, req.user._id);
+
+    // Record ledger audit entry
+    await CreditLedger.create([
+      {
+        clientId,
+        transactionType: "ADMIN_ADJUSTMENT",
+        credits: 0,
+        balanceAfter: wallet.availableCredits,
+        referenceModel: "AdminValidityAdjustment",
+        referenceId: req.user._id,
+        remarks:
+          remarks ||
+          `Admin updated service validity expiration to ${targetDate.toLocaleDateString("en-IN")}`,
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: `Account service validity successfully updated to ${targetDate.toLocaleDateString("en-IN")}`,
+      data: {
+        wallet: {
+          availableCredits: wallet.availableCredits,
+          blockedCredits: wallet.blockedCredits,
+          effectiveBalance: Math.max(0, wallet.availableCredits - wallet.blockedCredits),
+          activationDate: wallet.activationDate,
+          validUntil: wallet.validUntil,
+          isExpired: wallet.validUntil ? new Date() > new Date(wallet.validUntil) : false,
+          daysRemaining: wallet.validUntil ? Math.ceil((new Date(wallet.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error setting wallet validity:", err);
+    res.status(500).json({ success: false, message: err.message || "Failed to set validity" });
+  }
+});
+
+/**
+ * POST /api/eway-bill/wallet/approve-payment & /api/admin/wallet/approve-payment
+ * Admin endpoint: Approve payment request and credit client's wallet.
+ */
+const handleApprovePayment = async (req, res) => {
+  try {
+    const email = (req.user?.email || "").toLowerCase();
+    const role = (req.user?.role || "").toLowerCase();
+    const isPunit = email === "punit@alluvium.in";
+    const isSuperAdminEmail = email === "superadmin@exim.com";
+    const isAdmin = role === "admin" || role === "superadmin" || role === "super_admin";
+
+    if (!isPunit && !isSuperAdminEmail && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Unauthorized. Admin privileges required." });
+    }
+
+    const { paymentId } = req.body;
+    if (!paymentId) {
+      return res.status(400).json({ success: false, message: "paymentId is required" });
+    }
+
+    const result = await approvePayment(paymentId, req.user._id);
+
+    res.status(200).json({
+      success: true,
+      message: `Payment request approved. Added ${result.payment.creditsRequested} credit(s) to client wallet.`,
+      data: {
+        payment: result.payment,
+        walletBalance: result.wallet.availableCredits,
+      },
+    });
+  } catch (err) {
+    console.error("Error approving payment:", err);
+    res.status(500).json({ success: false, message: err.message || "Failed to approve payment" });
+  }
+};
+
+router.post("/wallet/approve-payment", authenticateUser, handleApprovePayment);
+router.post("/admin/wallet/approve-payment", authenticateUser, handleApprovePayment);
 
 // Define routes
 router.use(authenticateUser, multipartHandler, proxyRequest);

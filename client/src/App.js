@@ -20,6 +20,7 @@ import { TabValueProvider } from "./context/TabValueContext";
 import { UserContext } from "./context/UserContext";
 import { SelectedYearContext } from "./context/SelectedYearContext";
 import { ImportersProvider } from "./context/importersContext";
+import { WalletProvider } from "./context/WalletContext";
 import AppbarComponent from "./components/home/AppbarComponent";
 import NetPage from "./components/Net weight/NetPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
@@ -46,6 +47,8 @@ import OpenPointsHome from "./components/open-points/OpenPointsHome";
 import MyOpenPoints from "./components/open-points/MyOpenPoints";
 import ProjectWorkspace from "./components/open-points/ProjectWorkspace";
 import EwayBillForm from "./components/ewaybill/EwayBillForm";
+import WalletBillingPage from "./pages/WalletBillingPage";
+import AdminWalletControlPage from "./pages/AdminWalletControlPage";
 import { useActivityTracker } from "./hooks/useActivityTracker";
 
 // Layout wrapper component to conditionally show header
@@ -127,7 +130,8 @@ function App() {
           >
             <TabValueProvider>
               <ImportersProvider>
-                <LayoutWrapper>
+                <WalletProvider>
+                  <LayoutWrapper>
                   <Routes>
                     {/* Login routes - no header */}
                     <Route path="/login" element={<LoginPage />} />
@@ -283,6 +287,30 @@ function App() {
                       }
                     />
                     <Route
+                      path="/wallet"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <WalletBillingPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/billing"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <WalletBillingPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/wallet"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <AdminWalletControlPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
                       path="/open-points"
                       element={
                         <ProtectedRoute requiredAuth="user">
@@ -351,6 +379,7 @@ function App() {
                     />
                   </Routes>
                 </LayoutWrapper>
+                </WalletProvider>
               </ImportersProvider>
             </TabValueProvider>
           </SelectedYearContext.Provider>

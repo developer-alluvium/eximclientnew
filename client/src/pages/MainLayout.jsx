@@ -6,9 +6,11 @@ import {
   LogoutOutlined,
   TeamOutlined,
   CalendarOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { getJsonCookie, removeCookie } from "../utils/cookies";
+import CreditBadge from "../components/wallet/CreditBadge";
 
 const { Header, Content } = Layout;
 const { Text } = Typography;
@@ -166,6 +168,9 @@ const MainLayout = ({ children }) => {
 
         {/* Right Section */}
         <Space size={16} align="center">
+          {/* E-Way Bill Credit Badge */}
+          <CreditBadge />
+
           {/* DateTime - Compact inline format */}
           <div
             className="header-datetime-box"

@@ -23,6 +23,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
 import PartAEwayBillModal from "./Modals/PartAEwayBillModal";
+import CreditBadge from "../wallet/CreditBadge";
 
 function OthersEwayBillTab() {
   const [list, setList] = useState([]);
@@ -391,7 +392,8 @@ function OthersEwayBillTab() {
             Upload standalone Bill of Entries (BOE) and generate E-Way Bills.
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <CreditBadge />
           <input
             type="file"
             ref={fileInputRef}

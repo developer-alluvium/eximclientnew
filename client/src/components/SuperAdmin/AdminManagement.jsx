@@ -61,6 +61,11 @@ import {
   Lock,
   Visibility,
   VisibilityOff,
+  Bolt,
+  AccountBalanceWallet,
+  ArrowUpward,
+  ArrowDownward,
+  History,
 } from "@mui/icons-material";
 import axios from "axios";
 import { getCookie, getJsonCookie, removeCookie } from "../../utils/cookies";
@@ -249,11 +254,22 @@ const AdminManagement = ({ onRefresh }) => {
 
   // Enterprise Actions Modal state
   const [actionsMenuUser, setActionsMenuUser] = useState(null);
-  const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Branch Access
+  const [actionsTab, setActionsTab] = useState(0); // 0: IE Codes, 1: Status, 2: Modules, 3: Role, 4: Branch Access, 5: E-Way Bill Credits, 6: Change Password
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // E-Way Bill Wallet & Credits state for actions modal
+  const [userWalletData, setUserWalletData] = useState(null);
+  const [loadingWallet, setLoadingWallet] = useState(false);
+  const [walletError, setWalletError] = useState("");
+  const [walletSuccess, setWalletSuccess] = useState("");
+  const [creditAdjustAmount, setCreditAdjustAmount] = useState(100);
+  const [creditAdjustType, setCreditAdjustType] = useState("ADD"); // "ADD" | "DEDUCT"
+  const [creditAdjustRemarks, setCreditAdjustRemarks] = useState("");
+  const [submittingCreditAdjust, setSubmittingCreditAdjust] = useState(false);
+  const [togglingPartnerTier, setTogglingPartnerTier] = useState(false);
 
   // Branch Assignments
   const [selectedBranches, setSelectedBranches] = useState([]);
@@ -724,6 +740,127 @@ const AdminManagement = ({ onRefresh }) => {
       setLoading(false);
     }
   };
+
+  // Fetch wallet details for the user opened in Actions modal
+  const fetchUserWalletData = async (userId) => {
+    if (!userId) return;
+    try {
+      setLoadingWallet(true);
+      setWalletError("");
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          ...(superadminToken && { Authorization: `Bearer ${superadminToken}` }),
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/admin/wallet/client-details/${userId}`,
+        config
+      );
+
+      if (res.data?.success && res.data?.data) {
+        setUserWalletData(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching user wallet details:", err);
+      setWalletError(err.response?.data?.message || "Failed to load wallet data for this user");
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
+  // Adjust credits (Add or Deduct) for the selected user
+  const handleAdjustCredits = async () => {
+    if (!actionsMenuUser?._id) return;
+    const amount = Number(creditAdjustAmount);
+    if (!amount || isNaN(amount) || amount <= 0) {
+      setWalletError("Please enter a valid credit amount greater than 0");
+      return;
+    }
+
+    try {
+      setSubmittingCreditAdjust(true);
+      setWalletError("");
+      setWalletSuccess("");
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          ...(superadminToken && { Authorization: `Bearer ${superadminToken}` }),
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const delta = creditAdjustType === "ADD" ? amount : -amount;
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/admin/wallet/adjust-credits`,
+        {
+          clientId: actionsMenuUser._id,
+          creditsDelta: delta,
+          remarks: creditAdjustRemarks || `Manual ${creditAdjustType} by SuperAdmin`,
+        },
+        config
+      );
+
+      if (res.data?.success) {
+        setWalletSuccess(res.data.message || "Successfully adjusted credits");
+        setCreditAdjustRemarks("");
+        await fetchUserWalletData(actionsMenuUser._id);
+      }
+    } catch (err) {
+      console.error("Error adjusting credits:", err);
+      setWalletError(err.response?.data?.message || "Failed to adjust credits");
+    } finally {
+      setSubmittingCreditAdjust(false);
+    }
+  };
+
+  // Toggle SFPL+SRCC Partner tier for the selected user
+  const handleTogglePartnerTier = async (newVal) => {
+    if (!actionsMenuUser?._id) return;
+    try {
+      setTogglingPartnerTier(true);
+      setWalletError("");
+      setWalletSuccess("");
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          ...(superadminToken && { Authorization: `Bearer ${superadminToken}` }),
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/admin/wallet/set-partner-tier`,
+        {
+          clientId: actionsMenuUser._id,
+          isSfplClient: newVal,
+        },
+        config
+      );
+
+      if (res.data?.success) {
+        setWalletSuccess(res.data.message || "Partner tier updated");
+        setUserWalletData((prev) => (prev ? { ...prev, isSfplClient: newVal } : prev));
+      }
+    } catch (err) {
+      console.error("Error setting partner tier:", err);
+      setWalletError(err.response?.data?.message || "Failed to update partner tier");
+    } finally {
+      setTogglingPartnerTier(false);
+    }
+  };
+
+  // Automatically fetch wallet data when E-Way Bill Credits tab (tab 5) is selected
+  useEffect(() => {
+    if (actionsMenuUser?._id && actionsTab === 5) {
+      fetchUserWalletData(actionsMenuUser._id);
+    }
+  }, [actionsMenuUser?._id, actionsTab]);
 
   // All existing handler functions remain the same...
   const handlePromoteToAdmin = async (entity, type) => {
@@ -1639,6 +1776,13 @@ const AdminManagement = ({ onRefresh }) => {
                           setConfirmPassword("");
                           setShowNewPassword(false);
                           setShowConfirmPassword(false);
+                          setUserWalletData(null);
+                          setWalletError("");
+                          setWalletSuccess("");
+                          setCreditAdjustAmount(100);
+                          setCreditAdjustType("ADD");
+                          setCreditAdjustRemarks("");
+                          fetchUserWalletData(user._id);
                         }}
                         sx={{
                           textTransform: "none",
@@ -1787,7 +1931,8 @@ const AdminManagement = ({ onRefresh }) => {
               { idx: 2, icon: <Assignment sx={{ fontSize: 18 }} />, label: "Modules", desc: `${(actionsMenuUser?.assignedModules || []).length} assigned` },
               { idx: 3, icon: <AdminPanelSettings sx={{ fontSize: 18 }} />, label: "Role", desc: actionsMenuUser?.role === "admin" ? "Admin" : "User" },
               { idx: 4, icon: <Business sx={{ fontSize: 18 }} />, label: "Branch Access", desc: `${(actionsMenuUser?.selected_branches || []).length} branches` },
-              { idx: 5, icon: <Lock sx={{ fontSize: 18 }} />, label: "Change Password", desc: "Reset password" },
+              { idx: 5, icon: <Bolt sx={{ fontSize: 18, color: "#eab308" }} />, label: "E-Way Bill Credits", desc: userWalletData?.wallet?.availableCredits !== undefined ? `${userWalletData.wallet.availableCredits} Credits` : "Credits & Wallet" },
+              { idx: 6, icon: <Lock sx={{ fontSize: 18 }} />, label: "Change Password", desc: "Reset password" },
             ].map(({ idx, icon, label, desc }) => (
               <Box
                 key={idx}
@@ -2594,8 +2739,362 @@ const AdminManagement = ({ onRefresh }) => {
               </Box>
             )}
 
-            {/* Panel 5: Change Password */}
+            {/* Panel 5: E-Way Bill Credits & Wallet Management */}
             {actionsTab === 5 && (
+              <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                {/* Panel Header */}
+                <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+                  <Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Bolt sx={{ color: "#eab308", fontSize: 24 }} />
+                      <Typography sx={{ fontWeight: 700, fontSize: "1.05rem", color: "#0f172a" }}>
+                        E-Way Bill Credits & Wallet Control
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: "0.78rem", color: "#64748b", mt: 0.4 }}>
+                      Allocate top-up credits, adjust balances, configure SFPL+SRCC billing tier, and audit ledger transactions.
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Refresh sx={{ animation: loadingWallet ? "spin 1s linear infinite" : "none", "@keyframes spin": { "100%": { transform: "rotate(360deg)" } } }} />}
+                    onClick={() => fetchUserWalletData(actionsMenuUser?._id)}
+                    disabled={loadingWallet}
+                    sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.78rem", fontWeight: 600, borderColor: "#cbd5e1", color: "#475569" }}
+                  >
+                    Refresh
+                  </Button>
+                </Box>
+
+                {/* Alerts */}
+                {walletError && (
+                  <Alert severity="error" onClose={() => setWalletError("")} sx={{ borderRadius: 2 }}>
+                    {walletError}
+                  </Alert>
+                )}
+                {walletSuccess && (
+                  <Alert severity="success" onClose={() => setWalletSuccess("")} sx={{ borderRadius: 2 }}>
+                    {walletSuccess}
+                  </Alert>
+                )}
+
+                {loadingWallet && !userWalletData ? (
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 8, gap: 1.5 }}>
+                    <CircularProgress size={36} sx={{ color: "#eab308" }} />
+                    <Typography sx={{ fontSize: "0.82rem", color: "#64748b" }}>Loading client wallet details...</Typography>
+                  </Box>
+                ) : (
+                  <>
+                    {/* KPI Summary Cards */}
+                    <Grid container spacing={2}>
+                      {/* Available Credits */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "#fefce8", border: "1.5px solid #fef08a", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#854d0e", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              Available Credits
+                            </Typography>
+                            <Bolt sx={{ color: "#ca8a04", fontSize: 20 }} />
+                          </Box>
+                          <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, color: "#713f12", lineHeight: 1.2 }}>
+                            {userWalletData?.wallet?.availableCredits ?? 0}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#a16207", fontWeight: 600 }}>
+                            ≈ ₹{((userWalletData?.wallet?.availableCredits ?? 0) * 9).toLocaleString("en-IN")} (@ ₹9/credit)
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Blocked Credits */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "#fff7ed", border: "1.5px solid #fed7aa", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#9a3412", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              Blocked (In-Flight)
+                            </Typography>
+                            <Block sx={{ color: "#ea580c", fontSize: 18 }} />
+                          </Box>
+                          <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, color: "#7c2d12", lineHeight: 1.2 }}>
+                            {userWalletData?.wallet?.blockedCredits ?? 0}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#c2410c", fontWeight: 500 }}>
+                            Held during active generation
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Lifetime Debited */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "#f8fafc", border: "1.5px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              Lifetime Used
+                            </Typography>
+                            <ArrowDownward sx={{ color: "#ef4444", fontSize: 18 }} />
+                          </Box>
+                          <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, color: "#1e293b", lineHeight: 1.2 }}>
+                            {userWalletData?.stats?.totalDebited ?? 0}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>
+                            Total credits spent on E-Way bills
+                          </Typography>
+                        </Box>
+                      </Grid>
+
+                      {/* Lifetime Deposited / Rewarded */}
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: "#f0fdf4", border: "1.5px solid #bbf7d0", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              Lifetime Deposited
+                            </Typography>
+                            <ArrowUpward sx={{ color: "#22c55e", fontSize: 18 }} />
+                          </Box>
+                          <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, color: "#14532d", lineHeight: 1.2 }}>
+                            {(userWalletData?.stats?.totalDeposited ?? 0) + (userWalletData?.stats?.totalRewarded ?? 0)}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#15803d" }}>
+                            Purchased & reward credits
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Billing Tier Configuration Card (SFPL + SRCC Partner) */}
+                    <Box sx={{ p: 2.5, borderRadius: 2.5, bgcolor: userWalletData?.isSfplClient ? "#f0fdf4" : "#f8fafc", border: `1.5px solid ${userWalletData?.isSfplClient ? "#86efac" : "#e2e8f0"}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+                      <Box sx={{ maxWidth: 500 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#0f172a" }}>
+                            Partner Pricing Tier (SFPL + SRCC)
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={userWalletData?.isSfplClient ? "PARTNER ACTIVE" : "STANDARD TIER"}
+                            color={userWalletData?.isSfplClient ? "success" : "default"}
+                            sx={{ fontWeight: 700, fontSize: "0.68rem", height: 20 }}
+                          />
+                        </Box>
+                        <Typography sx={{ fontSize: "0.76rem", color: "#64748b", mt: 0.5, lineHeight: 1.4 }}>
+                          {userWalletData?.isSfplClient
+                            ? "Partner Client enabled: 0 Credits deducted per generation + 1 Reward credit added on each successful E-Way bill."
+                            : "Standard Client: 1 Credit (₹9) deducted per successful E-Way bill generation. Wallet balance required."}
+                        </Typography>
+                      </Box>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={Boolean(userWalletData?.isSfplClient)}
+                            disabled={togglingPartnerTier}
+                            onChange={(e) => handleTogglePartnerTier(e.target.checked)}
+                            color="success"
+                          />
+                        }
+                        label={
+                          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: userWalletData?.isSfplClient ? "#15803d" : "#64748b" }}>
+                            {togglingPartnerTier ? "Updating..." : userWalletData?.isSfplClient ? "Partner Active" : "Standard Client"}
+                          </Typography>
+                        }
+                      />
+                    </Box>
+
+                    {/* Credit Adjustment Form (Add / Deduct) */}
+                    <Box sx={{ p: 2.5, borderRadius: 2.5, border: "1.5px solid #e2e8f0", bgcolor: "#fff", display: "flex", flexDirection: "column", gap: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", pb: 1.5 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#0f172a" }}>
+                          Manual Credit Adjustment
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant={creditAdjustType === "ADD" ? "contained" : "outlined"}
+                            onClick={() => setCreditAdjustType("ADD")}
+                            startIcon={<AddCircle sx={{ fontSize: 16 }} />}
+                            sx={{
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              bgcolor: creditAdjustType === "ADD" ? "#16a34a" : "transparent",
+                              color: creditAdjustType === "ADD" ? "#fff" : "#16a34a",
+                              borderColor: "#16a34a",
+                              "&:hover": { bgcolor: creditAdjustType === "ADD" ? "#15803d" : "#f0fdf4", borderColor: "#15803d" },
+                            }}
+                          >
+                            Add Credits
+                          </Button>
+                          <Button
+                            size="small"
+                            variant={creditAdjustType === "DEDUCT" ? "contained" : "outlined"}
+                            onClick={() => setCreditAdjustType("DEDUCT")}
+                            startIcon={<RemoveCircle sx={{ fontSize: 16 }} />}
+                            sx={{
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              bgcolor: creditAdjustType === "DEDUCT" ? "#dc2626" : "transparent",
+                              color: creditAdjustType === "DEDUCT" ? "#fff" : "#dc2626",
+                              borderColor: "#dc2626",
+                              "&:hover": { bgcolor: creditAdjustType === "DEDUCT" ? "#b91c1c" : "#fef2f2", borderColor: "#b91c1c" },
+                            }}
+                          >
+                            Deduct Credits
+                          </Button>
+                        </Box>
+                      </Box>
+
+                      {/* Quick Presets */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                        <Typography sx={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", mr: 0.5 }}>Quick Presets:</Typography>
+                        {[50, 100, 250, 500, 1000].map((amt) => (
+                          <Chip
+                            key={amt}
+                            label={`${creditAdjustType === "ADD" ? "+" : "-"}${amt}`}
+                            size="small"
+                            onClick={() => setCreditAdjustAmount(amt)}
+                            sx={{
+                              cursor: "pointer",
+                              fontWeight: creditAdjustAmount === amt ? 700 : 500,
+                              bgcolor: creditAdjustAmount === amt ? "#1e293b" : "#f1f5f9",
+                              color: creditAdjustAmount === amt ? "#fff" : "#475569",
+                              "&:hover": { bgcolor: creditAdjustAmount === amt ? "#0f172a" : "#e2e8f0" },
+                            }}
+                          />
+                        ))}
+                      </Box>
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            label="Number of Credits"
+                            type="number"
+                            size="small"
+                            fullWidth
+                            value={creditAdjustAmount}
+                            onChange={(e) => setCreditAdjustAmount(Math.max(1, parseInt(e.target.value, 10) || 0))}
+                            helperText={`Equivalent to ₹${((creditAdjustAmount || 0) * 9).toLocaleString("en-IN")} (@ ₹9/credit)`}
+                            InputProps={{
+                              inputProps: { min: 1 },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={8}>
+                          <TextField
+                            label="Reason / Remarks (Audit Trail)"
+                            placeholder="e.g., Payment received offline via NEFT / Manual quota refill"
+                            size="small"
+                            fullWidth
+                            value={creditAdjustRemarks}
+                            onChange={(e) => setCreditAdjustRemarks(e.target.value)}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Button
+                          variant="contained"
+                          onClick={handleAdjustCredits}
+                          disabled={submittingCreditAdjust || !creditAdjustAmount || creditAdjustAmount <= 0}
+                          sx={{
+                            bgcolor: creditAdjustType === "ADD" ? "#16a34a" : "#dc2626",
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 3,
+                            py: 1,
+                            "&:hover": { bgcolor: creditAdjustType === "ADD" ? "#15803d" : "#b91c1c" },
+                          }}
+                        >
+                          {submittingCreditAdjust
+                            ? "Applying..."
+                            : `${creditAdjustType === "ADD" ? "Add" : "Deduct"} ${creditAdjustAmount || 0} Credits (₹${((creditAdjustAmount || 0) * 9).toLocaleString("en-IN")})`}
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {/* Recent Transactions Table */}
+                    <Box sx={{ border: "1.5px solid #e2e8f0", borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden" }}>
+                      <Box sx={{ px: 2.5, py: 1.5, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 1 }}>
+                        <History sx={{ fontSize: 18, color: "#64748b" }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e293b" }}>
+                          Recent Credit Ledger Transactions (Last 20)
+                        </Typography>
+                      </Box>
+                      <TableContainer sx={{ maxHeight: 260 }}>
+                        <Table size="small" stickyHeader>
+                          <TableHead>
+                            <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 700, fontSize: "0.72rem", color: "#64748b" } }}>
+                              <TableCell>Date & Time</TableCell>
+                              <TableCell>Type</TableCell>
+                              <TableCell align="right">Credits</TableCell>
+                              <TableCell align="right">Balance After</TableCell>
+                              <TableCell>Remarks / Reference</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {(!userWalletData?.recentTransactions || userWalletData.recentTransactions.length === 0) ? (
+                              <TableRow>
+                                <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#94a3b8", fontSize: "0.78rem" }}>
+                                  No credit transactions recorded for this user yet.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              userWalletData.recentTransactions.map((tx) => {
+                                const isCredit = (tx.credits || 0) > 0;
+                                return (
+                                  <TableRow key={tx._id} hover sx={{ "& td": { fontSize: "0.75rem", py: 1 } }}>
+                                    <TableCell sx={{ color: "#64748b", whiteSpace: "nowrap" }}>
+                                      {tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        size="small"
+                                        label={tx.transactionType || "TRANSACTION"}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: "0.65rem",
+                                          fontWeight: 700,
+                                          bgcolor:
+                                            tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
+                                              ? "#dcfce7"
+                                              : tx.transactionType === "ADMIN_ADJUSTMENT"
+                                              ? "#ede9fe"
+                                              : "#fee2e2",
+                                          color:
+                                            tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
+                                              ? "#16a34a"
+                                              : tx.transactionType === "ADMIN_ADJUSTMENT"
+                                              ? "#7c3aed"
+                                              : "#dc2626",
+                                          border: "none",
+                                        }}
+                                      />
+                                    </TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 700, color: isCredit ? "#16a34a" : "#dc2626" }}>
+                                      {isCredit ? `+${tx.credits}` : tx.credits}
+                                    </TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 600, color: "#1e293b" }}>
+                                      {tx.balanceAfter !== undefined ? tx.balanceAfter : "—"}
+                                    </TableCell>
+                                    <TableCell sx={{ color: "#475569", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {tx.remarks || tx.description || "—"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            )}
+
+            {/* Panel 6: Change Password */}
+            {actionsTab === 6 && (
               <Box sx={{ p: 3.5, display: "flex", flexDirection: "column", gap: 2.5, flex: 1 }}>
                 <Box sx={{ borderBottom: "1px solid #f1f5f9", pb: 2 }}>
                   <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#0f172a" }}>Change Password</Typography>

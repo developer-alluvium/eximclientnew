@@ -119,8 +119,21 @@ app.use(cookieParser());
 
 // Connect to MongoDB
 connectDB()
-  .then(() => {
+  .then(async () => {
     console.log(`Environment: ${config.nodeEnv}`);
+    try {
+      const EximclientUser = (await import("./models/eximclientUserModel.js")).default;
+      const punitUser = await EximclientUser.findOne({ email: "punit@alluvium.in" });
+      if (punitUser) {
+        if (punitUser.role !== "admin" && punitUser.role !== "super_admin" && punitUser.role !== "superadmin") {
+          punitUser.role = "admin";
+          await punitUser.save();
+          console.log("✅ Verified punit@alluvium.in role set to admin");
+        }
+      }
+    } catch (punitErr) {
+      console.warn("User role check notice:", punitErr.message);
+    }
   })
   .catch((err) => {
     console.error("Failed to connect to MongoDB", err);
