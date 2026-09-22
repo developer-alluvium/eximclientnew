@@ -24,6 +24,7 @@ const creditLedgerSchema = new mongoose.Schema(
           "EWAYBILL_REWARD",  // Reward credits (e.g. SFPL + SRCC incentive)
           "ADMIN_ADJUSTMENT", // Manual adjustment by SuperAdmin
           "REVERSAL",         // Transaction reversed / refunded
+          "EWAYBILL_TRIAL_FREE", // E-Way Bill generated during 3 Months Free Trial (0 Credits)
         ],
         message: "{VALUE} is not a valid transaction type",
       },

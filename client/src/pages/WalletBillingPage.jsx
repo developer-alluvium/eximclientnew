@@ -23,9 +23,7 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Tooltip,
   CircularProgress,
-  Divider,
   Pagination,
   Accordion,
   AccordionSummary,
@@ -35,10 +33,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import BoltIcon from "@mui/icons-material/Bolt";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircleOutline";
 import StarsIcon from "@mui/icons-material/Stars";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -47,34 +43,27 @@ import EmailIcon from "@mui/icons-material/Email";
 import { useNavigate } from "react-router-dom";
 import axios from "../utils/axiosConfig";
 import { useWallet } from "../context/WalletContext";
-import { getJsonCookie } from "../utils/cookies";
 
 const CREDIT_RATE = 9; // 1 Credit = ₹9
 
 function WalletBillingPage() {
   const navigate = useNavigate();
   const {
-    wallet,
     balance,
     availableCredits,
     blockedCredits,
+    walletServiceStatus,
+    isFirstTimeActivated,
+    daysRemaining,
     pricingTier,
-    pricingReason,
-    currencyRate,
     refreshBalance,
   } = useWallet();
-
-  const userData = getJsonCookie("exim_user") || {};
-  const isPunitOrAdmin =
-    userData?.email?.toLowerCase() === "punit@alluvium.in" ||
-    userData?.role === "admin" ||
-    userData?.role === "superadmin" ||
-    userData?.role === "super_admin";
 
   const [stats, setStats] = useState({
     totalDeposited: 0,
     totalDebited: 0,
     totalRewarded: 0,
+    totalFreeTrialEwbs: 0,
   });
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -162,11 +151,12 @@ function WalletBillingPage() {
 
     const rows = transactions.map((t) => {
       const d = new Date(t.createdAt);
+      const isTrial = t.transactionType === "EWAYBILL_TRIAL_FREE";
       return [
         d.toLocaleDateString("en-IN"),
         d.toLocaleTimeString("en-IN"),
-        t.transactionType,
-        t.credits,
+        isTrial ? "3 Months Free Trial (Free)" : t.transactionType,
+        isTrial ? "0 Cr (Free)" : t.credits,
         t.balanceAfter,
         t.referenceId || "N/A",
         `"${(t.remarks || "").replace(/"/g, '""')}"`,
@@ -189,7 +179,11 @@ function WalletBillingPage() {
     document.body.removeChild(link);
   };
 
-  const isLowBalance = (balance || 0) < 5;
+  const effectiveCredits = balance !== undefined && balance !== null ? balance : availableCredits || 0;
+  const isServiceInactive = walletServiceStatus === "INACTIVE";
+  const isCritical = effectiveCredits <= 10;
+  const isWarning = effectiveCredits > 10 && effectiveCredits <= 20;
+  const isLowBalance = isCritical || isWarning;
   const isPartnerTier = pricingTier === "SFPL_SRCC_PARTNER";
 
   return (
@@ -206,7 +200,7 @@ function WalletBillingPage() {
         }}
       >
         <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <IconButton
               size="small"
               onClick={() => navigate("/ewaybill")}
@@ -220,6 +214,33 @@ function WalletBillingPage() {
             >
               E-Way Bill Credit Wallet & Billing
             </Typography>
+
+            {/* Service Status Chip */}
+            <Chip
+              label={isServiceInactive ? "Service Inactive" : "Service Active"}
+              color={isServiceInactive ? "error" : "success"}
+              size="small"
+              sx={{ fontWeight: 800, fontSize: "0.75rem" }}
+            />
+
+            {/* 3 Months Free Benefit Chip */}
+            {isFirstTimeActivated && daysRemaining > 0 && (
+              <Chip
+                label={`🎁 3 Months Free (${daysRemaining}d left)`}
+                color="info"
+                size="small"
+                variant="outlined"
+                sx={{ fontWeight: 800, fontSize: "0.75rem", borderColor: "#0284c7", color: "#0369a1" }}
+              />
+            )}
+
+            {/* Credit Balance Threshold Chip */}
+            <Chip
+              label={isCritical ? "Critical Balance" : isWarning ? "Warning Balance" : "Healthy Balance"}
+              color={isCritical ? "error" : isWarning ? "warning" : "success"}
+              size="small"
+              sx={{ fontWeight: 800, fontSize: "0.75rem" }}
+            />
           </Box>
           <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5, ml: { sm: 5.5 } }}>
             Real-time balance tracking, commercial consumption metrics, and complete ledger transaction statement.
@@ -227,7 +248,6 @@ function WalletBillingPage() {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, alignSelf: { xs: "stretch", sm: "auto" } }}>
-
           <Button
             variant="outlined"
             startIcon={
@@ -257,8 +277,62 @@ function WalletBillingPage() {
         </Box>
       </Box>
 
-      {/* Low Balance Warning Banner if balance < 5 */}
-      {isLowBalance && (
+      {/* Service Inactive Warning Banner */}
+      {isServiceInactive && (
+        <Alert
+          severity="error"
+          variant="filled"
+          sx={{
+            mb: 3,
+            borderRadius: 2.5,
+            fontWeight: 600,
+            alignItems: "center",
+            bgcolor: "#b91c1c",
+            boxShadow: "0 4px 12px rgba(185, 28, 28, 0.25)",
+          }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              sx={{ fontWeight: 800, textTransform: "none" }}
+              href="mailto:superadmin@exim.com?subject=E-Way%20Bill%20Wallet%20Service%20Activation%20Request"
+            >
+              Contact SuperAdmin
+            </Button>
+          }
+        >
+          E-Way Bill Generation Service Inactive: Your account's E-Way Bill generation service is currently deactivated. Generation requests are blocked until activated by SuperAdmin. Introductory activation automatically includes 3 months of free service!
+        </Alert>
+      )}
+
+      {/* 3-Tier Balance Status Banners */}
+      {!isServiceInactive && isCritical && (
+        <Alert
+          severity="error"
+          variant="filled"
+          sx={{
+            mb: 3,
+            borderRadius: 2.5,
+            fontWeight: 600,
+            alignItems: "center",
+            boxShadow: "0 4px 12px rgba(220, 38, 38, 0.15)",
+          }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              sx={{ fontWeight: 800, textTransform: "none" }}
+              href="mailto:superadmin@exim.com?subject=E-Way%20Bill%20Credit%20Allocation%20Request"
+            >
+              Contact SuperAdmin
+            </Button>
+          }
+        >
+          Critical Credit Balance ({effectiveCredits} credits remaining, ≤ 10 threshold). Please contact SuperAdmin (superadmin@exim.com) to allocate credits and avoid E-Way Bill generation blocks.
+        </Alert>
+      )}
+
+      {!isServiceInactive && isWarning && (
         <Alert
           severity="warning"
           variant="filled"
@@ -274,13 +348,13 @@ function WalletBillingPage() {
               color="inherit"
               size="small"
               sx={{ fontWeight: 800, textTransform: "none" }}
-              href="mailto:punit@alluvium.in?subject=E-Way%20Bill%20Credit%20Recharge%20Request"
+              href="mailto:superadmin@exim.com?subject=E-Way%20Bill%20Credit%20Topup%20Notice"
             >
-              Contact Admin
+              Contact SuperAdmin
             </Button>
           }
         >
-          Your credit balance is low ({balance || 0} credits remaining). Please contact your administrator to allocate credits and avoid E-Way Bill generation blocks.
+          Warning: Low credit threshold reached ({effectiveCredits} credits remaining, 11-20 range). Contact your administrator (superadmin@exim.com) to maintain active balance.
         </Alert>
       )}
 
@@ -397,10 +471,12 @@ function WalletBillingPage() {
                     Total E-Way Bills Generated
                   </Typography>
                   <Typography variant="h3" sx={{ fontWeight: 900, color: "#475569", my: 0.5 }}>
-                    {stats.totalDebited}
+                    {(stats.totalDebited || 0) + (stats.totalFreeTrialEwbs || 0)}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-                    Lifetime Consumption ({stats.totalDebited} credits debited)
+                    {stats.totalFreeTrialEwbs > 0
+                      ? `${stats.totalFreeTrialEwbs} Free Trial + ${stats.totalDebited || 0} Paid (${stats.totalDebited || 0} Cr debited)`
+                      : `Lifetime Consumption (${stats.totalDebited || 0} credits debited)`}
                   </Typography>
                 </Box>
                 <Box
@@ -521,7 +597,7 @@ function WalletBillingPage() {
             variant="contained"
             color="primary"
             startIcon={<EmailIcon />}
-            href="mailto:punit@alluvium.in?subject=E-Way%20Bill%20Credit%20Recharge%20Request"
+            href="mailto:superadmin@exim.com?subject=E-Way%20Bill%20Credit%20Allocation%20Request"
             sx={{
               textTransform: "none",
               fontWeight: 700,
@@ -533,7 +609,7 @@ function WalletBillingPage() {
               "&:hover": { bgcolor: "#1d4ed8" },
             }}
           >
-            Contact punit@alluvium.in
+            Contact superadmin@exim.com
           </Button>
         </Box>
       </Paper>
@@ -611,6 +687,7 @@ function WalletBillingPage() {
                 }}
               >
                 <MenuItem value="ALL">All Transactions</MenuItem>
+                <MenuItem value="EWAYBILL_TRIAL_FREE">🎁 3 Months Free Trial (0 Cr)</MenuItem>
                 <MenuItem value="EWAYBILL_DEBIT">Debits (E-Way Bills)</MenuItem>
                 <MenuItem value="ADMIN_ADJUSTMENT">Admin Credit Grants</MenuItem>
                 <MenuItem value="PAYMENT_CREDIT">Payment Credits</MenuItem>
@@ -708,9 +785,7 @@ function WalletBillingPage() {
                   const dateObj = new Date(t.createdAt);
                   const isDebit = t.transactionType === "EWAYBILL_DEBIT";
                   const isReward = t.transactionType === "EWAYBILL_REWARD";
-                  const isCredit =
-                    t.transactionType === "PAYMENT_CREDIT" ||
-                    t.transactionType === "ADMIN_ADJUSTMENT";
+                  const isTrialFree = t.transactionType === "EWAYBILL_TRIAL_FREE";
 
                   return (
                     <TableRow
@@ -742,7 +817,15 @@ function WalletBillingPage() {
 
                       {/* Type Badge */}
                       <TableCell sx={{ py: 1.5 }}>
-                        {isDebit ? (
+                        {isTrialFree ? (
+                          <Chip
+                            size="small"
+                            label="3 Months Free Trial"
+                            color="info"
+                            variant="filled"
+                            sx={{ fontWeight: 800, fontSize: "0.72rem", bgcolor: "#0284c7", color: "#fff" }}
+                          />
+                        ) : isDebit ? (
                           <Chip
                             size="small"
                             label="E-Way Bill Debit"
@@ -776,10 +859,10 @@ function WalletBillingPage() {
                           sx={{
                             fontWeight: 800,
                             fontSize: "0.88rem",
-                            color: isDebit ? "#dc2626" : isReward ? "#059669" : "#2563eb",
+                            color: isTrialFree ? "#0284c7" : isDebit ? "#dc2626" : isReward ? "#059669" : "#2563eb",
                           }}
                         >
-                          {t.credits > 0 ? `+${t.credits}` : t.credits}
+                          {isTrialFree ? "0 Cr (Free)" : t.credits > 0 ? `+${t.credits}` : t.credits}
                         </Typography>
                       </TableCell>
 

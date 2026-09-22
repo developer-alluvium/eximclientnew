@@ -270,6 +270,8 @@ const AdminManagement = ({ onRefresh }) => {
   const [creditAdjustRemarks, setCreditAdjustRemarks] = useState("");
   const [submittingCreditAdjust, setSubmittingCreditAdjust] = useState(false);
   const [togglingPartnerTier, setTogglingPartnerTier] = useState(false);
+  const [togglingServiceStatus, setTogglingServiceStatus] = useState(false);
+  const [walletHistoryTab, setWalletHistoryTab] = useState(0); // 0: Credit Ledger, 1: Service Status History, 2: Partner Tier History
 
   // Branch Assignments
   const [selectedBranches, setSelectedBranches] = useState([]);
@@ -839,19 +841,62 @@ const AdminManagement = ({ onRefresh }) => {
         {
           clientId: actionsMenuUser._id,
           isSfplClient: newVal,
+          remarks: newVal
+            ? "Partner pricing tier enabled by SuperAdmin"
+            : "Standard commercial pricing tier enabled by SuperAdmin",
         },
         config
       );
 
       if (res.data?.success) {
         setWalletSuccess(res.data.message || "Partner tier updated");
-        setUserWalletData((prev) => (prev ? { ...prev, isSfplClient: newVal } : prev));
+        await fetchUserWalletData(actionsMenuUser._id);
       }
     } catch (err) {
       console.error("Error setting partner tier:", err);
       setWalletError(err.response?.data?.message || "Failed to update partner tier");
     } finally {
       setTogglingPartnerTier(false);
+    }
+  };
+
+  // Toggle E-Way Bill Wallet Service Status (ACTIVE / INACTIVE) with 3 months free on first activation
+  const handleToggleServiceStatus = async (newStatus) => {
+    if (!actionsMenuUser?._id) return;
+    try {
+      setTogglingServiceStatus(true);
+      setWalletError("");
+      setWalletSuccess("");
+      const superadminToken = getCookie("superadmin_token");
+      const config = {
+        headers: {
+          ...(superadminToken && { Authorization: `Bearer ${superadminToken}` }),
+          "Content-Type": "application/json",
+        },
+        withCredentials: true,
+      };
+
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/admin/wallet/set-service-status`,
+        {
+          clientId: actionsMenuUser._id,
+          status: newStatus ? "ACTIVE" : "INACTIVE",
+          remarks: newStatus
+            ? "Service activated by SuperAdmin"
+            : "Service deactivated by SuperAdmin",
+        },
+        config
+      );
+
+      if (res.data?.success) {
+        setWalletSuccess(res.data.message || "Wallet service status updated");
+        await fetchUserWalletData(actionsMenuUser._id);
+      }
+    } catch (err) {
+      console.error("Error setting wallet service status:", err);
+      setWalletError(err.response?.data?.message || "Failed to update wallet service status");
+    } finally {
+      setTogglingServiceStatus(false);
     }
   };
 
@@ -2861,24 +2906,123 @@ const AdminManagement = ({ onRefresh }) => {
                       </Grid>
                     </Grid>
 
+                    {/* E-Way Bill Wallet Service Status (Active / Deactive) */}
+                    {(() => {
+                      const isServiceActive = userWalletData?.wallet?.walletServiceStatus === "ACTIVE";
+                      const isFirstTime = userWalletData?.wallet?.isFirstTimeActivated;
+                      const validUntil = userWalletData?.wallet?.validUntil;
+                      const validUntilFormatted = validUntil
+                        ? new Date(validUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                        : "Not Set";
+                      const daysRemaining = userWalletData?.wallet?.daysRemaining;
+
+                      return (
+                        <Box
+                          sx={{
+                            p: 2.5,
+                            borderRadius: 2.5,
+                            bgcolor: isServiceActive ? "#f0fdf4" : "#fef2f2",
+                            border: `1.5px solid ${isServiceActive ? "#86efac" : "#fecaca"}`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: 2,
+                          }}
+                        >
+                          <Box sx={{ maxWidth: 560 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                              <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#0f172a" }}>
+                                E-Way Bill Wallet Service Status
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={isServiceActive ? "SERVICE ACTIVE" : "SERVICE INACTIVE"}
+                                color={isServiceActive ? "success" : "error"}
+                                sx={{ fontWeight: 700, fontSize: "0.68rem", height: 20 }}
+                              />
+                              {isFirstTime && (
+                                <Chip
+                                  size="small"
+                                  label="🎁 3 Months Free Service Activated"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.68rem",
+                                    height: 20,
+                                    bgcolor: "#e0e7ff",
+                                    color: "#4338ca",
+                                    border: "1px solid #c7d2fe",
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <Typography sx={{ fontSize: "0.76rem", color: "#64748b", mt: 0.5, lineHeight: 1.4 }}>
+                              {isServiceActive
+                                ? `E-Way Bill generation service is ACTIVE. Validity: ${validUntilFormatted} (${daysRemaining !== null ? `${daysRemaining} days remaining` : ""}). Client can generate E-Way bills.`
+                                : `E-Way Bill generation service is DEACTIVATED. Client cannot generate E-Way bills until activated by SuperAdmin.${
+                                    !isFirstTime ? " First activation will automatically grant 3 months free trial!" : ""
+                                  }`}
+                            </Typography>
+                          </Box>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={Boolean(isServiceActive)}
+                                disabled={togglingServiceStatus}
+                                onChange={(e) => handleToggleServiceStatus(e.target.checked)}
+                                color="success"
+                              />
+                            }
+                            label={
+                              <Typography
+                                sx={{
+                                  fontSize: "0.82rem",
+                                  fontWeight: 600,
+                                  color: isServiceActive ? "#15803d" : "#dc2626",
+                                }}
+                              >
+                                {togglingServiceStatus
+                                  ? "Updating..."
+                                  : isServiceActive
+                                  ? "Service Active"
+                                  : "Service Deactive"}
+                              </Typography>
+                            }
+                          />
+                        </Box>
+                      );
+                    })()}
+
                     {/* Billing Tier Configuration Card (SFPL + SRCC Partner) */}
-                    <Box sx={{ p: 2.5, borderRadius: 2.5, bgcolor: userWalletData?.isSfplClient ? "#f0fdf4" : "#f8fafc", border: `1.5px solid ${userWalletData?.isSfplClient ? "#86efac" : "#e2e8f0"}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-                      <Box sx={{ maxWidth: 500 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        bgcolor: userWalletData?.isSfplClient ? "#f0fdf4" : "#f8fafc",
+                        border: `1.5px solid ${userWalletData?.isSfplClient ? "#86efac" : "#e2e8f0"}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 2,
+                      }}
+                    >
+                      <Box sx={{ maxWidth: 560 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                           <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#0f172a" }}>
                             Partner Pricing Tier (SFPL + SRCC)
                           </Typography>
                           <Chip
                             size="small"
-                            label={userWalletData?.isSfplClient ? "PARTNER ACTIVE" : "STANDARD TIER"}
+                            label={userWalletData?.isSfplClient ? "PARTNER ACTIVE (PRICING TIER)" : "STANDARD COMMERCIAL TIER"}
                             color={userWalletData?.isSfplClient ? "success" : "default"}
                             sx={{ fontWeight: 700, fontSize: "0.68rem", height: 20 }}
                           />
                         </Box>
                         <Typography sx={{ fontSize: "0.76rem", color: "#64748b", mt: 0.5, lineHeight: 1.4 }}>
                           {userWalletData?.isSfplClient
-                            ? "Partner Client enabled: 0 Credits deducted per generation + 1 Reward credit added on each successful E-Way bill."
-                            : "Standard Client: 1 Credit (₹9) deducted per successful E-Way bill generation. Wallet balance required."}
+                            ? "Partner Pricing Tier enabled (Separate from Service Status): 0 Credits deducted + 1 Reward credit added per E-Way bill on SRCC transporter."
+                            : "Standard Commercial Tier: 1 Credit (₹9) deducted per successful E-Way bill generation. Requires wallet balance."}
                         </Typography>
                       </Box>
                       <FormControlLabel
@@ -2891,8 +3035,18 @@ const AdminManagement = ({ onRefresh }) => {
                           />
                         }
                         label={
-                          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: userWalletData?.isSfplClient ? "#15803d" : "#64748b" }}>
-                            {togglingPartnerTier ? "Updating..." : userWalletData?.isSfplClient ? "Partner Active" : "Standard Client"}
+                          <Typography
+                            sx={{
+                              fontSize: "0.82rem",
+                              fontWeight: 600,
+                              color: userWalletData?.isSfplClient ? "#15803d" : "#64748b",
+                            }}
+                          >
+                            {togglingPartnerTier
+                              ? "Updating..."
+                              : userWalletData?.isSfplClient
+                              ? "Partner Active"
+                              : "Standard Client"}
                           </Typography>
                         }
                       />
@@ -3013,80 +3167,272 @@ const AdminManagement = ({ onRefresh }) => {
                       </Box>
                     </Box>
 
-                    {/* Recent Transactions Table */}
+                    {/* ERP Audit & Transaction History Hub */}
                     <Box sx={{ border: "1.5px solid #e2e8f0", borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden" }}>
-                      <Box sx={{ px: 2.5, py: 1.5, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 1 }}>
-                        <History sx={{ fontSize: 18, color: "#64748b" }} />
-                        <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e293b" }}>
-                          Recent Credit Ledger Transactions (Last 20)
-                        </Typography>
+                      <Box
+                        sx={{
+                          px: 2.5,
+                          py: 1.5,
+                          bgcolor: "#f8fafc",
+                          borderBottom: "1px solid #e2e8f0",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 1.5,
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <History sx={{ fontSize: 18, color: "#64748b" }} />
+                          <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e293b" }}>
+                            ERP Audit & Transaction History
+                          </Typography>
+                        </Box>
+
+                        {/* History Navigation Pill Tabs */}
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button
+                            size="small"
+                            variant={walletHistoryTab === 0 ? "contained" : "outlined"}
+                            onClick={() => setWalletHistoryTab(0)}
+                            sx={{
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              px: 1.5,
+                              py: 0.3,
+                              bgcolor: walletHistoryTab === 0 ? "#1e293b" : "transparent",
+                              color: walletHistoryTab === 0 ? "#fff" : "#475569",
+                              borderColor: "#cbd5e1",
+                              "&:hover": { bgcolor: walletHistoryTab === 0 ? "#0f172a" : "#f1f5f9" },
+                            }}
+                          >
+                            Credit Ledger ({userWalletData?.recentTransactions?.length || 0})
+                          </Button>
+                          <Button
+                            size="small"
+                            variant={walletHistoryTab === 1 ? "contained" : "outlined"}
+                            onClick={() => setWalletHistoryTab(1)}
+                            sx={{
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              px: 1.5,
+                              py: 0.3,
+                              bgcolor: walletHistoryTab === 1 ? "#1e293b" : "transparent",
+                              color: walletHistoryTab === 1 ? "#fff" : "#475569",
+                              borderColor: "#cbd5e1",
+                              "&:hover": { bgcolor: walletHistoryTab === 1 ? "#0f172a" : "#f1f5f9" },
+                            }}
+                          >
+                            Service Status History ({userWalletData?.serviceStatusHistory?.length || 0})
+                          </Button>
+                          <Button
+                            size="small"
+                            variant={walletHistoryTab === 2 ? "contained" : "outlined"}
+                            onClick={() => setWalletHistoryTab(2)}
+                            sx={{
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              px: 1.5,
+                              py: 0.3,
+                              bgcolor: walletHistoryTab === 2 ? "#1e293b" : "transparent",
+                              color: walletHistoryTab === 2 ? "#fff" : "#475569",
+                              borderColor: "#cbd5e1",
+                              "&:hover": { bgcolor: walletHistoryTab === 2 ? "#0f172a" : "#f1f5f9" },
+                            }}
+                          >
+                            Partner Tier History ({userWalletData?.partnerTierHistory?.length || 0})
+                          </Button>
+                        </Box>
                       </Box>
-                      <TableContainer sx={{ maxHeight: 260 }}>
-                        <Table size="small" stickyHeader>
-                          <TableHead>
-                            <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 700, fontSize: "0.72rem", color: "#64748b" } }}>
-                              <TableCell>Date & Time</TableCell>
-                              <TableCell>Type</TableCell>
-                              <TableCell align="right">Credits</TableCell>
-                              <TableCell align="right">Balance After</TableCell>
-                              <TableCell>Remarks / Reference</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {(!userWalletData?.recentTransactions || userWalletData.recentTransactions.length === 0) ? (
-                              <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#94a3b8", fontSize: "0.78rem" }}>
-                                  No credit transactions recorded for this user yet.
-                                </TableCell>
+
+                      {/* Tab 0: Credit Ledger */}
+                      {walletHistoryTab === 0 && (
+                        <TableContainer sx={{ maxHeight: 260 }}>
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 700, fontSize: "0.72rem", color: "#64748b" } }}>
+                                <TableCell>Date & Time</TableCell>
+                                <TableCell>Type</TableCell>
+                                <TableCell align="right">Credits</TableCell>
+                                <TableCell align="right">Balance After</TableCell>
+                                <TableCell>Remarks / Reference</TableCell>
                               </TableRow>
-                            ) : (
-                              userWalletData.recentTransactions.map((tx) => {
-                                const isCredit = (tx.credits || 0) > 0;
-                                return (
-                                  <TableRow key={tx._id} hover sx={{ "& td": { fontSize: "0.75rem", py: 1 } }}>
+                            </TableHead>
+                            <TableBody>
+                              {(!userWalletData?.recentTransactions || userWalletData.recentTransactions.length === 0) ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#94a3b8", fontSize: "0.78rem" }}>
+                                    No credit transactions recorded for this user yet.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                userWalletData.recentTransactions.map((tx) => {
+                                  const isCredit = (tx.credits || 0) > 0;
+                                  return (
+                                    <TableRow key={tx._id} hover sx={{ "& td": { fontSize: "0.75rem", py: 1 } }}>
+                                      <TableCell sx={{ color: "#64748b", whiteSpace: "nowrap" }}>
+                                        {tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Chip
+                                          size="small"
+                                          label={tx.transactionType || "TRANSACTION"}
+                                          sx={{
+                                            height: 20,
+                                            fontSize: "0.65rem",
+                                            fontWeight: 700,
+                                            bgcolor:
+                                              tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
+                                                ? "#dcfce7"
+                                                : tx.transactionType === "ADMIN_ADJUSTMENT"
+                                                ? "#ede9fe"
+                                                : "#fee2e2",
+                                            color:
+                                              tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
+                                                ? "#16a34a"
+                                                : tx.transactionType === "ADMIN_ADJUSTMENT"
+                                                ? "#7c3aed"
+                                                : "#dc2626",
+                                            border: "none",
+                                          }}
+                                        />
+                                      </TableCell>
+                                      <TableCell align="right" sx={{ fontWeight: 700, color: isCredit ? "#16a34a" : "#dc2626" }}>
+                                        {isCredit ? `+${tx.credits}` : tx.credits}
+                                      </TableCell>
+                                      <TableCell align="right" sx={{ fontWeight: 600, color: "#1e293b" }}>
+                                        {tx.balanceAfter !== undefined ? tx.balanceAfter : "—"}
+                                      </TableCell>
+                                      <TableCell sx={{ color: "#475569", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {tx.remarks || tx.description || "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+
+                      {/* Tab 1: Service Status History */}
+                      {walletHistoryTab === 1 && (
+                        <TableContainer sx={{ maxHeight: 260 }}>
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 700, fontSize: "0.72rem", color: "#64748b" } }}>
+                                <TableCell>Date & Time</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Action By</TableCell>
+                                <TableCell>Validity Granted</TableCell>
+                                <TableCell>Remarks</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(!userWalletData?.serviceStatusHistory || userWalletData.serviceStatusHistory.length === 0) ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#94a3b8", fontSize: "0.78rem" }}>
+                                    No service status changes recorded for this client yet.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                [...userWalletData.serviceStatusHistory].reverse().map((entry, idx) => {
+                                  const isActive = entry.status === "ACTIVE";
+                                  return (
+                                    <TableRow key={entry._id || idx} hover sx={{ "& td": { fontSize: "0.75rem", py: 1 } }}>
+                                      <TableCell sx={{ color: "#64748b", whiteSpace: "nowrap" }}>
+                                        {entry.changedAt ? new Date(entry.changedAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                          <Chip
+                                            size="small"
+                                            label={entry.status}
+                                            color={isActive ? "success" : "error"}
+                                            sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700 }}
+                                          />
+                                          {entry.isFirstActivation && (
+                                            <Chip
+                                              size="small"
+                                              label="3 Mos Free"
+                                              color="info"
+                                              sx={{ height: 18, fontSize: "0.6rem", fontWeight: 700 }}
+                                            />
+                                          )}
+                                        </Box>
+                                      </TableCell>
+                                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
+                                        {entry.changedBy || "SuperAdmin"}
+                                      </TableCell>
+                                      <TableCell sx={{ color: "#64748b" }}>
+                                        {entry.validUntil
+                                          ? new Date(entry.validUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                          : "—"}
+                                      </TableCell>
+                                      <TableCell sx={{ color: "#475569" }}>
+                                        {entry.remarks || "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+
+                      {/* Tab 2: Partner Tier History */}
+                      {walletHistoryTab === 2 && (
+                        <TableContainer sx={{ maxHeight: 260 }}>
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 700, fontSize: "0.72rem", color: "#64748b" } }}>
+                                <TableCell>Date & Time</TableCell>
+                                <TableCell>Pricing Tier</TableCell>
+                                <TableCell>Action By</TableCell>
+                                <TableCell>Remarks</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {(!userWalletData?.partnerTierHistory || userWalletData.partnerTierHistory.length === 0) ? (
+                                <TableRow>
+                                  <TableCell colSpan={4} align="center" sx={{ py: 3, color: "#94a3b8", fontSize: "0.78rem" }}>
+                                    No partner tier changes recorded for this client yet.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                [...userWalletData.partnerTierHistory].reverse().map((entry, idx) => (
+                                  <TableRow key={entry._id || idx} hover sx={{ "& td": { fontSize: "0.75rem", py: 1 } }}>
                                     <TableCell sx={{ color: "#64748b", whiteSpace: "nowrap" }}>
-                                      {tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                                      {entry.changedAt ? new Date(entry.changedAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
                                     </TableCell>
                                     <TableCell>
                                       <Chip
                                         size="small"
-                                        label={tx.transactionType || "TRANSACTION"}
-                                        sx={{
-                                          height: 20,
-                                          fontSize: "0.65rem",
-                                          fontWeight: 700,
-                                          bgcolor:
-                                            tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
-                                              ? "#dcfce7"
-                                              : tx.transactionType === "ADMIN_ADJUSTMENT"
-                                              ? "#ede9fe"
-                                              : "#fee2e2",
-                                          color:
-                                            tx.transactionType === "PAYMENT_CREDIT" || tx.transactionType === "EWAYBILL_REWARD"
-                                              ? "#16a34a"
-                                              : tx.transactionType === "ADMIN_ADJUSTMENT"
-                                              ? "#7c3aed"
-                                              : "#dc2626",
-                                          border: "none",
-                                        }}
+                                        label={entry.isSfplClient ? "PARTNER ACTIVE" : "STANDARD TIER"}
+                                        color={entry.isSfplClient ? "success" : "default"}
+                                        sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700 }}
                                       />
                                     </TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 700, color: isCredit ? "#16a34a" : "#dc2626" }}>
-                                      {isCredit ? `+${tx.credits}` : tx.credits}
+                                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
+                                      {entry.changedBy || "SuperAdmin"}
                                     </TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 600, color: "#1e293b" }}>
-                                      {tx.balanceAfter !== undefined ? tx.balanceAfter : "—"}
-                                    </TableCell>
-                                    <TableCell sx={{ color: "#475569", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      {tx.remarks || tx.description || "—"}
+                                    <TableCell sx={{ color: "#475569" }}>
+                                      {entry.remarks || "—"}
                                     </TableCell>
                                   </TableRow>
-                                );
-                              })
-                            )}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
                     </Box>
                   </>
                 )}

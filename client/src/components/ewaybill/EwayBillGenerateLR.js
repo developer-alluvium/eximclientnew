@@ -28,6 +28,7 @@ import {
   isSezGstin,
   validateVehicleNumber as validateVehicleFormat,
 } from "./ewbValidationHelpers";
+import { extractEwbNumberClient, getExistingEwbForContainer } from "./ewbContainerCoverage";
 
 const validateVehicleNumber = validateVehicleFormat;
 
@@ -1483,6 +1484,17 @@ function EwayBillGenerateLR({
     // Internal tr_no (system LR record) is NOT required for EWB generation.
     try {
       setGenerating(true);
+
+      Swal.fire({
+        title: "Generating E-Way Bills...",
+        html: `<div style="font-weight: 600; color: #1e293b; margin-top: 10px;">Connecting to government portal and generating E-Way Bills for ${selectedContainers.length} container(s)...</div>`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       const promises = selectedContainers.map(async (container) => {
         const scNo = (container.container_number || container.container_no || "").trim().toUpperCase();
         const oIdx = boeContainers.findIndex(bc => {
@@ -1491,71 +1503,178 @@ function EwayBillGenerateLR({
         });
         const weight = parseFloat(oIdx !== -1 ? containerWeights[oIdx] : containerWeights[`manual_${scNo}`]) || 0;
         const containerValue = { weight, assessableValue: weight * perKgValue };
-        if (weight <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Weight is zero or invalid." };
-        if (!perKgValue || perKgValue <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Per KG value is not set." };
+        if (weight <= 0) return { container: scNo, ewbNo: null, status: "failed", error: "Weight is zero or invalid." };
+        if (!perKgValue || perKgValue <= 0) return { container: scNo, ewbNo: null, status: "failed", error: "Per KG value is not set." };
         const containerPayload = buildPayloadForContainer(container, containerValue);
+
+        let generatedEwbNo = null;
+        let ewbDate = null;
+        let validUpto = null;
+        let pdfUrl = null;
+        let isSuccess = false;
+        let errorMsg = "";
+
         try {
           const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, containerPayload);
-          if (r.data.success) {
-            markBoeDocumentGenerated(formData.documentNumber || boeNumber);
-            return {
-              container: container.container_number,
-              ewbNo: r.data.data.ewbNo,
-              ewbDate: r.data.data.ewbDate,
-              validUpto: r.data.data.validUpto,
-              pdfUrl: r.data.data.pdfUrl,
-              ewayBillId: r.data.data.ewayBillId,
-              status: "success"
-            };
-          }
-          else {
-            let errorMsg = r.data.message || "Unknown error";
-            if (r.data.errors?.length) errorMsg = r.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
-            else if (r.data.validationErrors?.length) errorMsg = r.data.validationErrors.map(e => e.message).join(", ");
-            return { container: container.container_number, ewbNo: null, status: "failed", error: errorMsg };
+          generatedEwbNo = extractEwbNumberClient(r.data);
+          const responseMsg = String(
+            r.data?.message ||
+            r.data?.error ||
+            r.data?.status_desc ||
+            ""
+          ).toLowerCase();
+
+          const isAlready = responseMsg.includes("already generated") || responseMsg.includes("already exists");
+          isSuccess = Boolean(
+            (r.data?.success || isAlready || r.data?.status === "success" || r.status === 200) &&
+            generatedEwbNo
+          );
+
+          if (isSuccess) {
+            ewbDate = r.data?.data?.ewbDate || r.data?.ewbDate || new Date();
+            validUpto = r.data?.data?.validUpto || r.data?.validUpto;
+            pdfUrl = r.data?.data?.pdfUrl || r.data?.pdfUrl || r.data?.data?.url || r.data?.url;
+          } else {
+            errorMsg = r.data?.message || "Unknown error";
+            if (r.data?.errors?.length) errorMsg = r.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
+            else if (r.data?.validationErrors?.length) errorMsg = r.data.validationErrors.map(e => e.message).join(", ");
           }
         } catch (err) {
+          console.warn(`Direct generate attempt error for container ${scNo}:`, err.message);
           const ed = err.response?.data;
-          let et = parseNicErrorMessage(ed?.message || err.message);
-          if (ed?.errors?.length) et = ed.errors.map(e => e.message).join(", ");
-          else if (ed?.validationErrors?.length) et = ed.validationErrors.map(e => e.message).join(", ");
-          return { container: container.container_number, ewbNo: null, status: "failed", error: et };
+          generatedEwbNo = extractEwbNumberClient(ed);
+          if (generatedEwbNo) {
+            isSuccess = true;
+            ewbDate = new Date();
+          } else {
+            errorMsg = parseNicErrorMessage(ed?.message || err.message);
+            if (ed?.errors?.length) errorMsg = ed.errors.map(e => e.message).join(", ");
+            else if (ed?.validationErrors?.length) errorMsg = ed.validationErrors.map(e => e.message).join(", ");
+          }
         }
+
+        // Auto-Recovery (Per-Container)
+        if (!isSuccess || !generatedEwbNo) {
+          const rawDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+          const checkDocNo = rawDoc.split("-CH-")[0].trim();
+          if (checkDocNo) {
+            try {
+              const listRes = await axios.get(
+                `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+              );
+              if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+                const matchingEwb = getExistingEwbForContainer(container, listRes.data.data, checkDocNo);
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Auto-Recovery in submitMultiple LR] Recovered EWB for container ${scNo}: ${recoveredNo}`);
+                    generatedEwbNo = recoveredNo;
+                    isSuccess = true;
+                    ewbDate = matchingEwb.ewbDate || new Date();
+                    validUpto = matchingEwb.validUpto;
+                    pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                  }
+                }
+              }
+            } catch (recErr) {
+              console.warn(`Could not auto-recover for container ${scNo}:`, recErr.message);
+            }
+          }
+        }
+
+        if (isSuccess && generatedEwbNo) {
+          markBoeDocumentGenerated(formData.documentNumber || boeNumber);
+          return {
+            container: scNo,
+            ewbNo: generatedEwbNo,
+            ewbDate: ewbDate,
+            validUpto: validUpto,
+            pdfUrl: pdfUrl,
+            status: "success",
+          };
+        }
+
+        return {
+          container: scNo,
+          ewbNo: null,
+          status: "failed",
+          error: errorMsg || "Failed to generate E-Way Bill from government portal",
+        };
       });
+
       const results = await Promise.all(promises);
+
+      // Batch Auto-Recovery if any container is still marked failed
+      const rawBatchDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+      const checkDocNo = rawBatchDoc.split("-CH-")[0].trim();
+      if (checkDocNo && results.some((r) => r.status !== "success")) {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const listRes = await axios.get(
+            `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+          );
+          if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            for (const r of results) {
+              if (r.status !== "success") {
+                const matchingEwb = getExistingEwbForContainer(
+                  { container_number: r.container },
+                  listRes.data.data,
+                  checkDocNo
+                );
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Batch Recovery in submitMultiple LR] Recovered EWB for ${r.container}: ${recoveredNo}`);
+                    r.status = "success";
+                    r.ewbNo = recoveredNo;
+                    r.ewbDate = matchingEwb.ewbDate || new Date();
+                    r.validUpto = matchingEwb.validUpto;
+                    r.pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                    r.error = undefined;
+                  }
+                }
+              }
+            }
+          }
+        } catch (batchRecErr) {
+          console.warn("Batch auto-recovery failed in LR:", batchRecErr.message);
+        }
+      }
+
       const successCount = results.filter(r => r.status === "success").length;
       const failedCount = results.filter(r => r.status === "failed").length;
+
       if (successCount > 0) {
         const sh = results.filter(r => r.status === "success").map(r => `<div><strong>${r.container}:</strong> ${r.ewbNo}</div>`).join("");
         const fh = failedCount > 0 ? `<hr><h5>Failed (${failedCount}):</h5>` + results.filter(r => r.status === "failed").map(r => `<div><strong>${r.container}:</strong> ${r.error}</div>`).join("") : "";
-        Swal.fire({ icon: successCount === selectedContainers.length ? "success" : "warning", title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`, html: `<div>${sh}${fh}</div>`, confirmButtonText: "OK" })
-          .then(() => { if (onSuccess) onSuccess(results); if (onClose) onClose(); });
+        await Swal.fire({
+          icon: successCount === selectedContainers.length ? "success" : "warning",
+          title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`,
+          html: `<div>${sh}${fh}</div>`,
+          confirmButtonText: "View Container Status →",
+          confirmButtonColor: "#16a34a",
+          timer: 3500,
+          timerProgressBar: true,
+          allowOutsideClick: false,
+        });
+        if (onSuccess) onSuccess(results);
+        if (onClose) onClose();
       } else {
-        // ── Check if all failures are "already exists" → open the existing EWB for viewing/printing
-        const alreadyExistsPattern = /e-?way\s*bill\s*(\d{12})\s*already\s*exists/i;
-        const existingEwbs = results
-          .map(r => {
-            const m = (r.error || "").match(alreadyExistsPattern);
-            return m ? { container: r.container, ewbNo: m[1], status: "exists" } : null;
-          })
-          .filter(Boolean);
-
-        if (existingEwbs.length > 0 && existingEwbs.length === results.length) {
-          // All failures are "already exists" — show info then open preview
-          await Swal.fire({
-            icon: "info",
-            title: "E-Way Bill Already Exists",
-            html: existingEwbs.map(e => `<div><strong>${e.container}:</strong> EWB ${e.ewbNo}</div>`).join(""),
-            confirmButtonText: "View & Print",
-          });
-          if (onSuccess) onSuccess(existingEwbs);
-        } else {
-          const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
-          Swal.fire({ icon: "error", title: "All E-Way Bills Failed", html: fh || "<div>No failure details available.</div>", confirmButtonText: "OK" });
-        }
+        const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
+        Swal.fire({
+          icon: "error",
+          title: "All E-Way Bills Failed",
+          html: fh || "<div>No failure details available.</div>",
+          confirmButtonColor: "#1e40af",
+          confirmButtonText: "OK",
+        });
       }
-    } catch (err) { console.error("submitMultipleEwayBills:", err); Swal.fire("Error", "Failed to generate E-Way Bills", "error"); }
-    finally { setGenerating(false); }
+    } catch (err) {
+      console.error("submitMultipleEwayBills:", err);
+      Swal.fire("Error", "Failed to generate E-Way Bills", "error");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const buildPayloadForContainer = (container, containerValue) => {
@@ -1603,9 +1722,38 @@ function EwayBillGenerateLR({
     const otherAmt = parseFloat(formData.otherAmount) || 0;
     const totalIV = parseFloat((taxable + cgstTotal + sgstTotal + igstTotal + cessTotal + cessNATotal + otherAmt).toFixed(2));
 
+    const cNumber = (container.container_number || container.container_no || "").trim().toUpperCase();
+
     return {
-      lrId, containerId: container?._id || containerObj?._id,
-      formData: { ...formData, totalInvoiceValue: totalIV, taxableAmount: taxable, calculatedAssessableValue: containerValue.assessableValue, cgstAmount: cgstTotal, sgstAmount: sgstTotal, igstAmount: igstTotal, cessAmount: cessTotal, cessNonAdvol: cessNATotal, otherAmount: otherAmt, transporterId: formData.transporterId || undefined, generatorRole: formData.supplyType === "inward" ? "consignee" : "consignor", userGstin: getEffectiveUserGstin(), items: itemsPayload, data_source: "lrEwbUpdate" },
+      lrId,
+      containerId: cNumber || container?._id || containerObj?._id,
+      containerNumber: cNumber,
+      container_number: cNumber,
+      formData: {
+        ...formData,
+        containerId: cNumber || container?._id || containerObj?._id,
+        containerNumber: cNumber,
+        container_number: cNumber,
+        boeNumber: (formData.boeNumber || boeNumber || "").trim(),
+        documentType: generationMode === "batch-selected" ? "Delivery Challan" : (formData.documentType || "Bill of Entry"),
+        documentNumber: generationMode === "batch-selected" 
+          ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${cNumber.slice(-4)}` 
+          : (formData.documentNumber || boeNumber),
+        totalInvoiceValue: totalIV,
+        taxableAmount: taxable,
+        calculatedAssessableValue: containerValue.assessableValue,
+        cgstAmount: cgstTotal,
+        sgstAmount: sgstTotal,
+        igstAmount: igstTotal,
+        cessAmount: cessTotal,
+        cessNonAdvol: cessNATotal,
+        otherAmount: otherAmt,
+        transporterId: formData.transporterId || undefined,
+        generatorRole: formData.supplyType === "inward" ? "consignee" : "consignor",
+        userGstin: getEffectiveUserGstin(),
+        items: itemsPayload,
+        data_source: "lrEwbUpdate"
+      },
     };
   };
 

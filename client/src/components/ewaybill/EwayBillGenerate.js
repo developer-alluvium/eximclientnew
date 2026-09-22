@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import axios from "../../utils/axiosConfig";
 import Swal from "sweetalert2";
 import { Autocomplete, TextField } from "@mui/material";
@@ -9,6 +9,7 @@ import {
   isSezGstin,
   validateVehicleNumber as validateVehicleFormat,
 } from "./ewbValidationHelpers";
+import { getExistingEwbForContainer } from "./ewbContainerCoverage";
 
 const validateVehicleNumber = validateVehicleFormat;
 
@@ -250,6 +251,49 @@ const DEFAULT_FORM = {
   reasonText: "", // Added for Part B
 };
 
+/**
+ * Universal client-side extractor for 12-digit Indian E-Way Bill numbers.
+ */
+const extractEwbNumberClient = (obj) => {
+  if (!obj) return null;
+  const candidateKeys = [
+    "ewbNo", "ewayBillNo", "ewbNumber", "ewayBillNumber", "generatedEwbNo", "eway_bill_no", "ewb_no"
+  ];
+  const queue = [obj];
+  const visited = new Set();
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (!curr || typeof curr !== "object" || visited.has(curr)) continue;
+    visited.add(curr);
+    for (const key of candidateKeys) {
+      const val = curr[key];
+      if (val !== undefined && val !== null) {
+        const cleaned = String(val).trim();
+        if (/^\d{12}$/.test(cleaned)) return cleaned;
+      }
+    }
+    const subKeys = ["data", "responseData", "response_data", "result", "results", "itemList", "response"];
+    for (const sk of subKeys) {
+      if (curr[sk] && typeof curr[sk] === "object") queue.push(curr[sk]);
+    }
+    if (Array.isArray(curr)) {
+      for (const item of curr) {
+        if (item && typeof item === "object") queue.push(item);
+      }
+    }
+  }
+  const stringCandidates = [
+    obj?.message, obj?.error, obj?.alert, obj?.status_desc, obj?.data?.message, obj?.data?.error
+  ];
+  for (const candidate of stringCandidates) {
+    if (!candidate) continue;
+    const text = typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    const match = text.match(/\b\d{12}\b/);
+    if (match) return match[0];
+  }
+  return null;
+};
+
 function EwayBillGenerate({ 
   asDialog = false, 
   action = "", // "generate" or "update"
@@ -271,7 +315,29 @@ function EwayBillGenerate({
   partAOnlyDefault = false,
   jobId = null
 }) {
-  const { openRechargeModal, refreshBalance } = useWallet();
+  const { balance, pricingTier, isFreeTrial, validUntil, daysRemaining, refreshBalance } = useWallet();
+  const isPartnerTier = pricingTier === "SFPL_SRCC_PARTNER";
+  const isEffectiveFree = isPartnerTier || isFreeTrial;
+  const containerCount = (selectedContainers && selectedContainers.length > 0) ? selectedContainers.length : 1;
+  const requiredCredits = isEffectiveFree ? 0 : containerCount;
+  const balanceAfter = isPartnerTier
+    ? (balance ?? 0) + containerCount
+    : isFreeTrial
+    ? (balance ?? 0)
+    : Math.max(0, (balance ?? 0) - requiredCredits);
+
+  const formattedValidDate = useMemo(() => {
+    if (!validUntil) return "";
+    try {
+      return new Date(validUntil).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch (_) {
+      return String(validUntil);
+    }
+  }, [validUntil]);
 
   // ---- Tab & Mode State ----
   // For BOE-only mode we always start in BOE tab and don't display the LR path.
@@ -1824,6 +1890,16 @@ function EwayBillGenerate({
     try {
       setGenerating(true);
 
+      Swal.fire({
+        title: "Generating E-Way Bills...",
+        html: `<div style="font-weight: 600; color: #1e293b; margin-top: 10px;">Connecting to government portal and generating E-Way Bills for ${selectedContainers.length} container(s)...</div>`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       const promises = selectedContainers.map(async (container) => {
         const scNo = (container.container_number || container.container_no || "").trim().toUpperCase();
         const oIdx = boeContainers.findIndex(bc => {
@@ -1839,7 +1915,7 @@ function EwayBillGenerate({
 
         if (weight <= 0) {
           return {
-            container: container.container_number,
+            container: scNo,
             ewbNo: null,
             status: "failed",
             error: "Weight is zero or invalid. Please check container weights.",
@@ -1848,7 +1924,7 @@ function EwayBillGenerate({
 
         if (!perKgValue || perKgValue <= 0) {
           return {
-            container: container.container_number,
+            container: scNo,
             ewbNo: null,
             status: "failed",
             error: "Assessable value (Per KG) is not set. Please fetch BOE details first.",
@@ -1858,59 +1934,150 @@ function EwayBillGenerate({
         // Build container-specific payload
         const containerPayload = buildPayloadForContainer(container, containerValue);
 
+        let generatedEwbNo = null;
+        let ewbDate = null;
+        let validUpto = null;
+        let pdfUrl = null;
+        let isSuccess = false;
+        let errorMsg = "";
+
         try {
           const response = await axios.post(
             `${process.env.REACT_APP_API_STRING}/eway-bill/generate`,
             containerPayload
           );
 
-          if (response.data.success) {
-            markBoeDocumentGenerated(formData.documentNumber || boeNumber);
-            return {
-              container: container.container_number,
-              ewbNo: response.data.data.ewbNo,
-              ewbDate: response.data.data.ewbDate,
-              validUpto: response.data.data.validUpto,
-              pdfUrl: response.data.data.pdfUrl,
-              ewayBillId: response.data.data.ewayBillId,
-              status: "success",
-            };
+          generatedEwbNo = extractEwbNumberClient(response.data);
+          const responseMsg = String(
+            response.data?.message ||
+            response.data?.error ||
+            response.data?.status_desc ||
+            ""
+          ).toLowerCase();
+
+          const isAlready = responseMsg.includes("already generated") || responseMsg.includes("already exists");
+          isSuccess = Boolean(
+            (response.data?.success || isAlready || response.data?.status === "success" || response.status === 200) &&
+            generatedEwbNo
+          );
+
+          if (isSuccess) {
+            ewbDate = response.data?.data?.ewbDate || response.data?.ewbDate || new Date();
+            validUpto = response.data?.data?.validUpto || response.data?.validUpto;
+            pdfUrl = response.data?.data?.pdfUrl || response.data?.pdfUrl || response.data?.data?.url || response.data?.url;
           } else {
-            let errorMsg = response.data.message || "Unknown error";
-            if (response.data.errors && Array.isArray(response.data.errors) && response.data.errors.length > 0) {
+            errorMsg = response.data?.message || "Unknown error";
+            if (response.data?.errors && Array.isArray(response.data.errors) && response.data.errors.length > 0) {
               errorMsg = response.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
-            } else if (response.data.validationErrors && Array.isArray(response.data.validationErrors) && response.data.validationErrors.length > 0) {
+            } else if (response.data?.validationErrors && Array.isArray(response.data.validationErrors) && response.data.validationErrors.length > 0) {
               errorMsg = response.data.validationErrors.map(e => e.message).join(", ");
             }
-
-            return {
-              container: container.container_number,
-              ewbNo: null,
-              status: "failed",
-              error: errorMsg,
-            };
           }
         } catch (err) {
-          console.error(`Error generating EWB for container ${container.container_number}:`, err);
+          console.warn(`Direct generate attempt error for container ${scNo}:`, err.message);
           const errorData = err.response?.data;
-          let errorText = parseNicErrorMessage(errorData?.message || err.message);
-          
-          if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
-            errorText = errorData.errors.map(e => e.message).join(", ");
-          } else if (errorData?.validationErrors && Array.isArray(errorData.validationErrors) && errorData.validationErrors.length > 0) {
-            errorText = errorData.validationErrors.map(e => e.message).join(", ");
+          generatedEwbNo = extractEwbNumberClient(errorData);
+          if (generatedEwbNo) {
+            isSuccess = true;
+            ewbDate = new Date();
+          } else {
+            errorMsg = parseNicErrorMessage(errorData?.message || err.message);
+            if (errorData?.errors && Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+              errorMsg = errorData.errors.map(e => e.message).join(", ");
+            } else if (errorData?.validationErrors && Array.isArray(errorData.validationErrors) && errorData.validationErrors.length > 0) {
+              errorMsg = errorData.validationErrors.map(e => e.message).join(", ");
+            }
           }
+        }
 
+        // Auto-Recovery (Per-Container): Check if E-Way bill already exists on the backend
+        if (!isSuccess || !generatedEwbNo) {
+          const rawDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+          const checkDocNo = rawDoc.split("-CH-")[0].trim();
+          if (checkDocNo) {
+            try {
+              const listRes = await axios.get(
+                `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+              );
+              if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+                const matchingEwb = getExistingEwbForContainer(container, listRes.data.data, checkDocNo);
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Auto-Recovery in submitMultiple] Recovered EWB for container ${scNo}: ${recoveredNo}`);
+                    generatedEwbNo = recoveredNo;
+                    isSuccess = true;
+                    ewbDate = matchingEwb.ewbDate || new Date();
+                    validUpto = matchingEwb.validUpto;
+                    pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                  }
+                }
+              }
+            } catch (recErr) {
+              console.warn(`Could not auto-recover for container ${scNo}:`, recErr.message);
+            }
+          }
+        }
+
+        if (isSuccess && generatedEwbNo) {
+          markBoeDocumentGenerated(formData.documentNumber || boeNumber);
           return {
-            container: container.container_number,
-            ewbNo: null,
-            status: "failed",
-            error: errorText,
+            container: scNo,
+            ewbNo: generatedEwbNo,
+            ewbDate: ewbDate,
+            validUpto: validUpto,
+            pdfUrl: pdfUrl,
+            status: "success",
           };
         }
+
+        return {
+          container: scNo,
+          ewbNo: null,
+          status: "failed",
+          error: errorMsg || "Failed to generate E-Way Bill from government portal",
+        };
       });
 
       const results = await Promise.all(promises);
+
+      // Post-Processing: Batch Auto-Recovery if any container is still marked failed
+      const rawBatchDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+      const checkDocNo = rawBatchDoc.split("-CH-")[0].trim();
+      if (checkDocNo && results.some((r) => r.status !== "success")) {
+        try {
+          // Short delay to allow NIC / backend indexing to complete
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const listRes = await axios.get(
+            `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+          );
+          if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            for (const r of results) {
+              if (r.status !== "success") {
+                const matchingEwb = getExistingEwbForContainer(
+                  { container_number: r.container },
+                  listRes.data.data,
+                  checkDocNo
+                );
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Batch Recovery in submitMultiple] Recovered EWB for ${r.container}: ${recoveredNo}`);
+                    r.status = "success";
+                    r.ewbNo = recoveredNo;
+                    r.ewbDate = matchingEwb.ewbDate || new Date();
+                    r.validUpto = matchingEwb.validUpto;
+                    r.pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                    r.error = undefined;
+                  }
+                }
+              }
+            }
+          }
+        } catch (batchRecErr) {
+          console.warn("Batch auto-recovery failed:", batchRecErr.message);
+        }
+      }
 
       // Show summary
       const successCount = results.filter((r) => r.status === "success").length;
@@ -1937,19 +2104,23 @@ function EwayBillGenerate({
                 .join("")
             : "";
 
-        Swal.fire({
+        await Swal.fire({
           icon: successCount === selectedContainers.length ? "success" : "warning",
           title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`,
           html: `<div>${successHtml}${failedHtml}</div>`,
-          confirmButtonText: "OK",
-        }).then(() => {
-          if (onSuccess) {
-            onSuccess(results);
-          }
-          if (onClose) {
-            onClose();
-          }
+          confirmButtonText: "View Container Status →",
+          confirmButtonColor: "#16a34a",
+          timer: 3500,
+          timerProgressBar: true,
+          allowOutsideClick: false,
         });
+
+        if (onSuccess) {
+          onSuccess(results);
+        }
+        if (onClose) {
+          onClose();
+        }
       } else {
         const failedHtml = results
           .map((r) => {
@@ -1963,6 +2134,7 @@ function EwayBillGenerate({
           icon: "error",
           title: "All E-Way Bills Failed",
           html: failedHtml || "<div>No failure details available.</div>",
+          confirmButtonColor: "#1e40af",
           confirmButtonText: "OK",
         });
       }
@@ -2017,14 +2189,22 @@ function EwayBillGenerate({
       },
     ];
 
+    const cNumber = (container.container_number || container.container_no || "").trim().toUpperCase();
+
     return {
       lrId: lrId,
-      containerId: container?._id || containerObj?._id,
+      containerId: cNumber || container?._id || containerObj?._id,
+      containerNumber: cNumber,
+      container_number: cNumber,
       formData: {
         ...formData,
+        containerId: cNumber || container?._id || containerObj?._id,
+        containerNumber: cNumber,
+        container_number: cNumber,
+        boeNumber: (formData.boeNumber || boeNumber || "").trim(),
         documentType: generationMode === "batch-selected" ? "Delivery Challan" : (formData.documentType || "Bill of Entry"),
         documentNumber: generationMode === "batch-selected" 
-          ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${(container.container_number || container.container_no || "").trim().toUpperCase().slice(-4)}` 
+          ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${cNumber.slice(-4)}` 
           : (formData.documentNumber || boeNumber),
         totalInvoiceValue: totalInvoiceValue,
         taxableAmount: taxable,
@@ -2190,10 +2370,8 @@ function EwayBillGenerate({
           icon: "error",
           title: "Validation Error",
           text: "Please correct the highlighted fields.",
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 3000,
+          confirmButtonColor: "#1e40af",
+          confirmButtonText: "OK",
         });
         return;
       }
@@ -2340,13 +2518,11 @@ function EwayBillGenerate({
     if (hasError) {
       setFieldErrors(newFieldErrors);
       Swal.fire({
-        icon: 'error',
-        title: 'Validation Failed',
-        text: 'Please correct the errors highlighted in the form.',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 3000
+        icon: "error",
+        title: "Validation Failed",
+        text: "Please correct the errors highlighted in the form.",
+        confirmButtonColor: "#1e40af",
+        confirmButtonText: "OK",
       });
       return;
     }
@@ -2360,17 +2536,82 @@ function EwayBillGenerate({
       });
       setFieldErrors(prev => ({ ...prev, ...clientErrors }));
       Swal.fire({
-        icon: 'error',
-        title: 'Validation Error',
-        text: clientValidation.errors[0]?.message || 'Please fix the highlighted fields.',
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 4000
+        icon: "error",
+        title: "Validation Error",
+        text: clientValidation.errors[0]?.message || "Please fix the highlighted fields.",
+        confirmButtonColor: "#1e40af",
+        confirmButtonText: "OK",
       });
       return;
     }
     // ───────────────────────────────────────────────────────────────────────
+
+    // ─── Credit Verification & User Confirmation Modal ──────────────────────
+    if (!isEffectiveFree && balance !== null && balance !== undefined && balance < requiredCredits) {
+      Swal.fire({
+        icon: "error",
+        title: "Insufficient Credits",
+        text: `You require ${requiredCredits} credit(s) to generate E-Way Bill for ${containerCount} container(s), but your available balance is ${balance ?? 0} credit(s). Please contact SuperAdmin (superadmin@exim.com) to allocate credits.`,
+        confirmButtonColor: "#1e40af",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+
+    // Only prompt with confirmation modal if containers were not pre-confirmed in Part A selection modal
+    if (!selectedContainers || selectedContainers.length === 0) {
+      const costDisplay = isPartnerTier
+        ? '<span style="color: #16a34a; font-weight: 700;">0 Credits (Partner Free Tier · +' + containerCount + ' Reward)</span>'
+        : isFreeTrial
+        ? '<span style="color: #16a34a; font-weight: 700;"><span style="text-decoration: line-through; color: #94a3b8; margin-right: 6px;">-' + containerCount + ' Cr (₹' + (containerCount * 9) + ')</span>0 Credits (FREE NOW - 3 Months Trial)</span>'
+        : '<span style="color: #dc2626; font-weight: 700;">-' + requiredCredits + ' Credit' + (requiredCredits > 1 ? 's' : '') + ' (₹' + (requiredCredits * 9) + ')</span>';
+
+      const confirmModal = await Swal.fire({
+        title: "Confirm E-Way Bill Generation",
+        html: `
+          <div style="text-align: left; font-size: 13.5px; line-height: 1.6; padding: 12px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+              <span style="color: #64748b;">Current Balance:</span>
+              <strong style="color: #1e293b;">${balance ?? 0} Credits (₹${(balance ?? 0) * 9})</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+              <span style="color: #64748b;">Containers to Generate:</span>
+              <strong style="color: #1e293b;">${containerCount} container${containerCount > 1 ? 's' : ''}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0;">
+              <span style="color: #64748b;">Credit Deduction:</span>
+              ${costDisplay}
+            </div>
+            ${isFreeTrial && formattedValidDate ? `
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0; color: #047857;">
+              <span style="font-weight: 600;">Trial Validity:</span>
+              <strong style="color: #047857;">${formattedValidDate} ${daysRemaining !== null ? '(' + daysRemaining + ' days left)' : ''}</strong>
+            </div>
+            ` : ''}
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid #cbd5e1; margin-top: 4px;">
+              <strong style="color: #1e293b;">Balance After Generation:</strong>
+              <strong style="color: ${isEffectiveFree ? '#16a34a' : (balanceAfter <= 10 ? '#dc2626' : '#2563eb')}; font-size: 15px;">
+                ${balanceAfter} Credits
+              </strong>
+            </div>
+          </div>
+          <p style="margin-top: 10px; font-size: 11.5px; color: #64748b; font-style: italic; text-align: left;">
+            *Credits will only be deducted if the E-Way Bill number is successfully generated by the government portal.
+          </p>
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#1e40af",
+        cancelButtonColor: "#64748b",
+        confirmButtonText: "Yes, Confirm & Generate",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+      });
+
+      if (!confirmModal.isConfirmed) {
+        return;
+      }
+    }
 
     try {
       setGenerating(true);
@@ -2429,30 +2670,47 @@ function EwayBillGenerate({
               ? formData.consigneeGstin
               : formData.consignorGstin,
           items: itemsPayload,
-          // NEW: Multi-container metadata for analytics & tracking
+          // Multi-container metadata for billing & tracking
+          selectedContainerCount: (selectedContainers && selectedContainers.length > 0) ? selectedContainers.length : 1,
+          containerIds: (selectedContainers && selectedContainers.length > 0) ? selectedContainers.map(c => c._id || c.container_number || c.containerNumber) : [],
+          containerSelectionMode: containerSelectionMode || "all",
           ...(isMultiContainerMode && {
             data_source: "lrEwbUpdate",
-            containerSelectionMode: containerSelectionMode,
-            selectedContainerCount: selectedContainers.length,
-            containerIds: selectedContainers.map(c => c._id || c.container_number),
           }),
-        }
+        },
+        selectedContainerCount: (selectedContainers && selectedContainers.length > 0) ? selectedContainers.length : 1,
+        containerIds: (selectedContainers && selectedContainers.length > 0) ? selectedContainers.map(c => c._id || c.container_number || c.containerNumber) : [],
+        containerSelectionMode: containerSelectionMode || "all",
       };
+
+      Swal.fire({
+        title: "Generating E-Way Bill...",
+        html: `<div style="font-weight: 600; color: #1e293b; margin-top: 10px;">Connecting to government portal, please wait...</div>`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
 
       const response = await axios.post(
         `${process.env.REACT_APP_API_STRING}/eway-bill/generate`,
         payload
       );
 
-      if (response.data.success) {
+      let generatedEwbNo = extractEwbNumberClient(response.data);
+      const isAlreadyGen = String(response.data?.message || "").toLowerCase().includes("already generated") ||
+        String(response.data?.message || "").toLowerCase().includes("already exists");
+      const isGenSuccess = Boolean((response.data?.success || isAlreadyGen) && generatedEwbNo);
+
+      if (isGenSuccess) {
         markBoeDocumentGenerated(formData.documentNumber || boeNumber);
 
         // Save E-Way Bill to database at container level
-        const ewbNo = response.data.data.ewbNo;
-        if (ewbNo && selectedContainers && selectedContainers.length > 0) {
+        if (selectedContainers && selectedContainers.length > 0) {
           const successList = selectedContainers.map(c => ({
             container: c.container_number || c.container_no,
-            ewbNo: ewbNo
+            ewbNo: generatedEwbNo
           })).filter(item => item.container && item.ewbNo);
 
           if (successList.length > 0) {
@@ -2460,25 +2718,103 @@ function EwayBillGenerate({
           }
         }
 
-        Swal.fire({
+        await Swal.fire({
           icon: "success",
-          title: "E-Way Bill Generated",
+          title: isAlreadyGen ? "E-Way Bill Active & Verified!" : "E-Way Bill Generated Successfully!",
           html: `
-            <p><strong>EWB No:</strong> ${response.data.data.ewbNo}</p>
-            <p><strong>Valid Until:</strong> ${response.data.data.validUpto || "N/A"}</p>
+            <div style="text-align: left; font-size: 14px; line-height: 1.6; padding: 12px 14px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; margin-top: 10px;">
+              <div style="margin-bottom: 6px;">
+                <span style="color: #64748b;">E-Way Bill Number:</span><br/>
+                <strong style="color: #15803d; font-size: 20px; letter-spacing: 0.5px;">${generatedEwbNo}</strong>
+              </div>
+              ${response.data?.data?.validUpto ? `<div><span style="color: #64748b;">Valid Until:</span> <strong>${response.data.data.validUpto}</strong></div>` : ""}
+              ${isAlreadyGen ? `<div style="color: #15803d; font-weight: 600; font-size: 12.5px; margin-top: 4px;">✓ Already generated on Government Portal (No extra credits charged)</div>` : ""}
+            </div>
           `,
-          confirmButtonText: "OK",
-          allowOutsideClick: false
-        }).then(() => {
-          refreshBalance();
-          if (onSuccess) {
-            onSuccess(response.data.data);
-          }
-          if (onClose) {
-            onClose();
-          }
+          confirmButtonText: "View Container Status →",
+          confirmButtonColor: "#16a34a",
+          timer: 3500,
+          timerProgressBar: true,
+          allowOutsideClick: false,
         });
+
+        refreshBalance();
+        if (onSuccess) {
+          onSuccess(response.data.data || { ewbNo: generatedEwbNo, alreadyGenerated: isAlreadyGen });
+        }
+        if (onClose) {
+          onClose();
+        }
+        return;
       }
+
+      // Auto-Recovery Check: Check if E-Way bill was already created on the transport backend!
+      const checkDocNo = formData.documentNumber || boeNumber;
+      if (checkDocNo) {
+        try {
+          const listRes = await axios.get(
+            `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+          );
+          if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            const foundEwb = listRes.data.data[0];
+            const recoveredEwbNo = extractEwbNumberClient(foundEwb);
+            if (recoveredEwbNo) {
+              console.log(`⚡ [Auto-Recovery] Found active E-Way Bill in system: ${recoveredEwbNo}`);
+              markBoeDocumentGenerated(checkDocNo);
+
+              if (selectedContainers && selectedContainers.length > 0) {
+                const successList = selectedContainers.map(c => ({
+                  container: c.container_number || c.container_no,
+                  ewbNo: recoveredEwbNo
+                })).filter(item => item.container && item.ewbNo);
+                if (successList.length > 0) {
+                  await saveGeneratedEwayBillsToDb(successList);
+                }
+              }
+
+              await Swal.fire({
+                icon: "success",
+                title: "E-Way Bill Active & Verified!",
+                html: `
+                  <div style="text-align: left; font-size: 14px; line-height: 1.6; padding: 12px 14px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; margin-top: 10px;">
+                    <div style="margin-bottom: 6px;">
+                      <span style="color: #64748b;">E-Way Bill Number:</span><br/>
+                      <strong style="color: #15803d; font-size: 20px; letter-spacing: 0.5px;">${recoveredEwbNo}</strong>
+                    </div>
+                    <div style="color: #15803d; font-weight: 600; font-size: 12.5px; margin-top: 4px;">✓ Verified from Government Records (No extra credits charged)</div>
+                  </div>
+                `,
+                confirmButtonText: "View Container Status →",
+                confirmButtonColor: "#16a34a",
+                timer: 3500,
+                timerProgressBar: true,
+                allowOutsideClick: false,
+              });
+
+              refreshBalance();
+              if (onSuccess) onSuccess({ ewbNo: recoveredEwbNo, alreadyGenerated: true });
+              if (onClose) onClose();
+              return;
+            }
+          }
+        } catch (recoverErr) {
+          console.warn("Auto-recovery verification lookup failed:", recoverErr);
+        }
+      }
+
+      let errorMsg = response.data?.message || "Failed to generate E-Way Bill from government portal.";
+      if (response.data?.errors && Array.isArray(response.data.errors) && response.data.errors.length > 0) {
+        errorMsg = response.data.errors.map(e => e.message || `${e.field}: ${e.message}`).join(", ");
+      } else if (response.data?.validationErrors && Array.isArray(response.data.validationErrors) && response.data.validationErrors.length > 0) {
+        errorMsg = response.data.validationErrors.map(e => e.message || e.msg).join(", ");
+      }
+      Swal.fire({
+        icon: "error",
+        title: "E-Way Bill Generation Failed",
+        text: errorMsg,
+        confirmButtonColor: "#1e40af",
+        confirmButtonText: "OK",
+      });
     } catch (error) {
       console.error("Error generating E-Way Bill:", error);
 
@@ -2488,23 +2824,41 @@ function EwayBillGenerate({
         error.response?.data?.code === "INSUFFICIENT_CREDITS"
       ) {
         Swal.fire({
-          icon: "warning",
+          icon: "error",
           title: "Insufficient Credits",
-          text:
-            error.response?.data?.message ||
-            "You do not have enough credits to generate this E-Way Bill. Please recharge your wallet to proceed.",
-          showCancelButton: true,
-          confirmButtonText: "Top Up Credits",
-          cancelButtonText: "Cancel",
+          text: error.response?.data?.message || "Insufficient Credits. Please contact your Administrator (superadmin@exim.com) to recharge your wallet.",
+          confirmButtonText: "OK",
           confirmButtonColor: "#2563eb",
-          cancelButtonColor: "#64748b",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            openRechargeModal(
-              error.response?.data?.message ||
-                "Your credit balance is insufficient to generate this E-Way Bill."
-            );
-          }
+        });
+        return;
+      }
+
+      // ── SaaS Billing: Service Inactive Interception ─────────────────────
+      if (
+        error.response?.status === 403 &&
+        (error.response?.data?.code === "WALLET_SERVICE_INACTIVE" || error.response?.data?.message?.includes("inactive"))
+      ) {
+        Swal.fire({
+          icon: "warning",
+          title: "Service Inactive",
+          text: error.response?.data?.message || "Your E-Way Bill wallet service is currently inactive. Please contact SuperAdmin (superadmin@exim.com) to activate your service.",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#2563eb",
+        });
+        return;
+      }
+
+      // ── SaaS Billing: Service Validity Expired Interception ─────────────
+      if (
+        error.response?.status === 403 &&
+        (error.response?.data?.code === "WALLET_EXPIRED" || error.response?.data?.message?.includes("expired"))
+      ) {
+        Swal.fire({
+          icon: "error",
+          title: "Service Validity Expired",
+          text: error.response?.data?.message || "Your E-Way Bill service validity has expired. Please contact your Administrator (superadmin@exim.com) to renew your subscription.",
+          confirmButtonText: "OK",
+          confirmButtonColor: "#2563eb",
         });
         return;
       }
@@ -2524,13 +2878,65 @@ function EwayBillGenerate({
           icon: "error",
           title: "API Validation Error",
           text: firstValidationMessage,
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 5000
+          confirmButtonColor: "#1e40af",
+          confirmButtonText: "OK",
         });
       } else {
-        const rawMsg = error.response?.data?.message || "";
+        // Auto-Recovery Check before showing final error dialog:
+        const checkDocNo = formData.documentNumber || boeNumber;
+        if (checkDocNo) {
+          try {
+            const listRes = await axios.get(
+              `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+            );
+            if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+              const foundEwb = listRes.data.data[0];
+              const recoveredEwbNo = extractEwbNumberClient(foundEwb);
+              if (recoveredEwbNo) {
+                console.log(`⚡ [Auto-Recovery Catch] Found active E-Way Bill in system: ${recoveredEwbNo}`);
+                markBoeDocumentGenerated(checkDocNo);
+
+                if (selectedContainers && selectedContainers.length > 0) {
+                  const successList = selectedContainers.map(c => ({
+                    container: c.container_number || c.container_no,
+                    ewbNo: recoveredEwbNo
+                  })).filter(item => item.container && item.ewbNo);
+                  if (successList.length > 0) {
+                    await saveGeneratedEwayBillsToDb(successList);
+                  }
+                }
+
+                await Swal.fire({
+                  icon: "success",
+                  title: "E-Way Bill Active & Verified!",
+                  html: `
+                    <div style="text-align: left; font-size: 14px; line-height: 1.6; padding: 12px 14px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; margin-top: 10px;">
+                      <div style="margin-bottom: 6px;">
+                        <span style="color: #64748b;">E-Way Bill Number:</span><br/>
+                        <strong style="color: #15803d; font-size: 20px; letter-spacing: 0.5px;">${recoveredEwbNo}</strong>
+                      </div>
+                      <div style="color: #15803d; font-weight: 600; font-size: 12.5px; margin-top: 4px;">✓ Verified from Government Records (No extra credits charged)</div>
+                    </div>
+                  `,
+                  confirmButtonText: "View Container Status →",
+                  confirmButtonColor: "#16a34a",
+                  timer: 3500,
+                  timerProgressBar: true,
+                  allowOutsideClick: false,
+                });
+
+                refreshBalance();
+                if (onSuccess) onSuccess({ ewbNo: recoveredEwbNo, alreadyGenerated: true });
+                if (onClose) onClose();
+                return;
+              }
+            }
+          } catch (recoverErr) {
+            console.warn("Auto-recovery in catch block failed:", recoverErr);
+          }
+        }
+
+        const rawMsg = error.response?.data?.message || error.message || "";
         const errorMsg = parseNicErrorMessage(rawMsg);
         
         const rawMsgString = typeof rawMsg === 'string' ? rawMsg : JSON.stringify(rawMsg);
@@ -2538,12 +2944,10 @@ function EwayBillGenerate({
 
         Swal.fire({
           icon: "error",
-          title: "API Error",
-          text: errorMsg,
-          toast: true,
-          position: "top-end",
-          showConfirmButton: false,
-          timer: 8000
+          title: "E-Way Bill Generation Failed",
+          text: errorMsg || "Failed to generate E-Way Bill",
+          confirmButtonColor: "#1e40af",
+          confirmButtonText: "OK",
         });
       }
     } finally {
@@ -4167,6 +4571,65 @@ function EwayBillGenerate({
                       <input type="date" className="form-input" name="transporterDocDate" value={formData.transporterDocDate} onChange={handleInputChange} disabled={formData.partAOnly} />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Credit Cost & Balance Preview Box */}
+              <div style={{
+                margin: "16px 0 10px 0",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "0.82rem",
+                flexWrap: "wrap",
+                gap: "8px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{ color: "#64748b" }}>Current Balance:</span>
+                  <strong style={{ color: "#1e293b" }}>{balance ?? 0} Credits</strong>
+                  <span style={{ color: "#cbd5e1" }}>|</span>
+                  <span style={{ color: "#64748b" }}>Cost for {containerCount} container{containerCount > 1 ? "s" : ""}:</span>
+                  {isPartnerTier ? (
+                    <strong style={{ color: "#16a34a" }}>
+                      0 Cr (+ {containerCount} Reward)
+                    </strong>
+                  ) : isFreeTrial ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <span style={{ textDecoration: "line-through", color: "#94a3b8", fontWeight: 600 }}>
+                        -{containerCount} Cr (₹{containerCount * 9})
+                      </span>
+                      <strong style={{ color: "#16a34a" }}>
+                        FREE NOW (Trial)
+                      </strong>
+                      {formattedValidDate && (
+                        <span style={{
+                          color: "#047857",
+                          background: "#ecfdf5",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          border: "1px solid #a7f3d0",
+                          fontSize: "0.75rem",
+                          fontWeight: 700
+                        }}>
+                          Validity Remaining: {formattedValidDate}{daysRemaining !== null ? ` (${daysRemaining} days left)` : ""}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <strong style={{ color: "#dc2626" }}>
+                      -{requiredCredits} Cr (₹{requiredCredits * 9})
+                    </strong>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ color: "#64748b" }}>Balance After:</span>
+                  <strong style={{ color: isEffectiveFree ? "#16a34a" : (balanceAfter <= 10 ? "#dc2626" : "#2563eb") }}>
+                    {balanceAfter} Credits
+                  </strong>
                 </div>
               </div>
 

@@ -36,8 +36,8 @@ const paymentRequestSchema = new mongoose.Schema(
     },
     slipFileUrl: {
       type: String,
-      required: [true, "Payment slip file URL is required"],
       trim: true,
+      default: "",
     },
     slipFileKey: {
       type: String,

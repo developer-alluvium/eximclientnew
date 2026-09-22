@@ -49,6 +49,7 @@ import ProjectWorkspace from "./components/open-points/ProjectWorkspace";
 import EwayBillForm from "./components/ewaybill/EwayBillForm";
 import WalletBillingPage from "./pages/WalletBillingPage";
 import AdminWalletControlPage from "./pages/AdminWalletControlPage";
+import AdminWalletManagement from "./pages/AdminWalletManagement";
 import { useActivityTracker } from "./hooks/useActivityTracker";
 
 // Layout wrapper component to conditionally show header
@@ -304,6 +305,22 @@ function App() {
                     />
                     <Route
                       path="/admin/wallet"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <AdminWalletManagement />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/wallet-management"
+                      element={
+                        <ProtectedRoute requiredAuth="user">
+                          <AdminWalletManagement />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/wallet-control"
                       element={
                         <ProtectedRoute requiredAuth="user">
                           <AdminWalletControlPage />

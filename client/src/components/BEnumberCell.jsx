@@ -535,6 +535,74 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
     }
   };
 
+  const refreshContainerStatusAndOpenModal = async (newEwbData) => {
+    setIsPartAEwayBillDialogOpen(false);
+    setPrefetchedEwbList([]);
+
+    try {
+      const res = await axios.get(
+        `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(beNumber)}`
+      );
+
+      const fetchedEwbs = (res.data?.success && Array.isArray(res.data.data)) ? res.data.data : [];
+      setPrefetchedEwbList(fetchedEwbs);
+
+      const origContainers = cell.row.original.container_nos || [];
+      const mapped = origContainers.map((c) => {
+        const cNo = (c.container_no || c.container_number || "").trim().toUpperCase();
+        const matchingEwb = getExistingEwbForContainer(c, fetchedEwbs, beNumber);
+        let ewbNo = matchingEwb ? matchingEwb.ewbNo : null;
+
+        if (!ewbNo) {
+          if (Array.isArray(newEwbData)) {
+            const matchInBatch = newEwbData.find(
+              (r) => (r.container || "").trim().toUpperCase() === cNo
+            );
+            if (matchInBatch && matchInBatch.ewbNo) {
+              ewbNo = matchInBatch.ewbNo;
+            }
+          } else if (newEwbData?.ewbNo) {
+            ewbNo = newEwbData.ewbNo;
+          }
+        }
+
+        return {
+          ...c,
+          ewaybill_no: ewbNo || c.ewaybill_no || null,
+        };
+      });
+
+      setUpdatedContainersList(mapped);
+      setIsContainerEwaybillStatusModalOpen(true);
+    } catch (err) {
+      console.warn("Error refreshing EWB list:", err);
+      const origContainers = cell.row.original.container_nos || [];
+      const fallbackEwbNo = !Array.isArray(newEwbData) ? newEwbData?.ewbNo : null;
+      const mapped = origContainers.map((c) => {
+        const cNo = (c.container_no || c.container_number || "").trim().toUpperCase();
+        let ewbNo = null;
+        if (Array.isArray(newEwbData)) {
+          const matchInBatch = newEwbData.find(
+            (r) => (r.container || "").trim().toUpperCase() === cNo
+          );
+          if (matchInBatch && matchInBatch.ewbNo) ewbNo = matchInBatch.ewbNo;
+        } else if (fallbackEwbNo) {
+          ewbNo = fallbackEwbNo;
+        }
+        return {
+          ...c,
+          ewaybill_no: ewbNo || c.ewaybill_no || null,
+        };
+      });
+      setUpdatedContainersList(mapped);
+      setIsContainerEwaybillStatusModalOpen(true);
+    }
+
+    if (onEwayBillSuccess) {
+      onEwayBillSuccess();
+    }
+  };
+
   const handleContinueToGenerate = () => {
     setIsContainerEwaybillStatusModalOpen(false);
     setIsPartAEwayBillDialogOpen(true);
@@ -850,13 +918,8 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
           setSelectedEwb(list);
           setIsActionModalOpen(true);
         }}
-        onSuccess={async () => {
-          setIsPartAEwayBillDialogOpen(false);
-          setPrefetchedEwbList([]);
-          await handleEwayBillClick();
-          if (onEwayBillSuccess) {
-            onEwayBillSuccess();
-          }
+        onSuccess={async (newEwbData) => {
+          await refreshContainerStatusAndOpenModal(newEwbData);
         }}
       />
 

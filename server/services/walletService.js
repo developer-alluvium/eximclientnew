@@ -31,7 +31,21 @@ export class WalletExpiredError extends Error {
 }
 
 /**
- * Ensures a client wallet exists; creates one with 3 months activation validity if not present.
+ * Custom Error for inactive wallet service
+ */
+export class WalletServiceInactiveError extends Error {
+  constructor(
+    message = "E-Way Bill wallet service is currently inactive for this account. Please contact SuperAdmin (superadmin@exim.com) to activate your service."
+  ) {
+    super(message);
+    this.name = "WalletServiceInactiveError";
+    this.code = "WALLET_SERVICE_INACTIVE";
+    this.status = 403; // Forbidden
+  }
+}
+
+/**
+ * Ensures a client wallet exists; creates one with INACTIVE initial status if not present.
  * @param {string|mongoose.Types.ObjectId} clientId 
  * @param {mongoose.ClientSession|null} session 
  * @returns {Promise<Document>}
@@ -39,20 +53,16 @@ export class WalletExpiredError extends Error {
 export const getOrCreateWallet = async (clientId, session = null) => {
   let wallet = await ClientWallet.findOne({ clientId }).session(session);
   if (!wallet) {
-    // First time client active: provide 3 months (90 days) activation
-    const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     wallet = new ClientWallet({
       clientId,
       availableCredits: 0,
       blockedCredits: 0,
+      walletServiceStatus: "INACTIVE",
+      isFirstTimeActivated: false,
+      firstActivatedAt: null,
       activationDate: new Date(),
-      validUntil,
+      validUntil: null,
     });
-    await wallet.save({ session });
-  } else if (!wallet.validUntil) {
-    // Backfill 3 months validity if not present
-    wallet.validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-    wallet.activationDate = wallet.activationDate || new Date();
     await wallet.save({ session });
   }
   return wallet;
@@ -60,22 +70,31 @@ export const getOrCreateWallet = async (clientId, session = null) => {
 
 /**
  * Check if the client has enough effective balance and atomically block the credits.
- * Also verifies that the client's service validity has not expired.
+ * Also verifies that the client's wallet service is ACTIVE and has not expired.
  * Equivalent to SELECT ... FOR UPDATE pattern using atomic findOneAndUpdate.
  * 
  * Condition:
- * (availableCredits - blockedCredits) >= amount && validUntil >= now
+ * walletServiceStatus === 'ACTIVE' && (availableCredits - blockedCredits) >= amount && validUntil >= now
  * 
  * @param {string|mongoose.Types.ObjectId} clientId - The tenant/account identifier
  * @param {number} amount - Number of credits to block
  * @param {string} refId - Reference identifier (e.g. BOE Number, Document No)
  * @param {mongoose.ClientSession|null} session - Optional active session
  * @returns {Promise<Document>} The updated ClientWallet document
- * @throws {WalletExpiredError|InsufficientCreditsError}
+ * @throws {WalletServiceInactiveError|WalletExpiredError|InsufficientCreditsError}
  */
 export const checkAndBlockCredits = async (clientId, amount, refId, session = null) => {
   // Ensure wallet exists and check account validity date
   const currentWallet = await getOrCreateWallet(clientId, session);
+
+  // 1. Verify that E-Way Bill Wallet Service is ACTIVE
+  if (currentWallet.walletServiceStatus === "INACTIVE") {
+    throw new WalletServiceInactiveError(
+      "E-Way Bill wallet service is currently inactive for this account. Please contact SuperAdmin (superadmin@exim.com) to activate your service."
+    );
+  }
+
+  // 2. Verify validity date
   if (currentWallet.validUntil && new Date() > new Date(currentWallet.validUntil)) {
     const expStr = new Date(currentWallet.validUntil).toLocaleDateString("en-IN", {
       day: "numeric",
@@ -83,7 +102,7 @@ export const checkAndBlockCredits = async (clientId, amount, refId, session = nu
       year: "numeric",
     });
     throw new WalletExpiredError(
-      `Your E-Way Bill service validity expired on ${expStr}. Please recharge / top up your account or contact support to renew your subscription.`,
+      `Your E-Way Bill service validity expired on ${expStr}. Please contact SuperAdmin (superadmin@exim.com) to renew your subscription.`,
       currentWallet.validUntil
     );
   }
@@ -470,12 +489,55 @@ export const getPricingRule = async (client, context = {}) => {
       (typeof formData.jobNumber === "string" && formData.jobNumber.startsWith("AMD/"))
     );
 
+    // Check if client is in 3 Months Free Trial
+    let isFreeTrial = false;
+    let clientWallet = null;
+    const clientId = (
+      client?.adminId?._id ||
+      client?.adminId ||
+      client?._id ||
+      client?.id
+    )?.toString();
+
+    if (clientId) {
+      try {
+        clientWallet = await ClientWallet.findOne({ clientId }).lean();
+        if (
+          clientWallet &&
+          clientWallet.walletServiceStatus === "ACTIVE" &&
+          clientWallet.isFirstTimeActivated &&
+          clientWallet.validUntil &&
+          new Date() <= new Date(clientWallet.validUntil)
+        ) {
+          isFreeTrial = true;
+        }
+      } catch (wErr) {
+        console.warn("Could not check wallet for free trial:", wErr.message);
+      }
+    }
+
     if (isSfplClient && isSrccTransporter) {
       return {
         debit: 0,
         reward: 1,
         tier: "SFPL_SRCC_PARTNER",
+        isFreeTrial,
         reason: "SFPL + SRCC Partner Incentive (0 Debit, +1 Reward Credit)",
+      };
+    }
+
+    // 3 Months Free Trial SaaS Tier (0 Credits debited)
+    if (isFreeTrial) {
+      return {
+        debit: 0,
+        reward: 0,
+        tier: "FREE_TRIAL",
+        isFreeTrial: true,
+        validUntil: clientWallet?.validUntil,
+        daysRemaining: clientWallet?.validUntil
+          ? Math.max(0, Math.ceil((new Date(clientWallet.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : null,
+        reason: "3 Months Free Trial Active (0 Credits / Free Now)",
       };
     }
 
@@ -484,6 +546,7 @@ export const getPricingRule = async (client, context = {}) => {
       debit: 1,
       reward: 0,
       tier: "STANDARD_COMMERCIAL",
+      isFreeTrial: false,
       reason: "Standard Tier (1 Credit per E-Way Bill)",
     };
   } catch (err) {
@@ -492,7 +555,249 @@ export const getPricingRule = async (client, context = {}) => {
       debit: 1,
       reward: 0,
       tier: "STANDARD_COMMERCIAL",
+      isFreeTrial: false,
       reason: "Standard Fallback Tier (1 Credit)",
     };
   }
 };
+
+/**
+ * Universal extractor for 12-digit Indian E-Way Bill numbers.
+ * Handles all government NIC / Masters India / Transport server response formats.
+ * 
+ * Supports:
+ * - Direct fields: ewbNo, ewayBillNo, ewbNumber, ewayBillNumber, generatedEwbNo, eway_bill_no, ewb_no
+ * - Nested objects: responseData, data.responseData, result, results[0], itemList[0]
+ * - Message / error parsing: "already generated: 371010885063", "already exists (371010885063)"
+ * 
+ * @param {any} obj - Response object, array, or string from downstream
+ * @returns {string|null} - The extracted 12-digit E-Way Bill number or null
+ */
+export const extractEwbNumber = (obj) => {
+  if (!obj) return null;
+
+  const candidateKeys = [
+    "ewbNo",
+    "ewayBillNo",
+    "ewbNumber",
+    "ewayBillNumber",
+    "generatedEwbNo",
+    "eway_bill_no",
+    "ewb_no",
+  ];
+
+  // 1. Breadth-first traversal of nested JSON structures
+  const queue = [obj];
+  const visited = new Set();
+
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (!curr || typeof curr !== "object" || visited.has(curr)) continue;
+    visited.add(curr);
+
+    for (const key of candidateKeys) {
+      const val = curr[key];
+      if (val !== undefined && val !== null) {
+        const cleaned = String(val).trim();
+        if (/^\d{12}$/.test(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+
+    // Traverse sub-properties
+    const subKeys = [
+      "data",
+      "responseData",
+      "response_data",
+      "result",
+      "results",
+      "itemList",
+      "item_list",
+      "response",
+      "payload",
+    ];
+    for (const sk of subKeys) {
+      if (curr[sk] && typeof curr[sk] === "object") {
+        queue.push(curr[sk]);
+      }
+    }
+
+    // Traverse arrays
+    if (Array.isArray(curr)) {
+      for (const item of curr) {
+        if (item && typeof item === "object") queue.push(item);
+      }
+    }
+  }
+
+  // 2. String/Regex extraction on message, error, alert, or status descriptions
+  const stringCandidates = [
+    obj?.message,
+    obj?.error,
+    obj?.alert,
+    obj?.status_desc,
+    obj?.statusDesc,
+    obj?.data?.message,
+    obj?.data?.error,
+    obj?.errors,
+  ];
+
+  for (const candidate of stringCandidates) {
+    if (!candidate) continue;
+    const text = typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    const match = text.match(/\b\d{12}\b/);
+    if (match) {
+      return match[0];
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Toggle E-Way Bill Wallet Service Status (ACTIVE / INACTIVE).
+ * ERP Business Rules:
+ * - First-time activation grants 3 months (90 days) of free service validity.
+ * - Records an immutable audit log entry in serviceStatusHistory.
+ * 
+ * @param {string|mongoose.Types.ObjectId} clientId 
+ * @param {"ACTIVE"|"INACTIVE"} newStatus 
+ * @param {string|Object} [adminInfo='SuperAdmin'] 
+ * @param {string} [remarks=''] 
+ * @returns {Promise<{ wallet: Document, isFirstActivation: boolean }>}
+ */
+export const toggleWalletServiceStatus = async (
+  clientId,
+  newStatus,
+  adminInfo = "SuperAdmin",
+  remarks = ""
+) => {
+  const normalizedStatus = String(newStatus).toUpperCase();
+  if (!["ACTIVE", "INACTIVE"].includes(normalizedStatus)) {
+    throw new Error("Invalid wallet service status. Must be 'ACTIVE' or 'INACTIVE'.");
+  }
+
+  const wallet = await getOrCreateWallet(clientId);
+  const previousStatus = wallet.walletServiceStatus || "INACTIVE";
+  let isFirstActivation = false;
+  let computedRemarks = remarks;
+
+  if (normalizedStatus === "ACTIVE") {
+    // 1. First-Time Activation check
+    if (!wallet.isFirstTimeActivated) {
+      isFirstActivation = true;
+      wallet.isFirstTimeActivated = true;
+      wallet.firstActivatedAt = new Date();
+      // First-time active: Grant 3 months (90 days) free service
+      wallet.validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      if (!computedRemarks) {
+        computedRemarks = "First-time service activation: 3 months free trial service activated.";
+      }
+    } else {
+      // 2. Reactivation: If currently expired or validity missing, refresh 3 months validity
+      if (!wallet.validUntil || new Date() > new Date(wallet.validUntil)) {
+        wallet.validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      }
+      if (!computedRemarks) {
+        computedRemarks = "Service reactivated by SuperAdmin.";
+      }
+    }
+  } else {
+    // Deactivation
+    if (!computedRemarks) {
+      computedRemarks = "Service deactivated by SuperAdmin.";
+    }
+  }
+
+  wallet.walletServiceStatus = normalizedStatus;
+
+  // Extract admin name/email for ERP audit trail
+  const changedByStr =
+    typeof adminInfo === "object" && adminInfo !== null
+      ? adminInfo.email || adminInfo.name || adminInfo.id || "SuperAdmin"
+      : String(adminInfo || "SuperAdmin");
+
+  if (!wallet.serviceStatusHistory) {
+    wallet.serviceStatusHistory = [];
+  }
+
+  wallet.serviceStatusHistory.push({
+    status: normalizedStatus,
+    previousStatus,
+    changedBy: changedByStr,
+    changedAt: new Date(),
+    remarks: computedRemarks,
+    validUntil: wallet.validUntil,
+    isFirstActivation,
+  });
+
+  await wallet.save();
+  return { wallet, isFirstActivation };
+};
+
+/**
+ * Update Partner Pricing Tier (SFPL + SRCC) and record ERP audit history.
+ * Partner Tier is separate from Service Status and determines 0 debit / +1 reward incentive.
+ * 
+ * @param {string|mongoose.Types.ObjectId} clientId 
+ * @param {boolean} isSfplClient 
+ * @param {string|Object} [adminInfo='SuperAdmin'] 
+ * @param {string} [remarks=''] 
+ * @returns {Promise<{ client: Document, wallet: Document }>}
+ */
+export const updatePartnerTier = async (
+  clientId,
+  isSfplClient,
+  adminInfo = "SuperAdmin",
+  remarks = ""
+) => {
+  const isPartner = Boolean(isSfplClient);
+  const wallet = await getOrCreateWallet(clientId);
+
+  const EximclientUser = mongoose.model("EximclientUser");
+  const client = await EximclientUser.findById(clientId);
+  const previousState = Boolean(client?.isSfplClient);
+
+  if (client) {
+    client.isSfplClient = isPartner;
+    await client.save();
+  }
+
+  // Also sync with Customer / Admin models if present
+  try {
+    const CustomerModel = mongoose.models.Customer || mongoose.model("Customer");
+    await CustomerModel.findByIdAndUpdate(clientId, { $set: { isSfplClient: isPartner } });
+  } catch (_) {}
+  try {
+    const AdminModel = mongoose.models.Admin || mongoose.model("Admin");
+    await AdminModel.findByIdAndUpdate(clientId, { $set: { isSfplClient: isPartner } });
+  } catch (_) {}
+
+  const changedByStr =
+    typeof adminInfo === "object" && adminInfo !== null
+      ? adminInfo.email || adminInfo.name || adminInfo.id || "SuperAdmin"
+      : String(adminInfo || "SuperAdmin");
+
+  const computedRemarks =
+    remarks ||
+    (isPartner
+      ? "SFPL+SRCC Partner tier enabled by SuperAdmin"
+      : "Standard commercial tier enabled by SuperAdmin");
+
+  if (!wallet.partnerTierHistory) {
+    wallet.partnerTierHistory = [];
+  }
+
+  wallet.partnerTierHistory.push({
+    isSfplClient: isPartner,
+    previousState,
+    changedBy: changedByStr,
+    changedAt: new Date(),
+    remarks: computedRemarks,
+  });
+
+  await wallet.save();
+  return { client, wallet };
+};
+
