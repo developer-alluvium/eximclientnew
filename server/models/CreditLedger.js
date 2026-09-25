@@ -25,6 +25,8 @@ const creditLedgerSchema = new mongoose.Schema(
           "ADMIN_ADJUSTMENT", // Manual adjustment by SuperAdmin
           "REVERSAL",         // Transaction reversed / refunded
           "EWAYBILL_TRIAL_FREE", // E-Way Bill generated during 3 Months Free Trial (0 Credits)
+          "OFFER_ACTIVATION", // Promotional offer / 3 Months Free Trial activation
+          "SERVICE_ACTIVATION", // Service activated / reactivated by SuperAdmin
         ],
         message: "{VALUE} is not a valid transaction type",
       },
@@ -42,7 +44,7 @@ const creditLedgerSchema = new mongoose.Schema(
     },
     referenceModel: {
       type: String,
-      enum: ["PaymentRequest", "OtherEwayBill", "Job", "AdminAdjustment", null],
+      enum: ["PaymentRequest", "OtherEwayBill", "EwayBill", "Job", "AdminAdjustment", "ServiceStatus", null],
       default: null,
     },
     referenceId: {

@@ -2115,6 +2115,11 @@ function EwayBillGenerate({
           allowOutsideClick: false,
         });
 
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {
+          // ignore
+        }
         if (onSuccess) {
           onSuccess(results);
         }
@@ -2739,6 +2744,11 @@ function EwayBillGenerate({
         });
 
         refreshBalance();
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {
+          // ignore
+        }
         if (onSuccess) {
           onSuccess(response.data.data || { ewbNo: generatedEwbNo, alreadyGenerated: isAlreadyGen });
         }

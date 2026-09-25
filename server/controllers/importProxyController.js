@@ -2,6 +2,7 @@ import axios from "axios";
 import mongoose from "mongoose";
 import EximclientUser from "../models/eximclientUserModel.js";
 import JobModel from "../models/jobModel.js";
+import { recordCreditHistory } from "../services/ewayBillCreditHistoryService.js";
 
 const IMPORT_API_BASE_URL = process.env.IMPORT_API_BASE_URL || "http://localhost:9006/api";
 
@@ -1295,6 +1296,65 @@ export const updateContainerEwayBill = async (req, res) => {
     }
 
     const updatedJob = await JobModel.findByIdAndUpdate(job._id, { $set: setQuery }, { new: true });
+
+    // Fallback: ensure each container E-Way Bill is in EwayBillCreditHistory.
+    // The /generate route already records history when EWB is generated.
+    // This is a deduplication-safe fallback for cases where /generate didn't run
+    // (e.g. admin-triggered updates or direct DB saves without going through billing gateway).
+    try {
+      const clientId = (
+        req.user?.adminId?._id ||
+        req.user?.adminId ||
+        req.user?._id
+      )?.toString();
+
+      const EwayBillCreditHistory = mongoose.models.EwayBillCreditHistory ||
+        mongoose.model("EwayBillCreditHistory", new mongoose.Schema({}, { strict: false }), "ewaybillcredithistory");
+
+      if (clientId && updates && updates.length > 0) {
+        for (const u of updates) {
+          const cNo = (u.container_no || "").trim().toUpperCase();
+          const ewbNo = (u.ewaybill_no || "").trim();
+          if (!cNo || !ewbNo) continue;
+
+          // ── Idempotency: skip if history already exists from /generate route ──
+          const alreadyExists = await EwayBillCreditHistory.findOne({
+            $or: [
+              { ewayBillNo: ewbNo, clientId: clientId },
+              { ewayBillNo: ewbNo, containerNo: cNo },
+            ],
+          }).lean();
+
+          if (alreadyExists) {
+            console.log(`📋 [updateContainerEwayBill] History already recorded for EWB ${ewbNo} / Container ${cNo} — skipping duplicate.`);
+            continue;
+          }
+
+          // Fallback write: use be_no (correct field for import jobs), not boe_no
+          const boeNoForJob = job.be_no || job.boe_no || job.be_number || "";
+
+          await recordCreditHistory({
+            clientId,
+            transactionType: "EWAYBILL_TRIAL_FREE",
+            credits: 0,
+            balanceAfter: 0,
+            referenceModel: "Job",
+            referenceId: `${job.job_no || job._id} / ${cNo}`,
+            boeNo: boeNoForJob,
+            containerNo: cNo,
+            ewayBillNo: ewbNo,
+            mode: "CONTAINER",
+            isFreeTrial: true,
+            moneySaved: 9,
+            remarks: `🎁 3 Months Free Trial: Container E-Way Bill Generated (Cont: ${cNo}, EWB: ${ewbNo}, Job: ${job.job_no || job._id}) - Saved ₹9`,
+            performedBy: req.user?.email || "System",
+          });
+          console.log(`📜 [updateContainerEwayBill] Fallback history created for Container ${cNo}, EWB ${ewbNo}`);
+        }
+      }
+    } catch (histErr) {
+      console.warn("Could not log container history in updateContainerEwayBill:", histErr.message);
+    }
 
     res.json({ success: true, message: "Container E-Way Bill(s) updated successfully", data: updatedJob });
   } catch (error) {

@@ -307,6 +307,10 @@ function OthersEwayBillTab() {
         ewayBillData: results,
       });
 
+      try {
+        window.dispatchEvent(new Event("wallet:refresh"));
+      } catch (e) {}
+
       fetchList();
       handleCloseGenerate();
     } catch (err) {

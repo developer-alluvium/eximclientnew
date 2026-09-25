@@ -37,6 +37,7 @@ const MainLayout = ({ children }) => {
     removeCookie("exim_user");
     removeCookie("access_token");
     removeCookie("refresh_token");
+    window.dispatchEvent(new Event("exim:logout"));
     navigate("/login");
   };
 

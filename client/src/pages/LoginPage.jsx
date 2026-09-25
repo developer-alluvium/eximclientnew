@@ -99,6 +99,8 @@ function LoginPage() {
           setCookie("refresh_token", refreshToken, 7);
 
           setUser(userData);
+          window.dispatchEvent(new Event("exim:login"));
+          window.dispatchEvent(new Event("wallet:refresh"));
           navigate("/", { replace: true });
         }
       }

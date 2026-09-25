@@ -54,6 +54,7 @@ function WalletBillingPage() {
     blockedCredits,
     walletServiceStatus,
     isFirstTimeActivated,
+    isFreeTrial,
     daysRemaining,
     pricingTier,
     refreshBalance,
@@ -64,7 +65,10 @@ function WalletBillingPage() {
     totalDebited: 0,
     totalRewarded: 0,
     totalFreeTrialEwbs: 0,
+    totalMoneySaved: 0,
   });
+  const [totalMoneySaved, setTotalMoneySaved] = useState(0);
+  const [totalFreeTrialEwbs, setTotalFreeTrialEwbs] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,6 +88,12 @@ function WalletBillingPage() {
       );
       if (res.data?.success && res.data?.data) {
         setStats(res.data.data);
+        if (res.data.data.totalMoneySaved !== undefined) {
+          setTotalMoneySaved(res.data.data.totalMoneySaved);
+        }
+        if (res.data.data.totalFreeTrialEwbs !== undefined) {
+          setTotalFreeTrialEwbs(res.data.data.totalFreeTrialEwbs);
+        }
       }
     } catch (err) {
       console.warn("Could not fetch wallet stats:", err.message);
@@ -112,6 +122,12 @@ function WalletBillingPage() {
           setTotalPages(res.data.data.pagination.pages || 1);
           setTotalCount(res.data.data.pagination.total || 0);
         }
+        if (res.data.data.totalMoneySaved !== undefined) {
+          setTotalMoneySaved(res.data.data.totalMoneySaved);
+        }
+        if (res.data.data.totalFreeTrialEwbs !== undefined) {
+          setTotalFreeTrialEwbs(res.data.data.totalFreeTrialEwbs);
+        }
       }
     } catch (err) {
       console.error("Failed to load credit ledger:", err);
@@ -122,12 +138,21 @@ function WalletBillingPage() {
 
   // Initial Load
   useEffect(() => {
+    refreshBalance();
     fetchStats();
-  }, [fetchStats]);
-
-  useEffect(() => {
     fetchLedger();
-  }, [fetchLedger]);
+  }, [refreshBalance, fetchStats, fetchLedger]);
+
+  // Auto-refresh ledger when an E-Way Bill is generated elsewhere on the page
+  // The wallet:refresh event is dispatched after every successful EWB generation.
+  useEffect(() => {
+    const handleWalletRefresh = () => {
+      fetchStats();
+      fetchLedger();
+    };
+    window.addEventListener("wallet:refresh", handleWalletRefresh);
+    return () => window.removeEventListener("wallet:refresh", handleWalletRefresh);
+  }, [fetchStats, fetchLedger]);
 
   const handleRefreshAll = async () => {
     setRefreshing(true);
@@ -144,20 +169,28 @@ function WalletBillingPage() {
       "Time",
       "Transaction Type",
       "Credits",
+      "Money Saved (INR)",
       "Balance After",
+      "BOE Number",
+      "Container Number",
+      "E-Way Bill Number",
       "Reference",
       "Remarks",
     ];
 
     const rows = transactions.map((t) => {
       const d = new Date(t.createdAt);
-      const isTrial = t.transactionType === "EWAYBILL_TRIAL_FREE";
+      const isTrial = t.transactionType === "EWAYBILL_TRIAL_FREE" || t.isFreeTrial;
       return [
         d.toLocaleDateString("en-IN"),
         d.toLocaleTimeString("en-IN"),
-        isTrial ? "3 Months Free Trial (Free)" : t.transactionType,
-        isTrial ? "0 Cr (Free)" : t.credits,
+        isTrial ? "3 Months Free Trial" : t.transactionType,
+        isTrial ? "0" : t.credits,
+        t.moneySaved || (isTrial ? 9 : 0),
         t.balanceAfter,
+        t.boeNo || "",
+        t.containerNo || "",
+        t.ewayBillNo || "",
         t.referenceId || "N/A",
         `"${(t.remarks || "").replace(/"/g, '""')}"`,
       ];
@@ -181,10 +214,22 @@ function WalletBillingPage() {
 
   const effectiveCredits = balance !== undefined && balance !== null ? balance : availableCredits || 0;
   const isServiceInactive = walletServiceStatus === "INACTIVE";
-  const isCritical = effectiveCredits <= 10;
-  const isWarning = effectiveCredits > 10 && effectiveCredits <= 20;
-  const isLowBalance = isCritical || isWarning;
+
+  const isFreeTrialOffer = Boolean(
+    !isServiceInactive &&
+    (isFreeTrial ||
+      (isFirstTimeActivated &&
+       daysRemaining !== null &&
+       daysRemaining !== undefined &&
+       daysRemaining > 0))
+  );
+
   const isPartnerTier = pricingTier === "SFPL_SRCC_PARTNER";
+  const isUnlimitedOrFree = isFreeTrialOffer || isPartnerTier;
+
+  const isCritical = !isUnlimitedOrFree && effectiveCredits <= 10;
+  const isWarning = !isUnlimitedOrFree && effectiveCredits > 10 && effectiveCredits <= 20;
+  const isLowBalance = !isUnlimitedOrFree && (isCritical || isWarning);
 
   return (
     <Container maxWidth="xl" sx={{ py: 3, px: { xs: 1.5, sm: 3 } }}>
@@ -224,23 +269,25 @@ function WalletBillingPage() {
             />
 
             {/* 3 Months Free Benefit Chip */}
-            {isFirstTimeActivated && daysRemaining > 0 && (
+            {isFreeTrialOffer && (
               <Chip
-                label={`🎁 3 Months Free (${daysRemaining}d left)`}
-                color="info"
+                label={`🎁 3 Months Free Trial (${daysRemaining || 90}d left)`}
+                color="success"
                 size="small"
-                variant="outlined"
-                sx={{ fontWeight: 800, fontSize: "0.75rem", borderColor: "#0284c7", color: "#0369a1" }}
+                variant="filled"
+                sx={{ fontWeight: 800, fontSize: "0.75rem", bgcolor: "#16a34a", color: "#ffffff" }}
               />
             )}
 
             {/* Credit Balance Threshold Chip */}
-            <Chip
-              label={isCritical ? "Critical Balance" : isWarning ? "Warning Balance" : "Healthy Balance"}
-              color={isCritical ? "error" : isWarning ? "warning" : "success"}
-              size="small"
-              sx={{ fontWeight: 800, fontSize: "0.75rem" }}
-            />
+            {!isFreeTrialOffer && (
+              <Chip
+                label={isCritical ? "Critical Balance" : isWarning ? "Warning Balance" : "Healthy Balance"}
+                color={isCritical ? "error" : isWarning ? "warning" : "success"}
+                size="small"
+                sx={{ fontWeight: 800, fontSize: "0.75rem" }}
+              />
+            )}
           </Box>
           <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5, ml: { sm: 5.5 } }}>
             Real-time balance tracking, commercial consumption metrics, and complete ledger transaction statement.
@@ -550,6 +597,83 @@ function WalletBillingPage() {
         </Grid>
       </Grid>
 
+      {/* 3 Months Free Trial Total Savings Card / Banner */}
+      {(isFreeTrial || totalMoneySaved > 0 || totalFreeTrialEwbs > 0) && (
+        <Card
+          elevation={0}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            border: "1px solid #bbf7d0",
+            background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
+            p: 2.5,
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 2.5,
+                  bgcolor: "#dcfce7",
+                  color: "#16a34a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 28,
+                  boxShadow: "0 2px 8px rgba(22, 163, 74, 0.15)",
+                }}
+              >
+                🎁
+              </Box>
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: "#166534" }}>
+                    Introductory Offer: 3 Months Free Trial Active
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={`${daysRemaining !== null ? daysRemaining : 90} days left`}
+                    color="success"
+                    sx={{ fontWeight: 800, fontSize: "0.72rem", height: 22 }}
+                  />
+                </Box>
+                <Typography variant="body2" sx={{ color: "#15803d", mt: 0.3, fontWeight: 500 }}>
+                  You have generated <strong>{totalFreeTrialEwbs} container / full E-Way Bill(s)</strong> at ₹0 charge. Standard charges: 1 Credit = ₹9 per bill.
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                bgcolor: "#ffffff",
+                px: 3,
+                py: 1.5,
+                borderRadius: 2.5,
+                border: "1px solid #86efac",
+                textAlign: "right",
+              }}
+            >
+              <Typography variant="caption" sx={{ color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
+                Total Money Saved via Free Service
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: "#15803d" }}>
+                ₹{totalMoneySaved || (totalFreeTrialEwbs * CREDIT_RATE)}
+              </Typography>
+            </Box>
+          </Box>
+        </Card>
+      )}
+
       {/* Admin Recharge Notice & Support Card */}
       <Paper
         elevation={0}
@@ -688,9 +812,12 @@ function WalletBillingPage() {
               >
                 <MenuItem value="ALL">All Transactions</MenuItem>
                 <MenuItem value="EWAYBILL_TRIAL_FREE">🎁 3 Months Free Trial (0 Cr)</MenuItem>
-                <MenuItem value="EWAYBILL_DEBIT">Debits (E-Way Bills)</MenuItem>
+                <MenuItem value="CONTAINER_EWAYBILL">Container E-Way Bills</MenuItem>
+                <MenuItem value="FULL_EWAYBILL">Full E-Way Bills</MenuItem>
+                <MenuItem value="EWAYBILL_DEBIT">Debits (Paid Credits)</MenuItem>
                 <MenuItem value="ADMIN_ADJUSTMENT">Admin Credit Grants</MenuItem>
-                <MenuItem value="PAYMENT_CREDIT">Payment Credits</MenuItem>
+                <MenuItem value="PAYMENT_CREDIT">Top-Up Deposits</MenuItem>
+                <MenuItem value="OFFER_ACTIVATION">Offer Activation</MenuItem>
                 <MenuItem value="EWAYBILL_REWARD">Partner Rewards</MenuItem>
               </Select>
             </FormControl>
@@ -785,7 +912,7 @@ function WalletBillingPage() {
                   const dateObj = new Date(t.createdAt);
                   const isDebit = t.transactionType === "EWAYBILL_DEBIT";
                   const isReward = t.transactionType === "EWAYBILL_REWARD";
-                  const isTrialFree = t.transactionType === "EWAYBILL_TRIAL_FREE";
+                  const isTrialFree = t.transactionType === "EWAYBILL_TRIAL_FREE" || t.isFreeTrial;
 
                   return (
                     <TableRow
@@ -818,12 +945,51 @@ function WalletBillingPage() {
                       {/* Type Badge */}
                       <TableCell sx={{ py: 1.5 }}>
                         {isTrialFree ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-start" }}>
+                            <Chip
+                              size="small"
+                              label="🎁 3 Months Free Trial"
+                              variant="filled"
+                              sx={{ fontWeight: 800, fontSize: "0.72rem", bgcolor: "#0284c7", color: "#fff" }}
+                            />
+                            {t.containerNo && (
+                              <Chip
+                                size="small"
+                                label={`Cont: ${t.containerNo}`}
+                                variant="outlined"
+                                sx={{ fontWeight: 700, fontSize: "0.68rem", height: 20, borderColor: "#38bdf8", color: "#0369a1" }}
+                              />
+                            )}
+                          </Box>
+                        ) : t.transactionType === "CONTAINER_EWAYBILL" ? (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-start" }}>
+                            <Chip
+                              size="small"
+                              label="Container E-Way Bill"
+                              color="primary"
+                              variant="filled"
+                              sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "#2563eb", color: "#fff" }}
+                            />
+                            {t.containerNo && (
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e40af", fontSize: "0.7rem" }}>
+                                {t.containerNo}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : t.transactionType === "FULL_EWAYBILL" ? (
                           <Chip
                             size="small"
-                            label="3 Months Free Trial"
-                            color="info"
+                            label="Full E-Way Bill"
                             variant="filled"
-                            sx={{ fontWeight: 800, fontSize: "0.72rem", bgcolor: "#0284c7", color: "#fff" }}
+                            sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "#7c3aed", color: "#fff" }}
+                          />
+                        ) : t.transactionType === "OFFER_ACTIVATION" ? (
+                          <Chip
+                            size="small"
+                            label="🎁 Offer Activated"
+                            color="success"
+                            variant="filled"
+                            sx={{ fontWeight: 800, fontSize: "0.72rem", bgcolor: "#16a34a", color: "#fff" }}
                           />
                         ) : isDebit ? (
                           <Chip
@@ -844,7 +1010,7 @@ function WalletBillingPage() {
                         ) : (
                           <Chip
                             size="small"
-                            label={t.transactionType === "ADMIN_ADJUSTMENT" ? "Admin Grant" : "Top-Up Deposit"}
+                            label={t.transactionType === "ADMIN_ADJUSTMENT" ? "Admin Grant" : t.transactionType === "SERVICE_ACTIVATION" ? "Service Status" : "Top-Up Deposit"}
                             color="primary"
                             variant="outlined"
                             sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "#eff6ff" }}
@@ -864,6 +1030,22 @@ function WalletBillingPage() {
                         >
                           {isTrialFree ? "0 Cr (Free)" : t.credits > 0 ? `+${t.credits}` : t.credits}
                         </Typography>
+                        {(isTrialFree || t.moneySaved > 0) && (
+                          <Box sx={{ mt: 0.3 }}>
+                            <Chip
+                              size="small"
+                              label={`Saved ₹${t.moneySaved || 9}`}
+                              sx={{
+                                height: 18,
+                                fontSize: "0.68rem",
+                                fontWeight: 800,
+                                bgcolor: "#dcfce7",
+                                color: "#15803d",
+                                border: "1px solid #86efac",
+                              }}
+                            />
+                          </Box>
+                        )}
                       </TableCell>
 
                       {/* Balance After */}
@@ -875,26 +1057,63 @@ function WalletBillingPage() {
 
                       {/* Reference / BOE No. */}
                       <TableCell sx={{ py: 1.5 }}>
-                        {t.referenceId ? (
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: 600,
-                              fontFamily: "monospace",
-                              color: "#2563eb",
-                              fontSize: "0.8rem",
-                            }}
-                          >
-                            {typeof t.referenceId === "object"
-                              ? JSON.stringify(t.referenceId)
-                              : t.referenceId}
-                          </Typography>
+                        {t.boeNo && t.containerNo ? (
+                          <Box>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 700,
+                                fontFamily: "monospace",
+                                color: "#1e293b",
+                                fontSize: "0.82rem",
+                              }}
+                            >
+                              BOE: {t.boeNo}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 700,
+                                color: "#2563eb",
+                                display: "block",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              Cont: {t.containerNo}
+                            </Typography>
+                            {t.ewayBillNo && (
+                              <Typography variant="caption" sx={{ color: "#059669", fontWeight: 700, display: "block" }}>
+                                EWB: {t.ewayBillNo}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : t.referenceId ? (
+                          <Box>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                fontFamily: "monospace",
+                                color: "#2563eb",
+                                fontSize: "0.8rem",
+                              }}
+                            >
+                              {typeof t.referenceId === "object"
+                                ? JSON.stringify(t.referenceId)
+                                : t.referenceId}
+                            </Typography>
+                            {t.ewayBillNo && (
+                              <Typography variant="caption" sx={{ color: "#059669", fontWeight: 700, display: "block" }}>
+                                EWB: {t.ewayBillNo}
+                              </Typography>
+                            )}
+                          </Box>
                         ) : (
                           <Typography variant="caption" sx={{ color: "#94a3b8" }}>
                             -
                           </Typography>
                         )}
-                        {t.referenceModel && (
+                        {t.referenceModel && !t.containerNo && (
                           <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
                             {t.referenceModel}
                           </Typography>

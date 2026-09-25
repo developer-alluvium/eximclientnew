@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import ClientWallet from "../models/ClientWallet.js";
 import CreditLedger from "../models/CreditLedger.js";
 import PaymentRequest from "../models/PaymentRequest.js";
+import { recordCreditHistory } from "./ewayBillCreditHistoryService.js";
 
 /**
  * Custom Error for insufficient credit balances
@@ -111,10 +112,17 @@ export const checkAndBlockCredits = async (clientId, amount, refId, session = nu
     return currentWallet;
   }
 
+  const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
+    ? new mongoose.Types.ObjectId(clientId)
+    : null;
+  const clientFilter = clientObjectId
+    ? { $in: [clientObjectId, String(clientId)] }
+    : String(clientId);
+
   // Atomically test and increment blockedCredits only if effective balance is sufficient
   const wallet = await ClientWallet.findOneAndUpdate(
     {
-      clientId,
+      clientId: clientFilter,
       $expr: {
         $gte: [{ $subtract: ["$availableCredits", "$blockedCredits"] }, amount],
       },
@@ -127,7 +135,7 @@ export const checkAndBlockCredits = async (clientId, amount, refId, session = nu
 
   if (!wallet) {
     // Fetch current wallet state to provide accurate diagnostic details in the error
-    const current = await ClientWallet.findOne({ clientId }).session(session);
+    const current = await ClientWallet.findOne({ clientId: clientFilter }).session(session);
     const available = current ? current.getEffectiveBalance() : 0;
     throw new InsufficientCreditsError(
       `Insufficient credits. You need ${amount} credit(s) to generate this E-Way Bill, but only ${available} credit(s) are available. Please top up your wallet.`,
@@ -157,9 +165,17 @@ export const finalizeDebit = async (clientId, amount, refId, remarks = "E-Way Bi
     return { wallet, ledger: null };
   }
 
-  const wallet = await ClientWallet.findOneAndUpdate(
+  const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
+    ? new mongoose.Types.ObjectId(clientId)
+    : null;
+  const clientFilter = clientObjectId
+    ? { $in: [clientObjectId, String(clientId)] }
+    : String(clientId);
+
+  // Find and update with fallback to availableCredits deduction if blocked was 0
+  let wallet = await ClientWallet.findOneAndUpdate(
     {
-      clientId,
+      clientId: clientFilter,
       blockedCredits: { $gte: amount },
       availableCredits: { $gte: amount },
     },
@@ -173,19 +189,33 @@ export const finalizeDebit = async (clientId, amount, refId, remarks = "E-Way Bi
   );
 
   if (!wallet) {
+    // Fallback: in case blocked credits were already 0 or bypassed, deduct availableCredits directly
+    wallet = await ClientWallet.findOneAndUpdate(
+      {
+        clientId: clientFilter,
+        availableCredits: { $gte: amount },
+      },
+      {
+        $inc: { availableCredits: -amount },
+      },
+      { new: true, session }
+    );
+  }
+
+  if (!wallet) {
     throw new Error(
-      `Failed to finalize debit for client ${clientId}. Inconsistent blocked credits state.`
+      `Failed to finalize debit for client ${clientId}. Inconsistent credit balance state.`
     );
   }
 
   const [ledger] = await CreditLedger.create(
     [
       {
-        clientId,
+        clientId: wallet.clientId,
         transactionType: "EWAYBILL_DEBIT",
         credits: -amount,
         balanceAfter: wallet.availableCredits,
-        referenceModel: "OtherEwayBill",
+        referenceModel: "EwayBill",
         referenceId: refId,
         remarks,
       },
@@ -210,9 +240,16 @@ export const finalizeDebit = async (clientId, amount, refId, remarks = "E-Way Bi
 export const rollbackBlockedCredits = async (clientId, amount, refId, remarks = "Rollback blocked credits", session = null) => {
   if (amount <= 0) return null;
 
+  const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
+    ? new mongoose.Types.ObjectId(clientId)
+    : null;
+  const clientFilter = clientObjectId
+    ? { $in: [clientObjectId, String(clientId)] }
+    : String(clientId);
+
   const wallet = await ClientWallet.findOneAndUpdate(
     {
-      clientId,
+      clientId: clientFilter,
       blockedCredits: { $gte: amount },
     },
     {
@@ -327,6 +364,24 @@ export const approvePayment = async (paymentId, adminId) => {
     );
 
     await session.commitTransaction();
+
+    // Record in EwayBillCreditHistory
+    try {
+      await recordCreditHistory({
+        clientId: payment.clientId,
+        transactionType: "PAYMENT_CREDIT",
+        credits: payment.creditsRequested,
+        balanceAfter: wallet.availableCredits,
+        referenceModel: "PaymentRequest",
+        referenceId: String(payment._id),
+        mode: "TOPUP",
+        remarks: `Top-Up Deposit approved by Admin (${adminId}). Amount: ₹${payment.amountInr}, UTR: ${payment.utrNumber}. Validity extended to ${newValidUntil.toLocaleDateString("en-IN")}.`,
+        performedBy: String(adminId),
+      });
+    } catch (hErr) {
+      console.warn("Could not log payment history:", hErr.message);
+    }
+
     return { payment, wallet, ledger };
   } catch (error) {
     await session.abortTransaction();
@@ -418,6 +473,29 @@ export const adminAdjustCredits = async (
     );
 
     await session.commitTransaction();
+
+    // Record in EwayBillCreditHistory
+    try {
+      const finalRemarks =
+        remarks ||
+        `Admin manual adjustment (${creditsDelta > 0 ? "+" : ""}${creditsDelta} credits)${
+          computedValidUntil ? ` [Validity: ${computedValidUntil.toLocaleDateString("en-IN")}]` : ""
+        }`;
+      await recordCreditHistory({
+        clientId,
+        transactionType: "ADMIN_ADJUSTMENT",
+        credits: creditsDelta,
+        balanceAfter: wallet.availableCredits,
+        referenceModel: "AdminAdjustment",
+        referenceId: String(adminId),
+        mode: "ADMIN",
+        remarks: finalRemarks,
+        performedBy: String(adminId),
+      });
+    } catch (hErr) {
+      console.warn("Could not log admin adjustment history:", hErr.message);
+    }
+
     return { wallet, ledger };
   } catch (error) {
     await session.abortTransaction();
@@ -733,6 +811,43 @@ export const toggleWalletServiceStatus = async (
   });
 
   await wallet.save();
+
+  // Record an immutable CreditLedger entry for audit trail and client ledger visibility
+  try {
+    if (isFirstActivation) {
+      const expDateStr = wallet.validUntil
+        ? new Date(wallet.validUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+        : "90 days";
+      await recordCreditHistory({
+        clientId: wallet.clientId,
+        transactionType: "OFFER_ACTIVATION",
+        credits: 0,
+        balanceAfter: wallet.availableCredits || 0,
+        referenceModel: "AdminAdjustment",
+        referenceId: "PROMO-3M-TRIAL",
+        mode: "ADMIN",
+        remarks: `🎁 Introductory Offer Activated: 3 Months Free Trial (Valid for 90 days until ${expDateStr}) - Authorized by ${changedByStr}`,
+        performedBy: changedByStr,
+      });
+      console.log(`📜 [Wallet Service] Created Introductory Offer CreditLedger & History record for client ${wallet.clientId}`);
+    } else {
+      await recordCreditHistory({
+        clientId: wallet.clientId,
+        transactionType: "SERVICE_ACTIVATION",
+        credits: 0,
+        balanceAfter: wallet.availableCredits || 0,
+        referenceModel: "ServiceStatus",
+        referenceId: `STATUS_${normalizedStatus}`,
+        mode: "ADMIN",
+        remarks: `${normalizedStatus === "ACTIVE" ? "Service Activated" : "Service Deactivated"} by SuperAdmin (${changedByStr}). Remarks: ${computedRemarks}`,
+        performedBy: changedByStr,
+      });
+      console.log(`📜 [Wallet Service] Created Service Status CreditLedger & History record for client ${wallet.clientId}`);
+    }
+  } catch (ledgerErr) {
+    console.warn("Could not record service status CreditLedger entry:", ledgerErr.message);
+  }
+
   return { wallet, isFirstActivation };
 };
 

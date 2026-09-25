@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Box, Typography, Tooltip, CircularProgress, Chip, Button } from "@mui/material";
 import BoltIcon from "@mui/icons-material/Bolt";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
@@ -25,12 +25,20 @@ function CreditBadge() {
     blockedCredits,
     walletServiceStatus,
     isFirstTimeActivated,
+    isFreeTrial,
     daysRemaining,
     pricingTier,
     pricingReason,
     currencyRate,
     loading,
+    isInitialized,
+    refreshBalance,
   } = useWallet();
+
+  // Automatically fetch fresh balance when CreditBadge mounts in the navbar
+  useEffect(() => {
+    refreshBalance();
+  }, [refreshBalance]);
 
   const userData = getJsonCookie("exim_user") || {};
   const userEmail = (userData?.email || "").toLowerCase();
@@ -45,15 +53,38 @@ function CreditBadge() {
   const effectiveCredits = balance !== undefined && balance !== null ? balance : availableCredits || 0;
   const isServiceInactive = walletServiceStatus === "INACTIVE";
 
-  // 3-Tier Visual Thresholds
-  // > 20: Healthy (Green)
-  // 11-20: Warning (Yellow)
-  // <= 10: Critical (Red)
-  const isCritical = effectiveCredits <= 10;
-  const isWarning = effectiveCredits > 10 && effectiveCredits <= 20;
+  // Prevent false "Service Inactive" flash while initial fetch is completing
+  const isInitialLoading = !isInitialized || (loading && availableCredits === 0 && walletServiceStatus === "INACTIVE");
+
+  // Free Trial Offer condition: active service + introductory 3-month trial
+  const isFreeTrialOffer = Boolean(
+    !isServiceInactive &&
+    (isFreeTrial ||
+      (isFirstTimeActivated &&
+       daysRemaining !== null &&
+       daysRemaining !== undefined &&
+       daysRemaining > 0))
+  );
+
+  const isPartnerTier = pricingTier === "SFPL_SRCC_PARTNER";
+  const isUnlimitedOrFree = isFreeTrialOffer || isPartnerTier;
+
+  // 3-Tier Visual Thresholds (Only applies when NOT on free trial or partner tier)
+  const isCritical = !isUnlimitedOrFree && effectiveCredits <= 10;
+  const isWarning = !isUnlimitedOrFree && effectiveCredits > 10 && effectiveCredits <= 20;
 
   // Palette assignment
-  const badgeColors = isServiceInactive
+  const badgeColors = isInitialLoading
+    ? {
+        bg: "#f8fafc",
+        border: "#cbd5e1",
+        text: "#475569",
+        icon: "#64748b",
+        hoverBg: "#f1f5f9",
+        tag: "Loading...",
+        tagColor: "default",
+      }
+    : isServiceInactive
     ? {
         bg: "#fef2f2",
         border: "#f87171",
@@ -62,6 +93,26 @@ function CreditBadge() {
         hoverBg: "#fee2e2",
         tag: "Service Inactive",
         tagColor: "error",
+      }
+    : isFreeTrialOffer
+    ? {
+        bg: "#f0fdf4",
+        border: "#86efac",
+        text: "#166534",
+        icon: "#16a34a",
+        hoverBg: "#dcfce7",
+        tag: "🎁 3 Months Free Trial",
+        tagColor: "success",
+      }
+    : isPartnerTier
+    ? {
+        bg: "#f0fdf4",
+        border: "#86efac",
+        text: "#166534",
+        icon: "#16a34a",
+        hoverBg: "#dcfce7",
+        tag: "SFPL Partner",
+        tagColor: "success",
       }
     : isCritical
     ? {
@@ -89,11 +140,9 @@ function CreditBadge() {
         text: "#166534",
         icon: "#16a34a",
         hoverBg: "#dcfce7",
-        tag: isFirstTimeActivated ? "3 Mos Free" : "Healthy",
+        tag: "Healthy",
         tagColor: "success",
       };
-
-  const isPartnerTier = pricingTier === "SFPL_SRCC_PARTNER";
 
   const tooltipContent = (
     <Box sx={{ p: 1, fontSize: "0.8rem", maxWidth: 290 }}>
@@ -109,28 +158,45 @@ function CreditBadge() {
         />
       </Box>
 
-      {/* Service Status */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
-        <span style={{ color: "#cbd5e1" }}>Service Status:</span>
-        <strong style={{ color: isServiceInactive ? "#f87171" : "#4ade80", fontWeight: 800 }}>
-          {isServiceInactive ? "INACTIVE (Disabled)" : "ACTIVE"}
-        </strong>
-      </Box>
-
-      {isFirstTimeActivated && (
-        <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
-          <span style={{ color: "#38bdf8" }}>Introductory Offer:</span>
-          <strong style={{ color: "#38bdf8" }}>🎁 3 Months Free Trial</strong>
+      {/* Free Trial Highlight Card in Tooltip */}
+      {isFreeTrialOffer ? (
+        <Box sx={{ mt: 0.5, mb: 1, p: 1, bgcolor: "rgba(34, 197, 94, 0.15)", borderRadius: 1.5, border: "1px solid rgba(74, 222, 128, 0.4)" }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.2 }}>
+            <span style={{ color: "#86efac", fontWeight: 700 }}>Introductory Offer:</span>
+            <strong style={{ color: "#4ade80", fontWeight: 800 }}>🎁 3 Months Free Trial</strong>
+          </Box>
+          {daysRemaining !== null && daysRemaining !== undefined && (
+            <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.2 }}>
+              <span style={{ color: "#cbd5e1" }}>Validity Remaining:</span>
+              <strong style={{ color: daysRemaining <= 10 ? "#f87171" : "#4ade80", fontWeight: 800 }}>
+                {daysRemaining > 0 ? `${daysRemaining} days left` : "Expired"}
+              </strong>
+            </Box>
+          )}
+          <Box sx={{ fontSize: "0.72rem", color: "#bbf7d0", mt: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+            <span>✅</span>
+            <span>Free E-Way Bill generation active for all containers!</span>
+          </Box>
         </Box>
-      )}
+      ) : (
+        <>
+          {/* Service Status */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
+            <span style={{ color: "#cbd5e1" }}>Service Status:</span>
+            <strong style={{ color: isServiceInactive ? "#f87171" : "#4ade80", fontWeight: 800 }}>
+              {isServiceInactive ? "INACTIVE (Disabled)" : "ACTIVE"}
+            </strong>
+          </Box>
 
-      {daysRemaining !== null && daysRemaining !== undefined && (
-        <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
-          <span style={{ color: "#cbd5e1" }}>Validity Remaining:</span>
-          <strong style={{ color: daysRemaining <= 10 ? "#f87171" : "#e2e8f0" }}>
-            {daysRemaining > 0 ? `${daysRemaining} days left` : "Expired"}
-          </strong>
-        </Box>
+          {daysRemaining !== null && daysRemaining !== undefined && (
+            <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
+              <span style={{ color: "#cbd5e1" }}>Validity Remaining:</span>
+              <strong style={{ color: daysRemaining <= 10 ? "#f87171" : "#e2e8f0" }}>
+                {daysRemaining > 0 ? `${daysRemaining} days left` : "Expired"}
+              </strong>
+            </Box>
+          )}
+        </>
       )}
 
       <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
@@ -147,8 +213,8 @@ function CreditBadge() {
 
       <Box sx={{ display: "flex", justifyContent: "space-between", py: 0.3 }}>
         <span style={{ color: "#cbd5e1" }}>Ready for Generation:</span>
-        <strong style={{ color: isCritical ? "#f87171" : isWarning ? "#fde047" : "#4ade80" }}>
-          {effectiveCredits} Credits
+        <strong style={{ color: isFreeTrialOffer ? "#4ade80" : isCritical ? "#f87171" : isWarning ? "#fde047" : "#4ade80" }}>
+          {isFreeTrialOffer ? "Free (Trial Active)" : `${effectiveCredits} Credits`}
         </strong>
       </Box>
 
@@ -157,8 +223,8 @@ function CreditBadge() {
         <strong style={{ color: "#e2e8f0" }}>{currencyRate || "1 Credit = ₹9"}</strong>
       </Box>
 
-      <Box sx={{ mt: 0.8, fontSize: "0.74rem", color: isPartnerTier ? "#86efac" : "#94a3b8" }}>
-        Tier: {pricingReason || (isPartnerTier ? "SFPL + SRCC Partner (0 Debit, +1 Reward)" : "Standard Tier (1 Credit per EWB)")}
+      <Box sx={{ mt: 0.8, fontSize: "0.74rem", color: isPartnerTier ? "#86efac" : isFreeTrialOffer ? "#4ade80" : "#94a3b8" }}>
+        Tier: {pricingReason || (isFreeTrialOffer ? "3 Months Free Trial (0 Credits / Free Now)" : isPartnerTier ? "SFPL + SRCC Partner (0 Debit, +1 Reward)" : "Standard Tier (1 Credit per EWB)")}
       </Box>
 
       {isServiceInactive && (
@@ -167,13 +233,13 @@ function CreditBadge() {
         </Box>
       )}
 
-      {!isServiceInactive && isCritical && (
+      {!isServiceInactive && !isUnlimitedOrFree && isCritical && (
         <Box sx={{ mt: 1, p: 0.8, bgcolor: "rgba(220, 38, 38, 0.2)", borderRadius: 1.5, border: "1px solid rgba(248, 113, 113, 0.4)", color: "#fca5a5", fontSize: "0.72rem" }}>
           ⚠️ Critical balance! Contact SuperAdmin (superadmin@exim.com) to allocate credits before generating E-Way Bills.
         </Box>
       )}
 
-      {!isServiceInactive && isWarning && (
+      {!isServiceInactive && !isUnlimitedOrFree && isWarning && (
         <Box sx={{ mt: 1, p: 0.8, bgcolor: "rgba(234, 179, 8, 0.15)", borderRadius: 1.5, border: "1px solid rgba(253, 224, 71, 0.4)", color: "#fef08a", fontSize: "0.72rem" }}>
           ⚠️ Approaching low balance. Notify SuperAdmin to top up credits.
         </Box>
@@ -245,7 +311,7 @@ function CreditBadge() {
             color: badgeColors.icon,
           }}
         >
-          {loading ? (
+          {loading || isInitialLoading ? (
             <CircularProgress size={14} color="inherit" />
           ) : (
             <BoltIcon sx={{ fontSize: 18 }} />
@@ -260,21 +326,56 @@ function CreditBadge() {
             color: badgeColors.text,
           }}
         >
-          {loading ? "..." : `${effectiveCredits} Credits`}
+          {isInitialLoading ? "Loading..." : loading ? "..." : `${effectiveCredits} Credits`}
         </Typography>
 
-        <Chip
-          label={badgeColors.tag}
-          size="small"
-          color={badgeColors.tagColor}
-          variant="filled"
-          sx={{
-            height: 18,
-            fontSize: "0.65rem",
-            fontWeight: 800,
-            px: 0.3,
-          }}
-        />
+        {isFreeTrialOffer ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+            <Chip
+              label="🎁 3 Months Free Trial"
+              size="small"
+              color="success"
+              variant="filled"
+              sx={{
+                height: 20,
+                fontSize: "0.68rem",
+                fontWeight: 800,
+                bgcolor: "#16a34a",
+                color: "#ffffff",
+                px: 0.4,
+              }}
+            />
+            {daysRemaining !== null && daysRemaining !== undefined && daysRemaining > 0 && (
+              <Chip
+                label={`${daysRemaining} days left`}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 20,
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  color: "#15803d",
+                  borderColor: "#86efac",
+                  bgcolor: "#f0fdf4",
+                  px: 0.4,
+                }}
+              />
+            )}
+          </Box>
+        ) : (
+          <Chip
+            label={badgeColors.tag}
+            size="small"
+            color={badgeColors.tagColor}
+            variant="filled"
+            sx={{
+              height: 18,
+              fontSize: "0.65rem",
+              fontWeight: 800,
+              px: 0.3,
+            }}
+          />
+        )}
 
         {isSuperAdmin && (
           <Button

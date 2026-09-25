@@ -1657,6 +1657,9 @@ function EwayBillGenerateLR({
           timerProgressBar: true,
           allowOutsideClick: false,
         });
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {}
         if (onSuccess) onSuccess(results);
         if (onClose) onClose();
       } else {
@@ -1873,6 +1876,9 @@ function EwayBillGenerateLR({
       const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, payload);
       if (r.data.success) {
         markBoeDocumentGenerated(formData.documentNumber || boeNumber);
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {}
         if (onSuccess) onSuccess(r.data.data);
         Swal.fire({ icon: "success", title: "E-Way Bill Generated", html: `<p><strong>EWB No:</strong> ${r.data.data.ewbNo}</p><p><strong>Valid Until:</strong> ${r.data.data.validUpto}</p>` })
           .then(() => { if (onClose) onClose(); });

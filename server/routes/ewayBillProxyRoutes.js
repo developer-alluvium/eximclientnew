@@ -32,6 +32,8 @@ import EximclientUser from "../models/eximclientUserModel.js";
 import CustomerModel from "../models/customerModel.js";
 import AdminModel from "../models/adminModel.js";
 import SuperAdminModel from "../models/superAdminModel.js";
+import EwayBillCreditHistory from "../models/EwayBillCreditHistory.js";
+import { recordCreditHistory, getClientCreditHistory } from "../services/ewayBillCreditHistoryService.js";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
@@ -659,45 +661,88 @@ router.post("/others/update-status", authenticateUser, async (req, res) => {
     record.markModified("ewayBillData");
     await record.save();
 
-    // Ensure Credit Ledger entry exists for audit accountability (especially for Free Trial)
+    // Ensure Credit History entry exists for each generated container
     try {
-      const activeEwb = ewayBillNo || record.ewayBillNo;
-      if (activeEwb) {
-        const clientWallet = await ClientWallet.findOne({ clientId: record.clientId }).lean();
-        const isFreeTrial = Boolean(
-          clientWallet &&
-          clientWallet.walletServiceStatus === "ACTIVE" &&
-          clientWallet.isFirstTimeActivated &&
-          clientWallet.validUntil &&
-          new Date() <= new Date(clientWallet.validUntil)
-        );
+      const clientWallet = await ClientWallet.findOne({ clientId: record.clientId }).lean();
+      const isFreeTrial = Boolean(
+        clientWallet &&
+        clientWallet.walletServiceStatus === "ACTIVE" &&
+        clientWallet.isFirstTimeActivated &&
+        clientWallet.validUntil &&
+        new Date() <= new Date(clientWallet.validUntil)
+      );
 
-        if (isFreeTrial) {
-          const existingLedger = await CreditLedger.findOne({
+      const generatedContainers = (record.containers || []).filter(
+        (c) => c.ewayBillStatus === "Generated" && c.ewayBillNo
+      );
+
+      if (generatedContainers.length > 0) {
+        for (const cont of generatedContainers) {
+          const contRef = `${record.boeNumber} / ${cont.containerNumber}`;
+          const existingHistory = await EwayBillCreditHistory.findOne({
             clientId: record.clientId,
             $or: [
-              { referenceId: record.boeNumber },
-              { remarks: new RegExp(activeEwb) },
+              { ewayBillNo: cont.ewayBillNo },
+              { referenceId: contRef },
+              { boeNo: record.boeNumber, containerNo: cont.containerNumber },
             ],
           }).lean();
 
-          if (!existingLedger) {
-            const contCount = generated.length || 1;
-            await CreditLedger.create({
+          if (!existingHistory) {
+            await recordCreditHistory({
               clientId: record.clientId,
-              transactionType: "EWAYBILL_TRIAL_FREE",
-              credits: 0,
-              balanceAfter: clientWallet.availableCredits || 0,
+              transactionType: isFreeTrial ? "EWAYBILL_TRIAL_FREE" : "CONTAINER_EWAYBILL",
+              credits: isFreeTrial ? 0 : -1,
+              balanceAfter: clientWallet?.availableCredits || 0,
               referenceModel: "OtherEwayBill",
-              referenceId: record.boeNumber,
-              remarks: `3 Months Free Trial: E-Way Bill Generated (${activeEwb}, ${contCount} Container${contCount > 1 ? "s" : ""}) - Free (0 Cr)`,
+              referenceId: contRef,
+              boeNo: record.boeNumber,
+              containerNo: cont.containerNumber,
+              ewayBillNo: cont.ewayBillNo,
+              vehicleNo: cont.vehicleNo || record.vehicleNo || "",
+              mode: "CONTAINER",
+              isFreeTrial,
+              moneySaved: isFreeTrial ? 9 : 0,
+              remarks: isFreeTrial
+                ? `🎁 3 Months Free Trial: Container E-Way Bill Generated (Cont: ${cont.containerNumber}, EWB: ${cont.ewayBillNo}) - Saved ₹9`
+                : `Container E-Way Bill Generated (Cont: ${cont.containerNumber}, EWB: ${cont.ewayBillNo}) - 1 Cr Debited`,
+              performedBy: req.user?.email || "System",
             });
-            console.log(`📜 [Others EWB] Created Free Trial CreditLedger audit record for BOE ${record.boeNumber}`);
+            console.log(`📜 [Others EWB] Created Credit History record for Container ${cont.containerNumber}, BOE ${record.boeNumber}`);
           }
+        }
+      } else if (record.ewayBillNo) {
+        const existingHistory = await EwayBillCreditHistory.findOne({
+          clientId: record.clientId,
+          $or: [
+            { ewayBillNo: record.ewayBillNo },
+            { referenceId: record.boeNumber },
+          ],
+        }).lean();
+
+        if (!existingHistory) {
+          await recordCreditHistory({
+            clientId: record.clientId,
+            transactionType: isFreeTrial ? "EWAYBILL_TRIAL_FREE" : "FULL_EWAYBILL",
+            credits: isFreeTrial ? 0 : -1,
+            balanceAfter: clientWallet?.availableCredits || 0,
+            referenceModel: "OtherEwayBill",
+            referenceId: record.boeNumber,
+            boeNo: record.boeNumber,
+            ewayBillNo: record.ewayBillNo,
+            vehicleNo: record.vehicleNo || "",
+            mode: "FULL",
+            isFreeTrial,
+            moneySaved: isFreeTrial ? 9 : 0,
+            remarks: isFreeTrial
+              ? `🎁 3 Months Free Trial: E-Way Bill Generated (BOE: ${record.boeNumber}, EWB: ${record.ewayBillNo}) - Saved ₹9`
+              : `E-Way Bill Generated for BOE ${record.boeNumber} (EWB: ${record.ewayBillNo}) - 1 Cr Debited`,
+            performedBy: req.user?.email || "System",
+          });
         }
       }
     } catch (auditErr) {
-      console.warn("Could not check/create free trial ledger entry:", auditErr.message);
+      console.warn("Could not check/create credit history entry in update-status:", auditErr.message);
     }
 
     res.status(200).json({ success: true, data: record });
@@ -1106,6 +1151,37 @@ router.post("/generate", authenticateUser, async (req, res) => {
         session.endSession();
       }
 
+      // Always record in dedicated EwayBillCreditHistory collection for complete container-level audit and savings tracking
+      try {
+        const vehicle = req.body?.formData?.vehicleNumber || req.body?.vehicleNumber || "";
+        const isFreeTrial = Boolean(pricing.isFreeTrial);
+        const contRef = containerId ? `${boeNo || refId} / ${containerId}` : (boeNo || refId);
+        await recordCreditHistory({
+          clientId,
+          transactionType: isFreeTrial
+            ? "EWAYBILL_TRIAL_FREE"
+            : (containerId ? "CONTAINER_EWAYBILL" : "FULL_EWAYBILL"),
+          credits: isAlreadyGenerated ? 0 : (isFreeTrial ? 0 : -totalDebit),
+          balanceAfter: clientWallet.availableCredits || 0,
+          referenceModel: "OtherEwayBill",
+          referenceId: contRef,
+          boeNo: boeNo || "",
+          containerNo: containerId || "",
+          ewayBillNo: generatedEwbNo,
+          vehicleNo: vehicle,
+          mode: containerId ? "CONTAINER" : (containerCount > 1 ? "BATCH" : "FULL"),
+          isFreeTrial,
+          moneySaved: isFreeTrial ? (containerCount * 9) : 0,
+          remarks: isFreeTrial
+            ? `🎁 3 Months Free Trial: ${containerId ? `Container ${containerId}` : `${containerCount} Container(s)`} E-Way Bill ${isAlreadyGenerated ? "Active" : "Generated"} (EWB: ${generatedEwbNo}) - Saved ₹${containerCount * 9}`
+            : `E-Way Bill Generated for ${containerId ? `Container ${containerId}` : `${containerCount} Container(s)`} (EWB: ${generatedEwbNo}) - ${isAlreadyGenerated ? "0 Cr (Active)" : `${totalDebit} Cr Debited`}`,
+          performedBy: req.user?.email || "System",
+        });
+        console.log(`📜 [EWB Credit History] Recorded container history for ${contRef} (EWB: ${generatedEwbNo})`);
+      } catch (histErr) {
+        console.warn("Could not record in EwayBillCreditHistory in /generate:", histErr.message);
+      }
+
       // Ensure ewbNo is populated cleanly on response data
       const responsePayload = {
         ...(downstreamRes.data || {}),
@@ -1232,6 +1308,9 @@ router.get("/wallet/balance", authenticateUser, async (req, res) => {
         currencyRate: "1 Credit = ₹9",
         pricingTier: pricing.tier,
         pricingReason: pricing.reason,
+        serviceStatusHistory: (wallet.serviceStatusHistory || []).sort(
+          (a, b) => new Date(b.changedAt) - new Date(a.changedAt)
+        ),
       },
     });
   } catch (err) {
@@ -1252,40 +1331,61 @@ router.get("/wallet/ledger", authenticateUser, async (req, res) => {
       req.user._id
     )?.toString();
 
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 20;
-    const skip = (page - 1) * limit;
-
-    const filter = { clientId };
-    if (req.query.type && req.query.type !== "ALL") {
-      filter.transactionType = req.query.type;
-    }
-    if (req.query.search && req.query.search.trim()) {
-      const searchRegex = new RegExp(req.query.search.trim(), "i");
-      filter.$or = [
-        { remarks: searchRegex },
-        { referenceModel: searchRegex },
-      ];
-    }
-
-    const [transactions, total] = await Promise.all([
-      CreditLedger.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      CreditLedger.countDocuments(filter),
+    const [historyResult, wallet] = await Promise.all([
+      getClientCreditHistory(clientId, req.query),
+      getOrCreateWallet(clientId),
     ]);
+
+    let transactions = historyResult.transactions;
+    let total = historyResult.total;
+    let totalPages = historyResult.pages;
+
+    // Fallback: If ewaybillcredithistory has no records yet for this query, check CreditLedger
+    if (total === 0 && (!req.query.search || !req.query.search.trim())) {
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 15;
+      const skip = (page - 1) * limit;
+
+      const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
+        ? new mongoose.Types.ObjectId(clientId)
+        : null;
+
+      const baseClientFilter = clientObjectId
+        ? { $or: [{ clientId: clientObjectId }, { clientId: String(clientId) }] }
+        : { clientId: String(clientId) };
+
+      const [clDocs, clTotal] = await Promise.all([
+        CreditLedger.find(baseClientFilter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        CreditLedger.countDocuments(baseClientFilter),
+      ]);
+
+      if (clDocs && clDocs.length > 0) {
+        transactions = clDocs;
+        total = clTotal;
+        totalPages = Math.ceil(clTotal / limit) || 1;
+      }
+    }
 
     res.status(200).json({
       success: true,
       data: {
         transactions,
+        summary: historyResult.summary,
+        totalMoneySaved: historyResult.summary.totalMoneySaved,
+        totalFreeTrialEwbs: historyResult.summary.totalFreeTrialEwbs,
+        totalContainers: historyResult.summary.totalContainers,
+        serviceStatusHistory: (wallet.serviceStatusHistory || []).sort(
+          (a, b) => new Date(b.changedAt) - new Date(a.changedAt)
+        ),
         pagination: {
-          page,
-          limit,
+          page: historyResult.page,
+          limit: historyResult.limit,
           total,
-          pages: Math.ceil(total / limit),
+          pages: totalPages,
         },
       },
     });
@@ -1339,10 +1439,17 @@ router.get("/wallet/stats", authenticateUser, async (req, res) => {
       req.user._id
     )?.toString();
 
+    const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
+      ? new mongoose.Types.ObjectId(clientId)
+      : null;
+    const clientMatch = clientObjectId
+      ? { $in: [clientObjectId, String(clientId)] }
+      : String(clientId);
+
     const [wallet, ledgerSummary, pendingCount] = await Promise.all([
       getOrCreateWallet(clientId),
       CreditLedger.aggregate([
-        { $match: { clientId: new mongoose.Types.ObjectId(clientId) } },
+        { $match: { clientId: clientMatch } },
         {
           $group: {
             _id: "$transactionType",
@@ -1368,7 +1475,7 @@ router.get("/wallet/stats", authenticateUser, async (req, res) => {
     ledgerSummary.forEach((item) => {
       if (item._id === "PAYMENT_CREDIT" || item._id === "ADMIN_ADJUSTMENT") {
         if (item.totalCredits > 0) stats.totalDeposited += item.totalCredits;
-      } else if (item._id === "EWAYBILL_DEBIT") {
+      } else if (item._id === "EWAYBILL_DEBIT" || item._id === "CONTAINER_EWAYBILL" || item._id === "FULL_EWAYBILL") {
         stats.totalDebited += Math.abs(item.totalCredits);
       } else if (item._id === "EWAYBILL_REWARD") {
         stats.totalRewarded += item.totalCredits;
@@ -1376,6 +1483,8 @@ router.get("/wallet/stats", authenticateUser, async (req, res) => {
         stats.totalFreeTrialEwbs += item.count || 1;
       }
     });
+
+    stats.totalMoneySaved = (stats.totalFreeTrialEwbs || 0) * 9;
 
     res.status(200).json({ success: true, data: stats });
   } catch (err) {

@@ -141,6 +141,10 @@ function UserLoginPage() {
             7
           );
 
+          // Dispatch login and wallet refresh events so contexts update immediately without requiring manual refresh
+          window.dispatchEvent(new Event("exim:login"));
+          window.dispatchEvent(new Event("wallet:refresh"));
+
           navigate("/user/dashboard", { replace: true });
         }
       }
