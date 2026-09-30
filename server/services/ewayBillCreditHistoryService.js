@@ -120,218 +120,22 @@ export const recordCreditHistory = async (data) => {
 };
 
 /**
- * Automatically synchronize any generated E-Way Bills (from `ewaybills` or `otherewaybills` collections)
- * for this client or their assigned importer/company into `ewaybillcredithistory`.
- *
- * @param {string} clientId
- * @returns {Promise<Array<string|ObjectId>>} Array of related clientIds
- */
-export const syncEwayBillsForClient = async (clientId) => {
-  try {
-    if (!clientId) return [clientId];
-
-    const db = mongoose.connection.db;
-    if (!db) return [clientId];
-
-    const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
-      ? new mongoose.Types.ObjectId(clientId)
-      : null;
-
-    // 1. Fetch user to find company / assigned importer names
-    const user = await db.collection("eximclientusers").findOne({
-      $or: [
-        ...(clientObjectId ? [{ _id: clientObjectId }] : []),
-        { _id: String(clientId) },
-      ],
-    });
-
-    const importerNames = [];
-    if (user) {
-      if (user.assignedImporterName) importerNames.push(user.assignedImporterName);
-      (user.ie_code_assignments || []).forEach((a) => {
-        if (a.importer_name) importerNames.push(a.importer_name);
-      });
-      (user.exporter_ie_code_assignments || []).forEach((a) => {
-        if (a.importer_name) importerNames.push(a.importer_name);
-      });
-    }
-
-    // 2. Find any sibling users belonging to the same company
-    const relatedClientIds = [String(clientId)];
-    if (clientObjectId) relatedClientIds.push(clientObjectId);
-
-    if (importerNames.length > 0) {
-      const siblingUsers = await db.collection("eximclientusers").find({
-        $or: [
-          { assignedImporterName: { $in: importerNames } },
-          { "ie_code_assignments.importer_name": { $in: importerNames } },
-          { "exporter_ie_code_assignments.importer_name": { $in: importerNames } },
-        ],
-      }).toArray();
-
-      siblingUsers.forEach((u) => {
-        if (u._id) {
-          relatedClientIds.push(String(u._id));
-          if (mongoose.Types.ObjectId.isValid(u._id)) {
-            relatedClientIds.push(new mongoose.Types.ObjectId(u._id));
-          }
-        }
-      });
-    }
-
-    // 3. Find all ewaybills from `ewaybills` collection for this client or their company
-    const ewbQueryFilters = [
-      { clientId: { $in: relatedClientIds } },
-      { userId: { $in: relatedClientIds } },
-      { generatedBy: { $in: relatedClientIds.map(String) } },
-    ];
-
-    importerNames.forEach((name) => {
-      const escaped = name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-      const regex = new RegExp(`^${escaped}$`, "i");
-      ewbQueryFilters.push({ consigneeName: regex });
-      ewbQueryFilters.push({ consignorName: regex });
-      ewbQueryFilters.push({ "requestPayload.legal_name_of_consignee": regex });
-      ewbQueryFilters.push({ "requestPayload.legal_name_of_consignor": regex });
-    });
-
-    const ewbs = await db.collection("ewaybills").find({ $or: ewbQueryFilters }).toArray();
-
-    // 4. Also check `otherewaybills` collection
-    const otherEwbs = await db.collection("otherewaybills").find({
-      $or: [
-        { clientId: { $in: relatedClientIds } },
-        { user: { $in: relatedClientIds } },
-      ],
-    }).toArray();
-
-    // Fetch client wallet to know availableCredits
-    const wallet = await db.collection("clientwallets").findOne({
-      $or: [
-        ...(clientObjectId ? [{ clientId: clientObjectId }] : []),
-        { clientId: String(clientId) },
-      ],
-    });
-    const currentBalance = wallet?.availableCredits || 0;
-
-    // 5. Ingest any missing ewaybills
-    const historyCol = db.collection("ewaybillcredithistory");
-
-    for (const e of ewbs) {
-      const ewbNo = String(e.ewbNo || e.responseData?.ewayBillNo || "").trim();
-      const docNo = String(e.documentNumber || e.requestPayload?.document_number || "").trim();
-      const cleanBoe = docNo ? docNo.split("-CH-")[0].trim() : "";
-      const containerNo = String(
-        e.containerId ||
-        (e.containerIds && e.containerIds[0]) ||
-        (docNo.includes("-CH-") ? docNo.split("-CH-")[1] : "")
-      ).trim().toUpperCase();
-      const refId = containerNo && cleanBoe
-        ? `${cleanBoe} / ${containerNo}`
-        : (cleanBoe || containerNo || ewbNo);
-
-      const existing = await historyCol.findOne({
-        $or: [
-          ...(ewbNo ? [{ ewayBillNo: ewbNo }] : []),
-          { referenceId: refId },
-          ...(containerNo && cleanBoe ? [{ boeNo: cleanBoe, containerNo }] : []),
-        ],
-      });
-
-      if (!existing) {
-        const isFree = true;
-        const entryDate = e.createdAt || e.generatedAt || new Date();
-        await historyCol.insertOne({
-          clientId: clientObjectId || clientId,
-          transactionType: "EWAYBILL_TRIAL_FREE",
-          credits: 0,
-          moneySaved: 9,
-          balanceAfter: currentBalance,
-          referenceModel: "EwayBill",
-          referenceId: refId,
-          boeNo: cleanBoe,
-          containerNo,
-          ewayBillNo: ewbNo,
-          vehicleNo: e.vehicleNo || e.requestPayload?.vehicle_number || "",
-          mode: containerNo ? "CONTAINER" : "FULL",
-          isFreeTrial: isFree,
-          remarks: `🎁 3 Months Free Trial: ${containerNo ? `Container ${containerNo}` : "E-Way Bill"} Generated (EWB: ${ewbNo || "Verified Active"}) - Saved ₹9`,
-          performedBy: user?.email || "System",
-          createdAt: entryDate,
-          updatedAt: entryDate,
-        });
-      }
-    }
-
-    // 6. Ingest any missing containers from `otherewaybills`
-    for (const o of otherEwbs) {
-      const containers = (o.containers || []).filter(c => c.ewayBillStatus === "Generated" && c.ewayBillNo);
-      for (const cont of containers) {
-        const contRef = `${o.boeNumber} / ${cont.containerNumber}`;
-        const existing = await historyCol.findOne({
-          $or: [
-            { ewayBillNo: String(cont.ewayBillNo) },
-            { referenceId: contRef },
-            { boeNo: o.boeNumber, containerNo: cont.containerNumber },
-          ],
-        });
-
-        if (!existing) {
-          const entryDate = cont.ewayBillDate || o.createdAt || new Date();
-          await historyCol.insertOne({
-            clientId: clientObjectId || clientId,
-            transactionType: "EWAYBILL_TRIAL_FREE",
-            credits: 0,
-            moneySaved: 9,
-            balanceAfter: currentBalance,
-            referenceModel: "OtherEwayBill",
-            referenceId: contRef,
-            boeNo: o.boeNumber || "",
-            containerNo: cont.containerNumber || "",
-            ewayBillNo: String(cont.ewayBillNo),
-            vehicleNo: cont.vehicleNo || o.vehicleNo || "",
-            mode: "CONTAINER",
-            isFreeTrial: true,
-            remarks: `🎁 3 Months Free Trial: Container E-Way Bill Generated (Cont: ${cont.containerNumber}, EWB: ${cont.ewayBillNo}) - Saved ₹9`,
-            performedBy: user?.email || "System",
-            createdAt: entryDate,
-            updatedAt: entryDate,
-          });
-        }
-      }
-    }
-
-    return relatedClientIds;
-  } catch (err) {
-    console.error("⚠️ [CreditHistory] Error syncing E-Way Bills for client:", err);
-    return [clientId];
-  }
-};
-
-/**
  * Fetch paginated history from ewaybillcredithistory collection
  * with complete summary calculations (money saved, free trial count, etc.)
+ * ONLY reads from ewaybillcredithistory collection.
  */
 export const getClientCreditHistory = async (clientId, query = {}) => {
   const page = parseInt(query.page, 10) || 1;
   const limit = parseInt(query.limit, 10) || 15;
   const skip = (page - 1) * limit;
 
-  // Auto-sync any E-Way Bills for this client and their company before querying
-  const relatedClientIds = await syncEwayBillsForClient(clientId);
-
   const clientObjectId = mongoose.Types.ObjectId.isValid(clientId)
     ? new mongoose.Types.ObjectId(clientId)
     : null;
 
-  const matchIds = [
-    clientId,
-    String(clientId),
-    ...(clientObjectId ? [clientObjectId] : []),
-    ...(relatedClientIds || [])
-  ];
-
-  const baseClientFilter = { clientId: { $in: matchIds } };
+  const baseClientFilter = clientObjectId
+    ? { $or: [{ clientId: clientObjectId }, { clientId: String(clientId) }] }
+    : { clientId: String(clientId) };
 
   const andConditions = [baseClientFilter];
 
