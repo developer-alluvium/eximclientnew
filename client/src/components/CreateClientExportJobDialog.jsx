@@ -12,22 +12,50 @@ import { Close, Add, Delete, Business, Group, LocalShipping } from "@mui/icons-m
 import axios from "axios";
 import { getCookie } from "../utils/cookies";
 
-// Standard Custom Houses
-const CUSTOM_HOUSES = [
-  "ICD SANAND",
-  "ICD SABARMATI",
-  "THAR DRY PORT",
-  "MUNDRA SEA",
-  "HAZIRA",
-  "ANKLESHWAR ICD",
-  "ICD VARNAMA",
-  "ICD KHODIYAR",
-  "ICD SACHANA",
-  "ICD VIROCHAN NAGAR",
-  "KANDLA SEA",
-  "AHMEDABAD AIR CARGO",
-  "COCHIN SEA",
-  "COCHIN AIR CARGO"
+// Custom House options grouped by branch
+const CUSTOM_HOUSE_OPTIONS = [
+  {
+    group: "Ahmedabad",
+    branchCode: "AMD",
+    items: [
+      { value: "AHMEDABAD AIR CARGO", label: "Ahmedabad Air Cargo", code: "INAMD4" },
+      { value: "ICD SABARMATI", label: "ICD Sabarmati", code: "INSBI6" },
+      { value: "ICD SACHANA", label: "ICD SACHANA", code: "INJKA6" },
+      { value: "ICD VIROCHAN NAGAR", label: "ICD Virochan Nagar", code: "INVCN6" },
+      { value: "THAR DRY PORT", label: "THAR DRY PORT", code: "INSAU6" },
+    ],
+  },
+  {
+    group: "Baroda",
+    branchCode: "BRD",
+    items: [
+      { value: "ANKLESHWAR ICD", label: "ANKLESHWAR ICD", code: "INAKV6" },
+      { value: "ICD VARNAMA", label: "ICD VARNAMA", code: "INVRM6" },
+    ],
+  },
+  {
+    group: "Gandhidham",
+    branchCode: "GIM",
+    items: [
+      { value: "MUNDRA SEA", label: "MUNDRA SEA", code: "INMUN1" },
+      { value: "KANDLA SEA", label: "KANDLA SEA", code: "INIXY1" },
+    ],
+  },
+  {
+    group: "Cochin",
+    branchCode: "COK",
+    items: [
+      { value: "COCHIN AIR CARGO", label: "COCHIN AIR CARGO", code: "INCOK4" },
+      { value: "COCHIN SEA", label: "COCHIN SEA", code: "INCOK1" },
+    ],
+  },
+  {
+    group: "Hazira",
+    branchCode: "HAZ",
+    items: [
+      { value: "HAZIRA", label: "HAZIRA", code: "INHZA1" },
+    ],
+  },
 ];
 
 // Standard Branches
@@ -148,8 +176,30 @@ export default function CreateClientExportJobDialog({
     }));
   };
 
+  // Filter custom house options based on selected branch
+  const availableCustomHouses = React.useMemo(() => {
+    if (!formData.branch_code) {
+      return CUSTOM_HOUSE_OPTIONS.flatMap((g) => g.items);
+    }
+    const branchGroup = CUSTOM_HOUSE_OPTIONS.find(
+      (g) => g.branchCode === formData.branch_code
+    );
+    return branchGroup ? branchGroup.items : CUSTOM_HOUSE_OPTIONS.flatMap((g) => g.items);
+  }, [formData.branch_code]);
+
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === "branch_code") {
+      const branchGroup = CUSTOM_HOUSE_OPTIONS.find((g) => g.branchCode === value);
+      const validItems = branchGroup ? branchGroup.items : [];
+      const isCurrentValid = validItems.some((item) => item.value === formData.custom_house);
+      setFormData((prev) => ({
+        ...prev,
+        branch_code: value,
+        custom_house: isCurrentValid ? prev.custom_house : "",
+      }));
+      return;
+    }
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleOrgChange = (newOrg) => {
@@ -429,8 +479,14 @@ export default function CreateClientExportJobDialog({
                     onChange={(e) => handleInputChange("custom_house", e.target.value)}
                   >
                     <option value="">SELECT CUSTOM HOUSE</option>
-                    {CUSTOM_HOUSES.map((ch) => (
-                      <option key={ch} value={ch}>{ch}</option>
+                    {formData.custom_house &&
+                      !availableCustomHouses.some((ch) => ch.value === formData.custom_house) && (
+                        <option value={formData.custom_house}>{formData.custom_house}</option>
+                    )}
+                    {availableCustomHouses.map((ch) => (
+                      <option key={ch.value} value={ch.value}>
+                        {ch.label || ch.value} {ch.code ? `(${ch.code})` : ""}
+                      </option>
                     ))}
                   </select>
                 </div>
