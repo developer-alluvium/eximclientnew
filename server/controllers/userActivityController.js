@@ -31,6 +31,13 @@ export const sendHeartbeat = async (req, res) => {
       if (isActiveTab) {
         session.totalActiveSeconds = (session.totalActiveSeconds || 0) + activeSecs;
       }
+      if (userId && userId !== "anonymous") {
+        session.userId = userId;
+        session.userName = userName;
+        session.userEmail = userEmail;
+        session.userRole = userRole;
+        if (ieCode) session.ieCode = ieCode;
+      }
       await session.save();
     } else {
       session = await UserSession.create({

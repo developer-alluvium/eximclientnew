@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
-import { getCookie } from "../utils/cookies";
+import { getCookie, getJsonCookie } from "../utils/cookies";
+
+const API_BASE = process.env.REACT_APP_API_STRING || "";
 
 // Get or generate session ID per browser tab session
 const getSessionId = () => {
@@ -21,11 +23,14 @@ export const useActivityTracker = () => {
   // Helper to send headers safely
   const getHeaders = () => {
     const headers = { "Content-Type": "application/json" };
+    const eximUser = getJsonCookie("exim_user");
     const token =
       getCookie("superadmin_token") ||
       getCookie("access_token") ||
-      getCookie("exim_user_token");
-    if (token) {
+      getCookie("user_access_token") ||
+      getCookie("exim_user_token") ||
+      eximUser?.auth?.accessToken;
+    if (token && token !== "null" && token !== "undefined") {
       headers["Authorization"] = `Bearer ${token}`;
     }
     return headers;
@@ -40,7 +45,7 @@ export const useActivityTracker = () => {
 
     try {
       await axios.post(
-        "/api/activity/log-events",
+        `${API_BASE}/activity/log-events`,
         { events: eventsToSend },
         { headers: getHeaders(), withCredentials: true }
       );
@@ -55,7 +60,7 @@ export const useActivityTracker = () => {
     const isActiveTab = !document.hidden && document.hasFocus();
     try {
       await axios.post(
-        "/api/activity/heartbeat",
+        `${API_BASE}/activity/heartbeat`,
         {
           sessionId: sessionIdRef.current,
           isActiveTab,
@@ -171,9 +176,18 @@ export const useActivityTracker = () => {
     const handleUnload = () => {
       if (eventBufferRef.current.length > 0) {
         const payload = JSON.stringify({ events: eventBufferRef.current });
-        if (navigator.sendBeacon) {
-          const blob = new Blob([payload], { type: "application/json" });
-          navigator.sendBeacon("/api/activity/log-events", blob);
+        try {
+          fetch(`${API_BASE}/activity/log-events`, {
+            method: "POST",
+            headers: getHeaders(),
+            body: payload,
+            keepalive: true,
+          });
+        } catch (e) {
+          if (navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: "application/json" });
+            navigator.sendBeacon(`${API_BASE}/activity/log-events`, blob);
+          }
         }
       }
     };

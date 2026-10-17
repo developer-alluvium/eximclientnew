@@ -89,10 +89,13 @@ const run = async () => {
     }
 
     // ----------------------------------------------------
-    // 1. SEED FAKE IMPORT JOBS (jobs collection)
+    // 1. SEED FAKE IMPORT JOBS (demo_jobs collection)
     // ----------------------------------------------------
     console.log(`\nClearing existing fake import jobs for IE ${fakeIeCode}...`);
     await JobModel.deleteMany({ ie_code_no: fakeIeCode });
+
+    const DemoJobModel = mongoose.models.DemoJob || mongoose.model("DemoJob", JobModel.schema, "demo_jobs");
+    await DemoJobModel.deleteMany({ ie_code_no: fakeIeCode });
 
     const fakeImportJobs = [
       {
@@ -386,16 +389,38 @@ const run = async () => {
       }
     ];
 
-    await JobModel.insertMany(fakeImportJobs);
-    console.log(`✅ Inserted ${fakeImportJobs.length} fake import jobs into 'jobs' collection.`);
+    await DemoJobModel.insertMany(fakeImportJobs);
+    console.log(`✅ Inserted ${fakeImportJobs.length} fake import jobs into 'demo_jobs' collection.`);
 
     // ----------------------------------------------------
-    // 2. SEED FAKE EXPORT JOBS (ex_jobs collection)
+    // 2. SEED FAKE EXPORT JOBS (demo_exportjobs & demo_ex_jobs collections)
     // ----------------------------------------------------
-    const ExJobModel = mongoose.model("ExJob", new mongoose.Schema({}, { strict: false }), "ex_jobs");
+    const exportDbUri = process.env.EXPORT_MONGODB_URI || "mongodb+srv://exim:I9y5bcMUHkGHpgq2@exim.xya3qh0.mongodb.net/export";
+    let exportConn = null;
+    let DemoExportJobColl = null;
+    try {
+      exportConn = await mongoose.createConnection(exportDbUri);
+      const realExportJobColl = exportConn.collection("exportjobs");
+      await realExportJobColl.deleteMany({
+        $or: [{ ieCode: fakeIeCode }, { iec_no: fakeIeCode }, { exporter: fakeCompanyName }]
+      });
 
-    console.log(`\nClearing existing fake export jobs for IE ${fakeIeCode}...`);
-    await ExJobModel.deleteMany({
+      DemoExportJobColl = exportConn.collection("demo_exportjobs");
+      console.log(`\nClearing existing fake export jobs in 'demo_exportjobs' for IE ${fakeIeCode}...`);
+      await DemoExportJobColl.deleteMany({
+        $or: [{ ieCode: fakeIeCode }, { iec_no: fakeIeCode }, { exporter: fakeCompanyName }]
+      });
+    } catch (e) {
+      console.warn("Could not connect to export DB directly:", e.message);
+    }
+
+    const RealExJobModel = mongoose.models.ExJob || mongoose.model("ExJob", new mongoose.Schema({}, { strict: false }), "ex_jobs");
+    await RealExJobModel.deleteMany({
+      $or: [{ ieCode: fakeIeCode }, { exporter_ie_code: fakeIeCode }]
+    });
+
+    const DemoExJobModel = mongoose.models.DemoExJob || mongoose.model("DemoExJob", new mongoose.Schema({}, { strict: false }), "demo_ex_jobs");
+    await DemoExJobModel.deleteMany({
       $or: [{ ieCode: fakeIeCode }, { exporter_ie_code: fakeIeCode }]
     });
 
@@ -883,8 +908,14 @@ const run = async () => {
       }
     ];
 
-    await ExJobModel.insertMany(fakeExportJobs);
-    console.log(`✅ Inserted ${fakeExportJobs.length} fake export jobs into 'ex_jobs' collection.`);
+    await DemoExJobModel.insertMany(fakeExportJobs);
+    console.log(`✅ Inserted ${fakeExportJobs.length} fake export jobs into 'demo_ex_jobs' collection.`);
+
+    if (DemoExportJobColl) {
+      await DemoExportJobColl.insertMany(fakeExportJobs);
+      console.log(`✅ Inserted ${fakeExportJobs.length} fake export jobs into 'demo_exportjobs' collection in export database.`);
+      if (exportConn) await exportConn.close();
+    }
 
     // ----------------------------------------------------
     // 3. SEED FAKE E-LOCK DETAILS (elockdetails collection)
