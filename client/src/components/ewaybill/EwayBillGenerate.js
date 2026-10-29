@@ -2207,7 +2207,7 @@ function EwayBillGenerate({
         containerNumber: cNumber,
         container_number: cNumber,
         boeNumber: (formData.boeNumber || boeNumber || "").trim(),
-        documentType: generationMode === "batch-selected" ? "Delivery Challan" : (formData.documentType || "Bill of Entry"),
+        documentType: formData.documentType || (formData.subSupplyType === "Import" ? "Bill of Entry" : "Delivery Challan"),
         documentNumber: generationMode === "batch-selected" 
           ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${cNumber.slice(-4)}` 
           : (formData.documentNumber || boeNumber),
@@ -2224,13 +2224,9 @@ function EwayBillGenerate({
         generatorRole:
           formData.supplyType === "inward" ? "consignee" : "consignor",
         userGstin:
-          (formData.supplyType === "inward"
-            ? formData.consigneeGstin
-            : formData.consignorGstin) === "URP"
-            ? process.env.REACT_APP_DEFAULT_GSTIN || ""
-            : formData.supplyType === "inward"
-            ? formData.consigneeGstin
-            : formData.consignorGstin,
+          process.env.REACT_APP_DEFAULT_GSTIN ||
+          process.env.REACT_APP_TRANSPORTER_GSTIN ||
+          undefined,
         items: itemsPayload,
         data_source: "lrEwbUpdate", // For analytics
       },

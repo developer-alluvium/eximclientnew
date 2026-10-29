@@ -60,8 +60,22 @@ const proxyRequest = async (req, res) => {
     const headers = { ...req.headers };
     delete headers.host;
     delete headers.connection;
+    delete headers["content-length"];
+    delete headers["content-encoding"];
+    delete headers["transfer-encoding"];
     if (serviceToken) {
       headers.Authorization = `Bearer ${serviceToken}`;
+    }
+
+    let outboundBody = req.body;
+    if (outboundBody && outboundBody.formData) {
+      outboundBody = { ...outboundBody, formData: { ...outboundBody.formData } };
+      const consigneeGstin = (outboundBody.formData.consigneeGstin || "").trim().toUpperCase();
+      const consignorGstin = (outboundBody.formData.consignorGstin || "").trim().toUpperCase();
+      const userGstin = (outboundBody.formData.userGstin || "").trim().toUpperCase();
+      if (userGstin === consigneeGstin || userGstin === consignorGstin || userGstin === "URP") {
+        delete outboundBody.formData.userGstin;
+      }
     }
 
     let response;
@@ -75,9 +89,9 @@ const proxyRequest = async (req, res) => {
       });
       
       // Merge other text fields if present
-      if (req.body) {
-        Object.keys(req.body).forEach(key => {
-          form.append(key, req.body[key]);
+      if (outboundBody) {
+        Object.keys(outboundBody).forEach(key => {
+          form.append(key, outboundBody[key]);
         });
       }
 
@@ -98,7 +112,7 @@ const proxyRequest = async (req, res) => {
       response = await axios({
         method: req.method,
         url: targetUrl,
-        data: req.body,
+        data: outboundBody,
         headers: headers,
         params: req.query,
         timeout: 30000,
@@ -1024,12 +1038,31 @@ router.post("/generate", authenticateUser, async (req, res) => {
     const headers = { ...req.headers };
     delete headers.host;
     delete headers.connection;
+    delete headers["content-length"];
+    delete headers["content-encoding"];
+    delete headers["transfer-encoding"];
     if (serviceToken) {
       headers.Authorization = `Bearer ${serviceToken}`;
     }
 
+    // Sanitize outbound request body:
+    // If userGstin was mistakenly passed as the consignee or consignor GSTIN,
+    // delete it so eximtransport uses its configured EWAY_BILL_*_GSTIN from .env.
+    // Otherwise Masters India will reject with 204 ("GSTIN is not mapped with logged-in user").
+    const outboundBody = { ...req.body };
+    if (outboundBody.formData) {
+      outboundBody.formData = { ...outboundBody.formData };
+      const consigneeGstin = (outboundBody.formData.consigneeGstin || "").trim().toUpperCase();
+      const consignorGstin = (outboundBody.formData.consignorGstin || "").trim().toUpperCase();
+      const userGstin = (outboundBody.formData.userGstin || "").trim().toUpperCase();
+      if (userGstin === consigneeGstin || userGstin === consignorGstin || userGstin === "URP") {
+        console.log(`🧹 [EWB Proxy] Removing mapped party userGstin (${userGstin}) so transport service uses its configured GSP GSTIN`);
+        delete outboundBody.formData.userGstin;
+      }
+    }
+
     console.log(`📡 [EWB SaaS Billing] Proxying generate request to Transport API: ${targetUrl}`);
-    const downstreamRes = await axios.post(targetUrl, req.body, {
+    const downstreamRes = await axios.post(targetUrl, outboundBody, {
       headers,
       params: req.query,
       timeout: 60000,

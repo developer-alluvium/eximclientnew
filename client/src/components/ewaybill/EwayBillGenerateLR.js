@@ -1408,8 +1408,9 @@ function EwayBillGenerateLR({
   }, 0);
 
   const getEffectiveUserGstin = (fd = formData) => {
-    const val = (fd.userGstin || (fd.supplyType === 'inward' ? fd.consigneeGstin : fd.consignorGstin) || "").toString().trim().toUpperCase();
-    return (val && val !== "URP") ? val : (process.env.REACT_APP_DEFAULT_GSTIN || "");
+    const defaultGstin = (process.env.REACT_APP_DEFAULT_GSTIN || process.env.REACT_APP_TRANSPORTER_GSTIN || "").toString().trim().toUpperCase();
+    const val = (fd.userGstin || defaultGstin).toString().trim().toUpperCase();
+    return (val && val !== "URP") ? val : defaultGstin;
   };
 
   const handleTransporterChange = (e) => {
@@ -1738,7 +1739,7 @@ function EwayBillGenerateLR({
         containerNumber: cNumber,
         container_number: cNumber,
         boeNumber: (formData.boeNumber || boeNumber || "").trim(),
-        documentType: generationMode === "batch-selected" ? "Delivery Challan" : (formData.documentType || "Bill of Entry"),
+        documentType: formData.documentType || (formData.subSupplyType === "Import" ? "Bill of Entry" : "Delivery Challan"),
         documentNumber: generationMode === "batch-selected" 
           ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${cNumber.slice(-4)}` 
           : (formData.documentNumber || boeNumber),
@@ -2026,7 +2027,7 @@ function EwayBillGenerateLR({
           <input list="states" className={ic("consignorState")} name="consignorState" value={formData.consignorState || formData.dispatchFromState} onChange={handleInputChange} placeholder="Origin State" />
         </Field>
         <Field label="User GSTIN" req name="userGstin" hint="Used as Transporter ID">
-          <input className={ic("userGstin")} name="userGstin" value={formData.userGstin || (formData.supplyType === 'inward' ? formData.consigneeGstin : formData.consignorGstin)} onChange={handleInputChange} placeholder="Your GSTIN" />
+          <input className={ic("userGstin")} name="userGstin" value={formData.userGstin || process.env.REACT_APP_DEFAULT_GSTIN || ""} onChange={handleInputChange} placeholder="Your GSTIN" />
         </Field>
       </div>
       <div className="ewb-grid cols-2" style={{ marginBottom: 14 }}>
