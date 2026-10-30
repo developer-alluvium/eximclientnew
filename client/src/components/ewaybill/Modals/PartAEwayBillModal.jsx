@@ -33,20 +33,48 @@ import {
   isCombinedEwb,
 } from "../ewbContainerCoverage";
 
-const parseAnyDate = (dateStr) => {
-  if (!dateStr) return new Date();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(dateStr);
-  const parts = dateStr.split(/[-/]/);
-  if (parts.length === 3) {
-    if (parts[2].length === 4) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      return new Date(year, month, day);
+export const parseBoeDate = (dateStr) => {
+  if (!dateStr || dateStr === "0") return "";
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    const y = dateStr.getFullYear();
+    const m = String(dateStr.getMonth() + 1).padStart(2, "0");
+    const d = String(dateStr.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof dateStr !== "string") {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const dt = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${dt}`;
+      }
+      return "";
+    } catch (e) {
+      return "";
     }
   }
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? new Date() : d;
+  const cleanStr = dateStr.trim();
+  if (cleanStr.includes("/")) {
+    const parts = cleanStr.split("/");
+    if (parts.length === 3) {
+      const yr = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+      return `${yr}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    }
+  }
+  if (cleanStr.includes("-")) {
+    const parts = cleanStr.split("-");
+    if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+      // DD-MM-YYYY
+      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    }
+    if (parts.length === 3 && parts[0].length === 4) {
+      // YYYY-MM-DD
+      return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].substring(0, 2).padStart(2, "0")}`;
+    }
+  }
+  return cleanStr;
 };
 
 const getContainerWeight = (c) =>
@@ -78,8 +106,23 @@ const PartAEwayBillModal = ({
   const allContainers = useMemo(() => selectedContainers || [], [selectedContainers]);
   const hasMultiple = allContainers.length > 1;
 
-  const parsedDate = parseAnyDate(beDate);
-  const formattedDate = parsedDate.toISOString().split("T")[0];
+  const boeDetail = boeData?.data || boeData || {};
+  const importerDetails = boeDetail.ImporterDetails || {};
+  const invoiceDetails = boeDetail.InvoiceAndItemDetails || {};
+  const extractedBoeDate =
+    importerDetails["BE Date"] ||
+    importerDetails["BE_DATE"] ||
+    importerDetails["be_date"] ||
+    invoiceDetails.BE_DATE ||
+    invoiceDetails.document_date ||
+    boeDetail.BE_DATE ||
+    boeDetail.document_date ||
+    boeDetail.be_date ||
+    boeData?.documentDate ||
+    "";
+
+  const resolvedBeDate = beDate || extractedBoeDate || "";
+  const formattedDate = parseBoeDate(resolvedBeDate) || "";
 
   const getExistingEwbForContainer = useCallback(
     (cont) => findEwbForContainer(cont, existingEwbs, beNo),

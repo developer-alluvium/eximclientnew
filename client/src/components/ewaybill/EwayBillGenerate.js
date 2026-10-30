@@ -8,6 +8,7 @@ import {
   runClientSideValidations,
   isSezGstin,
   validateVehicleNumber as validateVehicleFormat,
+  getStateFromPin,
 } from "./ewbValidationHelpers";
 import { getExistingEwbForContainer } from "./ewbContainerCoverage";
 
@@ -294,6 +295,51 @@ const extractEwbNumberClient = (obj) => {
   return null;
 };
 
+// Helper: Parse date from DD/MM/YYYY, DD-MM-YYYY, or YYYY-MM-DD to YYYY-MM-DD
+export const parseBoeDate = (dateStr) => {
+  if (!dateStr || dateStr === '0') return "";
+  if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+    const y = dateStr.getFullYear();
+    const m = String(dateStr.getMonth() + 1).padStart(2, '0');
+    const d = String(dateStr.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof dateStr !== 'string') {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dt = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dt}`;
+      }
+      return "";
+    } catch (e) {
+      return "";
+    }
+  }
+  const cleanStr = dateStr.trim();
+  if (cleanStr.includes('/')) {
+    const parts = cleanStr.split('/');
+    if (parts.length === 3) {
+      const yr = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+      return `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  if (cleanStr.includes('-')) {
+    const parts = cleanStr.split('-');
+    if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+      // DD-MM-YYYY
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    if (parts.length === 3 && parts[0].length === 4) {
+      // YYYY-MM-DD
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+    }
+  }
+  return cleanStr;
+};
+
 function EwayBillGenerate({ 
   asDialog = false, 
   action = "", // "generate" or "update"
@@ -370,8 +416,8 @@ function EwayBillGenerate({
   // ---- BOE State ----
   const [boeList, setBoeList] = useState([]); // autocomplete list from PrData.document_no
   const [selectedBoe, setSelectedBoe] = useState(null); // selected from autocomplete
-  const [boeNumber, setBoeNumber] = useState('');
-  const [boeDate, setBoeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [boeNumber, setBoeNumber] = useState(prefilledDocNo || '');
+  const [boeDate, setBoeDate] = useState(() => (prefilledDocDate ? parseBoeDate(prefilledDocDate) : new Date().toISOString().split('T')[0]));
   const [boeLoading, setBoeLoading] = useState(!!prefilledDocNo && !boeData);
   const [boeLrLoading, setBoeLrLoading] = useState(false); // loading for internal LR lookup
   const [boeLrData, setBoeLrData] = useState(null); // internal LR data fetched on BOE select
@@ -590,6 +636,12 @@ function EwayBillGenerate({
           });
         }
       } else if (generationMode === "batch-selected") {
+        // Fetch BOE automatically if not already provided or fetched
+        if (boeNumber && !autoFetchedBoe && !boeData) {
+          setAutoFetchedBoe(true);
+          handleBoeFetch();
+        }
+
         // Scenario 3: Individual Generation Flow
         // If there's 1 container, pre-fill its assessable value 
         if (selectedContainers.length === 1 && (containerAssessableValues[firstContainer._id] || firstContainer.container_gross_weight || firstContainer.gross_weight)) {
@@ -669,8 +721,9 @@ function EwayBillGenerate({
         if (isImport && hasDocNo && action !== "update" && !boeAutoFetched) {
           // Switch to BOE tab for imports if we are generating
           setActiveTab('boe');
-          const docNo = prData.document_no;
-          const docDate = prData.document_date ? new Date(prData.document_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+          const docNo = prData.document_no || prData.be_no || prefilledDocNo;
+          const rawDate = prData.document_date || prData.be_date || prData.boe_date || prefilledDocDate;
+          const docDate = rawDate ? parseBoeDate(rawDate) : new Date().toISOString().split('T')[0];
           
           setBoeNumber(docNo);
           setBoeDate(docDate);
@@ -695,7 +748,30 @@ function EwayBillGenerate({
         }
       }
     }
-  }, [asDialog, action, existingEwb, prData, prefilledLrId, boeList, boeOnly]);
+  }, [asDialog, action, existingEwb, prData, prefilledLrId, boeList, boeOnly, prefilledDocNo, prefilledDocDate]);
+
+  useEffect(() => {
+    if (prefilledDocNo) {
+      setBoeNumber(prefilledDocNo);
+      setFormData(prev => ({
+        ...prev,
+        documentNumber: prefilledDocNo
+      }));
+    }
+  }, [prefilledDocNo]);
+
+  useEffect(() => {
+    if (prefilledDocDate) {
+      const parsed = parseBoeDate(prefilledDocDate);
+      if (parsed) {
+        setBoeDate(parsed);
+        setFormData(prev => ({
+          ...prev,
+          documentDate: parsed
+        }));
+      }
+    }
+  }, [prefilledDocDate]);
 
   // BUG-09: Auto-fetch distance when pincodes are available
   useEffect(() => {
@@ -1177,19 +1253,6 @@ function EwayBillGenerate({
     }
   };
 
-  // Helper: Parse date from DD/MM/YYYY to YYYY-MM-DD
-  const parseBoeDate = (dateStr) => {
-    if (!dateStr || dateStr === '0') return new Date().toISOString().split('T')[0];
-    if (dateStr.includes('/')) {
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        const yr = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-        return `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      }
-    }
-    return dateStr;
-  };
-
   const populateFromBoe = (record, lrData = null) => {
     setIsPartBOnly(false);
     setExistingEwbNo('');
@@ -1345,18 +1408,51 @@ function EwayBillGenerate({
 
     setContainerWeights(initialWeights);
 
-    // Auto-fill Part A Document No and Date
-    const docNoVal = boeDetail.BE_NO || boeDetail.document_no || boeNumber;
-    let docDateVal = boeDetail.BE_DATE || boeDetail.document_date || boeDate;
-    
-    // Ensure BE date is in YYYY-MM-DD for the input[type=date]
-    if (docDateVal) {
-      docDateVal = parseBoeDate(docDateVal);
+    // Auto-fill Part A Document No and Date directly from extracted BOE details
+    const extractedBeDate =
+      importerDetails['BE Date'] ||
+      importerDetails['BE_DATE'] ||
+      importerDetails['be_date'] ||
+      importerDetails['document_date'] ||
+      invoiceDetails?.BE_DATE ||
+      invoiceDetails?.document_date ||
+      boeDetail.BE_DATE ||
+      boeDetail.document_date ||
+      boeDetail.be_date ||
+      record.document_date ||
+      record.be_date ||
+      record.BE_DATE ||
+      null;
+
+    const extractedDocNo =
+      importerDetails['BE No'] ||
+      importerDetails['BE_NO'] ||
+      importerDetails['be_no'] ||
+      invoiceDetails?.BE_NO ||
+      invoiceDetails?.document_no ||
+      boeDetail.BE_NO ||
+      boeDetail.document_no ||
+      boeDetail.be_no ||
+      record.document_no ||
+      record.be_no ||
+      record.BE_NO ||
+      boeNumber ||
+      "";
+
+    let docDateVal = extractedBeDate
+      ? parseBoeDate(extractedBeDate)
+      : (prefilledDocDate ? parseBoeDate(prefilledDocDate) : parseBoeDate(boeDate));
+
+    if (extractedBeDate) {
+      setBoeDate(docDateVal);
+    }
+    if (extractedDocNo) {
+      setBoeNumber(extractedDocNo);
     }
     
     setFormData(f => ({
       ...f,
-      documentNumber: docNoVal,
+      documentNumber: extractedDocNo,
       documentDate: docDateVal
     }));
 
@@ -1406,8 +1502,8 @@ function EwayBillGenerate({
         ...prev,
         ...modeDefaults,
         // BOE-specific defaults
-        documentNumber: boeNumber || importerDetails['BE No'] || "",
-        documentDate: parseBoeDate(boeDate || importerDetails['BE Date']),
+        documentNumber: extractedDocNo || prev.documentNumber || "",
+        documentDate: docDateVal || prev.documentDate,
 
         // Consignor — API data takes priority for BOE extraction
         consignorName: supplierName || consignorSrc?.name || "",
@@ -1417,11 +1513,13 @@ function EwayBillGenerate({
         consignorCity: consignorCity,
         consignorPincode: consignorPincode,
 
-        // Sync Dispatch From by default
-        dispatchFromAddress1: consignorAddress,
-        dispatchFromCity: consignorCity,
-        dispatchFromPincode: consignorPincode,
-        dispatchFromState: consignorState,
+        // Sync Dispatch From by default (preserve Indian dispatch PIN if already present)
+        dispatchFromAddress1: prev.dispatchFromAddress1 || consignorAddress,
+        dispatchFromCity: prev.dispatchFromCity || consignorCity,
+        dispatchFromPincode: (prev.dispatchFromPincode && prev.dispatchFromPincode !== "999999") ? prev.dispatchFromPincode : (isImport ? "" : consignorPincode),
+        dispatchFromState: (prev.dispatchFromState && prev.dispatchFromState !== "Other Country")
+          ? prev.dispatchFromState
+          : (isImport ? (getStateFromPin(prev.dispatchFromPincode) || consigneeState || "Gujarat") : consignorState),
 
         // Consignee — API data takes priority for BOE extraction
         consigneeName: buyerName || consigneeSrc?.name || "",
@@ -1447,7 +1545,7 @@ function EwayBillGenerate({
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2)
           : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummary['TOT.ASS VAL'] || "")),
-        transportDistance: prev.partAOnly ? '' : ((isImport || consignorPincode === "999999" || consigneePincode === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000)),
+        transportDistance: prev.partAOnly ? '' : (prev.transportDistance || ((isImport || consignorPincode === "999999" || consigneePincode === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || 0), 4000))),
       };
 
       // If we have selected containers, update the first item with combined weight and calculated assessable value
@@ -1502,23 +1600,35 @@ function EwayBillGenerate({
       
       // Prefill BOE number and date fields in UI
       const boeDetail = boeData.data || boeData;
+      const importerDetails = boeDetail.ImporterDetails || {};
       const invoiceDetails = boeDetail.InvoiceAndItemDetails || {};
-      const docNo = invoiceDetails.BE_NO || invoiceDetails.document_no || boeData.documentNumber
-        || boeDetail?.ImporterDetails?.['BE No'] || "";
+      const docNo =
+        importerDetails['BE No'] ||
+        importerDetails['BE_NO'] ||
+        invoiceDetails.BE_NO ||
+        invoiceDetails.document_no ||
+        boeData.documentNumber ||
+        "";
       if (docNo) {
         setBoeNumber(docNo);
       }
       
-      const rawBoeDate = invoiceDetails.BE_DATE || invoiceDetails.document_date || "";
+      const rawBoeDate =
+        importerDetails['BE Date'] ||
+        importerDetails['BE_DATE'] ||
+        invoiceDetails.BE_DATE ||
+        invoiceDetails.document_date ||
+        boeData.documentDate ||
+        "";
       if (rawBoeDate) {
-        if (rawBoeDate.includes("/")) {
-          const parts = rawBoeDate.split("/");
-          if (parts.length === 3) {
-            const formatted = `${parts[2].length === 2 ? "20" + parts[2] : parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-            setBoeDate(formatted);
-          }
-        } else {
-          setBoeDate(rawBoeDate);
+        const resolvedDate = parseBoeDate(rawBoeDate);
+        if (resolvedDate) {
+          setBoeDate(resolvedDate);
+          setFormData(prev => ({
+            ...prev,
+            documentDate: resolvedDate,
+            documentNumber: docNo || prev.documentNumber,
+          }));
         }
       }
     }
@@ -1715,11 +1825,37 @@ function EwayBillGenerate({
       if (isDispatchSame) {
         if (["dispatchFromAddress1", "dispatchFromCity", "dispatchFromPincode"].includes(name)) {
           const suffix = name.replace("dispatchFrom", "");
-          newData[`consignor${suffix}`] = value;
+          const isImportShipment =
+            newData.subSupplyType === "Import" ||
+            newData.supplyType === "inward" ||
+            newData.consignorState === "Other Country" ||
+            newData.consignorGstin === "URP";
+
+          if (name === "dispatchFromPincode" && isImportShipment) {
+            // For imports, consignor is foreign and MUST retain 999999 pincode
+            newData.consignorPincode = "999999";
+            if (/^\d{6}$/.test(value) && value !== "999999") {
+              const matchedState = getStateFromPin(value);
+              if (matchedState) {
+                newData.dispatchFromState = matchedState;
+              }
+            }
+          } else {
+            newData[`consignor${suffix}`] = value;
+          }
         }
         // State is still driven from consignor in Bill From section
         if (name === "consignorState") {
-          newData.dispatchFromState = value;
+          if (newData.subSupplyType !== "Import") {
+            newData.dispatchFromState = value;
+          }
+        }
+      }
+
+      if (name === "dispatchFromPincode" && /^\d{6}$/.test(value) && value !== "999999") {
+        const matchedState = getStateFromPin(value);
+        if (matchedState && (!newData.dispatchFromState || newData.dispatchFromState === "Other Country")) {
+          newData.dispatchFromState = matchedState;
         }
       }
 
@@ -2196,6 +2332,31 @@ function EwayBillGenerate({
 
     const cNumber = (container.container_number || container.container_no || "").trim().toUpperCase();
 
+    const isImportMode =
+      formData.subSupplyType === "Import" ||
+      formData.supplyType === "inward" ||
+      formData.consignorState === "Other Country" ||
+      formData.consignorGstin === "URP";
+
+    let resolvedConsignorPincode = formData.consignorPincode;
+    let resolvedDispatchState = formData.dispatchFromState;
+    let resolvedDispatchPincode = formData.dispatchFromPincode;
+    if (isImportMode) {
+      resolvedConsignorPincode = "999999";
+      if (formData.dispatchFromPincode && /^[1-9][0-9]{5}$/.test(String(formData.dispatchFromPincode).trim()) && String(formData.dispatchFromPincode).trim() !== "999999") {
+        resolvedDispatchPincode = String(formData.dispatchFromPincode).trim();
+        resolvedDispatchState = getStateFromPin(formData.dispatchFromPincode) || formData.dispatchFromState || "Gujarat";
+      } else {
+        resolvedDispatchState = "Other Country";
+        resolvedDispatchPincode = "999999";
+      }
+    }
+
+    const cleanDocNo = (formData.documentNumber || boeNumber || "").split("-CH-")[0].trim();
+    const resolvedDocNo = (isImportMode || formData.documentType === "Bill of Entry")
+      ? cleanDocNo
+      : (generationMode === "batch-selected" ? `${cleanDocNo}-CH-${cNumber.slice(-4)}` : cleanDocNo);
+
     return {
       lrId: lrId,
       containerId: cNumber || container?._id || containerObj?._id,
@@ -2203,14 +2364,16 @@ function EwayBillGenerate({
       container_number: cNumber,
       formData: {
         ...formData,
+        consignorState: isImportMode ? "Other Country" : formData.consignorState,
+        consignorPincode: resolvedConsignorPincode,
+        dispatchFromState: resolvedDispatchState,
+        dispatchFromPincode: resolvedDispatchPincode,
         containerId: cNumber || container?._id || containerObj?._id,
         containerNumber: cNumber,
         container_number: cNumber,
-        boeNumber: (formData.boeNumber || boeNumber || "").trim(),
-        documentType: formData.documentType || (formData.subSupplyType === "Import" ? "Bill of Entry" : "Delivery Challan"),
-        documentNumber: generationMode === "batch-selected" 
-          ? `${(formData.documentNumber || boeNumber || "").trim()}-CH-${cNumber.slice(-4)}` 
-          : (formData.documentNumber || boeNumber),
+        boeNumber: cleanDocNo,
+        documentType: formData.documentType || (isImportMode ? "Bill of Entry" : "Delivery Challan"),
+        documentNumber: resolvedDocNo,
         totalInvoiceValue: totalInvoiceValue,
         taxableAmount: taxable,
         calculatedAssessableValue: containerValue.assessableValue,
@@ -2647,11 +2810,41 @@ function EwayBillGenerate({
         };
       });
 
+      const isImportMode =
+        formData.subSupplyType === "Import" ||
+        formData.supplyType === "inward" ||
+        formData.consignorState === "Other Country" ||
+        formData.consignorGstin === "URP";
+
+      let resolvedConsignorPincode = formData.consignorPincode;
+      let resolvedDispatchState = formData.dispatchFromState;
+      let resolvedDispatchPincode = formData.dispatchFromPincode;
+      if (isImportMode) {
+        resolvedConsignorPincode = "999999";
+        if (formData.dispatchFromPincode && /^[1-9][0-9]{5}$/.test(String(formData.dispatchFromPincode).trim()) && String(formData.dispatchFromPincode).trim() !== "999999") {
+          resolvedDispatchPincode = String(formData.dispatchFromPincode).trim();
+          resolvedDispatchState = getStateFromPin(formData.dispatchFromPincode) || formData.dispatchFromState || "Gujarat";
+        } else {
+          resolvedDispatchState = "Other Country";
+          resolvedDispatchPincode = "999999";
+        }
+      }
+
+      const cleanDocNo = (formData.documentNumber || boeNumber || "").split("-CH-")[0].trim();
+      const resolvedDocNo = (isImportMode || formData.documentType === "Bill of Entry") ? cleanDocNo : (formData.documentNumber || cleanDocNo);
+
       const payload = {
         lrId: lrId,
         containerId: contId,
         formData: {
           ...formData,
+          consignorState: isImportMode ? "Other Country" : formData.consignorState,
+          consignorPincode: resolvedConsignorPincode,
+          dispatchFromState: resolvedDispatchState,
+          dispatchFromPincode: resolvedDispatchPincode,
+          documentType: formData.documentType || (isImportMode ? "Bill of Entry" : "Tax Invoice"),
+          documentNumber: resolvedDocNo,
+          boeNumber: cleanDocNo,
           totalInvoiceValue: parseFloat(formData.totalInvoiceValue) || 0,
           taxableAmount: taxableTotal,
           cgstAmount: cgstTotal,
@@ -2663,13 +2856,9 @@ function EwayBillGenerate({
           transporterId: formData.transporterId || undefined,
           generatorRole: formData.supplyType === 'inward' ? 'consignee' : 'consignor',
           userGstin:
-            (formData.supplyType === "inward"
-              ? formData.consigneeGstin
-              : formData.consignorGstin) === "URP"
-              ? process.env.REACT_APP_DEFAULT_GSTIN || ""
-              : formData.supplyType === "inward"
-              ? formData.consigneeGstin
-              : formData.consignorGstin,
+            process.env.REACT_APP_DEFAULT_GSTIN ||
+            process.env.REACT_APP_TRANSPORTER_GSTIN ||
+            undefined,
           items: itemsPayload,
           // Multi-container metadata for billing & tracking
           selectedContainerCount: (selectedContainers && selectedContainers.length > 0) ? selectedContainers.length : 1,
@@ -4196,9 +4385,7 @@ function EwayBillGenerate({
                             name="dispatchFromState" 
                             value={formData.dispatchFromState} 
                             onChange={handleInputChange}
-                            readOnly={true}
-                            style={{ background: '#f8fafc', color: '#64748b' }}
-                            placeholder="State linked to Bill From"
+                            placeholder="Dispatch State" 
                           />
                           {renderFieldError("dispatchFromState")}
                         </div>

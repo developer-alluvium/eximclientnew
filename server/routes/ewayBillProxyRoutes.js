@@ -48,6 +48,42 @@ const getTargetUrl = () => {
     : "https://eximbot.alvision.in/transport/api/eway-bill";
 };
 
+const PIN_PREFIX_TO_STATE = [
+  { prefixes: ["36", "37", "38", "39"], state: "Gujarat" },
+  { prefixes: ["40", "41", "42", "43", "44"], state: "Maharashtra" },
+  { prefixes: ["11"], state: "Delhi" },
+  { prefixes: ["12", "13"], state: "Haryana" },
+  { prefixes: ["14", "15"], state: "Punjab" },
+  { prefixes: ["16"], state: "Chandigarh" },
+  { prefixes: ["17"], state: "Himachal Pradesh" },
+  { prefixes: ["18", "19"], state: "Jammu and Kashmir" },
+  { prefixes: ["20", "21", "22", "23", "24", "25", "26", "27", "28"], state: "Uttar Pradesh" },
+  { prefixes: ["30", "31", "32", "33", "34"], state: "Rajasthan" },
+  { prefixes: ["45", "46", "47", "48"], state: "Madhya Pradesh" },
+  { prefixes: ["49"], state: "Chhattisgarh" },
+  { prefixes: ["50"], state: "Telangana" },
+  { prefixes: ["51", "52", "53"], state: "Andhra Pradesh" },
+  { prefixes: ["56", "57", "58", "59"], state: "Karnataka" },
+  { prefixes: ["60", "61", "62", "63", "64"], state: "Tamil Nadu" },
+  { prefixes: ["67", "68", "69"], state: "Kerala" },
+  { prefixes: ["70", "71", "72", "73", "74"], state: "West Bengal" },
+  { prefixes: ["75", "76", "77"], state: "Odisha" },
+  { prefixes: ["78"], state: "Assam" },
+  { prefixes: ["79"], state: "Arunachal Pradesh" },
+  { prefixes: ["80", "81", "82", "83", "84", "85"], state: "Bihar" }
+];
+
+const getStateFromPin = (pin) => {
+  if (!pin) return "";
+  const cleanPin = String(pin).trim();
+  if (cleanPin === "999999") return "Other Country";
+  const p3 = cleanPin.substring(0, 3);
+  if (p3 === "403") return "Goa";
+  const p2 = cleanPin.substring(0, 2);
+  const found = PIN_PREFIX_TO_STATE.find(item => item.prefixes.includes(p2));
+  return found ? found.state : "";
+};
+
 // Generic proxy handler
 const proxyRequest = async (req, res) => {
   try {
@@ -75,6 +111,54 @@ const proxyRequest = async (req, res) => {
       const userGstin = (outboundBody.formData.userGstin || "").trim().toUpperCase();
       if (userGstin === consigneeGstin || userGstin === consignorGstin || userGstin === "URP") {
         delete outboundBody.formData.userGstin;
+      }
+
+      const isImport =
+        outboundBody.formData.subSupplyType === "Import" ||
+        outboundBody.formData.subSupplyType === "2" ||
+        String(outboundBody.formData.supplyType || "").toLowerCase() === "inward" ||
+        consignorGstin === "URP" ||
+        outboundBody.formData.consignorState === "Other Country";
+
+      if (isImport) {
+        outboundBody.formData.consignorState = "Other Country";
+        outboundBody.formData.consignorPincode = "999999";
+
+        // Clean documentNumber to strictly pure BOE number without container suffix (-CH-xxxx)
+        if (outboundBody.formData.documentNumber && String(outboundBody.formData.documentNumber).includes("-CH-")) {
+          outboundBody.formData.documentNumber = String(outboundBody.formData.documentNumber).split("-CH-")[0].trim();
+        }
+
+        const rawDispatchPin = outboundBody.formData.dispatchFromPincode || outboundBody.formData.actualFromPincode;
+        if (rawDispatchPin && /^[1-9][0-9]{5}$/.test(String(rawDispatchPin).trim()) && String(rawDispatchPin).trim() !== "999999") {
+          outboundBody.formData.dispatchFromPincode = String(rawDispatchPin).trim();
+          outboundBody.formData.actualFromPincode = parseInt(String(rawDispatchPin).trim(), 10);
+          if (!outboundBody.formData.dispatchFromState || outboundBody.formData.dispatchFromState === "Other Country") {
+            outboundBody.formData.dispatchFromState = String(rawDispatchPin).startsWith("38") ? "Gujarat" : outboundBody.formData.dispatchFromState;
+          }
+        } else {
+          outboundBody.formData.dispatchFromState = "Other Country";
+          outboundBody.formData.dispatchFromPincode = "999999";
+        }
+
+        if (!outboundBody.formData.documentType || outboundBody.formData.documentType === "Delivery Challan") {
+          outboundBody.formData.documentType = "Bill of Entry";
+        }
+      }
+    }
+
+    let matchedJob = null;
+    const beNo = req.query.be_no || req.query.document_no;
+    if (beNo && (req.path === "/boe-extract" || req.path === "/boe-value-calc")) {
+      if (!req.query.be_date || String(req.query.be_date).trim() === "") {
+        try {
+          matchedJob = await Job.findOne({ be_no: beNo }).lean();
+          if (matchedJob && matchedJob.be_date) {
+            req.query.be_date = matchedJob.be_date;
+          }
+        } catch (err) {
+          console.warn("Job lookup for be_date in proxy:", err.message);
+        }
       }
     }
 
@@ -118,6 +202,46 @@ const proxyRequest = async (req, res) => {
         timeout: 30000,
         validateStatus: () => true
       });
+    }
+
+    // Auto-retry with Job.be_date if request failed and be_date in query was missing/mismatched
+    if (response.status >= 400 && (req.path === "/boe-extract" || req.path === "/boe-value-calc") && beNo) {
+      if (!matchedJob) {
+        try {
+          matchedJob = await Job.findOne({ be_no: beNo }).lean();
+        } catch (_) {}
+      }
+      if (matchedJob && matchedJob.be_date && matchedJob.be_date !== req.query.be_date) {
+        const retryQuery = { ...req.query, be_date: matchedJob.be_date };
+        console.log(`🔄 [Proxy E-Way Bill] Retrying ${req.path} with job.be_date:`, matchedJob.be_date);
+        const retryResponse = await axios({
+          method: req.method,
+          url: targetUrl,
+          data: outboundBody,
+          headers: headers,
+          params: retryQuery,
+          timeout: 30000,
+          validateStatus: () => true
+        });
+        if (retryResponse.status < 400) {
+          response = retryResponse;
+        }
+      }
+    }
+
+    if (req.path === "/boe-value-calc" && response.data && response.data.success && response.data.data) {
+      if (!response.data.data.beDate) {
+        if (!matchedJob && beNo) {
+          try {
+            matchedJob = await Job.findOne({ be_no: beNo }).lean();
+          } catch (_) {}
+        }
+        if (matchedJob && matchedJob.be_date) {
+          response.data.data.beDate = matchedJob.be_date;
+        } else if (req.query.be_date) {
+          response.data.data.beDate = req.query.be_date;
+        }
+      }
     }
 
     if (req.path === "/boe-lr-data" && response.data && response.data.success && response.data.data) {
@@ -435,6 +559,23 @@ router.post("/others/upload-boe", authenticateUser, upload.single("file"), async
         if (enrichRes.data && enrichRes.data.success !== false) {
           enrichedData = enrichRes.data;
           console.log("✅ [Others Upload] boe-extract enrichment successful — data saved to record (no repeat call needed)");
+          
+          const enrichDetail = enrichedData.data || enrichedData;
+          const enrichImporter = enrichDetail.ImporterDetails || {};
+          const extDate = enrichImporter["BE Date"] || enrichImporter["BE_DATE"] || enrichDetail.BE_DATE || "";
+          if (extDate && !boeDate) {
+            if (extDate.includes("/")) {
+              const parts = extDate.split("/");
+              if (parts.length === 3) {
+                const formatted = `${parts[2].length === 2 ? "20" + parts[2] : parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+                const d = new Date(formatted);
+                if (!isNaN(d.getTime())) boeDate = d;
+              }
+            } else {
+              const d = new Date(extDate);
+              if (!isNaN(d.getTime())) boeDate = d;
+            }
+          }
         }
       } catch (enrichErr) {
         console.warn("⚠️ [Others Upload] boe-extract enrichment failed (non-critical):", enrichErr.message);
@@ -1058,6 +1199,53 @@ router.post("/generate", authenticateUser, async (req, res) => {
       if (userGstin === consigneeGstin || userGstin === consignorGstin || userGstin === "URP") {
         console.log(`🧹 [EWB Proxy] Removing mapped party userGstin (${userGstin}) so transport service uses its configured GSP GSTIN`);
         delete outboundBody.formData.userGstin;
+      }
+
+      // Safeguard 1: Document Type for Import / URP Consignor must be "Bill of Entry"
+      // Safeguard 1: Import normalization to comply with NIC Rule 437
+      const isImport =
+        (outboundBody.formData.subSupplyType || "").toLowerCase() === "import" ||
+        outboundBody.formData.subSupplyType === "2" ||
+        String(outboundBody.formData.supplyType || "").toLowerCase() === "inward" ||
+        consignorGstin === "URP" ||
+        outboundBody.formData.consignorState === "Other Country";
+
+      if (isImport) {
+        console.log(`📄 [EWB Proxy] Normalizing Import payload to Bill of Entry & preserving valid dispatch details`);
+        outboundBody.formData.documentType = "Bill of Entry";
+        outboundBody.formData.consignorState = "Other Country";
+        outboundBody.formData.consignorPincode = "999999";
+
+        // Clean documentNumber to strictly pure BOE number without container suffix (-CH-xxxx)
+        if (outboundBody.formData.documentNumber && String(outboundBody.formData.documentNumber).includes("-CH-")) {
+          outboundBody.formData.documentNumber = String(outboundBody.formData.documentNumber).split("-CH-")[0].trim();
+        }
+
+        const rawDispatchPin = outboundBody.formData.dispatchFromPincode || outboundBody.formData.actualFromPincode;
+        if (rawDispatchPin && /^[1-9][0-9]{5}$/.test(String(rawDispatchPin).trim()) && String(rawDispatchPin).trim() !== "999999") {
+          outboundBody.formData.dispatchFromPincode = String(rawDispatchPin).trim();
+          outboundBody.formData.actualFromPincode = parseInt(String(rawDispatchPin).trim(), 10);
+          if (!outboundBody.formData.dispatchFromState || outboundBody.formData.dispatchFromState === "Other Country") {
+            outboundBody.formData.dispatchFromState = String(rawDispatchPin).startsWith("38") ? "Gujarat" : outboundBody.formData.dispatchFromState;
+          }
+        } else {
+          outboundBody.formData.dispatchFromState = "Other Country";
+          outboundBody.formData.dispatchFromPincode = "999999";
+        }
+      } else {
+        // Safeguard 2: Ensure dispatchFromPincode is set from form value if provided (domestic)
+        const rawDispatchPin = outboundBody.formData.dispatchFromPincode || outboundBody.formData.actualFromPincode;
+        if (rawDispatchPin && /^[1-9][0-9]{5}$/.test(String(rawDispatchPin).trim())) {
+          outboundBody.formData.dispatchFromPincode = String(rawDispatchPin).trim();
+          outboundBody.formData.actualFromPincode = parseInt(String(rawDispatchPin).trim(), 10);
+        }
+      }
+
+      // Safeguard 3: Preserve user entered transportDistance from form
+      const rawDistance = outboundBody.formData.transportDistance ?? outboundBody.formData.transportation_distance;
+      if (rawDistance !== undefined && rawDistance !== null && !isNaN(Number(rawDistance)) && Number(rawDistance) > 0) {
+        outboundBody.formData.transportDistance = Number(rawDistance);
+        outboundBody.formData.transportation_distance = Number(rawDistance);
       }
     }
 

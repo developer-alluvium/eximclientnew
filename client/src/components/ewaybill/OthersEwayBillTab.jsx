@@ -560,7 +560,17 @@ function OthersEwayBillTab() {
           open={generateOpen}
           onClose={handleCloseGenerate}
           beNo={selectedRecord.boeNumber}
-          beDate={selectedRecord.boeDate ? new Date(selectedRecord.boeDate).toISOString().split("T")[0] : ""}
+          beDate={
+            selectedRecord.boeDate
+              ? (selectedRecord.boeDate instanceof Date
+                  ? selectedRecord.boeDate.toISOString().split("T")[0]
+                  : String(selectedRecord.boeDate).split("T")[0])
+              : (selectedRecord.parsedData?.data?.ImporterDetails?.["BE Date"] ||
+                 selectedRecord.parsedData?.ImporterDetails?.["BE Date"] ||
+                 selectedRecord.parsedData?.data?.InvoiceAndItemDetails?.BE_DATE ||
+                 selectedRecord.parsedData?.InvoiceAndItemDetails?.BE_DATE ||
+                 "")
+          }
           selectedContainers={getContainerObjectsList(selectedRecord)}
           jobId={selectedRecord.jobId}
           onSuccess={handleGenerationSuccess}

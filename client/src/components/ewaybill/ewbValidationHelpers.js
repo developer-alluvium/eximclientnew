@@ -335,6 +335,23 @@ export function validateStatePin(state, pincode) {
   return null;
 }
 
+export function getStateFromPin(pin) {
+  if (!pin) return "";
+  const pinStr = String(pin).trim();
+  if (pinStr === "999999") return "Other Country";
+  if (!/^\d{6}$/.test(pinStr)) return "";
+  const prefix3 = pinStr.substring(0, 3);
+  if (prefix3 === "403") return "Goa";
+  const prefix2 = pinStr.substring(0, 2);
+  for (const [state, prefixes] of Object.entries(STATE_PIN_PREFIX_MAP)) {
+    if (state === "goa") continue;
+    if (prefixes.includes(prefix2)) {
+      return state.replace(/\b\w/g, l => l.toUpperCase());
+    }
+  }
+  return "";
+}
+
 // ─── 10. GSTIN / Transporter ID Format Validation (TC-TRA-02) ──────────────────
 export function validateGstinFormat(gstin) {
   if (!gstin) return null;

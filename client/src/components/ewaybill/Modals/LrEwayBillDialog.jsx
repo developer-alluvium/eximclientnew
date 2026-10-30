@@ -424,6 +424,15 @@ const LrEwayBillDialog = ({
       if (extractRes.status === "fulfilled" && extractRes.value.data && extractRes.value.data.status !== "error") {
         extractData = extractRes.value.data;
         setBoeExtractData(extractData);
+        const extDate =
+          extractData?.data?.ImporterDetails?.['BE Date'] ||
+          extractData?.ImporterDetails?.['BE Date'] ||
+          extractData?.data?.InvoiceAndItemDetails?.BE_DATE ||
+          extractData?.InvoiceAndItemDetails?.BE_DATE;
+        if (extDate) {
+          const parsed = parseDateToYyyyMmDd(extDate);
+          if (parsed) setBoeDocDate(parsed);
+        }
       } else {
         console.warn("boe-extract failed or returned error:", extractRes);
       }

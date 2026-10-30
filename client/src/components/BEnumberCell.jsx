@@ -10,6 +10,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PartAEwayBillModal from "./ewaybill/Modals/PartAEwayBillModal";
 import EwayBillActionModal from "./ewaybill/Modals/EwayBillActionModal";
 import { allContainersHaveEwb, getExistingEwbForContainer } from "./ewaybill/ewbContainerCoverage";
+import { parseBoeDate } from "./ewaybill/EwayBillGenerate";
 import Swal from "sweetalert2";
 
 const ExistingEwayBillModal = ({ open, onClose, ewbList, containers }) => {
@@ -401,6 +402,8 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
   const [prefetchedEwbList, setPrefetchedEwbList] = useState([]);
   const [isContainerEwaybillStatusModalOpen, setIsContainerEwaybillStatusModalOpen] = useState(false);
   const [updatedContainersList, setUpdatedContainersList] = useState([]);
+  const [extractedBoeData, setExtractedBoeData] = useState(null);
+  const [extractedBeDate, setExtractedBeDate] = useState("");
 
   const formatDate = useCallback((dateStr) => {
     const date = new Date(dateStr);
@@ -446,7 +449,7 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
   }, [cell.row.original.gate_pass_copies]);
 
   const beNumber = cell?.getValue()?.toString();
-  const rawBeDate = cell.row.original.be_date;
+  const rawBeDate = cell.row.original.be_date || cell.row.original.document_date || cell.row.original.boe_date || "";
   const customHouse = cell.row.original.custom_house;
   const beDate = formatDateDisplay(rawBeDate); // For display
   const beDateForAPI = formatDate(rawBeDate); // For API (YYYYMMDD)
@@ -488,21 +491,21 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
       );
 
       // 2. Pre-fetch/cache BOE calculation details from backend
-      let docDate = "";
-      if (rawBeDate) {
-        try {
-          const d = new Date(rawBeDate);
-          if (!isNaN(d.getTime())) {
-            docDate = d.toISOString().split("T")[0];
-          }
-        } catch (_) {}
-      }
+      let docDate = rawBeDate ? parseBoeDate(rawBeDate) : "";
       if (!docDate) {
         docDate = new Date().toISOString().split("T")[0];
       }
 
       try {
-        await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-value-calc?document_no=${encodeURIComponent(beNumber)}&be_date=${docDate}`);
+        const calcRes = await axios.get(`${process.env.REACT_APP_API_STRING}/eway-bill/boe-value-calc?document_no=${encodeURIComponent(beNumber)}&be_date=${docDate}`);
+        if (calcRes.data?.data) {
+          if (calcRes.data.data.beDate) {
+            setExtractedBeDate(calcRes.data.data.beDate);
+          }
+          if (calcRes.data.data.boeData) {
+            setExtractedBoeData(calcRes.data.data.boeData);
+          }
+        }
       } catch (e) {
         console.warn("BOE calc prefetch warning:", e);
       }
@@ -909,10 +912,11 @@ const BENumberCell = ({ cell, onDocumentsUpdated, module, copyFn, onEwayBillSucc
           setPrefetchedEwbList([]);
         }}
         beNo={beNumber}
-        beDate={rawBeDate}
+        beDate={extractedBeDate || rawBeDate}
         selectedContainers={cell.row.original.container_nos}
         initialExistingEwbs={prefetchedEwbList}
         jobId={rowId}
+        boeData={extractedBoeData}
         onViewExisting={(list) => {
           setIsPartAEwayBillDialogOpen(false);
           setSelectedEwb(list);
