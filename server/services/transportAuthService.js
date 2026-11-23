@@ -2,9 +2,11 @@ import axios from "axios";
 
 class TransportAuthService {
     constructor() {
-        this.baseURL = process.env.NODE_ENV === "development"
-            ? "http://localhost:9007/api"
-            : "https://eximbot.alvision.in/transport/api";
+        this.baseURL = process.env.TRANSPORT_API_BASE_URL || (
+            process.env.NODE_ENV === "development"
+                ? "http://localhost:9007/api"
+                : "https://eximbot.alvision.in/transport/api"
+        );
 
         // Configure axios request interceptor to automatically add the x-api-key header
         axios.interceptors.request.use(
@@ -17,7 +19,11 @@ class TransportAuthService {
                     targetUrl.includes("eximbot.alvision.in/transport") || 
                     targetUrl.includes("localhost:9007") ||
                     targetBaseUrl.includes("eximbot.alvision.in/transport") || 
-                    targetBaseUrl.includes("localhost:9007");
+                    targetBaseUrl.includes("localhost:9007") ||
+                    (process.env.TRANSPORT_API_BASE_URL && (
+                        targetUrl.includes(process.env.TRANSPORT_API_BASE_URL) ||
+                        targetBaseUrl.includes(process.env.TRANSPORT_API_BASE_URL)
+                    ));
 
                 if (isTransportApi) {
                     config.headers = config.headers || {};

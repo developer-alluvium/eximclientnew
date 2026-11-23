@@ -11,3 +11,8 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* Ensure SweetAlert2 modals and toasts always render above Material-UI Dialogs (z-index 1300+) */
+.swal2-container {
+  z-index: 99999 !important;
+}

@@ -27,7 +27,9 @@ import {
   runClientSideValidations,
   isSezGstin,
   validateVehicleNumber as validateVehicleFormat,
+  getStateFromPin,
 } from "./ewbValidationHelpers";
+import { extractEwbNumberClient, getExistingEwbForContainer } from "./ewbContainerCoverage";
 
 const validateVehicleNumber = validateVehicleFormat;
 
@@ -399,6 +401,36 @@ const Field = ({ label, req, name, children, hint }) => {
       {renderErr ? renderErr(name) : null}
     </div>
   );
+};
+
+// Helper: Parse date from DD/MM/YYYY, DD-MM-YYYY, or YYYY-MM-DD to YYYY-MM-DD
+export const parseBoeDate = (dateStr) => {
+  if (!dateStr || dateStr === '0') return new Date().toISOString().split('T')[0];
+  if (typeof dateStr !== 'string') {
+    try {
+      return new Date(dateStr).toISOString().split('T')[0];
+    } catch (e) {
+      return new Date().toISOString().split('T')[0];
+    }
+  }
+  const cleanStr = dateStr.trim();
+  if (cleanStr.includes('/')) {
+    const p = cleanStr.split('/');
+    if (p.length === 3) {
+      const yr = p[2].length === 2 ? '20' + p[2] : p[2];
+      return `${yr}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+    }
+  }
+  if (cleanStr.includes('-')) {
+    const parts = cleanStr.split('-');
+    if (parts.length === 3 && parts[0].length <= 2 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].substring(0, 2).padStart(2, '0')}`;
+    }
+  }
+  return cleanStr;
 };
 
 function EwayBillGenerateLR({
@@ -1083,15 +1115,6 @@ function EwayBillGenerateLR({
     } finally { setBoeLoading(false); }
   };
 
-  const parseBoeDate = (dateStr) => {
-    if (!dateStr || dateStr === '0') return new Date().toISOString().split('T')[0];
-    if (dateStr.includes('/')) {
-      const p = dateStr.split('/');
-      if (p.length === 3) { const yr = p[2].length === 2 ? '20' + p[2] : p[2]; return `${yr}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`; }
-    }
-    return dateStr;
-  };
-
   const populateFromBoe = (record, lrData = null) => {
     setIsPartBOnly(false); setExistingEwbNo('');
     const cleanTransacting = (str) => {
@@ -1197,9 +1220,47 @@ function EwayBillGenerateLR({
     });
     if (totalSelectedWeight === 0 && selectedContainers?.length === 1) totalSelectedWeight = parseFloat(selectedContainers[0].gross_weight || selectedContainers[0].grossWeight || 0);
     setContainerWeights(initialWeights);
-    const docNoVal = boeDetail.BE_NO || boeDetail.document_no || boeNumber;
-    let docDateVal = boeDetail.BE_DATE || boeDetail.document_date || documentDate || boeDate;
-    if (docDateVal) docDateVal = parseBoeDate(docDateVal);
+
+    const extractedBeDate =
+      importerDetails['BE Date'] ||
+      importerDetails['BE_DATE'] ||
+      importerDetails['be_date'] ||
+      importerDetails['document_date'] ||
+      invoiceDetails.BE_DATE ||
+      invoiceDetails.document_date ||
+      boeDetail.BE_DATE ||
+      boeDetail.document_date ||
+      boeDetail.be_date ||
+      record.document_date ||
+      record.be_date ||
+      record.BE_DATE ||
+      null;
+
+    const docNoVal =
+      importerDetails['BE No'] ||
+      importerDetails['BE_NO'] ||
+      importerDetails['be_no'] ||
+      invoiceDetails.BE_NO ||
+      invoiceDetails.document_no ||
+      boeDetail.BE_NO ||
+      boeDetail.document_no ||
+      boeDetail.be_no ||
+      record.document_no ||
+      record.be_no ||
+      record.BE_NO ||
+      boeNumber ||
+      "";
+
+    let docDateVal = extractedBeDate
+      ? parseBoeDate(extractedBeDate)
+      : (documentDate ? parseBoeDate(documentDate) : parseBoeDate(boeDate));
+
+    if (extractedBeDate) {
+      setBoeDate(docDateVal);
+    }
+    if (docNoVal) {
+      setBoeNumber(docNoVal);
+    }
     const mappedItems = items.length > 0 ? items.map((item) => ({
       productName: item.DESCRIPTION || "Goods", productDesc: item.DESCRIPTION || "",
       hsnCode: getBoeItemHsnCode(item), quantity: parseFloat(item.QUANTITY) || 1,
@@ -1236,7 +1297,7 @@ function EwayBillGenerateLR({
         totalInvoiceValue: totalSelectedWeight > 0 
           ? (totalSelectedWeight * calcPerKgValue).toFixed(2) 
           : (calcTotalValue ? calcTotalValue.toFixed(2) : (dutySummaryData['TOT.ASS VAL'] || "")),
-        transportDistance: (isImport || cSignorPin === "999999" || cSigneePin === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || prev.transportDistance || 0), 4000),
+        transportDistance: prev.transportDistance || ((isImport || cSignorPin === "999999" || cSigneePin === "999999") ? "" : Math.min(parseInt(lrData?.transport_distance || lrData?.container_details?.transport_distance || 0), 4000)),
       };
       if (totalSelectedWeight > 0 && res.items?.length > 0) { 
         res.items[0].quantity = totalSelectedWeight; 
@@ -1246,8 +1307,21 @@ function EwayBillGenerateLR({
         res.items[0].quantity = totalGW || res.items[0].quantity || 1;
       }
       if (prefilledAssessableValue && prefilledAssessableValue > 0) { res.totalInvoiceValue = prefilledAssessableValue; if (res.items?.length > 0) res.items[0].taxableAmount = prefilledAssessableValue; }
-      if (res.consignorName.toLowerCase().includes("suraj") || detectedMode === 'import' || res.consignorState === "Other Countries" || res.consignorState === "Other Territory") { res.consignorGstin = "URP"; res.consignorPincode = "999999"; res.dispatchFromPincode = "999999"; res.transportDistance = ""; }
-      if (res.consigneeName.toLowerCase().includes("suraj") || detectedMode === 'export' || res.consigneeState === "Other Countries" || res.consigneeState === "Other Territory") { res.consigneeGstin = "URP"; res.consigneePincode = "999999"; res.shipToPincode = "999999"; res.transportDistance = ""; }
+      if (res.consignorName.toLowerCase().includes("suraj") || detectedMode === 'import' || res.consignorState === "Other Countries" || res.consignorState === "Other Territory") { 
+        res.consignorGstin = "URP"; 
+        res.consignorPincode = "999999"; 
+        if (!res.dispatchFromPincode || res.dispatchFromPincode === "999999") {
+          res.dispatchFromPincode = (prev.dispatchFromPincode && prev.dispatchFromPincode !== "999999") ? prev.dispatchFromPincode : "999999";
+        }
+        if (prev.transportDistance) {
+          res.transportDistance = prev.transportDistance;
+        }
+      }
+      if (res.consigneeName.toLowerCase().includes("suraj") || detectedMode === 'export' || res.consigneeState === "Other Countries" || res.consigneeState === "Other Territory") { 
+        res.consigneeGstin = "URP"; 
+        res.consigneePincode = "999999"; 
+        res.shipToPincode = "999999"; 
+      }
       return res;
     });
   };
@@ -1358,9 +1432,31 @@ function EwayBillGenerateLR({
       }
       const isDispatchSame = n.transactionType == 1 || n.transactionType == 2;
       const isShipSame = n.transactionType == 1 || n.transactionType == 3;
+      const isImportShipment = n.subSupplyType === "Import" || n.supplyType === "inward" || n.consignorState === "Other Country" || n.consignorGstin === "URP";
+
       if (isDispatchSame) {
-        if (["dispatchFromAddress1", "dispatchFromCity", "dispatchFromPincode", "dispatchFromState"].includes(name)) { const sfx = name.replace("dispatchFrom", ""); n[`consignor${sfx}`] = value; }
-        if (name === "consignorState") n.dispatchFromState = value;
+        if (["dispatchFromAddress1", "dispatchFromCity", "dispatchFromPincode", "dispatchFromState"].includes(name)) {
+          const sfx = name.replace("dispatchFrom", "");
+          if (name === "dispatchFromPincode" && isImportShipment) {
+            n.consignorPincode = "999999";
+            if (/^\d{6}$/.test(value) && value !== "999999") {
+              const matchedState = getStateFromPin(value);
+              if (matchedState) n.dispatchFromState = matchedState;
+            }
+          } else if (name === "dispatchFromState" && isImportShipment) {
+            // Keep consignorState as Other Country
+            n.consignorState = "Other Country";
+          } else {
+            n[`consignor${sfx}`] = value;
+          }
+        }
+        if (name === "consignorState" && !isImportShipment) n.dispatchFromState = value;
+      }
+      if (name === "dispatchFromPincode" && /^\d{6}$/.test(value) && value !== "999999") {
+        const matchedState = getStateFromPin(value);
+        if (matchedState && (!n.dispatchFromState || n.dispatchFromState === "Other Country")) {
+          n.dispatchFromState = matchedState;
+        }
       }
       if (isShipSame) {
         if (["shipToAddress1", "shipToCity", "shipToPincode", "shipToState"].includes(name)) { const sfx = name.replace("shipTo", ""); n[`consignee${sfx}`] = value; }
@@ -1407,8 +1503,9 @@ function EwayBillGenerateLR({
   }, 0);
 
   const getEffectiveUserGstin = (fd = formData) => {
-    const val = (fd.userGstin || (fd.supplyType === 'inward' ? fd.consigneeGstin : fd.consignorGstin) || "").toString().trim().toUpperCase();
-    return (val && val !== "URP") ? val : (process.env.REACT_APP_DEFAULT_GSTIN || "");
+    const defaultGstin = (process.env.REACT_APP_DEFAULT_GSTIN || process.env.REACT_APP_TRANSPORTER_GSTIN || "").toString().trim().toUpperCase();
+    const val = (fd.userGstin || defaultGstin).toString().trim().toUpperCase();
+    return (val && val !== "URP") ? val : defaultGstin;
   };
 
   const handleTransporterChange = (e) => {
@@ -1483,6 +1580,17 @@ function EwayBillGenerateLR({
     // Internal tr_no (system LR record) is NOT required for EWB generation.
     try {
       setGenerating(true);
+
+      Swal.fire({
+        title: "Generating E-Way Bills...",
+        html: `<div style="font-weight: 600; color: #1e293b; margin-top: 10px;">Connecting to government portal and generating E-Way Bills for ${selectedContainers.length} container(s)...</div>`,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
+
       const promises = selectedContainers.map(async (container) => {
         const scNo = (container.container_number || container.container_no || "").trim().toUpperCase();
         const oIdx = boeContainers.findIndex(bc => {
@@ -1491,71 +1599,181 @@ function EwayBillGenerateLR({
         });
         const weight = parseFloat(oIdx !== -1 ? containerWeights[oIdx] : containerWeights[`manual_${scNo}`]) || 0;
         const containerValue = { weight, assessableValue: weight * perKgValue };
-        if (weight <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Weight is zero or invalid." };
-        if (!perKgValue || perKgValue <= 0) return { container: container.container_number, ewbNo: null, status: "failed", error: "Per KG value is not set." };
+        if (weight <= 0) return { container: scNo, ewbNo: null, status: "failed", error: "Weight is zero or invalid." };
+        if (!perKgValue || perKgValue <= 0) return { container: scNo, ewbNo: null, status: "failed", error: "Per KG value is not set." };
         const containerPayload = buildPayloadForContainer(container, containerValue);
+
+        let generatedEwbNo = null;
+        let ewbDate = null;
+        let validUpto = null;
+        let pdfUrl = null;
+        let isSuccess = false;
+        let errorMsg = "";
+
         try {
           const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, containerPayload);
-          if (r.data.success) {
-            markBoeDocumentGenerated(formData.documentNumber || boeNumber);
-            return {
-              container: container.container_number,
-              ewbNo: r.data.data.ewbNo,
-              ewbDate: r.data.data.ewbDate,
-              validUpto: r.data.data.validUpto,
-              pdfUrl: r.data.data.pdfUrl,
-              ewayBillId: r.data.data.ewayBillId,
-              status: "success"
-            };
-          }
-          else {
-            let errorMsg = r.data.message || "Unknown error";
-            if (r.data.errors?.length) errorMsg = r.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
-            else if (r.data.validationErrors?.length) errorMsg = r.data.validationErrors.map(e => e.message).join(", ");
-            return { container: container.container_number, ewbNo: null, status: "failed", error: errorMsg };
+          generatedEwbNo = extractEwbNumberClient(r.data);
+          const responseMsg = String(
+            r.data?.message ||
+            r.data?.error ||
+            r.data?.status_desc ||
+            ""
+          ).toLowerCase();
+
+          const isAlready = responseMsg.includes("already generated") || responseMsg.includes("already exists");
+          isSuccess = Boolean(
+            (r.data?.success || isAlready || r.data?.status === "success" || r.status === 200) &&
+            generatedEwbNo
+          );
+
+          if (isSuccess) {
+            ewbDate = r.data?.data?.ewbDate || r.data?.ewbDate || new Date();
+            validUpto = r.data?.data?.validUpto || r.data?.validUpto;
+            pdfUrl = r.data?.data?.pdfUrl || r.data?.pdfUrl || r.data?.data?.url || r.data?.url;
+          } else {
+            errorMsg = r.data?.message || "Unknown error";
+            if (r.data?.errors?.length) errorMsg = r.data.errors.map(e => `${e.field}: ${e.message}`).join(", ");
+            else if (r.data?.validationErrors?.length) errorMsg = r.data.validationErrors.map(e => e.message).join(", ");
           }
         } catch (err) {
+          console.warn(`Direct generate attempt error for container ${scNo}:`, err.message);
           const ed = err.response?.data;
-          let et = parseNicErrorMessage(ed?.message || err.message);
-          if (ed?.errors?.length) et = ed.errors.map(e => e.message).join(", ");
-          else if (ed?.validationErrors?.length) et = ed.validationErrors.map(e => e.message).join(", ");
-          return { container: container.container_number, ewbNo: null, status: "failed", error: et };
+          generatedEwbNo = extractEwbNumberClient(ed);
+          if (generatedEwbNo) {
+            isSuccess = true;
+            ewbDate = new Date();
+          } else {
+            errorMsg = parseNicErrorMessage(ed?.message || err.message);
+            if (ed?.errors?.length) errorMsg = ed.errors.map(e => e.message).join(", ");
+            else if (ed?.validationErrors?.length) errorMsg = ed.validationErrors.map(e => e.message).join(", ");
+          }
         }
+
+        // Auto-Recovery (Per-Container)
+        if (!isSuccess || !generatedEwbNo) {
+          const rawDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+          const checkDocNo = rawDoc.split("-CH-")[0].trim();
+          if (checkDocNo) {
+            try {
+              const listRes = await axios.get(
+                `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+              );
+              if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+                const matchingEwb = getExistingEwbForContainer(container, listRes.data.data, checkDocNo);
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Auto-Recovery in submitMultiple LR] Recovered EWB for container ${scNo}: ${recoveredNo}`);
+                    generatedEwbNo = recoveredNo;
+                    isSuccess = true;
+                    ewbDate = matchingEwb.ewbDate || new Date();
+                    validUpto = matchingEwb.validUpto;
+                    pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                  }
+                }
+              }
+            } catch (recErr) {
+              console.warn(`Could not auto-recover for container ${scNo}:`, recErr.message);
+            }
+          }
+        }
+
+        if (isSuccess && generatedEwbNo) {
+          markBoeDocumentGenerated(formData.documentNumber || boeNumber);
+          return {
+            container: scNo,
+            ewbNo: generatedEwbNo,
+            ewbDate: ewbDate,
+            validUpto: validUpto,
+            pdfUrl: pdfUrl,
+            status: "success",
+          };
+        }
+
+        return {
+          container: scNo,
+          ewbNo: null,
+          status: "failed",
+          error: errorMsg || "Failed to generate E-Way Bill from government portal",
+        };
       });
+
       const results = await Promise.all(promises);
+
+      // Batch Auto-Recovery if any container is still marked failed
+      const rawBatchDoc = (formData.boeNumber || boeNumber || formData.documentNumber || "").trim();
+      const checkDocNo = rawBatchDoc.split("-CH-")[0].trim();
+      if (checkDocNo && results.some((r) => r.status !== "success")) {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const listRes = await axios.get(
+            `${process.env.REACT_APP_API_STRING}/eway-bill/list?search=${encodeURIComponent(checkDocNo)}`
+          );
+          if (listRes.data?.success && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            for (const r of results) {
+              if (r.status !== "success") {
+                const matchingEwb = getExistingEwbForContainer(
+                  { container_number: r.container },
+                  listRes.data.data,
+                  checkDocNo
+                );
+                if (matchingEwb) {
+                  const recoveredNo = extractEwbNumberClient(matchingEwb);
+                  if (recoveredNo) {
+                    console.log(`⚡ [Batch Recovery in submitMultiple LR] Recovered EWB for ${r.container}: ${recoveredNo}`);
+                    r.status = "success";
+                    r.ewbNo = recoveredNo;
+                    r.ewbDate = matchingEwb.ewbDate || new Date();
+                    r.validUpto = matchingEwb.validUpto;
+                    r.pdfUrl = matchingEwb.pdfUrl || matchingEwb.url;
+                    r.error = undefined;
+                  }
+                }
+              }
+            }
+          }
+        } catch (batchRecErr) {
+          console.warn("Batch auto-recovery failed in LR:", batchRecErr.message);
+        }
+      }
+
       const successCount = results.filter(r => r.status === "success").length;
       const failedCount = results.filter(r => r.status === "failed").length;
+
       if (successCount > 0) {
         const sh = results.filter(r => r.status === "success").map(r => `<div><strong>${r.container}:</strong> ${r.ewbNo}</div>`).join("");
         const fh = failedCount > 0 ? `<hr><h5>Failed (${failedCount}):</h5>` + results.filter(r => r.status === "failed").map(r => `<div><strong>${r.container}:</strong> ${r.error}</div>`).join("") : "";
-        Swal.fire({ icon: successCount === selectedContainers.length ? "success" : "warning", title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`, html: `<div>${sh}${fh}</div>`, confirmButtonText: "OK" })
-          .then(() => { if (onSuccess) onSuccess(results); if (onClose) onClose(); });
+        await Swal.fire({
+          icon: successCount === selectedContainers.length ? "success" : "warning",
+          title: `${successCount}/${selectedContainers.length} E-Way Bills Generated`,
+          html: `<div>${sh}${fh}</div>`,
+          confirmButtonText: "View Container Status →",
+          confirmButtonColor: "#16a34a",
+          timer: 3500,
+          timerProgressBar: true,
+          allowOutsideClick: false,
+        });
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {}
+        if (onSuccess) onSuccess(results);
+        if (onClose) onClose();
       } else {
-        // ── Check if all failures are "already exists" → open the existing EWB for viewing/printing
-        const alreadyExistsPattern = /e-?way\s*bill\s*(\d{12})\s*already\s*exists/i;
-        const existingEwbs = results
-          .map(r => {
-            const m = (r.error || "").match(alreadyExistsPattern);
-            return m ? { container: r.container, ewbNo: m[1], status: "exists" } : null;
-          })
-          .filter(Boolean);
-
-        if (existingEwbs.length > 0 && existingEwbs.length === results.length) {
-          // All failures are "already exists" — show info then open preview
-          await Swal.fire({
-            icon: "info",
-            title: "E-Way Bill Already Exists",
-            html: existingEwbs.map(e => `<div><strong>${e.container}:</strong> EWB ${e.ewbNo}</div>`).join(""),
-            confirmButtonText: "View & Print",
-          });
-          if (onSuccess) onSuccess(existingEwbs);
-        } else {
-          const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
-          Swal.fire({ icon: "error", title: "All E-Way Bills Failed", html: fh || "<div>No failure details available.</div>", confirmButtonText: "OK" });
-        }
+        const fh = results.map(r => `<div><strong>${r.container || 'Unknown'}:</strong> ${r.error || 'Unknown error'}</div>`).join("");
+        Swal.fire({
+          icon: "error",
+          title: "All E-Way Bills Failed",
+          html: fh || "<div>No failure details available.</div>",
+          confirmButtonColor: "#1e40af",
+          confirmButtonText: "OK",
+        });
       }
-    } catch (err) { console.error("submitMultipleEwayBills:", err); Swal.fire("Error", "Failed to generate E-Way Bills", "error"); }
-    finally { setGenerating(false); }
+    } catch (err) {
+      console.error("submitMultipleEwayBills:", err);
+      Swal.fire("Error", "Failed to generate E-Way Bills", "error");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const buildPayloadForContainer = (container, containerValue) => {
@@ -1603,9 +1821,60 @@ function EwayBillGenerateLR({
     const otherAmt = parseFloat(formData.otherAmount) || 0;
     const totalIV = parseFloat((taxable + cgstTotal + sgstTotal + igstTotal + cessTotal + cessNATotal + otherAmt).toFixed(2));
 
+    const cNumber = (container.container_number || container.container_no || "").trim().toUpperCase();
+
+    const isImportMode = formData.subSupplyType === "Import" || formData.supplyType === "inward" || formData.consignorState === "Other Country" || formData.consignorGstin === "URP";
+    let resolvedConsignorPincode = formData.consignorPincode;
+    let resolvedDispatchState = formData.dispatchFromState;
+    let resolvedDispatchPincode = formData.dispatchFromPincode;
+    if (isImportMode) {
+      resolvedConsignorPincode = "999999";
+      if (formData.dispatchFromPincode && /^[1-9][0-9]{5}$/.test(String(formData.dispatchFromPincode).trim()) && String(formData.dispatchFromPincode).trim() !== "999999") {
+        resolvedDispatchPincode = String(formData.dispatchFromPincode).trim();
+        resolvedDispatchState = getStateFromPin(formData.dispatchFromPincode) || formData.dispatchFromState || "Gujarat";
+      } else {
+        resolvedDispatchState = "Other Country";
+        resolvedDispatchPincode = "999999";
+      }
+    }
+
+    const cleanDocNo = (formData.documentNumber || boeNumber || "").split("-CH-")[0].trim();
+    const resolvedDocNo = (isImportMode || formData.documentType === "Bill of Entry")
+      ? cleanDocNo
+      : (generationMode === "batch-selected" ? `${cleanDocNo}-CH-${cNumber.slice(-4)}` : cleanDocNo);
+
     return {
-      lrId, containerId: container?._id || containerObj?._id,
-      formData: { ...formData, totalInvoiceValue: totalIV, taxableAmount: taxable, calculatedAssessableValue: containerValue.assessableValue, cgstAmount: cgstTotal, sgstAmount: sgstTotal, igstAmount: igstTotal, cessAmount: cessTotal, cessNonAdvol: cessNATotal, otherAmount: otherAmt, transporterId: formData.transporterId || undefined, generatorRole: formData.supplyType === "inward" ? "consignee" : "consignor", userGstin: getEffectiveUserGstin(), items: itemsPayload, data_source: "lrEwbUpdate" },
+      lrId,
+      containerId: cNumber || container?._id || containerObj?._id,
+      containerNumber: cNumber,
+      container_number: cNumber,
+      formData: {
+        ...formData,
+        consignorState: isImportMode ? "Other Country" : formData.consignorState,
+        consignorPincode: resolvedConsignorPincode,
+        dispatchFromState: resolvedDispatchState,
+        dispatchFromPincode: resolvedDispatchPincode,
+        containerId: cNumber || container?._id || containerObj?._id,
+        containerNumber: cNumber,
+        container_number: cNumber,
+        boeNumber: cleanDocNo,
+        documentType: formData.documentType || (isImportMode ? "Bill of Entry" : "Delivery Challan"),
+        documentNumber: resolvedDocNo,
+        totalInvoiceValue: totalIV,
+        taxableAmount: taxable,
+        calculatedAssessableValue: containerValue.assessableValue,
+        cgstAmount: cgstTotal,
+        sgstAmount: sgstTotal,
+        igstAmount: igstTotal,
+        cessAmount: cessTotal,
+        cessNonAdvol: cessNATotal,
+        otherAmount: otherAmt,
+        transporterId: formData.transporterId || undefined,
+        generatorRole: formData.supplyType === "inward" ? "consignee" : "consignor",
+        userGstin: getEffectiveUserGstin(),
+        items: itemsPayload,
+        data_source: "lrEwbUpdate"
+      },
     };
   };
 
@@ -1708,10 +1977,36 @@ function EwayBillGenerateLR({
         cgstTotal += cgst; sgstTotal += sgst; igstTotal += igst; cessTotal += cess; taxableTotal += taxable;
         return { ...item, taxableAmount: taxable, cgstRate: parseFloat(item.cgstRate) || 0, sgstRate: parseFloat(item.sgstRate) || 0, igstRate: parseFloat(item.igstRate) || 0, cessRate: parseFloat(item.cessRate) || 0, cessNonAdvol: parseFloat(item.cessNonAdvol) || 0 };
       });
+      const isImportMode = formData.subSupplyType === "Import" || formData.supplyType === "inward" || formData.consignorState === "Other Country" || formData.consignorGstin === "URP";
+      let resolvedConsignorPincode = formData.consignorPincode;
+      let resolvedDispatchState = formData.dispatchFromState;
+      let resolvedDispatchPincode = formData.dispatchFromPincode;
+      if (isImportMode) {
+        resolvedConsignorPincode = "999999";
+        if (formData.dispatchFromPincode && /^[1-9][0-9]{5}$/.test(String(formData.dispatchFromPincode).trim()) && String(formData.dispatchFromPincode).trim() !== "999999") {
+          resolvedDispatchPincode = String(formData.dispatchFromPincode).trim();
+          resolvedDispatchState = getStateFromPin(formData.dispatchFromPincode) || formData.dispatchFromState || "Gujarat";
+        } else {
+          resolvedDispatchState = "Other Country";
+          resolvedDispatchPincode = "999999";
+        }
+      }
+
+      const cleanDocNo = (formData.documentNumber || boeNumber || "").split("-CH-")[0].trim();
+      const resolvedDocNo = (isImportMode || formData.documentType === "Bill of Entry") ? cleanDocNo : (formData.documentNumber || cleanDocNo);
+
       const payload = {
         lrId, containerId: contId,
         formData: {
-          ...formData, totalInvoiceValue: parseFloat(formData.totalInvoiceValue) || 0,
+          ...formData,
+          consignorState: isImportMode ? "Other Country" : formData.consignorState,
+          consignorPincode: resolvedConsignorPincode,
+          dispatchFromState: resolvedDispatchState,
+          dispatchFromPincode: resolvedDispatchPincode,
+          totalInvoiceValue: parseFloat(formData.totalInvoiceValue) || 0,
+          documentType: formData.documentType || (isImportMode ? 'Bill of Entry' : 'Tax Invoice'),
+          documentNumber: resolvedDocNo,
+          boeNumber: cleanDocNo,
           taxableAmount: taxableTotal, cgstAmount: cgstTotal, sgstAmount: sgstTotal, igstAmount: igstTotal,
           cessAmount: cessTotal, cessNonAdvol: formData.items.reduce((a, i) => a + (parseFloat(i.cessNonAdvol) || 0), 0),
           otherAmount: parseFloat(formData.otherAmount) || 0,
@@ -1725,6 +2020,9 @@ function EwayBillGenerateLR({
       const r = await axios.post(`${process.env.REACT_APP_API_STRING}/eway-bill/generate`, payload);
       if (r.data.success) {
         markBoeDocumentGenerated(formData.documentNumber || boeNumber);
+        try {
+          window.dispatchEvent(new Event("wallet:refresh"));
+        } catch (e) {}
         if (onSuccess) onSuccess(r.data.data);
         Swal.fire({ icon: "success", title: "E-Way Bill Generated", html: `<p><strong>EWB No:</strong> ${r.data.data.ewbNo}</p><p><strong>Valid Until:</strong> ${r.data.data.validUpto}</p>` })
           .then(() => { if (onClose) onClose(); });
@@ -1872,7 +2170,7 @@ function EwayBillGenerateLR({
           <input list="states" className={ic("consignorState")} name="consignorState" value={formData.consignorState || formData.dispatchFromState} onChange={handleInputChange} placeholder="Origin State" />
         </Field>
         <Field label="User GSTIN" req name="userGstin" hint="Used as Transporter ID">
-          <input className={ic("userGstin")} name="userGstin" value={formData.userGstin || (formData.supplyType === 'inward' ? formData.consigneeGstin : formData.consignorGstin)} onChange={handleInputChange} placeholder="Your GSTIN" />
+          <input className={ic("userGstin")} name="userGstin" value={formData.userGstin || process.env.REACT_APP_DEFAULT_GSTIN || ""} onChange={handleInputChange} placeholder="Your GSTIN" />
         </Field>
       </div>
       <div className="ewb-grid cols-2" style={{ marginBottom: 14 }}>

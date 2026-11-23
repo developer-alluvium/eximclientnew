@@ -23,6 +23,7 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
 import PartAEwayBillModal from "./Modals/PartAEwayBillModal";
+import CreditBadge from "../wallet/CreditBadge";
 
 function OthersEwayBillTab() {
   const [list, setList] = useState([]);
@@ -306,6 +307,10 @@ function OthersEwayBillTab() {
         ewayBillData: results,
       });
 
+      try {
+        window.dispatchEvent(new Event("wallet:refresh"));
+      } catch (e) {}
+
       fetchList();
       handleCloseGenerate();
     } catch (err) {
@@ -391,7 +396,8 @@ function OthersEwayBillTab() {
             Upload standalone Bill of Entries (BOE) and generate E-Way Bills.
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <CreditBadge />
           <input
             type="file"
             ref={fileInputRef}
@@ -554,7 +560,17 @@ function OthersEwayBillTab() {
           open={generateOpen}
           onClose={handleCloseGenerate}
           beNo={selectedRecord.boeNumber}
-          beDate={selectedRecord.boeDate ? new Date(selectedRecord.boeDate).toISOString().split("T")[0] : ""}
+          beDate={
+            selectedRecord.boeDate
+              ? (selectedRecord.boeDate instanceof Date
+                  ? selectedRecord.boeDate.toISOString().split("T")[0]
+                  : String(selectedRecord.boeDate).split("T")[0])
+              : (selectedRecord.parsedData?.data?.ImporterDetails?.["BE Date"] ||
+                 selectedRecord.parsedData?.ImporterDetails?.["BE Date"] ||
+                 selectedRecord.parsedData?.data?.InvoiceAndItemDetails?.BE_DATE ||
+                 selectedRecord.parsedData?.InvoiceAndItemDetails?.BE_DATE ||
+                 "")
+          }
           selectedContainers={getContainerObjectsList(selectedRecord)}
           jobId={selectedRecord.jobId}
           onSuccess={handleGenerationSuccess}

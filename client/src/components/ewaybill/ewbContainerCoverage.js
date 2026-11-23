@@ -59,6 +59,46 @@ export const isCombinedEwb = (ewb, beNo) => {
 export const hasAnyCombinedEwb = (existingEwbs, beNo) =>
   (existingEwbs || []).some((ewb) => isCombinedEwb(ewb, beNo));
 
+export const extractEwbNumberClient = (obj) => {
+  if (!obj) return null;
+  const candidateKeys = [
+    "ewbNo", "ewayBillNo", "ewbNumber", "ewayBillNumber", "generatedEwbNo", "eway_bill_no", "ewb_no"
+  ];
+  const queue = [obj];
+  const visited = new Set();
+  while (queue.length > 0) {
+    const curr = queue.shift();
+    if (!curr || typeof curr !== "object" || visited.has(curr)) continue;
+    visited.add(curr);
+    for (const key of candidateKeys) {
+      const val = curr[key];
+      if (val !== undefined && val !== null) {
+        const cleaned = String(val).trim();
+        if (/^\d{12}$/.test(cleaned)) return cleaned;
+      }
+    }
+    const subKeys = ["data", "responseData", "response_data", "result", "results", "itemList", "response"];
+    for (const sk of subKeys) {
+      if (curr[sk] && typeof curr[sk] === "object") queue.push(curr[sk]);
+    }
+    if (Array.isArray(curr)) {
+      for (const item of curr) {
+        if (item && typeof item === "object") queue.push(item);
+      }
+    }
+  }
+  const stringCandidates = [
+    obj?.message, obj?.error, obj?.alert, obj?.status_desc, obj?.data?.message, obj?.data?.error
+  ];
+  for (const candidate of stringCandidates) {
+    if (!candidate) continue;
+    const text = typeof candidate === "string" ? candidate : JSON.stringify(candidate);
+    const match = text.match(/\b\d{12}\b/);
+    if (match) return match[0];
+  }
+  return null;
+};
+
 export const getExistingEwbForContainer = (cont, existingEwbs, beNo) => {
   const cNo = getContainerNo(cont).toUpperCase();
   if (!cNo) return null;
@@ -66,12 +106,41 @@ export const getExistingEwbForContainer = (cont, existingEwbs, beNo) => {
   const suffix = cNo.slice(-4);
 
   for (const ewb of existingEwbs || []) {
-    const docUpper = getEwbDocNumber(ewb).toUpperCase();
+    // 1. Direct container match on EWB record if present
+    const ewbCont = (
+      ewb?.containerNumber ||
+      ewb?.container_number ||
+      ewb?.containerNo ||
+      ewb?.container_no ||
+      ewb?.container ||
+      ""
+    ).toString().trim().toUpperCase();
+    if (ewbCont && (ewbCont === cNo || (cNo.length >= 4 && ewbCont.endsWith(suffix)))) {
+      return ewb;
+    }
 
+    // 2. If EWB record has nested containers array
+    if (Array.isArray(ewb?.containers)) {
+      const foundInNested = ewb.containers.find(nc => {
+        const ncNo = (nc?.containerNumber || nc?.container_number || nc?.containerNo || nc?.container_no || "").toString().trim().toUpperCase();
+        return ncNo === cNo || (cNo.length >= 4 && ncNo.endsWith(suffix));
+      });
+      if (foundInNested && (foundInNested.ewayBillNo || foundInNested.ewaybill_no || foundInNested.ewbNo)) {
+        return {
+          ...ewb,
+          ewbNo: foundInNested.ewayBillNo || foundInNested.ewaybill_no || foundInNested.ewbNo,
+          ewayBillNo: foundInNested.ewayBillNo || foundInNested.ewaybill_no || foundInNested.ewbNo,
+        };
+      }
+    }
+
+    // 3. Document Number suffix match (-CH-XXXX)
+    const docUpper = getEwbDocNumber(ewb).toUpperCase();
     if (docUpper.includes(`-CH-${suffix}`)) {
       return ewb;
     }
 
+    // 4. Combined EWB match
     if (isCombinedEwb(ewb, beNo)) {
       const coveredIds = getContainersCoveredByEwb(ewb);
       if (coveredIds.length === 0) continue;

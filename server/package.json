@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "node scripts/testUploadBoeBddTdd.mjs",
+    "test:wallet": "node scripts/testWalletBillingBddTdd.mjs",
+    "test:api": "node scripts/testLiveApiEndpoints.mjs",
+    "test:all": "node scripts/testWalletBillingBddTdd.mjs && node scripts/testLiveApiEndpoints.mjs",
     "start": "nodemon app.js"
   },
   "keywords": [],

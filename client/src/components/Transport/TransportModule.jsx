@@ -20,7 +20,7 @@ const TransportModule = () => {
   const [columnOrder, setColumnOrder] = useState([]);
   const [isColumnOrderLoaded, setIsColumnOrderLoaded] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
-  const [filterActive, setFilterActive] = useState(true);
+  const [filterActive, setFilterActive] = useState(false);
 
   // Context for selected importer (name)
   const { selectedImporter, setSelectedImporter } = useImportersContext();
@@ -141,31 +141,39 @@ const TransportModule = () => {
 
   return (
     <div className="transport-module-wrapper">
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2, position: 'relative' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: '250px' }}>
-          <IconButton onClick={() => window.history.back()} size="small" sx={{ mr: 1 }}>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 2.5 }, height: { xs: 'auto', md: '100%' }, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ 
+        mb: 2, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'stretch', md: 'center' }, 
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: 1.5, 
+        position: 'relative' 
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton onClick={() => window.history.back()} size="small" sx={{ mr: 0.5 }}>
              <ArrowBackIcon />
           </IconButton>
           <Box>
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
+            <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1.1rem', sm: '1.3rem' }, lineHeight: 1.2 }}>
               Transport Module
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
               View transport details and tracking information
             </Typography>
           </Box>
         </Box>
 
         {/* Centered Importer Name */}
-        <Box sx={{ display: { xs: 'none', lg: 'flex' }, justifyContent: 'center', flex: 1, minWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <Box sx={{ display: { xs: 'none', lg: 'flex' }, justifyContent: 'center', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {selectedImporter && (
             <Typography
-              variant="h6"
+              variant="subtitle1"
               fontWeight="bold"
               sx={{
                 color: '#0e1929ff',
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}
@@ -176,7 +184,14 @@ const TransportModule = () => {
         </Box>
 
         {/* Actions Area */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, flex: 1, minWidth: '300px', flexWrap: 'wrap' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: { xs: 'flex-start', md: 'flex-end' }, 
+          gap: 1.2, 
+          flexWrap: 'wrap',
+          width: { xs: '100%', md: 'auto' }
+        }}>
           {/* Search Input */}
            <Input 
              placeholder="Search transport..." 
@@ -184,28 +199,31 @@ const TransportModule = () => {
              allowClear
              value={searchText}
              onChange={e => setSearchText(e.target.value)}
-             style={{ width: 250 }}
+             style={{ width: '100%', maxWidth: 220 }}
            />
 
            {/* Active Jobs Toggle Switch */}
-           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>Active Jobs Only</span>
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Active Jobs</span>
              <Switch 
                checked={filterActive}
                onChange={(checked) => setFilterActive(checked)}
                checkedChildren="Active"
                unCheckedChildren="All"
+               size="small"
              />
            </Box>
 
            {/* Toolbar Buttons */}
            <Button 
+             size="small"
              icon={<SettingOutlined />} 
              onClick={() => setIsColumnSettingsOpen(true)}
            >
              Columns
            </Button>
            <Button 
+             size="small"
              type="primary" 
              icon={<SaveOutlined />} 
              onClick={handleSaveLayout}
@@ -225,10 +243,10 @@ const TransportModule = () => {
                setSelectedImporter(newValue || null);
              }}
              sx={{
-               width: { xs: "200px", sm: "250px" },
-               minWidth: "150px",
+               width: { xs: "100%", sm: "220px" },
+               minWidth: "140px",
                "& .MuiInputBase-input": {
-                 fontSize: "0.85rem", // Match Antd input size roughly
+                 fontSize: "0.82rem",
                },
              }}
              renderInput={(params) => (
@@ -246,7 +264,8 @@ const TransportModule = () => {
 
       <Box sx={{ 
         flexGrow: 1, 
-        overflowX: 'auto',
+        overflowX: { xs: 'visible', md: 'auto' },
+        overflowY: { xs: 'visible', md: 'auto' },
       }}>
         {/* Pass down everything needed */}
         <TransportTable 

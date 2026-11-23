@@ -105,6 +105,10 @@ const eximclientUserSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isSfplClient: {
+      type: Boolean,
+      default: false,
+    },
 
     // AEO Certificate Reminder Settings - MOVED TO MAIN SCHEMA
     aeo_reminder_days: {

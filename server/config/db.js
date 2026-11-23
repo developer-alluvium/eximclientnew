@@ -1,4 +1,4 @@
-// config/db.mjs
+import "../fix-dns.js";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 

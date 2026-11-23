@@ -22,12 +22,13 @@ const isExternalUrl = (url) => {
 axios.interceptors.request.use(
   (config) => {
     if (!isExternalUrl(config.url)) {
-      const token = getCookie("access_token");
-      console.log("Token check:", {
-        token,
-        typeOfToken: typeof token,
-        isTokenNull: token === null,
-      });
+      const token =
+        getCookie("access_token") ||
+        getCookie("superadmin_token") ||
+        getCookie("superadmin_access_token") ||
+        getCookie("admin_access_token") ||
+        getCookie("user_access_token") ||
+        getCookie("token");
       // Ensure token is valid and not string "null"/"undefined"
       if (token && token !== "null" && token !== "undefined") {
         config.headers = config.headers || {};
