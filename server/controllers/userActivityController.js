@@ -4,6 +4,16 @@ import EximclientUser from "../models/eximclientUserModel.js";
 import Customer from "../models/customerModel.js";
 
 /**
+ * Helper to check if a user or request belongs to superadmin
+ */
+const isSuperAdmin = (userRole, userEmail = "", path = "") => {
+  if (userRole === "superadmin") return true;
+  if (userEmail && userEmail.toLowerCase().includes("superadmin")) return true;
+  if (path && path.toLowerCase().startsWith("/superadmin")) return true;
+  return false;
+};
+
+/**
  * Handle active session heartbeat from client tracker
  */
 export const sendHeartbeat = async (req, res) => {
@@ -19,6 +29,14 @@ export const sendHeartbeat = async (req, res) => {
     const userEmail = req.user?.email || "";
     const userRole = req.user?.role || "user";
     const ieCode = req.user?.primary_ie_code || req.user?.ie_code_no || "";
+
+    // Do not track heartbeats for superadmin
+    if (isSuperAdmin(userRole, userEmail, currentPath)) {
+      return res.status(200).json({
+        success: true,
+        message: "Superadmin activity skipped from tracking",
+      });
+    }
 
     const now = new Date();
     const activeSecs = isActiveTab ? Number(secondsIncrement) || 30 : 0;
@@ -86,20 +104,36 @@ export const logActivityEvents = async (req, res) => {
     const userEmail = req.user?.email || "";
     const userRole = req.user?.role || "user";
 
-    const formattedEvents = events.map((evt) => ({
-      userId,
-      userName,
-      userEmail,
-      userRole,
-      sessionId: evt.sessionId || "unknown_session",
-      eventType: evt.eventType || "click",
-      path: evt.path || "/",
-      elementId: evt.elementId || "",
-      elementText: evt.elementText ? String(evt.elementText).substring(0, 200) : "",
-      componentName: evt.componentName || "",
-      metadata: evt.metadata || {},
-      timestamp: evt.timestamp ? new Date(evt.timestamp) : new Date(),
-    }));
+    // Do not log click events for superadmin
+    if (isSuperAdmin(userRole, userEmail)) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
+
+    const formattedEvents = events
+      .filter((evt) => {
+        const evtPath = evt.path || "/";
+        const evtEmail = evt.userEmail || userEmail;
+        const evtRole = evt.userRole || userRole;
+        return !isSuperAdmin(evtRole, evtEmail, evtPath);
+      })
+      .map((evt) => ({
+        userId,
+        userName,
+        userEmail,
+        userRole,
+        sessionId: evt.sessionId || "unknown_session",
+        eventType: evt.eventType || "click",
+        path: evt.path || "/",
+        elementId: evt.elementId || "",
+        elementText: evt.elementText ? String(evt.elementText).substring(0, 200) : "",
+        componentName: evt.componentName || "",
+        metadata: evt.metadata || {},
+        timestamp: evt.timestamp ? new Date(evt.timestamp) : new Date(),
+      }));
+
+    if (formattedEvents.length === 0) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
 
     await UserClickEvent.insertMany(formattedEvents);
 
@@ -129,6 +163,17 @@ export const getMonitoringAnalytics = async (req, res) => {
 
     const onlineCutoff = new Date(Date.now() - 2.5 * 60 * 1000); // 2.5 minutes ago
 
+    const sessionSuperAdminFilter = {
+      userRole: { $ne: "superadmin" },
+      userEmail: { $not: /superadmin/i },
+    };
+
+    const clickSuperAdminFilter = {
+      userRole: { $ne: "superadmin" },
+      userEmail: { $not: /superadmin/i },
+      path: { $not: /^\/superadmin/i },
+    };
+
     const [
       onlineSessions,
       sessionStats,
@@ -136,12 +181,12 @@ export const getMonitoringAnalytics = async (req, res) => {
       topPages,
       topElements,
     ] = await Promise.all([
-      // Live online sessions
-      UserSession.distinct("userId", { lastHeartbeat: { $gte: onlineCutoff } }),
+      // Live online sessions (excluding superadmin)
+      UserSession.distinct("userId", { lastHeartbeat: { $gte: onlineCutoff }, ...sessionSuperAdminFilter }),
 
-      // Total time spent in date range
+      // Total time spent in date range (excluding superadmin)
       UserSession.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
+        { $match: { createdAt: { $gte: startDate }, ...sessionSuperAdminFilter } },
         {
           $group: {
             _id: null,
@@ -151,24 +196,25 @@ export const getMonitoringAnalytics = async (req, res) => {
         },
       ]),
 
-      // Total click events in date range
-      UserClickEvent.countDocuments({ timestamp: { $gte: startDate } }),
+      // Total click events in date range (excluding superadmin)
+      UserClickEvent.countDocuments({ timestamp: { $gte: startDate }, ...clickSuperAdminFilter }),
 
-      // Top Visited Pages
+      // Top Visited Pages (excluding superadmin)
       UserClickEvent.aggregate([
-        { $match: { timestamp: { $gte: startDate }, eventType: "page_view" } },
+        { $match: { timestamp: { $gte: startDate }, eventType: "page_view", ...clickSuperAdminFilter } },
         { $group: { _id: "$path", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 },
       ]),
 
-      // Top Clicked Elements
+      // Top Clicked Elements (excluding superadmin)
       UserClickEvent.aggregate([
         {
           $match: {
             timestamp: { $gte: startDate },
             eventType: "click",
             elementText: { $ne: "" },
+            ...clickSuperAdminFilter,
           },
         },
         { $group: { _id: "$elementText", count: { $sum: 1 }, path: { $first: "$path" } } },
@@ -213,9 +259,20 @@ export const getUserActivitySummary = async (req, res) => {
 
     const onlineCutoff = new Date(Date.now() - 2.5 * 60 * 1000);
 
-    // Aggregate user sessions grouped by userId
+    const sessionSuperAdminFilter = {
+      userRole: { $ne: "superadmin" },
+      userEmail: { $not: /superadmin/i },
+    };
+
+    const clickSuperAdminFilter = {
+      userRole: { $ne: "superadmin" },
+      userEmail: { $not: /superadmin/i },
+      path: { $not: /^\/superadmin/i },
+    };
+
+    // Aggregate user sessions grouped by userId (excluding superadmin)
     const userSessionStats = await UserSession.aggregate([
-      { $match: { createdAt: { $gte: startDate } } },
+      { $match: { createdAt: { $gte: startDate }, ...sessionSuperAdminFilter } },
       {
         $group: {
           _id: "$userId",
@@ -232,9 +289,9 @@ export const getUserActivitySummary = async (req, res) => {
       { $sort: { lastHeartbeat: -1 } },
     ]);
 
-    // Also fetch click counts per user
+    // Also fetch click counts per user (excluding superadmin)
     const clickCounts = await UserClickEvent.aggregate([
-      { $match: { timestamp: { $gte: startDate } } },
+      { $match: { timestamp: { $gte: startDate }, ...clickSuperAdminFilter } },
       {
         $group: {
           _id: "$userId",
@@ -249,23 +306,25 @@ export const getUserActivitySummary = async (req, res) => {
     });
 
     // Combine session stats & clicks
-    let combinedUsers = userSessionStats.map((u) => {
-      const isOnline = u.lastHeartbeat && new Date(u.lastHeartbeat) >= onlineCutoff;
-      return {
-        userId: u._id,
-        userName: u.userName || "Unknown User",
-        userEmail: u.userEmail || "",
-        userRole: u.userRole || "user",
-        ieCode: u.ieCode || "",
-        totalActiveSeconds: u.totalActiveSeconds || 0,
-        totalActiveMinutes: Math.round((u.totalActiveSeconds || 0) / 60),
-        totalActiveHours: ((u.totalActiveSeconds || 0) / 3600).toFixed(1),
-        sessionCount: u.sessionCount || 0,
-        totalClicks: clickMap[u._id] || 0,
-        lastHeartbeat: u.lastHeartbeat,
-        isOnline,
-      };
-    });
+    let combinedUsers = userSessionStats
+      .filter((u) => u.userRole !== "superadmin" && !u.userEmail?.toLowerCase().includes("superadmin"))
+      .map((u) => {
+        const isOnline = u.lastHeartbeat && new Date(u.lastHeartbeat) >= onlineCutoff;
+        return {
+          userId: u._id,
+          userName: u.userName || "Unknown User",
+          userEmail: u.userEmail || "",
+          userRole: u.userRole || "user",
+          ieCode: u.ieCode || "",
+          totalActiveSeconds: u.totalActiveSeconds || 0,
+          totalActiveMinutes: Math.round((u.totalActiveSeconds || 0) / 60),
+          totalActiveHours: ((u.totalActiveSeconds || 0) / 3600).toFixed(1),
+          sessionCount: u.sessionCount || 0,
+          totalClicks: clickMap[u._id] || 0,
+          lastHeartbeat: u.lastHeartbeat,
+          isOnline,
+        };
+      });
 
     // Filter by search query if provided
     if (search.trim()) {
@@ -309,8 +368,21 @@ export const getUserDetailedTimeline = async (req, res) => {
     }
 
     const [sessions, clickEvents] = await Promise.all([
-      UserSession.find({ userId }).sort({ lastHeartbeat: -1 }).limit(20),
-      UserClickEvent.find({ userId }).sort({ timestamp: -1 }).limit(100),
+      UserSession.find({
+        userId,
+        userRole: { $ne: "superadmin" },
+        userEmail: { $not: /superadmin/i },
+      })
+        .sort({ lastHeartbeat: -1 })
+        .limit(20),
+      UserClickEvent.find({
+        userId,
+        userRole: { $ne: "superadmin" },
+        userEmail: { $not: /superadmin/i },
+        path: { $not: /^\/superadmin/i },
+      })
+        .sort({ timestamp: -1 })
+        .limit(100),
     ]);
 
     // Calculate total time spent for this user
@@ -342,20 +414,29 @@ export const getUserDetailedTimeline = async (req, res) => {
 };
 
 /**
- * Super Admin: Get recent click stream log with filtering
+ * Super Admin: Get recent click stream log with filtering (excluding superadmin logs)
  */
 export const getLiveClickStream = async (req, res) => {
   try {
     const { userId, eventType, search, limit = 50 } = req.query;
 
-    const query = {};
+    const query = {
+      userRole: { $ne: "superadmin" },
+      userEmail: { $not: /superadmin/i },
+      path: { $not: /^\/superadmin/i },
+    };
+
     if (userId) query.userId = userId;
     if (eventType) query.eventType = eventType;
     if (search) {
-      query.$or = [
-        { path: { $regex: search, $options: "i" } },
-        { elementText: { $regex: search, $options: "i" } },
-        { userName: { $regex: search, $options: "i" } },
+      query.$and = [
+        {
+          $or: [
+            { path: { $regex: search, $options: "i" } },
+            { elementText: { $regex: search, $options: "i" } },
+            { userName: { $regex: search, $options: "i" } },
+          ],
+        },
       ];
     }
 
@@ -372,3 +453,4 @@ export const getLiveClickStream = async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to fetch click stream" });
   }
 };
+

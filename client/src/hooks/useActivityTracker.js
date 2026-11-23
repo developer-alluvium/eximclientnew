@@ -15,6 +15,22 @@ const getSessionId = () => {
   return sessionId;
 };
 
+// Check if current session / user is superadmin
+const isSuperAdminClient = () => {
+  if (window.location.pathname.startsWith("/superadmin")) return true;
+  const superadminToken = getCookie("superadmin_token");
+  if (superadminToken && superadminToken !== "null" && superadminToken !== "undefined") return true;
+  const eximUser = getJsonCookie("exim_user");
+  if (
+    eximUser?.role === "superadmin" ||
+    eximUser?.userType === "superadmin" ||
+    eximUser?.email?.toLowerCase().includes("superadmin")
+  ) {
+    return true;
+  }
+  return false;
+};
+
 export const useActivityTracker = () => {
   const location = useLocation();
   const eventBufferRef = useRef([]);
@@ -38,6 +54,10 @@ export const useActivityTracker = () => {
 
   // Flush buffered events to backend
   const flushEvents = async () => {
+    if (isSuperAdminClient()) {
+      eventBufferRef.current = [];
+      return;
+    }
     if (eventBufferRef.current.length === 0) return;
 
     const eventsToSend = [...eventBufferRef.current];
@@ -57,6 +77,8 @@ export const useActivityTracker = () => {
 
   // Heartbeat function
   const sendHeartbeatPing = async () => {
+    if (isSuperAdminClient()) return;
+
     const isActiveTab = !document.hidden && document.hasFocus();
     try {
       await axios.post(
@@ -76,6 +98,8 @@ export const useActivityTracker = () => {
 
   // 1. Initial Heartbeat & 30-Second Interval Heartbeat
   useEffect(() => {
+    if (isSuperAdminClient()) return;
+
     // Initial ping on mount
     sendHeartbeatPing();
 
@@ -88,6 +112,8 @@ export const useActivityTracker = () => {
 
   // 2. Track Route Navigation / Page Views
   useEffect(() => {
+    if (isSuperAdminClient()) return;
+
     const currentPath = location.pathname;
     
     // Add page view event to buffer
@@ -106,7 +132,11 @@ export const useActivityTracker = () => {
 
   // 3. Track Click Events
   useEffect(() => {
+    if (isSuperAdminClient()) return;
+
     const handleClick = (e) => {
+      if (isSuperAdminClient()) return;
+
       try {
         let target = e.target;
         if (!target) return;
@@ -174,6 +204,7 @@ export const useActivityTracker = () => {
 
     // Page unload listener to flush remaining events
     const handleUnload = () => {
+      if (isSuperAdminClient()) return;
       if (eventBufferRef.current.length > 0) {
         const payload = JSON.stringify({ events: eventBufferRef.current });
         try {
@@ -202,3 +233,4 @@ export const useActivityTracker = () => {
     };
   }, []);
 };
+

@@ -82,8 +82,21 @@ const UserActivity = () => {
       ]);
 
       if (analyticsRes?.success) setAnalytics(analyticsRes.data);
-      if (usersRes?.success) setUsersSummary(usersRes.data || []);
-      if (clicksRes?.success) setClickEvents(clicksRes.data || []);
+      if (usersRes?.success) {
+        const filteredUsers = (usersRes.data || []).filter(
+          (u) => u.userRole !== "superadmin" && !u.userEmail?.toLowerCase().includes("superadmin")
+        );
+        setUsersSummary(filteredUsers);
+      }
+      if (clicksRes?.success) {
+        const filteredClicks = (clicksRes.data || []).filter(
+          (evt) =>
+            evt.userRole !== "superadmin" &&
+            !evt.userEmail?.toLowerCase().includes("superadmin") &&
+            !evt.path?.toLowerCase().startsWith("/superadmin")
+        );
+        setClickEvents(filteredClicks);
+      }
     } catch (err) {
       console.error("Error loading user activity monitoring:", err);
     } finally {

@@ -1,7 +1,32 @@
 import axios from "axios";
+import mongoose from "mongoose";
 import EximclientUser from "../models/eximclientUserModel.js";
 
 const EXPORT_API_BASE_URL = process.env.EXPORT_API_BASE_URL || "http://localhost:9002/api";
+
+const escapeRegex = (string) => {
+  return string ? string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&") : "";
+};
+
+const isDemoUserRequest = (user, ieCodeQuery = "") => {
+  if (!user && !ieCodeQuery) return false;
+  const email = String(user?.email || "").toLowerCase().trim();
+  const ieStr = String(ieCodeQuery || "").toUpperCase().trim();
+  if (email === "demo@novusha.com" || email.includes("demo")) return true;
+  if (ieStr === "DEMO100001" || ieStr.startsWith("DEMO")) return true;
+  const assignments = (user?.exporter_ie_code_assignments || []).concat(user?.ie_code_assignments || []);
+  if (assignments.some((a) => {
+    const code = String(a?.ie_code_no || "").toUpperCase().trim();
+    return code === "DEMO100001" || code.startsWith("DEMO");
+  })) {
+    return true;
+  }
+  return false;
+};
+
+const getDemoExJobModel = () => {
+  return mongoose.models.DemoExJob || mongoose.model("DemoExJob", new mongoose.Schema({}, { strict: false }), "demo_ex_jobs");
+};
 
 /**
  * GET /api/superadmin/available-exporters
@@ -191,6 +216,73 @@ export const proxyExportListing = async (req, res) => {
       forwardParams.exporter = exporter;
     }
 
+    // Check if demo user
+    const isDemo = isDemoUserRequest(dbUser, forwardParams.ieCode || req.query.ieCode);
+
+    if (isDemo) {
+      console.log(`[Export Proxy] Demo user detected (${dbUser.email}), querying 'demo_ex_jobs' collection.`);
+      const DemoExJobModel = getDemoExJobModel();
+      const targetIeCode = "DEMO100001";
+
+      const localQuery = {
+        $or: [
+          { ieCode: targetIeCode },
+          { exporter_ie_code: targetIeCode },
+          { iec_no: targetIeCode },
+          { exporter: /NOVUSHA DEMO/i },
+          { exporter_name: /NOVUSHA DEMO/i }
+        ]
+      };
+
+      if (status && status.toLowerCase() !== "all") {
+        const statusRegex = new RegExp(`^${escapeRegex(status)}$`, "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({ status: statusRegex });
+      }
+
+      if (year && year.toLowerCase() !== "all") {
+        const yearRegex = new RegExp(`^${escapeRegex(year)}$`, "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({ year: yearRegex });
+      }
+
+      if (search && search.trim()) {
+        const sRegex = new RegExp(escapeRegex(search.trim()), "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({
+          $or: [
+            { job_no: sRegex },
+            { job_number: sRegex },
+            { sb_no: sRegex },
+            { invoiceNumber: sRegex },
+            { consignee_name: sRegex }
+          ]
+        });
+      }
+
+      const demoExportJobs = await DemoExJobModel.find(localQuery).sort({ job_date: -1, createdAt: -1 }).lean();
+
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 10;
+      const startIndex = (pageNum - 1) * limitNum;
+      const paginatedJobs = demoExportJobs.slice(startIndex, startIndex + limitNum);
+
+      return res.json({
+        success: true,
+        data: {
+          jobs: paginatedJobs,
+          pagination: {
+            currentPage: pageNum,
+            totalPages: Math.ceil(demoExportJobs.length / limitNum) || 1,
+            totalCount: demoExportJobs.length,
+            hasNextPage: startIndex + limitNum < demoExportJobs.length,
+            hasPrevPage: pageNum > 1,
+          }
+        },
+        message: "Demo export jobs fetched successfully from demo_ex_jobs collection"
+      });
+    }
+
     const exportApiUrl = `${EXPORT_API_BASE_URL}/operation-jobs/${encodeURIComponent(status)}`;
 
     const response = await axios.get(exportApiUrl, {
@@ -205,6 +297,30 @@ export const proxyExportListing = async (req, res) => {
     return res.json(response.data);
   } catch (error) {
     console.error("Export proxy listing error:", error);
+
+    // Fallback to demo_ex_jobs if demo request failed
+    if (req.user && isDemoUserRequest(req.user)) {
+      try {
+        const DemoExJobModel = getDemoExJobModel();
+        const demoExportJobs = await DemoExJobModel.find({ ieCode: "DEMO100001" }).lean();
+        return res.json({
+          success: true,
+          data: {
+            jobs: demoExportJobs,
+            pagination: {
+              currentPage: 1,
+              totalPages: 1,
+              totalCount: demoExportJobs.length,
+              hasNextPage: false,
+              hasPrevPage: false,
+            }
+          },
+          message: "Demo export jobs fallback fetched successfully"
+        });
+      } catch (fbErr) {
+        console.error("Export proxy demo fallback failed:", fbErr);
+      }
+    }
 
     if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
       return res.status(503).json({
@@ -243,11 +359,27 @@ export const proxyExportFilterOptions = async (req, res) => {
 
     // Fetch fresh user data to get IE code assignments
     const dbUser = await EximclientUser.findById(user.id || user._id)
-      .select("exporter_ie_code_assignments role")
+      .select("exporter_ie_code_assignments role email")
       .lean();
 
     if (!dbUser) {
       return res.status(401).json({ success: false, message: "User not found." });
+    }
+
+    if (isDemoUserRequest(dbUser, req.query.ieCode)) {
+      return res.json({
+        success: true,
+        data: {
+          branches: ["AMD"],
+          customHouses: ["MUNDRA SEA", "ICD SANAND", "HAZIRA SEA"],
+          consignmentTypes: ["FCL"],
+          goodsStuffedAt: [],
+          years: ["26-27"],
+          exporters: ["NOVUSHA DEMO GLOBAL IMPEX PRIVATE LIMITED"],
+          detailedStatuses: ["Pending", "SB Filed", "L.E.O", "Container HO"],
+          months: []
+        }
+      });
     }
 
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";

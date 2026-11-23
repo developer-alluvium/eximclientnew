@@ -57,7 +57,7 @@ export function setJsonCookie(name, valueObj, days = 7, opts = {}) {
 }
 
 export function getJsonCookie(name) {
-  if (name === "exim_user" || name === "ie_code_assignments") {
+  if (name === "exim_user" || name === "  ") {
     const val = localStorage.getItem(name);
     if (!val) return null;
     try {

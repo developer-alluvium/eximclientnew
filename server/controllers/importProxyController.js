@@ -20,6 +20,31 @@ const escapeRegex = (string) => {
   return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
 };
 
+// Helper to detect if a request/user is for demo data
+const isDemoUserRequest = (user, ieCodeQuery = "") => {
+  if (!user && !ieCodeQuery) return false;
+  const email = String(user?.email || "").toLowerCase().trim();
+  const ieStr = String(ieCodeQuery || "").toUpperCase().trim();
+  if (email === "demo@novusha.com" || email.includes("demo")) return true;
+  if (ieStr === "DEMO100001" || ieStr.startsWith("DEMO")) return true;
+  const assignments = (user?.ie_code_assignments || []).concat(user?.exporter_ie_code_assignments || []);
+  if (assignments.some((a) => {
+    const code = String(a?.ie_code_no || "").toUpperCase().trim();
+    return code === "DEMO100001" || code.startsWith("DEMO");
+  })) {
+    return true;
+  }
+  return false;
+};
+
+// Helper to get demo or standard import job model
+const getImportJobModel = (isDemo = false) => {
+  if (isDemo) {
+    return mongoose.models.DemoJob || mongoose.model("DemoJob", JobModel.schema, "demo_jobs");
+  }
+  return JobModel;
+};
+
 // Dynamic branch resolver from database
 const getBranchIdByCodeOrQuery = async (branchQuery, category = null) => {
   if (!branchQuery) return null;
@@ -54,6 +79,23 @@ export const getImporterJobCounts = async (req, res) => {
     const { importerURL, year } = req.params;
     const isGandhidham = req.path.includes("/gandhidham/");
 
+    if (importerURL.includes("novusha_demo") || isDemoUserRequest(req.user)) {
+      const DemoJobModel = getImportJobModel(true);
+      const jobs = await DemoJobModel.find({ ie_code_no: "DEMO100001" }).lean();
+      const statusCounts = {};
+      jobs.forEach((j) => {
+        const st = j.status || "Pending";
+        statusCounts[st] = (statusCounts[st] || 0) + 1;
+      });
+      return res.json({
+        success: true,
+        importer: "NOVUSHA DEMO GLOBAL IMPEX PRIVATE LIMITED",
+        year,
+        counts: statusCounts,
+        totalJobs: jobs.length,
+      });
+    }
+
     const params = {};
     if (isGandhidham) {
       const gimBranchId = await getBranchIdByCodeOrQuery("GIM", "SEA");
@@ -84,6 +126,16 @@ export const getImporterJobCounts = async (req, res) => {
 export const getJobByNumber = async (req, res) => {
   try {
     const { year, jobNo } = req.params;
+
+    if (String(jobNo).toUpperCase().startsWith("DEMO") || isDemoUserRequest(req.user)) {
+      const DemoJobModel = getImportJobModel(true);
+      const matchedJob = await DemoJobModel.findOne({
+        $or: [{ job_no: jobNo }, { job_number: jobNo }]
+      }).lean();
+      if (matchedJob) {
+        return res.json(matchedJob);
+      }
+    }
 
     // Fetch matching jobs from eximdev's search listing
     const response = await axios.get(
@@ -137,7 +189,7 @@ export const proxyImportListing = async (req, res) => {
     }
 
     const dbUser = await EximclientUser.findById(user.id || user._id)
-      .select("ie_code_assignments role")
+      .select("ie_code_assignments role email")
       .lean();
 
     if (!dbUser) {
@@ -147,6 +199,90 @@ export const proxyImportListing = async (req, res) => {
     const isAdmin = dbUser.role === "admin" || dbUser.role === "super_admin" || dbUser.role === "superadmin";
     const ieCodeAssignments = dbUser.ie_code_assignments || [];
     const shouldFilterByIE = ieCodeAssignments.length > 0;
+
+    // Check if this request is for the demo account
+    const isDemo = isDemoUserRequest(dbUser, req.query.ieCodes || req.query.ie_codes);
+
+    if (isDemo) {
+      console.log(`[Import Proxy] Demo user detected (${dbUser.email}), querying 'demo_jobs' collection.`);
+      const DemoJobModel = getImportJobModel(true);
+      const targetIeCode = "DEMO100001";
+
+      const localQuery = {
+        $or: [
+          { ie_code_no: targetIeCode },
+          { importer: /NOVUSHA DEMO/i },
+          { ie_code_no: /^DEMO/i }
+        ]
+      };
+
+      if (year && year.toLowerCase() !== "all") {
+        const escapedYear = escapeRegex(year);
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({
+          $or: [
+            { year: year },
+            { job_no: new RegExp(`/${escapedYear}$`, "i") }
+          ]
+        });
+      }
+
+      if (customHouse && customHouse.toLowerCase() !== "all") {
+        const chRegex = new RegExp(`^${escapeRegex(customHouse)}$`, "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({ custom_house: chRegex });
+      }
+
+      if (status && status.toLowerCase() !== "all") {
+        const statusRegex = new RegExp(`^${escapeRegex(status)}$`, "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({ status: statusRegex });
+      }
+
+      if (exporter && exporter.toLowerCase() !== "all" && exporter.toLowerCase() !== "all exporters") {
+        const expRegex = new RegExp(escapeRegex(decodeURIComponent(exporter)), "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({
+          $or: [
+            { supplier_exporter: expRegex },
+            { exporter: expRegex },
+            { supplier_exporter_name: expRegex },
+            { exporter_name: expRegex }
+          ]
+        });
+      }
+
+      if (search && search.trim()) {
+        const sRegex = new RegExp(escapeRegex(search.trim()), "i");
+        localQuery.$and = localQuery.$and || [];
+        localQuery.$and.push({
+          $or: [
+            { job_no: sRegex },
+            { job_number: sRegex },
+            { be_no: sRegex },
+            { invoice_number: sRegex },
+            { awb_bl_no: sRegex },
+            { description: sRegex },
+            { supplier_exporter: sRegex }
+          ]
+        });
+      }
+
+      let demoJobs = await DemoJobModel.find(localQuery).sort({ job_date: -1, createdAt: -1 }).lean();
+
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 100;
+      const startIndex = (pageNum - 1) * limitNum;
+      const paginatedJobs = demoJobs.slice(startIndex, startIndex + limitNum);
+
+      return res.json({
+        message: "Demo import jobs fetched successfully from demo_jobs collection",
+        data: paginatedJobs,
+        total: demoJobs.length,
+        currentPage: pageNum,
+        totalPages: Math.ceil(demoJobs.length / limitNum) || 1,
+      });
+    }
 
     if (!isAdmin && !shouldFilterByIE) {
       return res.json({

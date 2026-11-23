@@ -22,6 +22,9 @@ export const getClientTransportData = async (req, res) => {
         ? "http://localhost:9007/api"
         : "https://eximbot.alvision.in/transport/api";
 
+    // Check if demo user
+    const isDemo = ieCodeNo === "DEMO100001" || ieCodeNo.toUpperCase().startsWith("DEMO") || (req.user?.email && req.user.email.toLowerCase().includes("demo"));
+
     // Call external API
     try {
       const response = await axios.get(
@@ -32,7 +35,8 @@ export const getClientTransportData = async (req, res) => {
         },
         headers: {
           ...(serviceToken && { Authorization: `Bearer ${serviceToken}` }),
-        }
+        },
+        timeout: 10000
       });
 
       if (response.data && Array.isArray(response.data) && response.data.length > 0) {
@@ -42,46 +46,54 @@ export const getClientTransportData = async (req, res) => {
         });
       }
     } catch (apiErr) {
-      console.warn("External transport API call failed, providing demo transport data:", apiErr.message);
+      console.warn("External transport API call failed:", apiErr.message);
     }
 
-    // Fallback demo transport data
-    const mockTransportData = [
-      {
-        _id: "demo-tr-001",
-        tr_no: "TR/2026/00101",
-        lr_no: "LR-99801",
-        container_no: "HAMU1769376",
-        vehicle_no: "GJ12BW9810",
-        driver_name: "Ramesh Patel",
-        driver_phone: "9825012345",
-        from_location: "Mundra Port CT2",
-        to_location: "Sanand Factory Yard 4",
-        status: "IN_TRANSIT",
-        departure_date: "2026-08-10",
-        expected_delivery: "2026-08-12",
-        transporter_name: "GUJARAT FREIGHT CARRIERS"
-      },
-      {
-        _id: "demo-tr-002",
-        tr_no: "TR/2026/00102",
-        lr_no: "LR-99802",
-        container_no: "FSCU8889028",
-        vehicle_no: "GJ01CZ4410",
-        driver_name: "Suresh Kumar",
-        driver_phone: "9898054321",
-        from_location: "Hazira Port Gate 1",
-        to_location: "Khodiyar ICD Yard 2",
-        status: "DELIVERED",
-        departure_date: "2026-08-08",
-        delivery_date: "2026-08-09",
-        transporter_name: "SHREE RAM TRANSPORT"
-      }
-    ];
+    // Only return mock demo transport data if it's a demo user
+    if (isDemo) {
+      const mockTransportData = [
+        {
+          _id: "demo-tr-001",
+          tr_no: "TR/2026/00101",
+          lr_no: "LR-99801",
+          container_no: "HAMU1769376",
+          vehicle_no: "GJ12BW9810",
+          driver_name: "Ramesh Patel",
+          driver_phone: "9825012345",
+          from_location: "Mundra Port CT2",
+          to_location: "Sanand Factory Yard 4",
+          status: "IN_TRANSIT",
+          departure_date: "2026-08-10",
+          expected_delivery: "2026-08-12",
+          transporter_name: "GUJARAT FREIGHT CARRIERS"
+        },
+        {
+          _id: "demo-tr-002",
+          tr_no: "TR/2026/00102",
+          lr_no: "LR-99802",
+          container_no: "FSCU8889028",
+          vehicle_no: "GJ01CZ4410",
+          driver_name: "Suresh Kumar",
+          driver_phone: "9898054321",
+          from_location: "Hazira Port Gate 1",
+          to_location: "Khodiyar ICD Yard 2",
+          status: "DELIVERED",
+          departure_date: "2026-08-08",
+          delivery_date: "2026-08-09",
+          transporter_name: "SHREE RAM TRANSPORT"
+        }
+      ];
 
-    res.status(200).json({
+      return res.status(200).json({
+        success: true,
+        data: mockTransportData
+      });
+    }
+
+    // For real users like Bhavya, return empty array when no external transport data is found
+    return res.status(200).json({
       success: true,
-      data: mockTransportData
+      data: []
     });
 
   } catch (error) {
